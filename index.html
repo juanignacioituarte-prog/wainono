@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wainono Farm Monitor Pro | Feed Wedge</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root { 
+            --accent: #2ecc71; --bg: #f4f7f6; --text: #2c3e50; 
+            --prev: #7f8c8d; --growth: #27ae60; --out: #e74c3c; 
+            --warning: #f39c12; --partial: #3498db; 
+        }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; background: var(--bg); color: var(--text); overflow: hidden; }
+        
+        #map { flex-grow: 1; height: 100%; background: #000; position: relative; } 
+        #sidebar { width: 380px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; box-shadow: -2px 0 5px rgba(0,0,0,0.1); z-index: 1000; }
+        
+        .header { padding: 20px; background: #fff; border-bottom: 1px solid #eee; }
+        .avg-box { background: var(--accent); color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 5px; }
+        .avg-row { display: flex; justify-content: space-around; align-items: center; }
+        .sync-note { font-size: 10px; color: #95a5a6; text-align: center; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        #list { flex-grow: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; }
+        .card { background: white; border: 1px solid #eee; padding: 14px; margin-bottom: 10px; border-radius: 8px; cursor: pointer; border-left: 5px solid #ccc; position: relative; transition: 0.2s; }
+        .card:hover { background: #fafafa; }
+        .card.active { border-left-color: var(--accent); background: #f0fff4; border-right: 1px solid var(--accent); }
+        .card.is-out { opacity: 0.8; border-left-color: var(--out); }
+        .card.is-partial { border-left-color: var(--partial); background: #f0f7ff; }
+
+        .val { font-size: 17px; font-weight: bold; color: var(--accent); }
+        .val.prev { color: var(--prev); font-size: 14px; }
+        .unit { font-size: 10px; color: #95a5a6; font-weight: normal; margin-left: 2px; }
+        .label { font-size: 10px; text-transform: uppercase; color: #95a5a6; font-weight: bold; display: block; }
+
+        .map-controls { position: absolute; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+        .layer-group { background: white; padding: 4px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; }
+        .layer-btn { padding: 8px 15px; border: none; background: none; cursor: pointer; font-size: 11px; font-weight: bold; color: #777; border-radius: 6px; transition: 0.2s; }
+        .layer-btn.active { background: var(--accent); color: white; }
+        .date-label { background: rgba(0,0,0,0.7); color: white; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+
+        .legend-box { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); width: 180px; display: none; }
+        .legend-item { display: flex; align-items: center; font-size: 11px; margin-bottom: 5px; color: #555; font-weight: 600; }
+        .legend-color { width: 14px; height: 14px; border-radius: 3px; margin-right: 10px; border: 1px solid rgba(0,0,0,0.1); }
+
+        .paddock-label { 
+            background: rgba(255, 255, 255, 0.95) !important; 
+            border: 1px solid #333 !important; 
+            padding: 4px 8px !important; 
+            border-radius: 4px !important; 
+            pointer-events: none !important; 
+            color: #000 !important;
+            opacity: 0 !important;
+            transition: opacity 0.2s ease-in-out !important;
+            text-align: center !important;
+            line-height: 1.2 !important;
+        }
+        .paddock-label.show-label { opacity: 1 !important; }
+
+        .badge { color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; vertical-align: middle; text-transform: uppercase; }
+        #search { width:100%; padding:12px; border-radius:6px; border:1px solid #ddd; outline:none; box-sizing: border-box; }
+        .fallback-alert { color: var(--warning); font-size: 10px; font-weight: bold; margin-bottom: 5px; display: block; }
+    </style>
+</head>
+<body>
+
+<div id="map">
+    <div class="map-controls">
+        <div id="latest-date" class="date-label">LATEST DATA: --</div>
+        <div class="layer-group">
+            <button id="btn-ndvi" class="layer-btn active" onclick="setLayerMode('ndvi')">NDVI SATELLITE</button>
+            <button id="btn-cover" class="layer-btn" onclick="setLayerMode('cover')">COVER MAP</button>
+        </div>
+        <div id="legend" class="legend-box">
+            <div style="font-size: 9px; color: #999; margin-bottom: 8px; text-transform: uppercase;">Cover Scale (kgDM/ha)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#00441b"></div> > 2,800</div>
+            <div class="legend-item"><div class="legend-color" style="background:#238b45"></div> 2,000 - 2,400</div>
+            <div class="legend-item"><div class="legend-color" style="background:#a1d99b"></div> < 1,600</div>
+            <hr style="border:0; border-top:1px solid #eee; margin:8px 0;">
+            <div class="legend-item"><div class="legend-color" style="background:#3498db"></div> Partial Grazed</div>
+            <div class="legend-item"><div class="legend-color" style="background:#ff7675"></div> Out of Rotation</div>
+        </div>
+    </div>
+</div>
+
+<div id="sidebar">
+    <div class="header">
+        <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
+        <div class="avg-box">
+            <div class="avg-row">
+                <div class="avg-item"><small>FARM AVG COVER</small><div id="total-avg" style="font-size: 22px; font-weight: bold;">0</div><small>kgDM/ha</small></div>
+                <div class="avg-item"><small>GROWTH</small><div id="avg-growth" style="font-size: 22px; font-weight: bold;">0</div><small>kg/day</small></div>
+            </div>
+        </div>
+        <div class="sync-note">Synchronized on <span id="sync-time">...</span></div>
+        <input type="text" id="search" placeholder="Search paddocks...">
+    </div>
+    <div id="list">Loading data...</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
+const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
+const PARTIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv";
+const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
+
+let map, ndviLayer, geoLayer, baseLayer;
+let paddockData = [];
+let paddockMap = {}; 
+let areaLookup = {}; 
+let excludedPaddocks = new Map(); 
+let partialPaddocks = new Set();
+let currentViewMode = 'ndvi'; 
+
+function parseStrangeDate(dateStr) {
+    if (!dateStr || dateStr.trim() === "") return null;
+    if (!isNaN(dateStr) && dateStr.length > 5) return new Date((parseFloat(dateStr) - 25569) * 86400 * 1000);
+    if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+    return new Date(dateStr);
+}
+
+async function loadStatusSheets() {
+    try {
+        const [resEx, resPa] = await Promise.all([
+            fetch(EXCLUSIONS_CSV_URL + "&t=" + Date.now()),
+            fetch(PARTIAL_CSV_URL + "&t=" + Date.now())
+        ]);
+        const textEx = await resEx.text();
+        textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+            const cols = line.split(',').map(c => c.trim().toLowerCase());
+            if(cols[0]) excludedPaddocks.set(cols[0], cols[1] || 'out');
+        });
+        const textPa = await resPa.text();
+        textPa.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+            const name = line.split(',')[0].trim().toLowerCase();
+            if(name) partialPaddocks.add(name);
+        });
+    } catch (e) { console.error("Status sheets error", e); }
+}
+
+async function init() {
+    map = L.map('map', { zoomControl: false, minZoom: 14, maxZoom: 20 }).setView([-44.118829,170.8550364], 15);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    baseLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+    await loadStatusSheets();
+    loadGeoJSON();
+}
+
+async function loadGeoJSON() {
+    try {
+        const response = await fetch(GEOJSON_URL + "?t=" + Date.now());
+        const data = await response.json();
+        data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
+        geoLayer = L.geoJSON(data, {
+            style: { color: 'white', weight: 1.5, fillOpacity: 0.1 },
+            onEachFeature: (feature, layer) => {
+                const pName = feature.properties.name;
+                paddockMap[pName] = layer;
+                layer.bindTooltip("", { permanent: true, direction: 'center', className: 'paddock-label' });
+                layer.on('mouseover', function() { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.add('show-label'); });
+                layer.on('mouseout', function() { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.remove('show-label'); });
+                layer.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    const cardId = `card-${pName.replace(/\s+/g, '-')}`;
+                    const card = document.getElementById(cardId);
+                    if(card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.click(); }
+                });
+            }
+        }).addTo(map);
+        map.fitBounds(geoLayer.getBounds());
+        loadCSV();
+    } catch (e) { console.error("GeoJSON Error", e); loadCSV(); }
+}
+
+async function loadCSV() {
+    try {
+        const response = await fetch(DATA_CSV_URL + "&t=" + Date.now());
+        const csvText = await response.text();
+        Papa.parse(csvText, {
+            header: true, skipEmptyLines: true,
+            complete: (results) => {
+                const grouped = {};
+                results.data.forEach(row => {
+                    const name = row.paddock_name;
+                    if(!name) return;
+                    const ndvi = parseFloat(row.ndvi_effective || row.ndvi_mean);
+                    const cloud = parseFloat(row.cloud_pc) || 0;
+                    const dateObj = parseStrangeDate(row.date);
+                    const rawUrl = (row['latest-update'] || row.map_id || "").trim();
+                    if(!grouped[name]) grouped[name] = [];
+                    grouped[name].push({ name, ndvi, cloud, dateObj, url: rawUrl.replace(/['"]+/g, '') });
+                });
+
+                // GLOBAL FALLBACK LOGIC
+                // Check if the majority of paddocks in the most recent capture are < 0.3
+                const latestVals = Object.values(grouped).map(p => p.sort((a,b) => b.dateObj - a.dateObj)[0].ndvi).filter(v => !isNaN(v));
+                const lowQualityCount = latestVals.filter(v => v < 0.3).length;
+                const useFallback = (lowQualityCount / latestVals.length) > 0.5;
+
+                document.getElementById('fallback-warning').style.display = useFallback ? 'block' : 'none';
+
+                const history = {};
+                Object.keys(grouped).forEach(name => {
+                    let sorted = grouped[name].sort((a,b) => b.dateObj - a.dateObj);
+                    
+                    // Shift the "latest" to index 1 if global quality is bad
+                    if (useFallback && sorted.length > 1) {
+                        sorted.shift(); // Remove the bad latest image
+                    }
+
+                    history[name] = sorted.map(entry => {
+                        let cover = 0;
+                        if (!isNaN(entry.ndvi)) {
+                            let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
+                            let mod = (entry.cloud <= 10) ? 0.90 : (entry.cloud > 30 ? 1.15 : (entry.cloud > 20 ? 1.10 : 1.0));
+                            cover = Math.max(0, Math.round(base * mod));
+                        }
+                        return { 
+                            ...entry, 
+                            cover, 
+                            formattedDate: entry.dateObj ? entry.dateObj.toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' }) : "" 
+                        };
+                    });
+                });
+                processPaddockData(history);
+            }
+        });
+    } catch (e) { console.error("CSV Error", e); }
+}
+
+function getCoverColor(cover) {
+    if (cover > 2800) return '#00441b'; if (cover > 2400) return '#006d2c';
+    if (cover > 2000) return '#238b45'; if (cover > 1600) return '#41ab5d';
+    if (cover > 1200) return '#74c476'; return '#a1d99b'; 
+}
+
+function updateGeoStyles() {
+    if (!geoLayer) return;
+    geoLayer.eachLayer(layer => {
+        const pName = layer.feature.properties.name;
+        const p = paddockData.find(pd => pd.name === pName);
+        if (!p) return;
+        const tooltipContent = `<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>`;
+        layer.setTooltipContent(tooltipContent);
+        if (currentViewMode === 'cover') {
+            let color = getCoverColor(p.latest.cover);
+            if (p.isOut) color = '#ff7675'; else if (p.isPartial) color = '#3498db';
+            layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', weight: 1 });
+        } else {
+            layer.setStyle({ fillColor: 'transparent', fillOpacity: 0.1, color: 'white', weight: 1.5 });
+        }
+    });
+}
+
+function setLayerMode(mode) {
+    currentViewMode = mode;
+    document.getElementById('btn-ndvi').classList.toggle('active', mode === 'ndvi');
+    document.getElementById('btn-cover').classList.toggle('active', mode === 'cover');
+    document.getElementById('legend').style.display = (mode === 'cover') ? 'block' : 'none';
+    if (ndviLayer) { if (mode === 'ndvi') ndviLayer.addTo(map); else map.removeLayer(ndviLayer); }
+    updateGeoStyles();
+}
+
+function processPaddockData(history) {
+    let globalLatestDate = "";
+    paddockData = Object.keys(history).map(name => {
+        const sorted = history[name];
+        const latest = sorted[0];
+        const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
+        const area = areaLookup[name] || 0;
+        const lowerName = name.toLowerCase();
+        const isOut = !!excludedPaddocks.get(lowerName);
+        const isPartial = partialPaddocks.has(lowerName) && !isOut;
+        if (latest.formattedDate && (!globalLatestDate || latest.dateObj > parseStrangeDate(globalLatestDate))) globalLatestDate = latest.formattedDate;
+        
+        let growthRate = null;
+        if (previous && latest.dateObj && previous.dateObj) {
+            const dayDiff = (latest.dateObj - previous.dateObj) / 86400000;
+            if (dayDiff > 0 && latest.cover > previous.cover) growthRate = Math.round((latest.cover - previous.cover) / dayDiff);
+        }
+        return { name, latest, previous, growthRate, area, isOut, reason: excludedPaddocks.get(lowerName), isPartial };
+    }).sort((a, b) => {
+        if (a.isPartial !== b.isPartial) return a.isPartial ? -1 : 1;
+        if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
+        return b.latest.cover - a.latest.cover;
+    });
+    document.getElementById('latest-date').innerText = `LATEST IMAGERY: ${globalLatestDate}`;
+    renderDashboard();
+    updateGeoStyles();
+}
+
+function renderDashboard() {
+    let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
+    paddockData.forEach(p => {
+        if (p.area > 0 && !p.isOut) {
+            tWCover += (p.latest.cover * p.area); tAreaC += p.area;
+            if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * p.area); tAreaG += p.area; }
+        }
+    });
+    document.getElementById('total-avg').innerText = tAreaC > 0 ? Math.round(tWCover/tAreaC).toLocaleString() : "0";
+    document.getElementById('avg-growth').innerText = tAreaG > 0 ? "+" + Math.round(tWGrowth/tAreaG) : "0";
+    document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
+    const list = document.getElementById('list');
+    list.innerHTML = "";
+    paddockData.forEach(p => {
+        const div = document.createElement('div');
+        div.className = `card ${p.isOut ? 'is-out' : ''} ${p.isPartial ? 'is-partial' : ''}`;
+        div.id = `card-${p.name.replace(/\s+/g, '-')}`;
+        let badges = "";
+        if (p.isOut) badges += `<span class="badge" style="background:${(p.reason.toUpperCase()==='CROP'?'var(--warning)':'var(--out)')}">${p.reason.toUpperCase()}</span>`;
+        if (p.isPartial) badges += `<span class="badge" style="background:var(--partial)">PARTIAL</span>`;
+        
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                <div>
+                    <span class="label">Latest Cover</span>
+                    <span class="val" style="color:${p.isPartial ? 'var(--partial)' : (p.isOut ? 'var(--out)' : 'var(--accent)')}">${p.latest.cover}<span class="unit">kgDM/ha</span></span>
+                    <br><small style="color:#95a5a6">${p.latest.formattedDate}</small>
+                </div>
+                ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
+            </div>
+            ${(p.growthRate && !p.isOut) ? `<div style="position:absolute; top:14px; right:60px; text-align:right"><span style="color:var(--growth); font-weight:bold">${p.growthRate>0?'+':''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
+        `;
+        div.onclick = () => {
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+            div.classList.add('active');
+            updateMapTile(p.latest.url);
+            if(paddockMap[p.name]) {
+                updateGeoStyles(); 
+                let color = p.isOut ? '#e74c3c' : (p.isPartial ? 'var(--partial)' : 'var(--accent)');
+                paddockMap[p.name].setStyle({ color: color, weight: 4, fillOpacity: 0.5 });
+            }
+        };
+        list.appendChild(div);
+    });
+    const topPaddock = paddockData.find(p => p.latest.url && p.latest.url.length > 10 && !p.isOut);
+    if(topPaddock) updateMapTile(topPaddock.latest.url);
+}
+
+function updateMapTile(url) {
+    if(!url || url.length < 10) return;
+    if(ndviLayer) map.removeLayer(ndviLayer);
+    ndviLayer = L.tileLayer(url, { opacity: 0.7, maxZoom: 20 });
+    if (currentViewMode === 'ndvi') ndviLayer.addTo(map);
+}
+
+document.getElementById('search').oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('.card').forEach(c => c.style.display = c.querySelector('b').innerText.toLowerCase().includes(q) ? 'block' : 'none');
+};
+
+init();
+</script>
+</body>
+</html>
