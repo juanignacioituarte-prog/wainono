@@ -26,8 +26,8 @@
         .mode-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
 
         /* Farm Selector Styles */
-        .farm-selector { display: none; gap: 8px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #eee; }
-        .farm-btn { flex: 1; padding: 8px; border: 2px solid #eee; background: white; cursor: pointer; border-radius: 4px; font-size: 11px; font-weight: 800; color: #95a5a6; text-transform: uppercase; transition: 0.2s; }
+        .farm-select-container { display: none; gap: 8px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #eee; }
+        .farm-btn { flex: 1; padding: 6px; border: 2px solid #eee; background: white; cursor: pointer; border-radius: 20px; font-size: 10px; font-weight: 800; color: #95a5a6; text-transform: uppercase; transition: 0.2s; }
         .farm-btn:hover { border-color: var(--accent); color: var(--accent); }
         .farm-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
 
@@ -128,7 +128,6 @@
 
     <div id="feed-view">
         <div class="feed-container">
-            
             <div class="feed-card">
                 <div class="feed-title">Feed Wedge & Demand</div>
                 <div class="chart-box">
@@ -226,9 +225,9 @@
             <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED WEDGE</button>
         </div>
 
-        <div id="farm-toggle" class="farm-selector">
-            <button id="btn-wai" class="farm-btn active" onclick="switchFarm('wainono')">WAINONO</button>
-            <button id="btn-tr" class="farm-btn" onclick="switchFarm('teruahete')">TE RUAHETE</button>
+        <div id="farm-select-container" class="farm-select-container">
+            <button id="btn-farm-wainono" class="farm-btn active" onclick="switchFarm('wainono')">WAINONO</button>
+            <button id="btn-farm-teruahete" class="farm-btn" onclick="switchFarm('teruahete')">TE RUAHETE</button>
         </div>
 
         <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
@@ -236,7 +235,7 @@
         <div id="calibration-box" class="calib-box" style="display:none;">
             <div class="calib-row" id="calib-hover-area">
                 <div style="font-weight:800; color:#2c3e50; font-size:10px; text-transform:uppercase;">FARMWALK CALIBRATION CONFIDENCE</div>
-                <span id="calib-pill" class="calib-pill">...</span>
+                <span id="calib-pill" class="calib-pill">--</span>
             </div>
             <div id="calib-text" style="margin-top:6px; line-height:1.35; display:none;">--</div>
         </div>
@@ -258,28 +257,55 @@
 /* === CONFIGURATION === */
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwu-gm4MizN_14NZCRN7DxD-jpq1IiKSY-5t_AuIV2eGHdRz9BXky-tHPd4WZlAqA42Ug/exec"; 
 
-/* SHARED SOURCES */
-const MANUAL_CALIBRATION_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv";
-const SATELLITE_DATA_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
+// SHARED NDVI CSV (both farms)
+const SHARED_NDVI_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
 
+/* FARM DATA CONFIGURATION */
 const FARM_CONFIG = {
     wainono: {
         center: [-44.118829, 170.8550364],
         geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson",
+
+        // BOTH farms use the SAME NDVI csv + map tiles source
+        data_csv: SHARED_NDVI_CSV,
+
+        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv",
+
+        // IMPORTANT: per your instruction
+        // WHEN WE CLICK ON WAINONO exclusions_csv WILL BE ... gid=653318078
         exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv",
+
+        manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv",
         manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv",
-        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv",
-        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv"
+        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv"
     },
     teruahete: {
-        center: [-44.150000, 170.800000],
-        geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson", // Placeholder
+        center: [-44.150000, 170.800000], // placeholder center
+        geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson", // placeholder geojson
+
+        // BOTH farms use the SAME NDVI csv + map tiles source
+        data_csv: SHARED_NDVI_CSV,
+
+        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv",
+
+        // IMPORTANT: per your instruction
+        // WHEN WE CLICK ON TE RUAHETE exclusions_csv WILL BE ... gid=729706976
         exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=729706976&single=true&output=csv",
-        manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv", // Placeholder
-        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv", // Placeholder
-        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv" // Placeholder
+
+        manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv",
+        manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv",
+        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv"
     }
 };
+
+/* Rules */
+const NDVI_LOW_THRESHOLD = 0.30;
+const NDVI_LOW_MAX_PCT   = 0.60;
+const SCENE_LOOKBACK     = 3;
+const GAP_DAYS_MAX       = 3;
+const GRAZE_FACTOR       = 0.65;
+const RATIO_MIN          = 0.55;
+const RATIO_MAX          = 1.80;
 
 /* State */
 let currentFarmId = 'wainono';
@@ -292,9 +318,15 @@ let excludedPaddocks = new Map();
 let partialPaddocks = new Set();
 let currentViewMode = 'ndvi';   
 let currentDashboardMode = 'manual';
-let globalCalibrationModel = null;
+let manualEntries = [];
+let farmGrowthRate = 0;
+let calibrationModel = null;
+let selectedSceneTs = null;
 let satelliteHistory = {};
 let wedgeChartInstance = null;
+
+// ✅ Shared calibration model computed from TE RUAHETE and applied to WAINONO
+let sharedCalibrationModel = null;
 
 /* Helpers */
 function normName(s){ return (s||"").trim().toLowerCase(); }
@@ -325,155 +357,123 @@ function safeNum(x){
     return isNaN(n) ? 0 : n;
 }
 
-/* 1. CALCULATE GLOBAL CALIBRATION (Te Ruahete Only) */
-async function calculateGlobalCalibration() {
+function focusPaddockOnMap(paddockName, color) {
+    if (!paddockMap[paddockName] || !geoLayer) return;
+    updateGeoStyles();
+    const layer = paddockMap[paddockName];
     try {
-        const [resMan, resSat, resTrEx] = await Promise.all([
-            fetch(MANUAL_CALIBRATION_CSV + "&t=" + Date.now()),
-            fetch(SATELLITE_DATA_CSV + "&t=" + Date.now()),
-            fetch(FARM_CONFIG['teruahete'].exclusions_csv + "&t=" + Date.now())
-        ]);
-        
-        const txtMan = await resMan.text();
-        const txtSat = await resSat.text();
-        const txtTrEx = await resTrEx.text();
-        
-        // 1. Identify Te Ruahete Paddocks (Anything in the TR Exclusion list)
-        const trPaddocks = new Set();
-        txtTrEx.split('\n').forEach(l => {
-            const n = l.split(',')[0].trim();
-            if(n) trPaddocks.add(normName(n));
-        });
-
-        const satData = {};
-        const manualPoints = [];
-
-        // 2. Parse Shared Satellite Data
-        Papa.parse(txtSat, { header:true, skipEmptyLines:true, complete: (res) => {
-            res.data.forEach(r => {
-                const n = r.paddock_name; 
-                const d = parseStrangeDate(r.date);
-                if(n && d) {
-                    if(!satData[normName(n)]) satData[normName(n)] = [];
-                    satData[normName(n)].push({ 
-                        date: d, 
-                        ndvi: parseFloat(r.ndvi_mean || r.ndvi_effective),
-                        cloud: parseFloat(r.cloud_pc)||0 
-                    });
-                }
-            });
-        }});
-
-        // 3. Parse Manual Data & Filter for Te Ruahete Only
-        Papa.parse(txtMan, { header:true, skipEmptyLines:true, complete: (res) => {
-            const f = res.meta.fields.map(s => s.toLowerCase());
-            const idxN = f.findIndex(s => s.includes('paddock'));
-            const idxD = f.findIndex(s => s.includes('date'));
-            const idxC = f.findIndex(s => s.includes('measured') || s.includes('manual') || s.includes('cover'));
-            
-            res.data.forEach(r => {
-                const n = r[res.meta.fields[idxN]];
-                const d = parseStrangeDate(r[res.meta.fields[idxD]]);
-                const c = safeNum(r[res.meta.fields[idxC]]);
-                if(n && d && c > 0 && trPaddocks.has(normName(n))) {
-                    manualPoints.push({ name: normName(n), date: d, cover: c });
-                }
-            });
-        }});
-
-        // 4. Build Regression (Wait for parse)
-        setTimeout(() => {
-            const pairs = [];
-            const growthRate = 40; 
-            manualPoints.forEach(m => {
-                const hist = satData[m.name];
-                if(hist && hist.length > 0) {
-                    const sorted = hist.sort((a,b) => Math.abs(a.date - m.date) - Math.abs(b.date - m.date));
-                    const match = sorted[0];
-                    const diff = Math.abs((match.date - m.date)/86400000);
-                    if(diff <= 5) {
-                        const satVal = 331.62 * Math.exp(2.4555 * match.ndvi);
-                        const manualProj = m.cover - (growthRate * (match.date < m.date ? -diff : diff)); 
-                        if(satVal > 0 && manualProj > 0) {
-                            pairs.push({ x: satVal, y: manualProj });
-                        }
-                    }
-                }
-            });
-
-            if(pairs.length > 3) {
-                const n = pairs.length;
-                const meanX = pairs.reduce((a,b)=>a+b.x,0)/n;
-                const meanY = pairs.reduce((a,b)=>a+b.y,0)/n;
-                let num=0, den=0;
-                pairs.forEach(p => { num += (p.x-meanX)*(p.y-meanY); den += (p.x-meanX)**2; });
-                const slope = den!==0 ? num/den : 1;
-                const intercept = meanY - slope*meanX;
-                
-                let ssTot=0, ssRes=0;
-                pairs.forEach(p => {
-                    const pred = slope*p.x + intercept;
-                    ssTot += (p.y-meanY)**2;
-                    ssRes += (p.y-pred)**2;
-                });
-                const r2 = ssTot!==0 ? (1 - ssRes/ssTot) : 0;
-
-                globalCalibrationModel = { slope, intercept, r2, count: n };
-                updateCalibrationUI();
-                
-                // If dashboard is already showing uncalibrated data, reload it
-                if(satellitePaddockData.length > 0) processSatelliteData();
-            }
-        }, 500);
-
-    } catch(e) { console.error("Calib error", e); }
+        const bounds = layer.getBounds();
+        if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
+    } catch (e) {}
+    layer.setStyle({ color: color, weight: 4, fillOpacity: 0.5 });
+    if (layer.bringToFront) layer.bringToFront();
 }
 
-function updateCalibrationUI(){
-    const box = document.getElementById('calibration-box');
-    if(!globalCalibrationModel) return;
-    
-    if(currentDashboardMode === 'satellite') box.style.display = 'block';
-    
-    const m = globalCalibrationModel;
-    let cls = 'bad'; let txt = 'WEAK';
-    if(m.r2 > 0.7) { cls='good'; txt='GOOD'; }
-    else if(m.r2 > 0.5) { cls='warn'; txt='LOW'; }
-
-    document.getElementById('calib-pill').className = `calib-pill ${cls}`;
-    document.getElementById('calib-pill').innerText = txt;
-    document.getElementById('calib-text').innerHTML = 
-        `<b>R²:</b> ${m.r2.toFixed(2)} | <b>pts:</b> ${m.count}<br>y = ${m.slope.toFixed(2)}x + ${Math.round(m.intercept)}`;
-}
-
-/* 2. LOAD FARM DATA */
-async function loadFarmData(farmId) {
-    document.getElementById('list').innerHTML = "Loading " + farmId + "...";
+/* Farm Switching Logic */
+function switchFarm(farmId) {
+    if(!FARM_CONFIG[farmId]) return;
     currentFarmId = farmId;
     
-    // UI Update
-    document.getElementById('btn-wai').classList.toggle('active', farmId==='wainono');
-    document.getElementById('btn-tr').classList.toggle('active', farmId==='teruahete');
+    // Update UI Buttons
+    document.getElementById('btn-farm-wainono').classList.toggle('active', farmId === 'wainono');
+    document.getElementById('btn-farm-teruahete').classList.toggle('active', farmId === 'teruahete');
+    
+    // Clear existing data
+    satellitePaddockData = [];
+    manualModeData = [];
+    paddockMap = {};
+    areaLookup = {};
+    excludedPaddocks = new Map();
+    partialPaddocks = new Set();
+    manualEntries = [];
+    satelliteHistory = {};
+    
+    // Reset Map Layers
+    if (geoLayer) map.removeLayer(geoLayer);
+    if (ndviLayer) map.removeLayer(ndviLayer);
+    geoLayer = null;
+    ndviLayer = null;
 
-    // 1. Load Settings
-    await loadFeedSettings();
+    // Reset Map View
+    map.setView(FARM_CONFIG[farmId].center, 13);
     
-    // 2. Load Exclusions (Critical for defining farm scope)
-    await loadStatusSheets();
+    document.getElementById('list').innerHTML = "Loading farm data...";
     
-    // 3. Load GeoJSON
-    await loadGeoJSON(); 
-    
-    // 4. Process Shared Satellite Data for THIS farm
-    if(Object.keys(satelliteHistory).length > 0) {
-        processSatelliteData();
-    } else {
-        await loadSharedSatelliteData();
-    }
-    
-    if(currentDashboardMode === 'manual') await loadManualRankCSV();
-    
-    renderDashboard();
+    // Reload everything
+    startDataLoad();
+}
+
+/* Loaders */
+async function loadManualRankCSV() {
+    try {
+        const res = await fetch(FARM_CONFIG[currentFarmId].manual_mode_csv + "&t=" + Date.now());
+        const txt = await res.text();
+        Papa.parse(txt, {
+            header: false,
+            complete: (results) => {
+                const rows = results.data || [];
+                if (rows.length < 1) return;
+                const latestDate = parseStrangeDate(rows[0][1]);
+                const prevDate = parseStrangeDate(rows[0][2]);
+                const dayDiff = (latestDate && prevDate) ? Math.max(1, (latestDate - prevDate) / 86400000) : 1;
+                
+                manualModeData = rows.slice(1).map(r => {
+                    const name = (r[0] || "").trim();
+                    const latestCover = safeNum(r[1]);
+                    const prevCover = safeNum(r[2]);
+                    const isOut = (latestCover === 0);
+                    const growth = isOut ? 0 : Math.round((latestCover - prevCover) / dayDiff);
+
+                    return {
+                        name, latest: { cover: latestCover, formattedDate: fmtNZ(latestDate) },
+                        previous: { cover: prevCover, formattedDate: fmtNZ(prevDate) },
+                        growthRate: growth, isOut: isOut, area: areaLookup[name] || 0
+                    };
+                });
+                
+                Object.keys(paddockMap).forEach(pName => {
+                    if (!manualModeData.find(m => m.name === pName)) {
+                        manualModeData.push({
+                            name: pName, latest: { cover: 0, formattedDate: "--" },
+                            previous: { cover: 0, formattedDate: "--" },
+                            growthRate: 0, isOut: true, area: areaLookup[pName] || 0
+                        });
+                    }
+                });
+
+                if (currentDashboardMode === 'manual') {
+                    renderDashboard();
+                    updateGeoStyles(); 
+                }
+            }
+        });
+    } catch (e) {}
+}
+
+async function loadManualSheet(){
+    manualEntries = [];
+    try{
+        const res = await fetch(FARM_CONFIG[currentFarmId].manual_csv + "&t=" + Date.now());
+        const txt = await res.text();
+        Papa.parse(txt, {
+            header: true, skipEmptyLines: true,
+            complete: (results) => {
+                const rows = results.data || [];
+                const fields = (results.meta && results.meta.fields) ? results.meta.fields : [];
+                const f = fields.map(h => (h||"").trim().toLowerCase());
+                const idxName = f.findIndex(h => h.includes('paddock'));
+                const idxDate = f.findIndex(h => h === 'date' || h.includes('date'));
+                const idxCover = f.findIndex(h => h.includes('measured') || h.includes('manual') || h.includes('cover') || h.includes('kg'));
+                rows.forEach(r => {
+                    const name = (idxName>=0 ? r[fields[idxName]] : r.paddock_name || r.paddock || r.name || "").toString().trim();
+                    const dateObj = parseStrangeDate(idxDate>=0 ? r[fields[idxDate]] : r.date);
+                    const cover = safeNum(idxCover>=0 ? r[fields[idxCover]] : (r.measured_cover || r.cover || r.manual_cover));
+                    if(!name || !dateObj || isNaN(cover) || cover <= 0) return;
+                    manualEntries.push({ name, lower: normName(name), dateObj, cover: Math.round(cover) });
+                });
+            }
+        });
+    } catch(e){}
 }
 
 async function loadStatusSheets() {
@@ -482,317 +482,668 @@ async function loadStatusSheets() {
             fetch(FARM_CONFIG[currentFarmId].exclusions_csv + "&t=" + Date.now()),
             fetch(FARM_CONFIG[currentFarmId].partial_csv + "&t=" + Date.now())
         ]);
-        const txtEx = await resEx.text();
-        
-        excludedPaddocks = new Map();
-        // Store 'out' status. If present but not 'out', we still know it belongs to farm
-        txtEx.split('\n').slice(1).forEach(l => {
-            const c = l.split(',');
-            if(c[0]) excludedPaddocks.set(normName(c[0]), c[1] || 'active');
+        const textEx = await resEx.text();
+        textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+            const cols = line.split(',').map(c => c.trim().toLowerCase());
+            if(cols[0]) excludedPaddocks.set(cols[0], cols[1] || 'out');
         });
-        
-        const txtPa = await resPa.text();
-        partialPaddocks = new Set();
-        txtPa.split('\n').forEach(l => {
-            if(l.trim()) partialPaddocks.add(normName(l.split(',')[0]));
+        const textPa = await resPa.text();
+        textPa.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+            const name = line.split(',')[0].trim().toLowerCase();
+            if(name) partialPaddocks.add(name);
         });
-    } catch(e){}
+    } catch (e) {
+        console.warn("Status sheets not loaded");
+    }
+}
+
+/* ---------- PRECOMPUTE TE RUAHETE CALIBRATION (READ EXCLUSIONS FIRST) ---------- */
+async function precomputeSharedCalibrationFromTeRuahete() {
+    try {
+        const farmId = 'teruahete';
+
+        // 1) Load exclusions + partial for Te Ruahete first
+        const exMap = new Map();
+        const paSet = new Set();
+        try {
+            const [resEx, resPa] = await Promise.all([
+                fetch(FARM_CONFIG[farmId].exclusions_csv + "&t=" + Date.now()),
+                fetch(FARM_CONFIG[farmId].partial_csv + "&t=" + Date.now())
+            ]);
+            const textEx = await resEx.text();
+            textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+                const cols = line.split(',').map(c => c.trim().toLowerCase());
+                if(cols[0]) exMap.set(cols[0], cols[1] || 'out');
+            });
+            const textPa = await resPa.text();
+            textPa.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+                const name = line.split(',')[0].trim().toLowerCase();
+                if(name) paSet.add(name);
+            });
+        } catch(e) {}
+
+        // 2) Load manual entries for Te Ruahete
+        const manualLocal = [];
+        try {
+            const res = await fetch(FARM_CONFIG[farmId].manual_csv + "&t=" + Date.now());
+            const txt = await res.text();
+            Papa.parse(txt, {
+                header: true, skipEmptyLines: true,
+                complete: (results) => {
+                    const rows = results.data || [];
+                    const fields = (results.meta && results.meta.fields) ? results.meta.fields : [];
+                    const f = fields.map(h => (h||"").trim().toLowerCase());
+                    const idxName = f.findIndex(h => h.includes('paddock'));
+                    const idxDate = f.findIndex(h => h === 'date' || h.includes('date'));
+                    const idxCover = f.findIndex(h => h.includes('measured') || h.includes('manual') || h.includes('cover') || h.includes('kg'));
+                    rows.forEach(r => {
+                        const name = (idxName>=0 ? r[fields[idxName]] : r.paddock_name || r.paddock || r.name || "").toString().trim();
+                        const dateObj = parseStrangeDate(idxDate>=0 ? r[fields[idxDate]] : r.date);
+                        const cover = safeNum(idxCover>=0 ? r[fields[idxCover]] : (r.measured_cover || r.cover || r.manual_cover));
+                        if(!name || !dateObj || isNaN(cover) || cover <= 0) return;
+                        manualLocal.push({ name, lower: normName(name), dateObj, cover: Math.round(cover) });
+                    });
+                }
+            });
+        } catch(e) {}
+
+        // 3) Load shared NDVI CSV and build history (no UI)
+        const response = await fetch(SHARED_NDVI_CSV + "&t=" + Date.now());
+        const csvText = await response.text();
+
+        let model = null;
+
+        Papa.parse(csvText, {
+            header: true, skipEmptyLines: true,
+            complete: (results) => {
+                const grouped = {};
+                const updateCol = results.meta.fields.find(c => c.toLowerCase().includes('update')) || 'latest-update';
+
+                results.data.forEach(row => {
+                    const name = row.paddock_name; if(!name) return;
+                    const ndvi = parseFloat(row.ndvi_mean || row.ndvi_effective);
+                    const cloud = parseFloat(row.cloud_pc) || 0;
+                    const dateObj = parseStrangeDate(row.date);
+                    const rawUrl = (row[updateCol] || row.map_id || "").trim();
+                    if(!dateObj) return;
+                    if(!grouped[name]) grouped[name] = [];
+                    grouped[name].push({ name, ndvi, cloud, dateObj, url: rawUrl.replace(/['"]+/g, '') });
+                });
+
+                const pick = pickSceneTimestamp(grouped);
+                const tsLocal = pick.ts;
+
+                const historyLocal = {};
+                Object.keys(grouped).forEach(name => {
+                    let all = grouped[name].slice().sort((a,b) => b.dateObj - a.dateObj);
+                    let selected = (tsLocal !== null) ? (all.find(e => e.dateObj && e.dateObj.getTime() === tsLocal) || null) : null;
+                    let ordered = selected ? [selected] : [];
+                    ordered = ordered.concat(all.filter(e => !selected || e.dateObj.getTime() < tsLocal));
+
+                    historyLocal[name] = ordered.map(entry => {
+                        let cover = 0;
+                        if (!isNaN(entry.ndvi)) {
+                            let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
+                            let mod = (entry.cloud <= 10) ? 1 : (entry.cloud > 30 ? 1 : (entry.cloud > 20 ? 1 : 1.0));
+                            cover = Math.max(0, Math.round(base * mod));
+                        }
+                        return { ...entry, cover_raw: cover, cover: cover, formattedDate: fmtNZ(entry.dateObj) };
+                    });
+                });
+
+                // Estimate growth using Te Ruahete exclusions/partials (no area weighting)
+                const gLocal = (function estimateGrowthNoArea(history){
+                    let tWGrowth = 0, tAreaG = 0;
+                    Object.keys(history).forEach(name => {
+                        const sorted = history[name]; if(!sorted || sorted.length < 2) return;
+                        const latest = sorted[0]; const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
+                        if(!previous || !latest || !latest.dateObj || !previous.dateObj) return;
+                        const dayDiff = (latest.dateObj - previous.dateObj)/86400000;
+                        if(dayDiff <= 0) return;
+                        const lc = latest.cover_raw; const pc = previous.cover_raw;
+                        if(!(lc > pc)) return;
+                        const g = Math.round((lc - pc)/dayDiff);
+                        if(!isFinite(g) || g <= 0) return;
+
+                        const isOut = !!exMap.get(normName(name));
+                        const isPartial = paSet.has(normName(name));
+                        if(isOut || isPartial) return;
+
+                        tWGrowth += g;
+                        tAreaG += 1;
+                    });
+                    return tAreaG > 0 ? Math.round(tWGrowth/tAreaG) : 0;
+                })(historyLocal);
+
+                // Build model using Te Ruahete exclusions/partials
+                const historyLower = {};
+                Object.keys(historyLocal).forEach(k => { historyLower[normName(k)] = historyLocal[k]; });
+
+                const pairs = [];
+                for(const m of manualLocal){
+                    const hist = historyLower[m.lower]; if(!hist || hist.length === 0) continue;
+                    if (paSet.has(m.lower)) continue;
+
+                    const s = hist[0]; if(!s || !s.dateObj) continue;
+                    const gapDays = Math.abs((m.dateObj - s.dateObj)/86400000);
+                    if(gapDays > GAP_DAYS_MAX) continue;
+
+                    const satRaw = s.cover_raw; if(!isFinite(satRaw) || satRaw <= 0) continue;
+                    const manualProjected = m.cover - (gLocal * gapDays);
+                    if(!isFinite(manualProjected) || manualProjected <= 0) continue;
+
+                    if(manualProjected < satRaw * GRAZE_FACTOR) continue;
+                    const ratio = manualProjected / satRaw;
+                    if(ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
+
+                    pairs.push({ x: satRaw, y: manualProjected });
+                }
+
+                if(pairs.length >= 4){
+                    const n = pairs.length;
+                    const meanX = pairs.reduce((a,p)=>a+p.x,0)/n;
+                    const meanY = pairs.reduce((a,p)=>a+p.y,0)/n;
+                    let num=0, den=0;
+                    pairs.forEach(p => { num += (p.x-meanX)*(p.y-meanY); den += (p.x-meanX)*(p.x-meanX); });
+                    const a = den !== 0 ? (num/den) : 1;
+                    const b = meanY - a*meanX;
+
+                    let ssTot=0, ssRes=0;
+                    pairs.forEach(p => {
+                        const pred = a*p.x + b;
+                        ssTot += (p.y-meanY)*(p.y-meanY);
+                        ssRes += (p.y-pred)*(p.y-pred);
+                    });
+
+                    model = { a, b, r2: ssTot !== 0 ? (1 - ssRes/ssTot) : 0, count: n };
+                }
+            }
+        });
+
+        // Store
+        sharedCalibrationModel = model || null;
+    } catch(e) {
+        sharedCalibrationModel = null;
+    }
+}
+/* --------------------------------------------------------------------------- */
+
+async function loadFeedSettings() {
+    loadLocalFeedSettings();
+
+    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+        try {
+            const res = await fetch(GOOGLE_SCRIPT_URL + "?farm=" + currentFarmId);
+            const data = await res.json();
+            if(data) {
+                setFeedInputs(data);
+                calculateFeedLogic();
+            }
+        } catch(e) { console.log("Cloud load failed, using local/csv"); }
+    } else {
+        try {
+            const res = await fetch(FARM_CONFIG[currentFarmId].feed_settings_csv + "&t=" + Date.now());
+            const txt = await res.text();
+            Papa.parse(txt, {
+                header: true, skipEmptyLines: true,
+                complete: (results) => {
+                    const data = results.data[0]; 
+                    if(data && !localStorage.getItem(currentFarmId + '_feed_residual')) {
+                        document.getElementById('inp-residual').value = data.post_grazing_residual || 1500;
+                        document.getElementById('inp-cows').value = data.cow_numbers || 500;
+                        document.getElementById('inp-intake').value = data.intake_per_cow || 18;
+                        document.getElementById('inp-round').value = data.rotation_length || 25;
+                        document.getElementById('inp-actual-pre').value = data.target_pre_grazing_cover || 2800;
+                        calculateFeedLogic();
+                    }
+                }
+            });
+        } catch(e) {}
+    }
+}
+
+function setFeedInputs(data) {
+    if(data.residual) document.getElementById('inp-residual').value = data.residual;
+    if(data.cows) document.getElementById('inp-cows').value = data.cows;
+    if(data.intake) document.getElementById('inp-intake').value = data.intake;
+    if(data.round) document.getElementById('inp-round').value = data.round;
+    if(data.pre) document.getElementById('inp-actual-pre').value = data.pre;
+}
+
+function loadLocalFeedSettings() {
+    const p = currentFarmId + '_';
+    if(localStorage.getItem(p+'feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem(p+'feed_residual');
+    if(localStorage.getItem(p+'feed_cows')) document.getElementById('inp-cows').value = localStorage.getItem(p+'feed_cows');
+    if(localStorage.getItem(p+'feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem(p+'feed_intake');
+    if(localStorage.getItem(p+'feed_round')) document.getElementById('inp-round').value = localStorage.getItem(p+'feed_round');
+    if(localStorage.getItem(p+'feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem(p+'feed_actual_pre');
+    calculateFeedLogic();
+}
+
+async function init() {
+    map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 20 }).setView(FARM_CONFIG.wainono.center, 12);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    baseLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+    
+    const calibHoverArea = document.getElementById('calib-hover-area');
+    const calibText = document.getElementById('calib-text');
+    if (calibHoverArea && calibText) {
+        calibHoverArea.addEventListener('mouseenter', () => { calibText.style.display = 'block'; });
+        calibHoverArea.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
+    }
+
+    // ✅ ALWAYS compute calibration from TE RUAHETE first (reads its exclusions/partials before model build)
+    await precomputeSharedCalibrationFromTeRuahete();
+    
+    // Initial data load for the current farm (default wainono)
+    startDataLoad();
+    switchDashboardMode('manual');
+}
+
+async function startDataLoad() {
+    await loadFeedSettings();
+    await Promise.all([loadStatusSheets(), loadManualSheet()]);
+    await loadGeoJSON();
 }
 
 async function loadGeoJSON() {
     try {
-        if(geoLayer) map.removeLayer(geoLayer);
-        const res = await fetch(FARM_CONFIG[currentFarmId].geojson);
-        const data = await res.json();
-        
-        areaLookup = {};
-        data.features.forEach(f => {
-            if(f.properties.name) areaLookup[normName(f.properties.name)] = f.properties.calcArea || 0;
-        });
-
+        const response = await fetch(FARM_CONFIG[currentFarmId].geojson + "?t=" + Date.now());
+        const data = await response.json();
+        data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
         geoLayer = L.geoJSON(data, {
             style: { color: 'white', weight: 1.5, fillOpacity: 0.1 },
-            onEachFeature: (f, l) => {
-                const n = f.properties.name;
-                paddockMap[n] = l;
-                l.on('click', () => {
-                    const p = getCurrentModeData().find(x => x.name === n);
-                    const col = (p && !p.isOut) ? (p.isPartial ? 'var(--partial)' : 'var(--accent)') : '#e74c3c';
-                    focusPaddockOnMap(n, col);
-                    const card = document.getElementById('card-'+n.replace(/\s/g,'-'));
-                    if(card) card.scrollIntoView({behavior:'smooth', block:'center'});
+            onEachFeature: (feature, layer) => {
+                const pName = feature.properties.name;
+                paddockMap[pName] = layer;
+                layer.bindTooltip("", { permanent: true, direction: 'center', className: 'paddock-label' });
+                layer.on('mouseover', function() { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.add('show-label'); });
+                layer.on('mouseout', function() { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.remove('show-label'); });
+                layer.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    const p = getCurrentModeData().find(d => d.name === pName);
+                    const isOut = p ? p.isOut : true;
+                    const isPartial = p ? p.isPartial : false;
+                    const color = isOut ? '#e74c3c' : (isPartial ? 'var(--partial)' : 'var(--accent)');
+                    focusPaddockOnMap(pName, color);
+                    const cardId = `card-${pName.replace(/\s+/g, '-')}`;
+                    const card = document.getElementById(cardId);
+                    if(card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.click(); }
                 });
             }
         }).addTo(map);
         map.fitBounds(geoLayer.getBounds());
-    } catch(e){}
+        loadCSV();
+        loadManualRankCSV();
+    } catch (e) {}
 }
 
-async function loadSharedSatelliteData() {
-    try {
-        const res = await fetch(SATELLITE_DATA_CSV + "&t=" + Date.now());
-        const txt = await res.text();
-        
-        const grouped = {};
-        let latestDateStr = "";
-        
-        Papa.parse(txt, { header:true, skipEmptyLines:true, complete: (r) => {
-            r.data.forEach(row => {
-                const n = row.paddock_name; if(!n) return;
-                const d = parseStrangeDate(row.date); if(!d) return;
-                
-                if(!grouped[n]) grouped[n] = [];
-                grouped[n].push({
-                    name: n,
-                    date: d,
-                    ndvi: parseFloat(row.ndvi_mean || row.ndvi_effective),
-                    cloud: parseFloat(row.cloud_pc)||0,
-                    url: (row['latest-update'] || row.map_id || "").replace(/['"]+/g, '')
-                });
-            });
-
-            // Find global latest date
-            const allDates = new Set();
-            Object.values(grouped).forEach(g => g.forEach(x => allDates.add(x.date.getTime())));
-            const sortedDates = Array.from(allDates).sort((a,b)=>b-a);
-            if(sortedDates[0]) latestDateStr = fmtNZ(new Date(sortedDates[0]));
-            
-            document.getElementById('latest-date').innerText = "LATEST: " + latestDateStr;
-
-            // Sort histories
-            satelliteHistory = {};
-            Object.keys(grouped).forEach(name => {
-                satelliteHistory[name] = grouped[name].sort((a,b)=>b.date - a.date);
-            });
-            
-            processSatelliteData();
-        }});
-    } catch(e){}
-}
-
-function processSatelliteData() {
-    satellitePaddockData = [];
-    
-    // Iterate ALL satellite history
-    Object.keys(satelliteHistory).forEach(name => {
-        const nNorm = normName(name);
-
-        // FILTER: Only include paddocks that exist in current farm's exclusion list
-        // (This acts as the master list of paddocks for the farm)
-        if(!excludedPaddocks.has(nNorm)) return;
-
-        const hist = satelliteHistory[name];
-        const latest = hist[0];
-        const prev = hist[1]; 
-        
-        // Calc Cover (Calibration or Raw)
-        let cover = 0;
-        let raw = 331.62 * Math.exp(2.4555 * latest.ndvi);
-        
-        if(globalCalibrationModel) {
-            cover = Math.round(globalCalibrationModel.slope * raw + globalCalibrationModel.intercept);
-        } else {
-            cover = Math.round(raw);
-        }
-        if(latest.cloud > 20) cover = 0; // Simple cloud mask
-        
-        // Calc Growth (Farm Specific)
-        let growth = 0;
-        if(prev) {
-            let prevRaw = 331.62 * Math.exp(2.4555 * prev.ndvi);
-            let prevCover = globalCalibrationModel ? (globalCalibrationModel.slope*prevRaw + globalCalibrationModel.intercept) : prevRaw;
-            const days = (latest.date - prev.date)/86400000;
-            if(days > 0) growth = Math.round((cover - prevCover)/days);
-        }
-
-        const status = excludedPaddocks.get(nNorm);
-        const isOut = (status === 'out');
-        
-        satellitePaddockData.push({
-            name: name,
-            latest: { cover: Math.max(0, cover), formattedDate: fmtNZ(latest.date), url: latest.url },
-            growthRate: Math.max(0, growth),
-            area: areaLookup[nNorm] || 0,
-            isOut: isOut,
-            isPartial: partialPaddocks.has(nNorm)
-        });
-    });
-
-    // Map Tile
-    const top = satellitePaddockData.find(p => p.latest.url && !p.isOut);
-    if(top && currentViewMode==='ndvi') updateMapTile(top.latest.url);
-
-    if(currentDashboardMode === 'satellite') renderDashboard();
-}
-
-/* UI & Logic */
-function switchFarm(id) {
-    if(currentFarmId === id) return;
-    loadFarmData(id);
-}
-
+/* Dashboard Mode Switching */
 function switchDashboardMode(mode) {
     currentDashboardMode = mode;
-    document.getElementById('btn-mode-sat').classList.toggle('active', mode==='satellite');
-    document.getElementById('btn-mode-man').classList.toggle('active', mode==='manual');
-    document.getElementById('btn-mode-feed').classList.toggle('active', mode==='feed');
-
-    const isSat = (mode === 'satellite');
-    document.getElementById('farm-toggle').style.display = isSat ? 'flex' : 'none';
-    document.getElementById('calibration-box').style.display = isSat ? 'block' : 'none';
-    document.getElementById('sat-layer-controls').style.display = isSat ? 'flex' : 'none';
-    document.getElementById('feed-view').style.display = (mode==='feed') ? 'flex' : 'none';
-
-    if(isSat) {
-        setLayerMode('ndvi');
-        updateCalibrationUI(); // Ensure visible
-        // If data empty, load default
-        if(satellitePaddockData.length === 0) loadFarmData(currentFarmId);
-    } else if(mode === 'manual') {
-        setLayerMode('cover');
-        if(manualModeData.length === 0) loadManualRankCSV();
-    } else {
+    document.getElementById('btn-mode-sat').classList.toggle('active', mode === 'satellite');
+    document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual');
+    document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
+    
+    document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
+    document.getElementById('sat-layer-controls').style.display = (mode === 'satellite') ? 'flex' : 'none';
+    document.getElementById('latest-date').style.display = (mode === 'satellite') ? 'block' : 'none';
+    document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
+    
+    document.getElementById('farm-select-container').style.display = (mode === 'satellite') ? 'flex' : 'none';
+    
+    if (mode === 'feed') {
         calculateFeedLogic();
+    } else if (mode === 'manual') {
+        if (ndviLayer) map.removeLayer(ndviLayer);
+        document.getElementById('legend').style.display = 'block';
+        setLayerMode('cover');
+    } else if (mode === 'satellite') {
+        setLayerMode('ndvi');
+    } else {
+        setLayerMode(currentViewMode);
     }
+    
     renderDashboard();
-}
-
-function renderDashboard() {
-    const data = getCurrentModeData();
-    const list = document.getElementById('list');
-    list.innerHTML = "";
-    
-    // Calculate Stats (AVG COVER & GROWTH)
-    let totArea=0, wCover=0, wGrowth=0;
-    
-    data.forEach(p => {
-        if(!p.isOut && p.area > 0) {
-            totArea += p.area;
-            wCover += (p.latest.cover * p.area);
-            wGrowth += (p.growthRate * p.area);
-        }
-    });
-    
-    const avgCov = totArea ? Math.round(wCover/totArea) : 0;
-    const avgGro = totArea ? Math.round(wGrowth/totArea) : 0;
-    
-    document.getElementById('total-avg').innerText = avgCov;
-    document.getElementById('avg-growth').innerText = avgGro;
-    document.getElementById('feed-avg-cover').innerText = avgCov;
-    document.getElementById('feed-avg-growth').innerText = avgGro;
-    document.getElementById('feed-area-total').innerText = totArea.toFixed(1);
-
-    // Render Cards
-    data.sort((a,b) => (a.isOut===b.isOut) ? b.latest.cover - a.latest.cover : (a.isOut?1:-1));
-    
-    data.forEach(p => {
-        const div = document.createElement('div');
-        div.className = `card ${p.isOut?'is-out':''} ${p.isPartial?'is-partial':''}`;
-        div.id = `card-${p.name.replace(/\s/g,'-')}`;
-        div.innerHTML = `
-            <div style="display:flex;justify-content:space-between"><b>${p.name}</b> <small>${p.area.toFixed(1)}ha</small></div>
-            <div style="display:flex;justify-content:space-between;margin-top:5px">
-                <span class="val" style="color:${p.isOut?'var(--out)':'var(--accent)'}">${p.latest.cover} <small class="unit">kgDM</small></span>
-                ${(p.growthRate && !p.isOut) ? `<span style="color:var(--growth);font-weight:bold">+${p.growthRate}</span>` : ''}
-            </div>
-            <div style="font-size:10px;color:#999;margin-top:2px">${p.latest.formattedDate}</div>
-        `;
-        div.onclick = () => {
-            focusPaddockOnMap(p.name, 'var(--accent)');
-            if(currentDashboardMode==='satellite' && p.latest.url) updateMapTile(p.latest.url);
-        };
-        list.appendChild(div);
-    });
-    
     updateGeoStyles();
 }
 
-function updateGeoStyles() {
-    if(!geoLayer) return;
+function getCurrentModeData() {
+    return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed') ? manualModeData : satellitePaddockData;
+}
+
+/* Satellite Logic */
+function pickSceneTimestamp(grouped){
+    const set = new Set();
+    Object.values(grouped).forEach(arr => arr.forEach(e => { if(e.dateObj) set.add(e.dateObj.getTime()); }));
+    const dates = Array.from(set).sort((a,b)=>b-a);
+    if(dates.length === 0) return { ts: null, fallback: false };
+    const candidates = dates.slice(0, SCENE_LOOKBACK);
+    let ts = null; let fallback = false;
+    for (let i=0;i<candidates.length;i++){
+        const t = candidates[i];
+        const ndvis = Object.values(grouped).map(arr => arr.find(e => e.dateObj && e.dateObj.getTime() === t)).filter(Boolean).map(e => e.ndvi).filter(v => isFinite(v));
+        if(ndvis.length === 0) continue;
+        const pctLow = ndvis.filter(v => v < NDVI_LOW_THRESHOLD).length / ndvis.length;
+        if(pctLow < NDVI_LOW_MAX_PCT){ ts = t; fallback = (i > 0); break; }
+    }
+    if(ts === null){ ts = candidates[0]; fallback = true; }
+    return { ts, fallback };
+}
+
+function estimateFarmGrowthRate(history){
+    let tWGrowth = 0, tAreaG = 0;
+    Object.keys(history).forEach(name => {
+        const sorted = history[name]; if(!sorted || sorted.length < 2) return;
+        const latest = sorted[0]; const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
+        if(!previous || !latest || !latest.dateObj || !previous.dateObj) return;
+        const dayDiff = (latest.dateObj - previous.dateObj)/86400000;
+        if(dayDiff <= 0) return;
+        const lc = latest.cover_raw; const pc = previous.cover_raw;
+        if(!(lc > pc)) return;
+        const g = Math.round((lc - pc)/dayDiff);
+        if(!isFinite(g) || g <= 0) return;
+        
+        const isOut = !!excludedPaddocks.get(normName(name)); 
+        const isPartial = partialPaddocks.has(normName(name));
+        if(isOut || isPartial) return; 
+
+        const area = areaLookup[name] || 0;
+        if(area > 0){ tWGrowth += g * area; tAreaG += area; } else { tWGrowth += g; tAreaG += 1; }
+    });
+    return tAreaG > 0 ? Math.round(tWGrowth/tAreaG) : 0;
+}
+
+function buildCalibrationModel(historyLower){
+    const pairs = [];
+    for(const m of manualEntries){
+        const hist = historyLower[m.lower]; if(!hist || hist.length === 0) continue;
+        if (partialPaddocks.has(m.lower)) continue;
+        
+        const s = hist[0]; if(!s || !s.dateObj) continue;
+        const gapDays = Math.abs((m.dateObj - s.dateObj)/86400000);
+        if(gapDays > GAP_DAYS_MAX) continue;
+        const satRaw = s.cover_raw; if(!isFinite(satRaw) || satRaw <= 0) continue;
+        const manualProjected = m.cover - (farmGrowthRate * gapDays);
+        if(!isFinite(manualProjected) || manualProjected <= 0) continue;
+        if(manualProjected < satRaw * GRAZE_FACTOR) continue;
+        const ratio = manualProjected / satRaw;
+        if(ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
+        pairs.push({ x: satRaw, y: manualProjected });
+    }
+    if(pairs.length < 4) return null;
+    const n = pairs.length;
+    const meanX = pairs.reduce((a,p)=>a+p.x,0)/n; const meanY = pairs.reduce((a,p)=>a+p.y,0)/n;
+    let num=0, den=0; pairs.forEach(p => { num += (p.x-meanX)*(p.y-meanY); den += (p.x-meanX)*(p.x-meanX); });
+    const a = den !== 0 ? (num/den) : 1; const b = meanY - a*meanX;
+    let ssTot=0, ssRes=0; pairs.forEach(p => { const pred = a*p.x + b; ssTot += (p.y-meanY)*(p.y-meanY); ssRes += (p.y-pred)*(p.y-pred); });
+    return { a, b, r2: ssTot !== 0 ? (1 - ssRes/ssTot) : 0, count: n };
+}
+
+function applyCalibrationToHistory(history){
+    if(!calibrationModel) return;
+    Object.keys(history).forEach(name => {
+        history[name].forEach(e => {
+            const raw = e.cover_raw; if(!isFinite(raw)) return;
+            const cal = calibrationModel.a * raw + calibrationModel.b;
+            e.cover = Math.max(0, Math.round(cal));
+        });
+    });
+}
+
+function updateCalibrationUI(){
+    const box = document.getElementById('calibration-box');
+    const pill = document.getElementById('calib-pill');
+    const text = document.getElementById('calib-text');
+    if(!calibrationModel){ box.style.display = 'none'; return; }
+    if(currentDashboardMode === 'satellite') box.style.display = 'block';
+    let label = 'WEAK'; let cls = 'bad';
+    if (calibrationModel.r2 >= 0.85){ label = 'HIGH'; cls = 'good'; }
+    else if (calibrationModel.r2 >= 0.70){ label = 'GOOD'; cls = 'good'; }
+    else if (calibrationModel.r2 >= 0.50){ label = 'LOW'; cls = 'warn'; }
+    pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
+    text.innerHTML = `<div><b style="color:#2c3e50;">R²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> cover = ${calibrationModel.a.toFixed(2)}×raw + ${Math.round(calibrationModel.b)}</div>`;
+}
+
+async function loadCSV() {
+    try {
+        const response = await fetch(FARM_CONFIG[currentFarmId].data_csv + "&t=" + Date.now());
+        const csvText = await response.text();
+        Papa.parse(csvText, {
+            header: true, skipEmptyLines: true,
+            complete: (results) => {
+                const grouped = {};
+                const updateCol = results.meta.fields.find(c => c.toLowerCase().includes('update')) || 'latest-update';
+                results.data.forEach(row => {
+                    const name = row.paddock_name; if(!name) return;
+                    const ndvi = parseFloat(row.ndvi_mean || row.ndvi_effective);
+                    const cloud = parseFloat(row.cloud_pc) || 0;
+                    const dateObj = parseStrangeDate(row.date);
+                    const rawUrl = (row[updateCol] || row.map_id || "").trim();
+                    if(!dateObj) return;
+                    if(!grouped[name]) grouped[name] = [];
+                    grouped[name].push({ name, ndvi, cloud, dateObj, url: rawUrl.replace(/['"]+/g, '') });
+                });
+
+                const pick = pickSceneTimestamp(grouped);
+                selectedSceneTs = pick.ts;
+                document.getElementById('fallback-warning').style.display = pick.fallback ? 'block' : 'none';
+                
+                satelliteHistory = {};
+                Object.keys(grouped).forEach(name => {
+                    let all = grouped[name].slice().sort((a,b) => b.dateObj - a.dateObj);
+                    let selected = (selectedSceneTs !== null) ? (all.find(e => e.dateObj && e.dateObj.getTime() === selectedSceneTs) || null) : null;
+                    let ordered = selected ? [selected] : [];
+                    ordered = ordered.concat(all.filter(e => !selected || e.dateObj.getTime() < selectedSceneTs));
+                    satelliteHistory[name] = ordered.map(entry => {
+                        let cover = 0;
+                        if (!isNaN(entry.ndvi)) {
+                            let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
+                            let mod = (entry.cloud <= 10) ? 1 : (entry.cloud > 30 ? 1 : (entry.cloud > 20 ? 1 : 1.0));
+                            cover = Math.max(0, Math.round(base * mod));
+                        }
+                        return { ...entry, cover_raw: cover, cover: cover, formattedDate: fmtNZ(entry.dateObj) };
+                    });
+                });
+
+                // Always compute growth for the ACTIVE farm (uses its own exclusions/partials)
+                farmGrowthRate = estimateFarmGrowthRate(satelliteHistory);
+
+                // ✅ Calibration rules:
+                // - Te Ruahete: build model (after exclusions already loaded) AND store as sharedCalibrationModel
+                // - Wainono: apply sharedCalibrationModel (Te Ruahete) to Wainono
+                const historyLower = {};
+                Object.keys(satelliteHistory).forEach(k => { historyLower[normName(k)] = satelliteHistory[k]; });
+
+                if (currentFarmId === 'teruahete') {
+                    calibrationModel = buildCalibrationModel(historyLower);
+                    sharedCalibrationModel = calibrationModel;   // store and reuse
+                } else {
+                    calibrationModel = sharedCalibrationModel;   // apply Te Ruahete model to Wainono
+                    // If for any reason Te Ruahete model is missing, fallback to local build (keeps it running)
+                    if(!calibrationModel) calibrationModel = buildCalibrationModel(historyLower);
+                }
+
+                applyCalibrationToHistory(satelliteHistory);
+                updateCalibrationUI();
+                processSatelliteData();
+            }
+        });
+    } catch (e) {}
+}
+
+function processSatelliteData() {
+    let globalLatestDate = "";
+    satellitePaddockData = Object.keys(satelliteHistory).map(name => {
+        const sorted = satelliteHistory[name]; const latest = sorted[0];
+        const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
+        const area = areaLookup[name] || 0; const lowerName = name.toLowerCase();
+        const isOut = !!excludedPaddocks.get(normName(name)); const isPartial = partialPaddocks.has(lowerName) && !isOut;
+        if (latest.formattedDate && (!globalLatestDate || latest.formattedDate !== "")) globalLatestDate = latest.formattedDate;
+        let growthRate = null;
+        if (previous && latest.dateObj && previous.dateObj) {
+            const dayDiff = (latest.dateObj - previous.dateObj) / 86400000;
+            if (dayDiff > 0 && latest.cover > previous.cover) growthRate = Math.round((latest.cover - previous.cover) / dayDiff);
+        }
+        const manual = findBestManualForPaddock(name);
+        return { name, latest, previous, growthRate, area, isOut, reason: excludedPaddocks.get(lowerName), isPartial, manual, mStatus: manual ? manualCalibratorStatus(manual, latest.cover_raw, lowerName) : { ok:false, reason:"", className:"" } };
+    });
+    document.getElementById('latest-date').innerText = `LATEST IMAGERY: ${globalLatestDate}`;
+    
+    const topPaddock = satellitePaddockData.find(p => p.latest.url && p.latest.url.length > 10 && !p.isOut);
+    if(topPaddock) updateMapTile(topPaddock.latest.url);
+
+    if (currentDashboardMode === 'satellite') renderDashboard();
+}
+
+function manualCalibratorStatus(manual, satRaw, lowerName){
+    if(!manual || !selectedSceneTs) return { ok:false, reason:"", className:"" };
+    if(partialPaddocks.has(lowerName)) return { ok:false, reason:"partial", className:"bad" };
+    if(manual.gapDays > GAP_DAYS_MAX) return { ok:false, reason:`gap ${manual.gapDays.toFixed(0)}d`, className:"bad" };
+    const projected = manual.cover - (farmGrowthRate * manual.gapDays);
+    if(!isFinite(projected) || projected <= 0 || !isFinite(satRaw) || satRaw <= 0) return { ok:false, reason:"invalid", className:"bad" };
+    if(projected < satRaw * GRAZE_FACTOR) return { ok:false, reason:"likely grazed", className:"bad" };
+    const ratio = projected / satRaw;
+    if(ratio < RATIO_MIN || ratio > RATIO_MAX) return { ok:false, reason:"outlier", className:"bad" };
+    return { ok:true, reason:"used", className:"" };
+}
+
+function findBestManualForPaddock(paddockName){
+    const lower = normName(paddockName); let best = null; let bestAbs = Infinity;
+    for(const m of manualEntries){
+        if(m.lower !== lower || !selectedSceneTs) continue;
+        const gapDays = Math.abs((m.dateObj - new Date(selectedSceneTs))/86400000);
+        if(gapDays < bestAbs){ bestAbs = gapDays; best = { ...m, gapDays }; }
+    }
+    return best;
+}
+
+/* Rendering */
+function renderDashboard() {
     const data = getCurrentModeData();
-    geoLayer.eachLayer(l => {
-        const n = l.feature.properties.name;
-        const p = data.find(x => x.name === n);
-        if(p) {
-            let col = '#a1d99b';
-            if(p.latest.cover > 2800) col = '#00441b';
-            else if(p.latest.cover > 2400) col = '#006d2c';
-            else if(p.latest.cover > 2000) col = '#238b45';
-            else if(p.latest.cover > 1600) col = '#41ab5d';
-            
-            if(p.isOut) col = '#e74c3c';
-            else if(p.isPartial) col = '#3498db';
-            
-            const isCoverMode = (currentDashboardMode !== 'satellite' || currentViewMode === 'cover');
-            
-            l.setStyle({ 
-                fillColor: col, 
-                fillOpacity: isCoverMode ? 0.6 : 0.0, 
-                color: 'white', 
-                weight: isCoverMode ? 1 : 2 
-            });
-            l.bindTooltip(`${n}: ${p.latest.cover}kg`);
+    const sorted = [...data].sort((a, b) => {
+        if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
+        return b.latest.cover - a.latest.cover;
+    });
+
+    let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
+    sorted.forEach(p => {
+        if (p.area > 0 && !p.isOut) {
+            tWCover += (p.latest.cover * p.area); tAreaC += p.area;
+            if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * p.area); tAreaG += p.area; }
+        }
+    });
+
+    const avgCoverVal = tAreaC > 0 ? Math.round(tWCover/tAreaC) : 0;
+    const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth/tAreaG) : 0;
+    
+    document.getElementById('total-avg').innerText = avgCoverVal.toLocaleString();
+    document.getElementById('avg-growth').innerText = "+" + avgGrowthVal;
+    document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
+
+    document.getElementById('feed-area-total').innerText = tAreaC.toFixed(1);
+    document.getElementById('feed-avg-cover').innerText = avgCoverVal;
+    document.getElementById('feed-avg-growth').innerText = avgGrowthVal;
+    
+    calculateFeedLogic();
+
+    const list = document.getElementById('list'); list.innerHTML = "";
+    sorted.forEach(p => {
+        const div = document.createElement('div');
+        div.className = `card ${p.isOut ? 'is-out' : ''} ${p.isPartial ? 'is-partial' : ''}`;
+        div.id = `card-${p.name.replace(/\s+/g, '-')}`;
+        
+        let badges = "";
+        if (p.isOut) badges += `<span class="badge" style="background:${p.reason && p.reason.toUpperCase()==='CROP'?'var(--warning)':'var(--out)'}">${(p.reason || 'OUT').toUpperCase()}</span>`;
+        if (p.isPartial) badges += `<span class="badge" style="background:var(--partial)">PARTIAL GRAZED</span>`;
+        
+        if (currentDashboardMode === 'satellite' && p.manual && calibrationModel) {
+            badges += `<span class="badge" style="background:var(--prev)">M</span>`;
+        }
+
+        const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gaap:10px">
+                <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.isPartial ? 'var(--partial)' : 'var(--accent)')}">${p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.latest.formattedDate}</small>${manualHtml}</div>
+                ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
+            </div>
+            ${(p.growthRate && !p.isOut) ? `<div style="position:absolute; top:14px; right:60px; text-align:right"><span style="color:var(--growth); font-weight:bold">${p.growthRate>0?'+':''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
+        `;
+        
+        div.onclick = () => {
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+            div.classList.add('active');
+            if (currentDashboardMode === 'satellite') updateMapTile(p.latest.url);
+            focusPaddockOnMap(p.name, p.isOut ? '#e74c3c' : (p.isPartial ? 'var(--partial)' : 'var(--accent)'));
+        };
+        list.appendChild(div);
+    });
+}
+
+/* Map Logic */
+function getCoverColor(cover) {
+    if (cover > 2800) return '#00441b'; if (cover > 2400) return '#006d2c';
+    if (cover > 2000) return '#238b45'; if (cover > 1600) return '#41ab5d';
+    if (cover > 1200) return '#74c476'; return '#a1d99b'; 
+}
+
+function updateGeoStyles() {
+    if (!geoLayer) return;
+    const currentData = getCurrentModeData();
+    geoLayer.eachLayer(layer => {
+        const pName = layer.feature.properties.name;
+        const p = currentData.find(pd => pd.name === pName);
+        if (!p) return;
+        layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>`);
+        
+        if (currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentViewMode === 'cover') {
+            let color = getCoverColor(p.latest.cover);
+            if (p.isOut) color = '#ff7675'; else if (p.isPartial) color = '#3498db';
+            layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', weight: 1 });
+        } else {
+            layer.setStyle({ fillColor: 'transparent', fillOpacity: 0.1, color: 'white', weight: 1.5 });
         }
     });
 }
 
-function setLayerMode(m) {
-    currentViewMode = m;
-    if(ndviLayer) {
-        if(m==='ndvi') ndviLayer.addTo(map);
-        else map.removeLayer(ndviLayer);
+function setLayerMode(mode) {
+    currentViewMode = mode;
+    document.getElementById('btn-ndvi').classList.toggle('active', mode === 'ndvi');
+    document.getElementById('btn-cover').classList.toggle('active', mode === 'cover');
+    document.getElementById('legend').style.display = (mode === 'cover') ? 'block' : 'none';
+    if (ndviLayer) { 
+        if (mode === 'ndvi' && currentDashboardMode === 'satellite') ndviLayer.addTo(map); 
+        else map.removeLayer(ndviLayer); 
     }
     updateGeoStyles();
 }
 
 function updateMapTile(url) {
-    if(!url) return;
+    if(!url || url.length < 10) return;
     if(ndviLayer) map.removeLayer(ndviLayer);
-    ndviLayer = L.tileLayer(url, { opacity: 1, maxZoom: 22 }).addTo(map);
+    ndviLayer = L.tileLayer(url, { opacity: 0.7, maxZoom: 20 });
+    if (currentDashboardMode === 'satellite' && currentViewMode === 'ndvi') ndviLayer.addTo(map);
 }
 
-function focusPaddockOnMap(n, c) {
-    if(paddockMap[n]) {
-        map.fitBounds(paddockMap[n].getBounds());
-        paddockMap[n].setStyle({ color: 'yellow', weight: 4 });
-    }
+document.getElementById('search').oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('.card').forEach(c => c.style.display = c.querySelector('b').innerText.toLowerCase().includes(q) ? 'block' : 'none');
+};
+
+/* FEED CALCULATOR LOGIC */
+function saveAndRecalc() {
+    const p = currentFarmId + '_';
+    localStorage.setItem(p+'feed_residual', document.getElementById('inp-residual').value);
+    localStorage.setItem(p+'feed_cows', document.getElementById('inp-cows').value);
+    localStorage.setItem(p+'feed_intake', document.getElementById('inp-intake').value);
+    localStorage.setItem(p+'feed_round', document.getElementById('inp-round').value);
+    localStorage.setItem(p+'feed_actual_pre', document.getElementById('inp-actual-pre').value);
+    calculateFeedLogic();
 }
 
-// Init Sequence
-calculateGlobalCalibration();
-loadFarmData('wainono');
-
-// Helper logic for Manual/Feed modes (from original script)
-async function loadManualRankCSV() {
-    try {
-        const res = await fetch(FARM_CONFIG[currentFarmId].manual_mode_csv + "&t=" + Date.now());
-        const txt = await res.text();
-        Papa.parse(txt, { header: false, complete: (r) => {
-            const rows = r.data || [];
-            if(rows.length < 1) return;
-            const d1 = parseStrangeDate(rows[0][1]);
-            const d2 = parseStrangeDate(rows[0][2]);
-            const diff = (d1 && d2) ? (d1-d2)/86400000 : 1;
-            
-            manualModeData = rows.slice(1).map(row => {
-               const n = (row[0]||"").trim();
-               const cov = safeNum(row[1]);
-               const prev = safeNum(row[2]);
-               const isOut = (cov===0);
-               return {
-                   name: n,
-                   latest: { cover: cov, formattedDate: fmtNZ(d1) },
-                   growthRate: isOut ? 0 : Math.round((cov-prev)/diff),
-                   area: areaLookup[normName(n)] || 0,
-                   isOut: isOut
-               }; 
-            });
-            if(currentDashboardMode==='manual') renderDashboard();
-        }});
-    } catch(e){}
-}
-function calculateFeedLogic() { 
-    // Inputs
+function calculateFeedLogic() {
     const residual = safeNum(document.getElementById('inp-residual').value);
     const cows = safeNum(document.getElementById('inp-cows').value);
     const intake = safeNum(document.getElementById('inp-intake').value);
@@ -800,7 +1151,6 @@ function calculateFeedLogic() {
     const totalArea = safeNum(document.getElementById('feed-area-total').innerText);
     const actualPre = safeNum(document.getElementById('inp-actual-pre').value);
 
-    // Pre-grazing Target
     let preGrazeTarget = 0;
     if (totalArea > 0) {
         preGrazeTarget = ((cows * intake * round) / totalArea) + residual;
@@ -808,17 +1158,14 @@ function calculateFeedLogic() {
     document.getElementById('res-target-pre').innerText = Math.round(preGrazeTarget);
     document.getElementById('feed-target-copy').innerText = Math.round(preGrazeTarget);
 
-    // Area available per day
     let areaDay = 0;
     if (round > 0) areaDay = totalArea / round;
     document.getElementById('res-area-day').innerText = areaDay.toFixed(2);
 
-    // Area available per day per cow (m2)
     let areaCow = 0;
     if (cows > 0) areaCow = (areaDay / cows) * 10000;
     document.getElementById('res-area-cow').innerText = Math.round(areaCow);
 
-    // Supplement Required
     let supp = 0;
     if (cows > 0) {
         supp = (preGrazeTarget - actualPre) * areaDay / cows;
@@ -827,8 +1174,103 @@ function calculateFeedLogic() {
 
     renderFeedWedge(manualModeData, preGrazeTarget, residual);
 }
-function saveToCloud() { /* ... */ }
 
+function renderFeedWedge(paddockData, targetPre, targetRes) {
+    const ctx = document.getElementById('wedgeChart').getContext('2d');
+    const activePaddocks = paddockData.filter(p => !p.isOut).sort((a,b) => b.latest.cover - a.latest.cover);
+    const labels = activePaddocks.map(p => p.name);
+    const dataCover = activePaddocks.map(p => p.latest.cover);
+    
+    const demandLine = [];
+    const count = activePaddocks.length;
+    if (count > 0) {
+        const slope = (targetRes - targetPre) / (count - 1 || 1);
+        for(let i=0; i<count; i++) {
+            demandLine.push(targetPre + (slope * i));
+        }
+    }
+
+    if (wedgeChartInstance) wedgeChartInstance.destroy();
+
+    wedgeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Demand Line',
+                    data: demandLine,
+                    borderColor: '#e74c3c',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0
+                },
+                {
+                    type: 'bar',
+                    label: 'Cover (kgDM/ha)',
+                    data: dataCover,
+                    backgroundColor: '#2ecc71',
+                    borderRadius: 3,
+                    barPercentage: 0.95,
+                    categoryPercentage: 0.95
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: true, position:'top', align:'end' },
+                tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } }
+            },
+            scales: {
+                y: { beginAtZero: true, title: {display:true, text:'kgDM/ha', font:{size:10, weight:'bold'}} },
+                x: { ticks: { maxRotation: 90, minRotation: 90, font: {size: 9} } }
+            }
+        }
+    });
+}
+
+function saveToCloud() {
+    if(!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) {
+        alert("Please set the GOOGLE_SCRIPT_URL variable in the code to enable cloud saving.");
+        return;
+    }
+    const btn = document.querySelector('.btn-save');
+    const msg = document.getElementById('save-msg');
+    
+    btn.disabled = true;
+    btn.innerText = "SAVING...";
+    
+    const payload = {
+        farm: currentFarmId,
+        residual: document.getElementById('inp-residual').value,
+        cows: document.getElementById('inp-cows').value,
+        intake: document.getElementById('inp-intake').value,
+        round: document.getElementById('inp-round').value,
+        pre: document.getElementById('inp-actual-pre').value
+    };
+
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerText = "SAVE TO CLOUD";
+        msg.style.display = 'inline-block';
+        setTimeout(() => msg.style.display = 'none', 3000);
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerText = "ERROR";
+        console.error(err);
+    });
+}
+
+init();
 </script>
 </body>
 </html>
