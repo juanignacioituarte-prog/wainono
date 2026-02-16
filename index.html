@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Wainono Farm Monitor Pro | Feed Wedge</title>
+    <title>Farm Monitor Pro | Multi-Farm</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -25,6 +24,12 @@
         .mode-toggle-container { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;}
         .mode-btn { flex: 1; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; cursor: pointer; border-radius: 6px; font-size: 11px; font-weight: bold; color: #777; transition: 0.2s; white-space: nowrap; }
         .mode-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        /* Farm Selector Styles */
+        .farm-select-container { display: none; gap: 8px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #eee; }
+        .farm-btn { flex: 1; padding: 6px; border: 2px solid #eee; background: white; cursor: pointer; border-radius: 20px; font-size: 10px; font-weight: 800; color: #95a5a6; text-transform: uppercase; transition: 0.2s; }
+        .farm-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .farm-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
 
         .avg-box { background: var(--accent); color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 5px; }
         .avg-row { display: flex; justify-content: space-around; align-items: center; }
@@ -221,6 +226,11 @@
             <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED WEDGE</button>
         </div>
 
+        <div id="farm-select-container" class="farm-select-container">
+            <button id="btn-farm-wainono" class="farm-btn active" onclick="switchFarm('wainono')">WAINONO</button>
+            <button id="btn-farm-teruahete" class="farm-btn" onclick="switchFarm('teruahete')">TE RUAHETE</button>
+        </div>
+
         <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
         
         <div id="calibration-box" class="calib-box" style="display:none;">
@@ -246,17 +256,32 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* === CONFIGURATION === */
-// Paste your Google Apps Script Web App URL here to enable cloud saving
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwu-gm4MizN_14NZCRN7DxD-jpq1IiKSY-5t_AuIV2eGHdRz9BXky-tHPd4WZlAqA42Ug/exec"; 
 
-/* URLs */
-const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
-const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
-const PARTIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv";
-const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
-const MANUAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv";
-const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv";
-const FEED_SETTINGS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv";
+/* FARM DATA CONFIGURATION */
+const FARM_CONFIG = {
+    wainono: {
+        center: [-44.118829, 170.8550364],
+        geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson",
+        data_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv",
+        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv",
+        exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv",
+        manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv",
+        manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv",
+        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv"
+    },
+    teruahete: {
+        center: [-44.150000, 170.800000], // Approx placeholder location
+        // IMPORTANT: Replace these URLs with the actual Te Ruahete Sheets/GeoJSON links
+        geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson", // Placeholder
+        data_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv", // Placeholder
+        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv", // Placeholder
+        exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv", // Placeholder
+        manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv", // Placeholder
+        manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv", // Placeholder
+        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv" // Placeholder
+    }
+};
 
 /* Rules */
 const NDVI_LOW_THRESHOLD = 0.30;
@@ -268,6 +293,7 @@ const RATIO_MIN          = 0.55;
 const RATIO_MAX          = 1.80;
 
 /* State */
+let currentFarmId = 'wainono';
 let map, ndviLayer, geoLayer, baseLayer;
 let satellitePaddockData = [];
 let manualModeData = [];      
@@ -325,10 +351,44 @@ function focusPaddockOnMap(paddockName, color) {
     if (layer.bringToFront) layer.bringToFront();
 }
 
+/* Farm Switching Logic */
+function switchFarm(farmId) {
+    if(!FARM_CONFIG[farmId]) return;
+    currentFarmId = farmId;
+    
+    // Update UI Buttons
+    document.getElementById('btn-farm-wainono').classList.toggle('active', farmId === 'wainono');
+    document.getElementById('btn-farm-teruahete').classList.toggle('active', farmId === 'teruahete');
+    
+    // Clear existing data
+    satellitePaddockData = [];
+    manualModeData = [];
+    paddockMap = {};
+    areaLookup = {};
+    excludedPaddocks = new Map();
+    partialPaddocks = new Set();
+    manualEntries = [];
+    satelliteHistory = {};
+    
+    // Reset Map Layers
+    if (geoLayer) map.removeLayer(geoLayer);
+    if (ndviLayer) map.removeLayer(ndviLayer);
+    geoLayer = null;
+    ndviLayer = null;
+
+    // Reset Map View
+    map.setView(FARM_CONFIG[farmId].center, 13);
+    
+    document.getElementById('list').innerHTML = "Loading farm data...";
+    
+    // Reload everything
+    startDataLoad();
+}
+
 /* Loaders */
 async function loadManualRankCSV() {
     try {
-        const res = await fetch(MANUAL_MODE_CSV + "&t=" + Date.now());
+        const res = await fetch(FARM_CONFIG[currentFarmId].manual_mode_csv + "&t=" + Date.now());
         const txt = await res.text();
         Papa.parse(txt, {
             header: false,
@@ -375,7 +435,7 @@ async function loadManualRankCSV() {
 async function loadManualSheet(){
     manualEntries = [];
     try{
-        const res = await fetch(MANUAL_CSV_URL + "&t=" + Date.now());
+        const res = await fetch(FARM_CONFIG[currentFarmId].manual_csv + "&t=" + Date.now());
         const txt = await res.text();
         Papa.parse(txt, {
             header: true, skipEmptyLines: true,
@@ -401,8 +461,8 @@ async function loadManualSheet(){
 async function loadStatusSheets() {
     try {
         const [resEx, resPa] = await Promise.all([
-            fetch(EXCLUSIONS_CSV_URL + "&t=" + Date.now()),
-            fetch(PARTIAL_CSV_URL + "&t=" + Date.now())
+            fetch(FARM_CONFIG[currentFarmId].exclusions_csv + "&t=" + Date.now()),
+            fetch(FARM_CONFIG[currentFarmId].partial_csv + "&t=" + Date.now())
         ]);
         const textEx = await resEx.text();
         textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
@@ -420,16 +480,15 @@ async function loadStatusSheets() {
 }
 
 async function loadFeedSettings() {
-    // 1. Load Local Storage IMMEDIATELY (Fastest)
+    // 1. Load Local Storage IMMEDIATELY (Fastest) - scoped by farm
     loadLocalFeedSettings();
 
     // 2. Try to fetch from Apps Script (Cloud) if configured
     if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
         try {
-            const res = await fetch(GOOGLE_SCRIPT_URL);
+            const res = await fetch(GOOGLE_SCRIPT_URL + "?farm=" + currentFarmId);
             const data = await res.json();
             if(data) {
-                // Cloud data found, update UI
                 setFeedInputs(data);
                 calculateFeedLogic();
             }
@@ -437,14 +496,13 @@ async function loadFeedSettings() {
     } else {
         // 3. Fallback to CSV (Read Only) if no script
         try {
-            const res = await fetch(FEED_SETTINGS_CSV + "&t=" + Date.now());
+            const res = await fetch(FARM_CONFIG[currentFarmId].feed_settings_csv + "&t=" + Date.now());
             const txt = await res.text();
             Papa.parse(txt, {
                 header: true, skipEmptyLines: true,
                 complete: (results) => {
                     const data = results.data[0]; 
-                    if(data && !localStorage.getItem('feed_residual')) {
-                        // Only use CSV if local storage is empty
+                    if(data && !localStorage.getItem(currentFarmId + '_feed_residual')) {
                         document.getElementById('inp-residual').value = data.post_grazing_residual || 1500;
                         document.getElementById('inp-cows').value = data.cow_numbers || 500;
                         document.getElementById('inp-intake').value = data.intake_per_cow || 18;
@@ -467,25 +525,20 @@ function setFeedInputs(data) {
 }
 
 function loadLocalFeedSettings() {
-    if(localStorage.getItem('feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem('feed_residual');
-    if(localStorage.getItem('feed_cows')) document.getElementById('inp-cows').value = localStorage.getItem('feed_cows');
-    if(localStorage.getItem('feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem('feed_intake');
-    if(localStorage.getItem('feed_round')) document.getElementById('inp-round').value = localStorage.getItem('feed_round');
-    if(localStorage.getItem('feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem('feed_actual_pre');
+    const p = currentFarmId + '_';
+    if(localStorage.getItem(p+'feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem(p+'feed_residual');
+    if(localStorage.getItem(p+'feed_cows')) document.getElementById('inp-cows').value = localStorage.getItem(p+'feed_cows');
+    if(localStorage.getItem(p+'feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem(p+'feed_intake');
+    if(localStorage.getItem(p+'feed_round')) document.getElementById('inp-round').value = localStorage.getItem(p+'feed_round');
+    if(localStorage.getItem(p+'feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem(p+'feed_actual_pre');
     calculateFeedLogic();
 }
 
 async function init() {
-    map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 20 }).setView([-44.118829,170.8550364], 12);
+    map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 20 }).setView(FARM_CONFIG.wainono.center, 12);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     baseLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
     
-    // Load settings first
-    await loadFeedSettings();
-    
-    await Promise.all([loadStatusSheets(), loadManualSheet()]);
-    await loadGeoJSON();
-
     const calibHoverArea = document.getElementById('calib-hover-area');
     const calibText = document.getElementById('calib-text');
     if (calibHoverArea && calibText) {
@@ -493,12 +546,20 @@ async function init() {
         calibHoverArea.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
     }
     
+    // Initial data load
+    startDataLoad();
     switchDashboardMode('manual');
+}
+
+async function startDataLoad() {
+    await loadFeedSettings();
+    await Promise.all([loadStatusSheets(), loadManualSheet()]);
+    await loadGeoJSON();
 }
 
 async function loadGeoJSON() {
     try {
-        const response = await fetch(GEOJSON_URL + "?t=" + Date.now());
+        const response = await fetch(FARM_CONFIG[currentFarmId].geojson + "?t=" + Date.now());
         const data = await response.json();
         data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
         geoLayer = L.geoJSON(data, {
@@ -540,6 +601,9 @@ function switchDashboardMode(mode) {
     document.getElementById('sat-layer-controls').style.display = (mode === 'satellite') ? 'flex' : 'none';
     document.getElementById('latest-date').style.display = (mode === 'satellite') ? 'block' : 'none';
     document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
+    
+    // FARM SELECTOR VISIBILITY - Only in Satellite
+    document.getElementById('farm-select-container').style.display = (mode === 'satellite') ? 'flex' : 'none';
     
     // Map vs Overlay Logic
     if (mode === 'feed') {
@@ -659,7 +723,7 @@ function updateCalibrationUI(){
 
 async function loadCSV() {
     try {
-        const response = await fetch(DATA_CSV_URL + "&t=" + Date.now());
+        const response = await fetch(FARM_CONFIG[currentFarmId].data_csv + "&t=" + Date.now());
         const csvText = await response.text();
         Papa.parse(csvText, {
             header: true, skipEmptyLines: true,
@@ -870,12 +934,12 @@ document.getElementById('search').oninput = (e) => {
 
 /* FEED CALCULATOR LOGIC */
 function saveAndRecalc() {
-    // Save to LocalStorage instantly
-    localStorage.setItem('feed_residual', document.getElementById('inp-residual').value);
-    localStorage.setItem('feed_cows', document.getElementById('inp-cows').value);
-    localStorage.setItem('feed_intake', document.getElementById('inp-intake').value);
-    localStorage.setItem('feed_round', document.getElementById('inp-round').value);
-    localStorage.setItem('feed_actual_pre', document.getElementById('inp-actual-pre').value);
+    const p = currentFarmId + '_';
+    localStorage.setItem(p+'feed_residual', document.getElementById('inp-residual').value);
+    localStorage.setItem(p+'feed_cows', document.getElementById('inp-cows').value);
+    localStorage.setItem(p+'feed_intake', document.getElementById('inp-intake').value);
+    localStorage.setItem(p+'feed_round', document.getElementById('inp-round').value);
+    localStorage.setItem(p+'feed_actual_pre', document.getElementById('inp-actual-pre').value);
     
     calculateFeedLogic();
 }
@@ -998,6 +1062,7 @@ function saveToCloud() {
     btn.innerText = "SAVING...";
     
     const payload = {
+        farm: currentFarmId, // Send farm ID to script
         residual: document.getElementById('inp-residual').value,
         cows: document.getElementById('inp-cows').value,
         intake: document.getElementById('inp-intake').value,
