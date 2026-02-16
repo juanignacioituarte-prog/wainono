@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,6 +6,7 @@
     <title>Wainono Farm Monitor Pro | Feed Wedge</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { 
             --accent: #2ecc71;
@@ -20,8 +22,8 @@
         
         .header { padding: 20px; background: #fff; border-bottom: 1px solid #eee; }
         
-        .mode-toggle-container { display: flex; gap: 8px; margin-bottom: 15px; }
-        .mode-btn { flex: 1; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; cursor: pointer; border-radius: 6px; font-size: 11px; font-weight: bold; color: #777; transition: 0.2s; }
+        .mode-toggle-container { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;}
+        .mode-btn { flex: 1; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; cursor: pointer; border-radius: 6px; font-size: 11px; font-weight: bold; color: #777; transition: 0.2s; white-space: nowrap; }
         .mode-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
 
         .avg-box { background: var(--accent); color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 5px; }
@@ -65,10 +67,38 @@
         .calib-pill.bad { background: var(--out); }
 
         .manual-chip { display:inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 6px; border: 1px solid #dff3e7; background: #f0fff4; font-size: 10px; color: #2c3e50; }
+        .manual-chip.bad { background: #fff5f5; border-color: #ffd8d8; }
         .manual-chip b { color: var(--growth); }
-        .manual-chip .muted { color:#95a5a6; font-weight:600; }
-        .manual-chip.bad { border-color:#ffd2d2; background:#fff2f2; }
         .manual-chip.bad b { color: var(--out); }
+        .manual-chip .muted { color:#95a5a6; font-weight:600; }
+
+        /* Feed Calculations View */
+        #feed-view {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #f4f7f6; z-index: 2000; display: none; flex-direction: column;
+            overflow-y: auto; padding: 20px; box-sizing: border-box;
+        }
+        .feed-container { max-width: 1000px; margin: 0 auto; width: 100%; }
+        .feed-card { background: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 20px; }
+        .feed-title-row { display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .feed-title { font-size: 18px; font-weight: 700; color: var(--text); }
+        
+        .calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .input-group { margin-bottom: 10px; }
+        .input-group label { display: block; font-size: 11px; text-transform: uppercase; color: #7f8c8d; font-weight: bold; margin-bottom: 4px; }
+        .input-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-weight: bold; color: var(--text); box-sizing: border-box; }
+        .input-group input:focus { border-color: var(--accent); outline: none; }
+        .input-group .ro-val { padding: 8px; background: #f8f9fa; border: 1px solid #eee; border-radius: 5px; font-weight: bold; color: #2c3e50; }
+        
+        .result-highlight { background: #f0fff4; border: 1px solid var(--accent); padding: 15px; border-radius: 8px; text-align: center; }
+        .result-highlight h3 { margin: 0; font-size: 24px; color: var(--accent); }
+        .result-highlight small { text-transform: uppercase; font-size: 10px; color: #7f8c8d; font-weight: bold; }
+
+        .chart-box { height: 350px; width: 100%; position: relative; }
+
+        .btn-save { padding: 6px 12px; background: #34495e; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer; }
+        .btn-save:hover { background: #2c3e50; }
+        .save-status { font-size: 11px; color: var(--growth); font-weight: bold; margin-right: 10px; display: none; }
     </style>
 </head>
 <body>
@@ -90,19 +120,111 @@
             <div class="legend-item"><div class="legend-color" style="background:#ff7675"></div> Out of Rotation</div>
         </div>
     </div>
+
+    <div id="feed-view">
+        <div class="feed-container">
+            
+            <div class="feed-card">
+                <div class="feed-title">Feed Wedge & Demand</div>
+                <div class="chart-box">
+                    <canvas id="wedgeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="feed-card">
+                <div class="feed-title-row">
+                    <div class="feed-title">Rotation Parameters</div>
+                    <div>
+                        <span id="save-msg" class="save-status">SAVED TO CLOUD!</span>
+                        <button class="btn-save" onclick="saveToCloud()">SAVE TO CLOUD</button>
+                    </div>
+                </div>
+                <div class="calc-grid">
+                    <div class="input-group">
+                        <label>Total Area (Rotation)</label>
+                        <div id="feed-area-total" class="ro-val">0</div>
+                    </div>
+                    <div class="input-group">
+                        <label>Farm Avg Cover</label>
+                        <div id="feed-avg-cover" class="ro-val">0</div>
+                    </div>
+                    <div class="input-group">
+                        <label>Farm Avg Growth</label>
+                        <div id="feed-avg-growth" class="ro-val">0</div>
+                    </div>
+                    <div class="input-group">
+                        <label>Post Grazing Residual</label>
+                        <input type="number" id="inp-residual" value="1500" oninput="saveAndRecalc()">
+                    </div>
+                </div>
+                <div class="calc-grid" style="margin-top:15px;">
+                    <div class="input-group">
+                        <label>Number of Cows</label>
+                        <input type="number" id="inp-cows" value="500" oninput="saveAndRecalc()">
+                    </div>
+                    <div class="input-group">
+                        <label>Avg Daily Intake (kgDM/cow)</label>
+                        <input type="number" id="inp-intake" value="18" oninput="saveAndRecalc()">
+                    </div>
+                    <div class="input-group">
+                        <label>Rotation Length (days)</label>
+                        <input type="number" id="inp-round" value="25" oninput="saveAndRecalc()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="feed-card">
+                <div class="feed-title">Allocation & Targets</div>
+                <div class="calc-grid">
+                    <div class="result-highlight">
+                        <h3 id="res-target-pre">0</h3>
+                        <small>Calculated Pre-graze Target</small>
+                    </div>
+                    <div class="result-highlight">
+                        <h3 id="res-area-day">0</h3>
+                        <small>Area Available (ha/day)</small>
+                    </div>
+                    <div class="result-highlight">
+                        <h3 id="res-area-cow">0</h3>
+                        <small>Area per Cow (m²/day)</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feed-card">
+                <div class="feed-title">Supplement Calculator</div>
+                <div class="calc-grid">
+                    <div class="input-group">
+                        <label>Calc. Pre-graze Target</label>
+                        <div id="feed-target-copy" class="ro-val">0</div>
+                    </div>
+                    <div class="input-group">
+                        <label>Actual Pre-grazing Cover (User)</label>
+                        <input type="number" id="inp-actual-pre" value="2800" oninput="saveAndRecalc()">
+                    </div>
+                    <div class="result-highlight" style="border-color:var(--warning); background:#fffaf0;">
+                        <h3 id="res-supp" style="color:var(--warning)">0</h3>
+                        <small>Supplement Required (kg/cow/day)</small>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
 
 <div id="sidebar">
     <div class="header">
         <div class="mode-toggle-container">
-            <button id="btn-mode-sat" class="mode-btn active" onclick="switchDashboardMode('satellite')">SATELLITE MODE</button>
-            <button id="btn-mode-man" class="mode-btn" onclick="switchDashboardMode('manual')">MANUAL FARMWALK</button>
+            <button id="btn-mode-sat" class="mode-btn" onclick="switchDashboardMode('satellite')">SATELLITE MODE</button>
+            <button id="btn-mode-man" class="mode-btn active" onclick="switchDashboardMode('manual')">MANUAL FARMWALK</button>
+            <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED WEDGE</button>
         </div>
 
         <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
-
+        
         <div id="calibration-box" class="calib-box" style="display:none;">
-            <div class="calib-row">
+            <div class="calib-row" id="calib-hover-area">
                 <div style="font-weight:800; color:#2c3e50; font-size:10px; text-transform:uppercase;">FARMWALK CALIBRATION CONFIDENCE</div>
                 <span id="calib-pill" class="calib-pill">--</span>
             </div>
@@ -123,15 +245,18 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* =======================
-   URLs (WAINONO)
-======================= */
+/* === CONFIGURATION === */
+// Paste your Google Apps Script Web App URL here to enable cloud saving
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwu-gm4MizN_14NZCRN7DxD-jpq1IiKSY-5t_AuIV2eGHdRz9BXky-tHPd4WZlAqA42Ug/exec"; 
+
+/* URLs */
 const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
 const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
 const PARTIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv";
 const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
 const MANUAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv";
 const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv";
+const FEED_SETTINGS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv";
 
 /* Rules */
 const NDVI_LOW_THRESHOLD = 0.30;
@@ -151,12 +276,13 @@ let areaLookup = {};
 let excludedPaddocks = new Map(); 
 let partialPaddocks = new Set();
 let currentViewMode = 'ndvi';   
-let currentDashboardMode = 'satellite'; 
+let currentDashboardMode = 'manual';
 let manualEntries = [];
 let farmGrowthRate = 0;
 let calibrationModel = null;
 let selectedSceneTs = null;
 let satelliteHistory = {};
+let wedgeChartInstance = null;
 
 /* Helpers */
 function normName(s){ return (s||"").trim().toLowerCase(); }
@@ -237,7 +363,10 @@ async function loadManualRankCSV() {
                     }
                 });
 
-                if (currentDashboardMode === 'manual') renderDashboard();
+                if (currentDashboardMode === 'manual') {
+                    renderDashboard();
+                    updateGeoStyles(); 
+                }
             }
         });
     } catch (e) {}
@@ -285,22 +414,86 @@ async function loadStatusSheets() {
             const name = line.split(',')[0].trim().toLowerCase();
             if(name) partialPaddocks.add(name);
         });
-    } catch (e) {}
+    } catch (e) {
+        console.warn("Status sheets not loaded");
+    }
+}
+
+async function loadFeedSettings() {
+    // 1. Load Local Storage IMMEDIATELY (Fastest)
+    loadLocalFeedSettings();
+
+    // 2. Try to fetch from Apps Script (Cloud) if configured
+    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+        try {
+            const res = await fetch(GOOGLE_SCRIPT_URL);
+            const data = await res.json();
+            if(data) {
+                // Cloud data found, update UI
+                setFeedInputs(data);
+                calculateFeedLogic();
+            }
+        } catch(e) { console.log("Cloud load failed, using local/csv"); }
+    } else {
+        // 3. Fallback to CSV (Read Only) if no script
+        try {
+            const res = await fetch(FEED_SETTINGS_CSV + "&t=" + Date.now());
+            const txt = await res.text();
+            Papa.parse(txt, {
+                header: true, skipEmptyLines: true,
+                complete: (results) => {
+                    const data = results.data[0]; 
+                    if(data && !localStorage.getItem('feed_residual')) {
+                        // Only use CSV if local storage is empty
+                        document.getElementById('inp-residual').value = data.post_grazing_residual || 1500;
+                        document.getElementById('inp-cows').value = data.cow_numbers || 500;
+                        document.getElementById('inp-intake').value = data.intake_per_cow || 18;
+                        document.getElementById('inp-round').value = data.rotation_length || 25;
+                        document.getElementById('inp-actual-pre').value = data.target_pre_grazing_cover || 2800;
+                        calculateFeedLogic();
+                    }
+                }
+            });
+        } catch(e) {}
+    }
+}
+
+function setFeedInputs(data) {
+    if(data.residual) document.getElementById('inp-residual').value = data.residual;
+    if(data.cows) document.getElementById('inp-cows').value = data.cows;
+    if(data.intake) document.getElementById('inp-intake').value = data.intake;
+    if(data.round) document.getElementById('inp-round').value = data.round;
+    if(data.pre) document.getElementById('inp-actual-pre').value = data.pre;
+}
+
+function loadLocalFeedSettings() {
+    if(localStorage.getItem('feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem('feed_residual');
+    if(localStorage.getItem('feed_cows')) document.getElementById('inp-cows').value = localStorage.getItem('feed_cows');
+    if(localStorage.getItem('feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem('feed_intake');
+    if(localStorage.getItem('feed_round')) document.getElementById('inp-round').value = localStorage.getItem('feed_round');
+    if(localStorage.getItem('feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem('feed_actual_pre');
+    calculateFeedLogic();
 }
 
 async function init() {
-    map = L.map('map', { zoomControl: false, minZoom: 14, maxZoom: 20 }).setView([-44.118829,170.8550364], 15);
+    map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 20 }).setView([-44.118829,170.8550364], 12);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     baseLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+    
+    // Load settings first
+    await loadFeedSettings();
+    
     await Promise.all([loadStatusSheets(), loadManualSheet()]);
-    loadGeoJSON();
+    await loadGeoJSON();
 
-    const calibBox = document.getElementById('calibration-box');
+    const calibHoverArea = document.getElementById('calib-hover-area');
     const calibText = document.getElementById('calib-text');
-    if (calibBox && calibText) {
-        calibBox.addEventListener('mouseenter', () => { calibText.style.display = 'block'; });
-        calibBox.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
+    if (calibHoverArea && calibText) {
+        calibHoverArea.addEventListener('mouseenter', () => { calibText.style.display = 'block'; });
+        calibHoverArea.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
     }
+    
+    switchDashboardMode('manual');
 }
 
 async function loadGeoJSON() {
@@ -335,18 +528,30 @@ async function loadGeoJSON() {
     } catch (e) {}
 }
 
+/* Dashboard Mode Switching */
 function switchDashboardMode(mode) {
     currentDashboardMode = mode;
     document.getElementById('btn-mode-sat').classList.toggle('active', mode === 'satellite');
     document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual');
+    document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
     
+    // UI Toggles
     document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
     document.getElementById('sat-layer-controls').style.display = (mode === 'satellite') ? 'flex' : 'none';
     document.getElementById('latest-date').style.display = (mode === 'satellite') ? 'block' : 'none';
+    document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
     
-    if (mode === 'manual') {
+    // Map vs Overlay Logic
+    if (mode === 'feed') {
+        // Feed view overlays map
+        calculateFeedLogic(); // Trigger calculations
+    } else if (mode === 'manual') {
         if (ndviLayer) map.removeLayer(ndviLayer);
         document.getElementById('legend').style.display = 'block';
+        setLayerMode('cover'); // Manual defaults to cover map
+    } else if (mode === 'satellite') {
+        // Switch to NDVI automatically
+        setLayerMode('ndvi');
     } else {
         setLayerMode(currentViewMode);
     }
@@ -356,7 +561,7 @@ function switchDashboardMode(mode) {
 }
 
 function getCurrentModeData() {
-    return currentDashboardMode === 'manual' ? manualModeData : satellitePaddockData;
+    return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed') ? manualModeData : satellitePaddockData;
 }
 
 /* Satellite Logic */
@@ -390,7 +595,11 @@ function estimateFarmGrowthRate(history){
         if(!(lc > pc)) return;
         const g = Math.round((lc - pc)/dayDiff);
         if(!isFinite(g) || g <= 0) return;
-        const isOut = !!excludedPaddocks.get(normName(name)); if(isOut) return;
+        
+        const isOut = !!excludedPaddocks.get(normName(name)); 
+        const isPartial = partialPaddocks.has(normName(name));
+        if(isOut || isPartial) return; 
+
         const area = areaLookup[name] || 0;
         if(area > 0){ tWGrowth += g * area; tAreaG += area; } else { tWGrowth += g; tAreaG += 1; }
     });
@@ -402,6 +611,7 @@ function buildCalibrationModel(historyLower){
     for(const m of manualEntries){
         const hist = historyLower[m.lower]; if(!hist || hist.length === 0) continue;
         if (partialPaddocks.has(m.lower)) continue;
+        
         const s = hist[0]; if(!s || !s.dateObj) continue;
         const gapDays = Math.abs((m.dateObj - s.dateObj)/86400000);
         if(gapDays > GAP_DAYS_MAX) continue;
@@ -480,7 +690,7 @@ async function loadCSV() {
                         let cover = 0;
                         if (!isNaN(entry.ndvi)) {
                             let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
-                            let mod = (entry.cloud <= 10) ? 0.90 : (entry.cloud > 30 ? 1.15 : (entry.cloud > 20 ? 1.10 : 1.0));
+                            let mod = (entry.cloud <= 10) ? 1 : (entry.cloud > 30 ? 1 : (entry.cloud > 20 ? 1 : 1.0));
                             cover = Math.max(0, Math.round(base * mod));
                         }
                         return { ...entry, cover_raw: cover, cover: cover, formattedDate: fmtNZ(entry.dateObj) };
@@ -541,8 +751,7 @@ function findBestManualForPaddock(paddockName){
         const gapDays = Math.abs((m.dateObj - new Date(selectedSceneTs))/86400000);
         if(gapDays < bestAbs){ bestAbs = gapDays; best = { ...m, gapDays }; }
     }
-    return best;
-}
+    return best;}
 
 /* Rendering */
 function renderDashboard() {
@@ -560,9 +769,19 @@ function renderDashboard() {
         }
     });
 
-    document.getElementById('total-avg').innerText = tAreaC > 0 ? Math.round(tWCover/tAreaC).toLocaleString() : "0";
-    document.getElementById('avg-growth').innerText = tAreaG > 0 ? "+" + Math.round(tWGrowth/tAreaG) : "0";
+    // Update Side Stats
+    const avgCoverVal = tAreaC > 0 ? Math.round(tWCover/tAreaC) : 0;
+    const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth/tAreaG) : 0;
+    
+    document.getElementById('total-avg').innerText = avgCoverVal.toLocaleString();
+    document.getElementById('avg-growth').innerText = "+" + avgGrowthVal;
     document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
+
+    document.getElementById('feed-area-total').innerText = tAreaC.toFixed(1);
+    document.getElementById('feed-avg-cover').innerText = avgCoverVal;
+    document.getElementById('feed-avg-growth').innerText = avgGrowthVal;
+    
+    calculateFeedLogic();
 
     const list = document.getElementById('list'); list.innerHTML = "";
     sorted.forEach(p => {
@@ -578,11 +797,11 @@ function renderDashboard() {
             badges += `<span class="badge" style="background:var(--prev)">M</span>`;
         }
 
-        const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus && !p.mStatus.ok ? 'bad' : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+        const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
 
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gaap:10px">
                 <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.isPartial ? 'var(--partial)' : 'var(--accent)')}">${p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.latest.formattedDate}</small>${manualHtml}</div>
                 ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
             </div>
@@ -615,7 +834,7 @@ function updateGeoStyles() {
         if (!p) return;
         layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>`);
         
-        if (currentDashboardMode === 'manual' || currentViewMode === 'cover') {
+        if (currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentViewMode === 'cover') {
             let color = getCoverColor(p.latest.cover);
             if (p.isOut) color = '#ff7675'; else if (p.isPartial) color = '#3498db';
             layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', weight: 1 });
@@ -648,6 +867,161 @@ document.getElementById('search').oninput = (e) => {
     const q = e.target.value.toLowerCase();
     document.querySelectorAll('.card').forEach(c => c.style.display = c.querySelector('b').innerText.toLowerCase().includes(q) ? 'block' : 'none');
 };
+
+/* FEED CALCULATOR LOGIC */
+function saveAndRecalc() {
+    // Save to LocalStorage instantly
+    localStorage.setItem('feed_residual', document.getElementById('inp-residual').value);
+    localStorage.setItem('feed_cows', document.getElementById('inp-cows').value);
+    localStorage.setItem('feed_intake', document.getElementById('inp-intake').value);
+    localStorage.setItem('feed_round', document.getElementById('inp-round').value);
+    localStorage.setItem('feed_actual_pre', document.getElementById('inp-actual-pre').value);
+    
+    calculateFeedLogic();
+}
+
+function calculateFeedLogic() {
+    // Inputs
+    const residual = safeNum(document.getElementById('inp-residual').value);
+    const cows = safeNum(document.getElementById('inp-cows').value);
+    const intake = safeNum(document.getElementById('inp-intake').value);
+    const round = safeNum(document.getElementById('inp-round').value);
+    const totalArea = safeNum(document.getElementById('feed-area-total').innerText);
+    const actualPre = safeNum(document.getElementById('inp-actual-pre').value);
+
+    // Pre-grazing Target
+    let preGrazeTarget = 0;
+    if (totalArea > 0) {
+        preGrazeTarget = ((cows * intake * round) / totalArea) + residual;
+    }
+    document.getElementById('res-target-pre').innerText = Math.round(preGrazeTarget);
+    document.getElementById('feed-target-copy').innerText = Math.round(preGrazeTarget);
+
+    // Area available per day
+    let areaDay = 0;
+    if (round > 0) areaDay = totalArea / round;
+    document.getElementById('res-area-day').innerText = areaDay.toFixed(2);
+
+    // Area available per day per cow (m2)
+    let areaCow = 0;
+    if (cows > 0) areaCow = (areaDay / cows) * 10000;
+    document.getElementById('res-area-cow').innerText = Math.round(areaCow);
+
+    // Supplement Required
+    let supp = 0;
+    if (cows > 0) {
+        supp = (preGrazeTarget - actualPre) * areaDay / cows;
+    }
+    document.getElementById('res-supp').innerText = supp.toFixed(1);
+
+    renderFeedWedge(manualModeData, preGrazeTarget, residual);
+}
+
+function renderFeedWedge(paddockData, targetPre, targetRes) {
+    const ctx = document.getElementById('wedgeChart').getContext('2d');
+    
+    // Filter out 'out' paddocks and sort by cover high to low
+    const activePaddocks = paddockData.filter(p => !p.isOut).sort((a,b) => b.latest.cover - a.latest.cover);
+    
+    const labels = activePaddocks.map(p => p.name);
+    const dataCover = activePaddocks.map(p => p.latest.cover);
+    
+    // Create Demand Line Data
+    const demandLine = [];
+    const count = activePaddocks.length;
+    if (count > 0) {
+        const slope = (targetRes - targetPre) / (count - 1 || 1);
+        for(let i=0; i<count; i++) {
+            demandLine.push(targetPre + (slope * i));
+        }
+    }
+
+    if (wedgeChartInstance) wedgeChartInstance.destroy();
+
+    wedgeChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Demand Line',
+                    data: demandLine,
+                    borderColor: '#e74c3c',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0
+                },
+                {
+                    type: 'bar',
+                    label: 'Cover (kgDM/ha)',
+                    data: dataCover,
+                    backgroundColor: '#2ecc71',
+                    borderRadius: 3,
+                    barPercentage: 0.95,
+                    categoryPercentage: 0.95
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: true, position:'top', align:'end' },
+                tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    title: {display:true, text:'kgDM/ha', font:{size:10, weight:'bold'}} 
+                },
+                x: {
+                    ticks: { maxRotation: 90, minRotation: 90, font: {size: 9} }
+                }
+            }
+        }
+    });
+}
+
+function saveToCloud() {
+    if(!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) {
+        alert("Please set the GOOGLE_SCRIPT_URL variable in the code to enable cloud saving.");
+        return;
+    }
+    const btn = document.querySelector('.btn-save');
+    const msg = document.getElementById('save-msg');
+    
+    btn.disabled = true;
+    btn.innerText = "SAVING...";
+    
+    const payload = {
+        residual: document.getElementById('inp-residual').value,
+        cows: document.getElementById('inp-cows').value,
+        intake: document.getElementById('inp-intake').value,
+        round: document.getElementById('inp-round').value,
+        pre: document.getElementById('inp-actual-pre').value
+    };
+
+    fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerText = "SAVE TO CLOUD";
+        msg.style.display = 'inline-block';
+        setTimeout(() => msg.style.display = 'none', 3000);
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerText = "ERROR";
+        console.error(err);
+    });
+}
 
 init();
 </script>
