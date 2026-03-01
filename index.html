@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Farm Monitor Pro | Multi-Farm</title>
@@ -7,1270 +8,1796 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { 
+        :root {
             --accent: #2ecc71;
-            --bg: #f4f7f6; --text: #2c3e50; 
-            --prev: #7f8c8d; --growth: #27ae60; --out: #e74c3c; 
-            --warning: #f39c12; --partial: #3498db;
+            --bg: #f4f7f6;
+            --text: #2c3e50;
+            --prev: #7f8c8d;
+            --growth: #27ae60;
+            --out: #e74c3c;
+            --warning: #f39c12;
+            --cloud: #3498db;
         }
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex;
-        background: var(--bg); color: var(--text); overflow: hidden; }
-        
-        #map { flex-grow: 1; height: 100%; background: #000; position: relative; } 
-        #sidebar { width: 380px; background: white; border-left: 1px solid #ddd; display: flex; flex-direction: column; box-shadow: -2px 0 5px rgba(0,0,0,0.1); z-index: 1000; }
-        
-        .header { padding: 20px; background: #fff; border-bottom: 1px solid #eee; }
-        
-        .mode-toggle-container { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;}
-        .mode-btn { flex: 1; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; cursor: pointer; border-radius: 6px; font-size: 11px; font-weight: bold; color: #777; transition: 0.2s; white-space: nowrap; }
-        .mode-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        #map {
+            flex-grow: 1;
+            height: 100%;
+            background: #000;
+            position: relative;
+        }
+
+        #sidebar {
+            width: 380px;
+            background: white;
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .header {
+            padding: 20px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+
+        .mode-toggle-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #777;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
 
         /* Farm Selector Styles */
-        .farm-select-container { display: none; gap: 8px; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #eee; }
-        .farm-btn { flex: 1; padding: 6px; border: 2px solid #eee; background: white; cursor: pointer; border-radius: 20px; font-size: 10px; font-weight: 800; color: #95a5a6; text-transform: uppercase; transition: 0.2s; }
-        .farm-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .farm-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        .farm-select-container {
+            display: none;
+            gap: 8px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #eee;
+        }
 
-        .avg-box { background: var(--accent); color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 5px; }
-        .avg-row { display: flex; justify-content: space-around; align-items: center; }
-        .sync-note { font-size: 10px; color: #95a5a6; text-align: center; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        #list { flex-grow: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; }
-        .card { background: white; border: 1px solid #eee; padding: 14px; margin-bottom: 10px; border-radius: 8px; cursor: pointer; border-left: 5px solid #ccc; position: relative; transition: 0.2s; }
-        .card:hover { background: #fafafa; }
-        .card.active { border-left-color: var(--accent); background: #f0fff4; border-right: 1px solid var(--accent); }
-        .card.is-out { opacity: 0.8; border-left-color: var(--out); }
-        .card.is-partial { border-left-color: var(--partial); background: #f0f7ff; }
+        .farm-btn {
+            flex: 1;
+            padding: 6px;
+            border: 2px solid #eee;
+            background: white;
+            cursor: pointer;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 800;
+            color: #95a5a6;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
 
-        .val { font-size: 17px; font-weight: bold; color: var(--accent); }
-        .val.prev { color: var(--prev); font-size: 14px; }
-        .unit { font-size: 10px; color: #95a5a6; font-weight: normal; margin-left: 2px; }
-        .label { font-size: 10px; text-transform: uppercase; color: #95a5a6; font-weight: bold; display: block; }
+        .farm-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
 
-        .map-controls { position: absolute; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-        .layer-group { background: white; padding: 4px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; }
-        .layer-btn { padding: 8px 15px; border: none; background: none; cursor: pointer; font-size: 11px; font-weight: bold; color: #777; border-radius: 6px; transition: 0.2s; }
-        .layer-btn.active { background: var(--accent); color: white; }
-        .date-label { background: rgba(0,0,0,0.7); color: white; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .farm-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
 
-        .legend-box { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); width: 180px; display: none; }
-        .legend-item { display: flex; align-items: center; font-size: 11px; margin-bottom: 5px; color: #555; font-weight: 600; }
-        .legend-color { width: 14px; height: 14px; border-radius: 3px; margin-right: 10px; border: 1px solid rgba(0,0,0,0.1); }
+        .avg-box {
+            background: var(--accent);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 5px;
+        }
 
-        .paddock-label { background: rgba(255, 255, 255, 0.95) !important; border: 1px solid #333 !important; padding: 4px 8px !important; border-radius: 4px !important; pointer-events: none !important; color: #000 !important; opacity: 0 !important; transition: opacity 0.2s ease-in-out !important; text-align: center !important; line-height: 1.2 !important; }
-        .paddock-label.show-label { opacity: 1 !important; }
+        .avg-row {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
 
-        .badge { color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; vertical-align: middle; text-transform: uppercase; }
-        #search { width:100%; padding:12px; border-radius:6px; border:1px solid #ddd; outline:none; box-sizing: border-box; }
-        .fallback-alert { color: var(--warning); font-size: 10px; font-weight: bold; margin-bottom: 5px; display: block; }
+        .sync-note {
+            font-size: 10px;
+            color: #95a5a6;
+            text-align: center;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
 
-        .calib-box { margin-top: 8px; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 10px; font-size: 11px; color: #7f8c8d; }
-        .calib-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-        .calib-pill { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px; color: white; background: var(--prev); text-transform: uppercase; white-space: nowrap; }
-        .calib-pill.good { background: var(--accent); }
-        .calib-pill.warn { background: var(--warning); }
-        .calib-pill.bad { background: var(--out); }
+        #list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            scroll-behavior: smooth;
+        }
 
-        .manual-chip { display:inline-block; margin-top: 6px; padding: 4px 8px; border-radius: 6px; border: 1px solid #dff3e7; background: #f0fff4; font-size: 10px; color: #2c3e50; }
-        .manual-chip.bad { background: #fff5f5; border-color: #ffd8d8; }
-        .manual-chip b { color: var(--growth); }
-        .manual-chip.bad b { color: var(--out); }
-        .manual-chip .muted { color:#95a5a6; font-weight:600; }
+        .card {
+            background: white;
+            border: 1px solid #eee;
+            padding: 14px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            border-left: 5px solid #ccc;
+            position: relative;
+            transition: 0.2s;
+        }
+
+        .card:hover {
+            background: #fafafa;
+        }
+
+        .card.active {
+            border-left-color: var(--accent);
+            background: #f0fff4;
+            border-right: 1px solid var(--accent);
+        }
+
+        .card.is-out {
+            opacity: 0.8;
+            border-left-color: var(--out);
+        }
+
+        .card.is-cloud {
+            border-left-color: var(--cloud);
+            background: #f0f7ff;
+        }
+
+        .val {
+            font-size: 17px;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .val.prev {
+            color: var(--prev);
+            font-size: 14px;
+        }
+
+        .unit {
+            font-size: 10px;
+            color: #95a5a6;
+            font-weight: normal;
+            margin-left: 2px;
+        }
+
+        .label {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #95a5a6;
+            font-weight: bold;
+            display: block;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .layer-group {
+            background: white;
+            padding: 4px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+        }
+
+        .layer-btn {
+            padding: 8px 15px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            color: #777;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+
+        .layer-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .date-label {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .legend-box {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            width: 180px;
+            display: none;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            margin-right: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .paddock-label {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 1px solid #333 !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            pointer-events: none !important;
+            color: #000 !important;
+            opacity: 0 !important;
+            transition: opacity 0.2s ease-in-out !important;
+            text-align: center !important;
+            line-height: 1.2 !important;
+        }
+
+        .paddock-label.show-label {
+            opacity: 1 !important;
+        }
+
+        .badge {
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-left: 8px;
+            vertical-align: middle;
+            text-transform: uppercase;
+        }
+
+        #search {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .fallback-alert {
+            color: var(--warning);
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .calib-box {
+            margin-top: 8px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 11px;
+            color: #7f8c8d;
+        }
+
+        .calib-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .calib-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            color: white;
+            background: var(--prev);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .calib-pill.good {
+            background: var(--accent);
+        }
+
+        .calib-pill.warn {
+            background: var(--warning);
+        }
+
+        .calib-pill.bad {
+            background: var(--out);
+        }
+
+        .manual-chip {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #dff3e7;
+            background: #f0fff4;
+            font-size: 10px;
+            color: #2c3e50;
+        }
+
+        .manual-chip.bad {
+            background: #fff5f5;
+            border-color: #ffd8d8;
+        }
+
+        .manual-chip b {
+            color: var(--growth);
+        }
+
+        .manual-chip.bad b {
+            color: var(--out);
+        }
+
+        .manual-chip .muted {
+            color: #95a5a6;
+            font-weight: 600;
+        }
 
         /* Feed Calculations View */
         #feed-view {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #f4f7f6; z-index: 2000; display: none; flex-direction: column;
-            overflow-y: auto; padding: 20px; box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f4f7f6;
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
         }
-        .feed-container { max-width: 1000px; margin: 0 auto; width: 100%; }
-        .feed-card { background: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 20px; }
-        .feed-title-row { display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-        .feed-title { font-size: 18px; font-weight: 700; color: var(--text); }
-        
-        .calc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
-        .input-group { margin-bottom: 10px; }
-        .input-group label { display: block; font-size: 11px; text-transform: uppercase; color: #7f8c8d; font-weight: bold; margin-bottom: 4px; }
-        .input-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-weight: bold; color: var(--text); box-sizing: border-box; }
-        .input-group input:focus { border-color: var(--accent); outline: none; }
-        .input-group .ro-val { padding: 8px; background: #f8f9fa; border: 1px solid #eee; border-radius: 5px; font-weight: bold; color: #2c3e50; }
-        
-        .result-highlight { background: #f0fff4; border: 1px solid var(--accent); padding: 15px; border-radius: 8px; text-align: center; }
-        .result-highlight h3 { margin: 0; font-size: 24px; color: var(--accent); }
-        .result-highlight small { text-transform: uppercase; font-size: 10px; color: #7f8c8d; font-weight: bold; }
 
-        .chart-box { height: 350px; width: 100%; position: relative; }
+        .feed-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+        }
 
-        .btn-save { padding: 6px 12px; background: #34495e; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer; }
-        .btn-save:hover { background: #2c3e50; }
-        .save-status { font-size: 11px; color: var(--growth); font-weight: bold; margin-right: 10px; display: none; }
+        .feed-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .feed-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .feed-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .input-group {
+            margin-bottom: 10px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #7f8c8d;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-weight: bold;
+            color: var(--text);
+            box-sizing: border-box;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        .input-group .ro-val {
+            padding: 8px;
+            background: #f8f9fa;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .result-highlight {
+            background: #f0fff4;
+            border: 1px solid var(--accent);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .result-highlight h3 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--accent);
+        }
+
+        .result-highlight small {
+            text-transform: uppercase;
+            font-size: 10px;
+            color: #7f8c8d;
+            font-weight: bold;
+        }
+
+        .chart-box {
+            height: 350px;
+            width: 100%;
+            position: relative;
+        }
+
+        .btn-save {
+            padding: 6px 12px;
+            background: #34495e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .btn-save:hover {
+            background: #2c3e50;
+        }
+
+        .save-status {
+            font-size: 11px;
+            color: var(--growth);
+            font-weight: bold;
+            margin-right: 10px;
+            display: none;
+        }
     </style>
 </head>
+
 <body>
 
-<div id="map">
-    <div class="map-controls">
-        <div id="latest-date" class="date-label">LATEST DATA: --</div>
-        <div id="sat-layer-controls" class="layer-group">
-            <button id="btn-ndvi" class="layer-btn active" onclick="setLayerMode('ndvi')">NDVI SATELLITE</button>
-            <button id="btn-cover" class="layer-btn" onclick="setLayerMode('cover')">COVER MAP</button>
-        </div>
-        <div id="legend" class="legend-box">
-            <div style="font-size: 9px; color: #999; margin-bottom: 8px; text-transform: uppercase;">Cover Scale (kgDM/ha)</div>
-            <div class="legend-item"><div class="legend-color" style="background:#00441b"></div> > 2,800</div>
-            <div class="legend-item"><div class="legend-color" style="background:#238b45"></div> 2,000 - 2,400</div>
-            <div class="legend-item"><div class="legend-color" style="background:#a1d99b"></div> < 1,600</div>
-            <hr style="border:0; border-top:1px solid #eee; margin:8px 0;">
-            <div class="legend-item"><div class="legend-color" style="background:#3498db"></div> Partial Grazed</div>
-            <div class="legend-item"><div class="legend-color" style="background:#ff7675"></div> Out of Rotation</div>
-        </div>
-    </div>
-
-    <div id="feed-view">
-        <div class="feed-container">
-            <div class="feed-card">
-                <div class="feed-title">Feed Wedge & Demand</div>
-                <div class="chart-box">
-                    <canvas id="wedgeChart"></canvas>
+    <div id="map">
+        <div class="map-controls">
+            <div id="latest-date" class="date-label">LATEST DATA: --</div>
+            <div id="sat-layer-controls" class="layer-group">
+                <button id="btn-ndvi" class="layer-btn active" onclick="setLayerMode('ndvi')">NDVI SATELLITE</button>
+                <button id="btn-cover" class="layer-btn" onclick="setLayerMode('cover')">COVER MAP</button>
+            </div>
+            <div id="legend" class="legend-box">
+                <div style="font-size: 9px; color: #999; margin-bottom: 8px; text-transform: uppercase;">Cover Scale
+                    (kgDM/ha)</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:#00441b"></div> > 2,800
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:#238b45"></div> 2,000 - 2,400
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background:#a1d99b"></div>
+                    < 1,600</div>
+                        <hr style="border:0; border-top:1px solid #eee; margin:8px 0;">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background:#3498db"></div> High Cloud Cover
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background:#ff7675"></div> Out of Rotation
+                        </div>
                 </div>
             </div>
 
-            <div class="feed-card">
-                <div class="feed-title-row">
-                    <div class="feed-title">Rotation Parameters</div>
-                    <div>
-                        <span id="save-msg" class="save-status">SAVED TO CLOUD!</span>
-                        <button class="btn-save" onclick="saveToCloud()">SAVE TO CLOUD</button>
+            <div id="feed-view">
+                <div class="feed-container">
+                    <div class="feed-card">
+                        <div class="feed-title">Feed Wedge & Demand</div>
+                        <div class="chart-box">
+                            <canvas id="wedgeChart"></canvas>
+                        </div>
                     </div>
-                </div>
-                <div class="calc-grid">
-                    <div class="input-group">
-                        <label>Total Area (Rotation)</label>
-                        <div id="feed-area-total" class="ro-val">0</div>
+
+                    <div class="feed-card">
+                        <div class="feed-title-row">
+                            <div class="feed-title">Rotation Parameters</div>
+                            <div>
+                                <span id="save-msg" class="save-status">SAVED TO CLOUD!</span>
+                                <button class="btn-save" onclick="saveToCloud()">SAVE TO CLOUD</button>
+                            </div>
+                        </div>
+                        <div class="calc-grid">
+                            <div class="input-group">
+                                <label>Total Area (Rotation)</label>
+                                <div id="feed-area-total" class="ro-val">0</div>
+                            </div>
+                            <div class="input-group">
+                                <label>Farm Avg Cover</label>
+                                <div id="feed-avg-cover" class="ro-val">0</div>
+                            </div>
+                            <div class="input-group">
+                                <label>Farm Avg Growth</label>
+                                <div id="feed-avg-growth" class="ro-val">0</div>
+                            </div>
+                            <div class="input-group">
+                                <label>Post Grazing Residual</label>
+                                <input type="number" id="inp-residual" value="1500" oninput="saveAndRecalc()">
+                            </div>
+                        </div>
+                        <div class="calc-grid" style="margin-top:15px;">
+                            <div class="input-group">
+                                <label>Number of Cows</label>
+                                <input type="number" id="inp-cows" value="500" oninput="saveAndRecalc()">
+                            </div>
+                            <div class="input-group">
+                                <label>Avg Daily Intake (kgDM/cow)</label>
+                                <input type="number" id="inp-intake" value="18" oninput="saveAndRecalc()">
+                            </div>
+                            <div class="input-group">
+                                <label>Rotation Length (days)</label>
+                                <input type="number" id="inp-round" value="25" oninput="saveAndRecalc()">
+                            </div>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label>Farm Avg Cover</label>
-                        <div id="feed-avg-cover" class="ro-val">0</div>
+
+                    <div class="feed-card">
+                        <div class="feed-title">Allocation & Targets</div>
+                        <div class="calc-grid">
+                            <div class="result-highlight">
+                                <h3 id="res-target-pre">0</h3>
+                                <small>Calculated Pre-graze Target</small>
+                            </div>
+                            <div class="result-highlight">
+                                <h3 id="res-area-day">0</h3>
+                                <small>Area Available (ha/day)</small>
+                            </div>
+                            <div class="result-highlight">
+                                <h3 id="res-area-cow">0</h3>
+                                <small>Area per Cow (m²/day)</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label>Farm Avg Growth</label>
-                        <div id="feed-avg-growth" class="ro-val">0</div>
+
+                    <div class="feed-card">
+                        <div class="feed-title">Supplement Calculator</div>
+                        <div class="calc-grid">
+                            <div class="input-group">
+                                <label>Calc. Pre-graze Target</label>
+                                <div id="feed-target-copy" class="ro-val">0</div>
+                            </div>
+                            <div class="input-group">
+                                <label>Actual Pre-grazing Cover (User)</label>
+                                <input type="number" id="inp-actual-pre" value="2800" oninput="saveAndRecalc()">
+                            </div>
+                            <div class="result-highlight" style="border-color:var(--warning); background:#fffaf0;">
+                                <h3 id="res-supp" style="color:var(--warning)">0</h3>
+                                <small>Supplement Required (kg/cow/day)</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label>Post Grazing Residual</label>
-                        <input type="number" id="inp-residual" value="1500" oninput="saveAndRecalc()">
-                    </div>
-                </div>
-                <div class="calc-grid" style="margin-top:15px;">
-                    <div class="input-group">
-                        <label>Number of Cows</label>
-                        <input type="number" id="inp-cows" value="500" oninput="saveAndRecalc()">
-                    </div>
-                    <div class="input-group">
-                        <label>Avg Daily Intake (kgDM/cow)</label>
-                        <input type="number" id="inp-intake" value="18" oninput="saveAndRecalc()">
-                    </div>
-                    <div class="input-group">
-                        <label>Rotation Length (days)</label>
-                        <input type="number" id="inp-round" value="25" oninput="saveAndRecalc()">
-                    </div>
+
                 </div>
             </div>
+        </div>
 
-            <div class="feed-card">
-                <div class="feed-title">Allocation & Targets</div>
-                <div class="calc-grid">
-                    <div class="result-highlight">
-                        <h3 id="res-target-pre">0</h3>
-                        <small>Calculated Pre-graze Target</small>
+        <div id="sidebar">
+            <div class="header">
+                <div class="mode-toggle-container">
+                    <button id="btn-mode-sat" class="mode-btn" onclick="switchDashboardMode('satellite')">SATELLITE
+                        MODE</button>
+                    <button id="btn-mode-man" class="mode-btn active" onclick="switchDashboardMode('manual')">MANUAL
+                        FARMWALK</button>
+                    <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED
+                        WEDGE</button>
+                </div>
+
+                <div id="farm-select-container" class="farm-select-container">
+                    <button id="btn-farm-wainono" class="farm-btn active"
+                        onclick="switchFarm('wainono')">WAINONO</button>
+                    <button id="btn-farm-teruahete" class="farm-btn" onclick="switchFarm('teruahete')">TE
+                        RUAHETE</button>
+                </div>
+
+                <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA CLOUDY OR LOW
+                    NDVI - SHOWING PREVIOUS DATE</div>
+
+                <div id="calibration-box" class="calib-box"
+                    style="display:none; margin-bottom: 0; border-bottom: none; border-bottom-left-radius: 0; border-bottom-right-radius: 0; background: #fff; border: 1px solid #ddd; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 6px 10px;">
+                    <div class="calib-row" id="calib-hover-area" style="padding: 0;">
+                        <div
+                            style="font-weight:800; color:#2c3e50; font-size:9px; text-transform:uppercase; letter-spacing: 0.5px;">
+                            SATELLITE CALIBRATION</div>
+                        <span id="calib-pill" class="calib-pill" style="font-size: 8px; padding: 1px 6px;">--</span>
                     </div>
-                    <div class="result-highlight">
-                        <h3 id="res-area-day">0</h3>
-                        <small>Area Available (ha/day)</small>
-                    </div>
-                    <div class="result-highlight">
-                        <h3 id="res-area-cow">0</h3>
-                        <small>Area per Cow (m²/day)</small>
+                    <div id="calib-text" style="margin-top:4px; line-height:1.2; font-size: 10px; display:none;">--
                     </div>
                 </div>
-            </div>
 
-            <div class="feed-card">
-                <div class="feed-title">Supplement Calculator</div>
-                <div class="calc-grid">
-                    <div class="input-group">
-                        <label>Calc. Pre-graze Target</label>
-                        <div id="feed-target-copy" class="ro-val">0</div>
-                    </div>
-                    <div class="input-group">
-                        <label>Actual Pre-grazing Cover (User)</label>
-                        <input type="number" id="inp-actual-pre" value="2800" oninput="saveAndRecalc()">
-                    </div>
-                    <div class="result-highlight" style="border-color:var(--warning); background:#fffaf0;">
-                        <h3 id="res-supp" style="color:var(--warning)">0</h3>
-                        <small>Supplement Required (kg/cow/day)</small>
+                <div class="avg-box"
+                    style="border-top-left-radius: 0; border-top-right-radius: 0; border: 1px solid #ddd; border-top: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div class="avg-row">
+                        <div class="avg-item"><small>FARM AVG COVER</small>
+                            <div id="total-avg" style="font-size: 22px; font-weight: bold;">0</div>
+                            <small>kgDM/ha</small>
+                        </div>
+                        <div class="avg-item"><small>GROWTH</small>
+                            <div id="avg-growth" style="font-size: 22px; font-weight: bold;">0</div>
+                            <small>kg/day</small>
+                        </div>
                     </div>
                 </div>
+                <div class="sync-note">Synchronized on <span id="sync-time">...</span></div>
+                <input type="text" id="search" placeholder="Search paddocks...">
             </div>
-
-        </div>
-    </div>
-</div>
-
-<div id="sidebar">
-    <div class="header">
-        <div class="mode-toggle-container">
-            <button id="btn-mode-sat" class="mode-btn" onclick="switchDashboardMode('satellite')">SATELLITE MODE</button>
-            <button id="btn-mode-man" class="mode-btn active" onclick="switchDashboardMode('manual')">MANUAL FARMWALK</button>
-            <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED WEDGE</button>
+            <div id="list">Loading data...</div>
         </div>
 
-        <div id="farm-select-container" class="farm-select-container">
-            <button id="btn-farm-wainono" class="farm-btn active" onclick="switchFarm('wainono')">WAINONO</button>
-            <button id="btn-farm-teruahete" class="farm-btn" onclick="switchFarm('teruahete')">TE RUAHETE</button>
-        </div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+            /* === CONFIGURATION === */
+            const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwu-gm4MizN_14NZCRN7DxD-jpq1IiKSY-5t_AuIV2eGHdRz9BXky-tHPd4WZlAqA42Ug/exec";
 
-        <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
-        
-        <div id="calibration-box" class="calib-box" style="display:none;">
-            <div class="calib-row" id="calib-hover-area">
-                <div style="font-weight:800; color:#2c3e50; font-size:10px; text-transform:uppercase;">FARMWALK CALIBRATION CONFIDENCE</div>
-                <span id="calib-pill" class="calib-pill">--</span>
-            </div>
-            <div id="calib-text" style="margin-top:6px; line-height:1.35; display:none;">--</div>
-        </div>
+            // SHARED NDVI CSV (both farms)
+            const SHARED_NDVI_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
 
-        <div class="avg-box">
-            <div class="avg-row">
-                <div class="avg-item"><small>FARM AVG COVER</small><div id="total-avg" style="font-size: 22px; font-weight: bold;">0</div><small>kgDM/ha</small></div>
-                <div class="avg-item"><small>GROWTH</small><div id="avg-growth" style="font-size: 22px; font-weight: bold;">0</div><small>kg/day</small></div>
-            </div>
-        </div>
-        <div class="sync-note">Synchronized on <span id="sync-time">...</span></div>
-        <input type="text" id="search" placeholder="Search paddocks...">
-    </div>
-    <div id="list">Loading data...</div>
-</div>
+            /* FARM DATA CONFIGURATION */
+            const FARM_CONFIG = {
+                wainono: {
+                    center: [-44.118829, 170.8550364],
+                    geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson",
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-/* === CONFIGURATION === */
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwu-gm4MizN_14NZCRN7DxD-jpq1IiKSY-5t_AuIV2eGHdRz9BXky-tHPd4WZlAqA42Ug/exec"; 
+                    // BOTH farms use the SAME NDVI csv + map tiles source
+                    data_csv: SHARED_NDVI_CSV,
 
-// SHARED NDVI CSV (both farms)
-const SHARED_NDVI_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
+                    // IMPORTANT: per your instruction
+                    // WHEN WE CLICK ON WAINONO exclusions_csv WILL BE ... gid=653318078
+                    exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv",
 
-/* FARM DATA CONFIGURATION */
-const FARM_CONFIG = {
-    wainono: {
-        center: [-44.118829, 170.8550364],
-        geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson",
+                    manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv",
+                    manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv",
+                    feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv"
+                },
+                teruahete: {
+                    center: [-44.150000, 170.800000], // placeholder center
+                    geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson", // placeholder geojson
 
-        // BOTH farms use the SAME NDVI csv + map tiles source
-        data_csv: SHARED_NDVI_CSV,
+                    // BOTH farms use the SAME NDVI csv + map tiles source
+                    data_csv: SHARED_NDVI_CSV,
 
-        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv",
+                    // IMPORTANT: per your instruction
+                    // WHEN WE CLICK ON TE RUAHETE exclusions_csv WILL BE ... gid=729706976
+                    exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=729706976&single=true&output=csv",
 
-        // IMPORTANT: per your instruction
-        // WHEN WE CLICK ON WAINONO exclusions_csv WILL BE ... gid=653318078
-        exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv",
+                    manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv",
+                    manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv",
+                    feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv"
+                }
+            };
 
-        manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv",
-        manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv",
-        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv"
-    },
-    teruahete: {
-        center: [-44.150000, 170.800000], // placeholder center
-        geojson: "https://storage.googleapis.com/ndvi-exports/wainono.geojson", // placeholder geojson
+            /* Rules */
+            const NDVI_LOW_THRESHOLD = 0.20;
+            const NDVI_LOW_MAX_PCT = 0.15;
+            const SCENE_LOOKBACK = 3;
+            const GAP_DAYS_MAX = 3;
+            const GRAZE_FACTOR = 0.65;
+            const RATIO_MIN = 0.55;
+            const RATIO_MAX = 1.80;
 
-        // BOTH farms use the SAME NDVI csv + map tiles source
-        data_csv: SHARED_NDVI_CSV,
+            /* State */
+            let currentFarmId = 'wainono';
+            let map, ndviLayer, geoLayer, baseLayer;
+            let satellitePaddockData = [];
+            let manualModeData = [];
+            let paddockMap = {};
+            let areaLookup = {};
+            let excludedPaddocks = new Map();
+            let currentViewMode = 'ndvi';
+            let currentDashboardMode = 'manual';
+            let manualEntries = [];
+            let farmGrowthRate = 0;
+            let calibrationModel = null;
+            let selectedSceneTs = null;
+            let satelliteHistory = {};
+            let wedgeChartInstance = null;
 
-        partial_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=71697510&single=true&output=csv",
+            // ✅ Shared calibration model computed from TE RUAHETE and applied to WAINONO
+            let sharedCalibrationModel = null;
 
-        // IMPORTANT: per your instruction
-        // WHEN WE CLICK ON TE RUAHETE exclusions_csv WILL BE ... gid=729706976
-        exclusions_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=729706976&single=true&output=csv",
-
-        manual_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv",
-        manual_mode_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv",
-        feed_settings_csv: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=605870127&single=true&output=csv"
-    }
-};
-
-/* Rules */
-const NDVI_LOW_THRESHOLD = 0.30;
-const NDVI_LOW_MAX_PCT   = 0.60;
-const SCENE_LOOKBACK     = 3;
-const GAP_DAYS_MAX       = 3;
-const GRAZE_FACTOR       = 0.65;
-const RATIO_MIN          = 0.55;
-const RATIO_MAX          = 1.80;
-
-/* State */
-let currentFarmId = 'wainono';
-let map, ndviLayer, geoLayer, baseLayer;
-let satellitePaddockData = [];
-let manualModeData = [];      
-let paddockMap = {};
-let areaLookup = {}; 
-let excludedPaddocks = new Map(); 
-let partialPaddocks = new Set();
-let currentViewMode = 'ndvi';   
-let currentDashboardMode = 'manual';
-let manualEntries = [];
-let farmGrowthRate = 0;
-let calibrationModel = null;
-let selectedSceneTs = null;
-let satelliteHistory = {};
-let wedgeChartInstance = null;
-
-// ✅ Shared calibration model computed from TE RUAHETE and applied to WAINONO
-let sharedCalibrationModel = null;
-
-/* Helpers */
-function normName(s){ return (s||"").trim().toLowerCase(); }
-function parseStrangeDate(dateStr) {
-    if (!dateStr) return null;
-    const s = (""+dateStr).trim();
-    if (s === "") return null;
-    try {
-        if (!isNaN(s) && s.length > 5) {
-            const d = new Date((parseFloat(s) - 25569) * 86400 * 1000);
-            return isNaN(d) ? null : d;
-        }
-    } catch(e){}
-    if (s.includes('/')) {
-        const parts = s.split('/');
-        if (parts.length === 3) {
-            const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            return isNaN(d) ? null : d;
-        }
-    }
-    const d = new Date(s);
-    return isNaN(d) ? null : d;
-}
-function fmtNZ(dateObj){ return dateObj ? dateObj.toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' }) : ""; }
-function safeNum(x){
-    const s = (""+x).replace(/,/g,'').trim();
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-}
-
-function focusPaddockOnMap(paddockName, color) {
-    if (!paddockMap[paddockName] || !geoLayer) return;
-    updateGeoStyles();
-    const layer = paddockMap[paddockName];
-    try {
-        const bounds = layer.getBounds();
-        if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
-    } catch (e) {}
-    layer.setStyle({ color: color, weight: 4, fillOpacity: 0.5 });
-    if (layer.bringToFront) layer.bringToFront();
-}
-
-/* Farm Switching Logic */
-function switchFarm(farmId) {
-    if(!FARM_CONFIG[farmId]) return;
-    currentFarmId = farmId;
-    
-    // Update UI Buttons
-    document.getElementById('btn-farm-wainono').classList.toggle('active', farmId === 'wainono');
-    document.getElementById('btn-farm-teruahete').classList.toggle('active', farmId === 'teruahete');
-    
-    // Clear existing data
-    satellitePaddockData = [];
-    manualModeData = [];
-    paddockMap = {};
-    areaLookup = {};
-    excludedPaddocks = new Map();
-    partialPaddocks = new Set();
-    manualEntries = [];
-    satelliteHistory = {};
-    
-    // Reset Map Layers
-    if (geoLayer) map.removeLayer(geoLayer);
-    if (ndviLayer) map.removeLayer(ndviLayer);
-    geoLayer = null;
-    ndviLayer = null;
-
-    // Reset Map View
-    map.setView(FARM_CONFIG[farmId].center, 13);
-    
-    document.getElementById('list').innerHTML = "Loading farm data...";
-    
-    // Reload everything
-    startDataLoad();
-}
-
-/* Loaders */
-async function loadManualRankCSV() {
-    try {
-        const res = await fetch(FARM_CONFIG[currentFarmId].manual_mode_csv + "&t=" + Date.now());
-        const txt = await res.text();
-        Papa.parse(txt, {
-            header: false,
-            complete: (results) => {
-                const rows = results.data || [];
-                if (rows.length < 1) return;
-                const latestDate = parseStrangeDate(rows[0][1]);
-                const prevDate = parseStrangeDate(rows[0][2]);
-                const dayDiff = (latestDate && prevDate) ? Math.max(1, (latestDate - prevDate) / 86400000) : 1;
-                
-                manualModeData = rows.slice(1).map(r => {
-                    const name = (r[0] || "").trim();
-                    const latestCover = safeNum(r[1]);
-                    const prevCover = safeNum(r[2]);
-                    const isOut = (latestCover === 0);
-                    const growth = isOut ? 0 : Math.round((latestCover - prevCover) / dayDiff);
-
-                    return {
-                        name, latest: { cover: latestCover, formattedDate: fmtNZ(latestDate) },
-                        previous: { cover: prevCover, formattedDate: fmtNZ(prevDate) },
-                        growthRate: growth, isOut: isOut, area: areaLookup[name] || 0
-                    };
-                });
-                
-                Object.keys(paddockMap).forEach(pName => {
-                    if (!manualModeData.find(m => m.name === pName)) {
-                        manualModeData.push({
-                            name: pName, latest: { cover: 0, formattedDate: "--" },
-                            previous: { cover: 0, formattedDate: "--" },
-                            growthRate: 0, isOut: true, area: areaLookup[pName] || 0
-                        });
+            /* Helpers */
+            function normName(s) { return (s || "").trim().toLowerCase(); }
+            function parseStrangeDate(dateStr) {
+                if (!dateStr) return null;
+                const s = ("" + dateStr).trim();
+                if (s === "") return null;
+                try {
+                    if (!isNaN(s) && s.length > 5) {
+                        const d = new Date((parseFloat(s) - 25569) * 86400 * 1000);
+                        return isNaN(d) ? null : d;
                     }
-                });
-
-                if (currentDashboardMode === 'manual') {
-                    renderDashboard();
-                    updateGeoStyles(); 
+                } catch (e) { }
+                if (s.includes('/')) {
+                    const parts = s.split('/');
+                    if (parts.length === 3) {
+                        const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                        return isNaN(d) ? null : d;
+                    }
                 }
+                const d = new Date(s);
+                return isNaN(d) ? null : d;
             }
-        });
-    } catch (e) {}
-}
-
-async function loadManualSheet(){
-    manualEntries = [];
-    try{
-        const res = await fetch(FARM_CONFIG[currentFarmId].manual_csv + "&t=" + Date.now());
-        const txt = await res.text();
-        Papa.parse(txt, {
-            header: true, skipEmptyLines: true,
-            complete: (results) => {
-                const rows = results.data || [];
-                const fields = (results.meta && results.meta.fields) ? results.meta.fields : [];
-                const f = fields.map(h => (h||"").trim().toLowerCase());
-                const idxName = f.findIndex(h => h.includes('paddock'));
-                const idxDate = f.findIndex(h => h === 'date' || h.includes('date'));
-                const idxCover = f.findIndex(h => h.includes('measured') || h.includes('manual') || h.includes('cover') || h.includes('kg'));
-                rows.forEach(r => {
-                    const name = (idxName>=0 ? r[fields[idxName]] : r.paddock_name || r.paddock || r.name || "").toString().trim();
-                    const dateObj = parseStrangeDate(idxDate>=0 ? r[fields[idxDate]] : r.date);
-                    const cover = safeNum(idxCover>=0 ? r[fields[idxCover]] : (r.measured_cover || r.cover || r.manual_cover));
-                    if(!name || !dateObj || isNaN(cover) || cover <= 0) return;
-                    manualEntries.push({ name, lower: normName(name), dateObj, cover: Math.round(cover) });
-                });
+            function fmtNZ(dateObj) { return dateObj ? dateObj.toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' }) : ""; }
+            function safeNum(x) {
+                const s = ("" + x).replace(/,/g, '').trim();
+                const n = parseFloat(s);
+                return isNaN(n) ? 0 : n;
             }
-        });
-    } catch(e){}
-}
 
-async function loadStatusSheets() {
-    try {
-        const [resEx, resPa] = await Promise.all([
-            fetch(FARM_CONFIG[currentFarmId].exclusions_csv + "&t=" + Date.now()),
-            fetch(FARM_CONFIG[currentFarmId].partial_csv + "&t=" + Date.now())
-        ]);
-        const textEx = await resEx.text();
-        textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
-            const cols = line.split(',').map(c => c.trim().toLowerCase());
-            if(cols[0]) excludedPaddocks.set(cols[0], cols[1] || 'out');
-        });
-        const textPa = await resPa.text();
-        textPa.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
-            const name = line.split(',')[0].trim().toLowerCase();
-            if(name) partialPaddocks.add(name);
-        });
-    } catch (e) {
-        console.warn("Status sheets not loaded");
-    }
-}
+            function focusPaddockOnMap(paddockName, color) {
+                if (!paddockMap[paddockName] || !geoLayer) return;
+                updateGeoStyles();
+                const layer = paddockMap[paddockName];
+                try {
+                    const bounds = layer.getBounds();
+                    if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
+                } catch (e) { }
+                layer.setStyle({ color: color, weight: 4, fillOpacity: 0.5 });
+                if (layer.bringToFront) layer.bringToFront();
+            }
 
-/* ---------- PRECOMPUTE TE RUAHETE CALIBRATION (READ EXCLUSIONS FIRST) ---------- */
-async function precomputeSharedCalibrationFromTeRuahete() {
-    try {
-        const farmId = 'teruahete';
+            /* Farm Switching Logic */
+            function switchFarm(farmId) {
+                if (!FARM_CONFIG[farmId]) return;
+                currentFarmId = farmId;
 
-        // 1) Load exclusions + partial for Te Ruahete first
-        const exMap = new Map();
-        const paSet = new Set();
-        try {
-            const [resEx, resPa] = await Promise.all([
-                fetch(FARM_CONFIG[farmId].exclusions_csv + "&t=" + Date.now()),
-                fetch(FARM_CONFIG[farmId].partial_csv + "&t=" + Date.now())
-            ]);
-            const textEx = await resEx.text();
-            textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
-                const cols = line.split(',').map(c => c.trim().toLowerCase());
-                if(cols[0]) exMap.set(cols[0], cols[1] || 'out');
-            });
-            const textPa = await resPa.text();
-            textPa.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
-                const name = line.split(',')[0].trim().toLowerCase();
-                if(name) paSet.add(name);
-            });
-        } catch(e) {}
+                // Update UI Buttons
+                document.getElementById('btn-farm-wainono').classList.toggle('active', farmId === 'wainono');
+                document.getElementById('btn-farm-teruahete').classList.toggle('active', farmId === 'teruahete');
 
-        // 2) Load manual entries for Te Ruahete
-        const manualLocal = [];
-        try {
-            const res = await fetch(FARM_CONFIG[farmId].manual_csv + "&t=" + Date.now());
-            const txt = await res.text();
-            Papa.parse(txt, {
-                header: true, skipEmptyLines: true,
-                complete: (results) => {
-                    const rows = results.data || [];
-                    const fields = (results.meta && results.meta.fields) ? results.meta.fields : [];
-                    const f = fields.map(h => (h||"").trim().toLowerCase());
-                    const idxName = f.findIndex(h => h.includes('paddock'));
-                    const idxDate = f.findIndex(h => h === 'date' || h.includes('date'));
-                    const idxCover = f.findIndex(h => h.includes('measured') || h.includes('manual') || h.includes('cover') || h.includes('kg'));
-                    rows.forEach(r => {
-                        const name = (idxName>=0 ? r[fields[idxName]] : r.paddock_name || r.paddock || r.name || "").toString().trim();
-                        const dateObj = parseStrangeDate(idxDate>=0 ? r[fields[idxDate]] : r.date);
-                        const cover = safeNum(idxCover>=0 ? r[fields[idxCover]] : (r.measured_cover || r.cover || r.manual_cover));
-                        if(!name || !dateObj || isNaN(cover) || cover <= 0) return;
-                        manualLocal.push({ name, lower: normName(name), dateObj, cover: Math.round(cover) });
-                    });
-                }
-            });
-        } catch(e) {}
+                // Clear existing data
+                satellitePaddockData = [];
+                manualModeData = [];
+                paddockMap = {};
+                areaLookup = {};
+                excludedPaddocks = new Map();
+                manualEntries = [];
+                satelliteHistory = {};
 
-        // 3) Load shared NDVI CSV and build history (no UI)
-        const response = await fetch(SHARED_NDVI_CSV + "&t=" + Date.now());
-        const csvText = await response.text();
+                // Reset Map Layers
+                if (geoLayer) map.removeLayer(geoLayer);
+                if (ndviLayer) map.removeLayer(ndviLayer);
+                geoLayer = null;
+                ndviLayer = null;
 
-        let model = null;
+                // Reset Map View
+                map.setView(FARM_CONFIG[farmId].center, 13);
 
-        Papa.parse(csvText, {
-            header: true, skipEmptyLines: true,
-            complete: (results) => {
-                const grouped = {};
-                const updateCol = results.meta.fields.find(c => c.toLowerCase().includes('update')) || 'latest-update';
+                document.getElementById('list').innerHTML = "Loading farm data...";
 
-                results.data.forEach(row => {
-                    const name = row.paddock_name; if(!name) return;
-                    const ndvi = parseFloat(row.ndvi_mean || row.ndvi_effective);
-                    const cloud = parseFloat(row.cloud_pc) || 0;
-                    const dateObj = parseStrangeDate(row.date);
-                    const rawUrl = (row[updateCol] || row.map_id || "").trim();
-                    if(!dateObj) return;
-                    if(!grouped[name]) grouped[name] = [];
-                    grouped[name].push({ name, ndvi, cloud, dateObj, url: rawUrl.replace(/['"]+/g, '') });
-                });
+                // Reload everything
+                startDataLoad();
+            }
 
-                const pick = pickSceneTimestamp(grouped);
-                const tsLocal = pick.ts;
+            /* Loaders */
+            async function loadManualRankCSV() {
+                try {
+                    const res = await fetch(FARM_CONFIG[currentFarmId].manual_mode_csv + "&t=" + Date.now());
+                    const txt = await res.text();
+                    Papa.parse(txt, {
+                        header: false,
+                        complete: (results) => {
+                            const rows = results.data || [];
+                            if (rows.length < 1) return;
+                            const latestDate = parseStrangeDate(rows[0][1]);
+                            const prevDate = parseStrangeDate(rows[0][2]);
+                            const dayDiff = (latestDate && prevDate) ? Math.max(1, (latestDate - prevDate) / 86400000) : 1;
 
-                const historyLocal = {};
-                Object.keys(grouped).forEach(name => {
-                    let all = grouped[name].slice().sort((a,b) => b.dateObj - a.dateObj);
-                    let selected = (tsLocal !== null) ? (all.find(e => e.dateObj && e.dateObj.getTime() === tsLocal) || null) : null;
-                    let ordered = selected ? [selected] : [];
-                    ordered = ordered.concat(all.filter(e => !selected || e.dateObj.getTime() < tsLocal));
+                            manualModeData = rows.slice(1).map(r => {
+                                const name = (r[0] || "").trim();
+                                const latestCover = safeNum(r[1]);
+                                const prevCover = safeNum(r[2]);
+                                const isOut = (latestCover === 0);
+                                const growth = isOut ? 0 : Math.round((latestCover - prevCover) / dayDiff);
 
-                    historyLocal[name] = ordered.map(entry => {
-                        let cover = 0;
-                        if (!isNaN(entry.ndvi)) {
-                            let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
-                            let mod = (entry.cloud <= 10) ? 1 : (entry.cloud > 30 ? 1 : (entry.cloud > 20 ? 1 : 1.0));
-                            cover = Math.max(0, Math.round(base * mod));
+                                return {
+                                    name, latest: { cover: latestCover, formattedDate: fmtNZ(latestDate) },
+                                    previous: { cover: prevCover, formattedDate: fmtNZ(prevDate) },
+                                    growthRate: growth, isOut: isOut, area: areaLookup[name] || 0
+                                };
+                            });
+
+                            Object.keys(paddockMap).forEach(pName => {
+                                if (!manualModeData.find(m => m.name === pName)) {
+                                    manualModeData.push({
+                                        name: pName, latest: { cover: 0, formattedDate: "--" },
+                                        previous: { cover: 0, formattedDate: "--" },
+                                        growthRate: 0, isOut: true, area: areaLookup[pName] || 0
+                                    });
+                                }
+                            });
+
+                            if (currentDashboardMode === 'manual') {
+                                renderDashboard();
+                                updateGeoStyles();
+                            }
                         }
-                        return { ...entry, cover_raw: cover, cover: cover, formattedDate: fmtNZ(entry.dateObj) };
                     });
-                });
+                } catch (e) { }
+            }
 
-                // Estimate growth using Te Ruahete exclusions/partials (no area weighting)
-                const gLocal = (function estimateGrowthNoArea(history){
-                    let tWGrowth = 0, tAreaG = 0;
-                    Object.keys(history).forEach(name => {
-                        const sorted = history[name]; if(!sorted || sorted.length < 2) return;
-                        const latest = sorted[0]; const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
-                        if(!previous || !latest || !latest.dateObj || !previous.dateObj) return;
-                        const dayDiff = (latest.dateObj - previous.dateObj)/86400000;
-                        if(dayDiff <= 0) return;
-                        const lc = latest.cover_raw; const pc = previous.cover_raw;
-                        if(!(lc > pc)) return;
-                        const g = Math.round((lc - pc)/dayDiff);
-                        if(!isFinite(g) || g <= 0) return;
-
-                        const isOut = !!exMap.get(normName(name));
-                        const isPartial = paSet.has(normName(name));
-                        if(isOut || isPartial) return;
-
-                        tWGrowth += g;
-                        tAreaG += 1;
+            async function loadManualSheet() {
+                manualEntries = [];
+                try {
+                    const res = await fetch(FARM_CONFIG[currentFarmId].manual_csv + "&t=" + Date.now());
+                    const txt = await res.text();
+                    Papa.parse(txt, {
+                        header: true, skipEmptyLines: true,
+                        complete: (results) => {
+                            const rows = results.data || [];
+                            const fields = (results.meta && results.meta.fields) ? results.meta.fields : [];
+                            const f = fields.map(h => (h || "").trim().toLowerCase());
+                            const idxName = f.findIndex(h => h.includes('paddock'));
+                            const idxDate = f.findIndex(h => h === 'date' || h.includes('date'));
+                            const idxCover = f.findIndex(h => h.includes('measured') || h.includes('manual') || h.includes('cover') || h.includes('kg'));
+                            rows.forEach(r => {
+                                const name = (idxName >= 0 ? r[fields[idxName]] : r.paddock_name || r.paddock || r.name || "").toString().trim();
+                                const dateObj = parseStrangeDate(idxDate >= 0 ? r[fields[idxDate]] : r.date);
+                                const cover = safeNum(idxCover >= 0 ? r[fields[idxCover]] : (r.measured_cover || r.cover || r.manual_cover));
+                                if (!name || !dateObj || isNaN(cover) || cover <= 0) return;
+                                manualEntries.push({ name, lower: normName(name), dateObj, cover: Math.round(cover) });
+                            });
+                        }
                     });
-                    return tAreaG > 0 ? Math.round(tWGrowth/tAreaG) : 0;
-                })(historyLocal);
+                } catch (e) { }
 
-                // Build model using Te Ruahete exclusions/partials
-                const historyLower = {};
-                Object.keys(historyLocal).forEach(k => { historyLower[normName(k)] = historyLocal[k]; });
-
-                const pairs = [];
-                for(const m of manualLocal){
-                    const hist = historyLower[m.lower]; if(!hist || hist.length === 0) continue;
-                    if (paSet.has(m.lower)) continue;
-
-                    const s = hist[0]; if(!s || !s.dateObj) continue;
-                    const gapDays = Math.abs((m.dateObj - s.dateObj)/86400000);
-                    if(gapDays > GAP_DAYS_MAX) continue;
-
-                    const satRaw = s.cover_raw; if(!isFinite(satRaw) || satRaw <= 0) continue;
-                    const manualProjected = m.cover - (gLocal * gapDays);
-                    if(!isFinite(manualProjected) || manualProjected <= 0) continue;
-
-                    if(manualProjected < satRaw * GRAZE_FACTOR) continue;
-                    const ratio = manualProjected / satRaw;
-                    if(ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
-
-                    pairs.push({ x: satRaw, y: manualProjected });
-                }
-
-                if(pairs.length >= 4){
-                    const n = pairs.length;
-                    const meanX = pairs.reduce((a,p)=>a+p.x,0)/n;
-                    const meanY = pairs.reduce((a,p)=>a+p.y,0)/n;
-                    let num=0, den=0;
-                    pairs.forEach(p => { num += (p.x-meanX)*(p.y-meanY); den += (p.x-meanX)*(p.x-meanX); });
-                    const a = den !== 0 ? (num/den) : 1;
-                    const b = meanY - a*meanX;
-
-                    let ssTot=0, ssRes=0;
-                    pairs.forEach(p => {
-                        const pred = a*p.x + b;
-                        ssTot += (p.y-meanY)*(p.y-meanY);
-                        ssRes += (p.y-pred)*(p.y-pred);
-                    });
-
-                    model = { a, b, r2: ssTot !== 0 ? (1 - ssRes/ssTot) : 0, count: n };
+                // ✅ Fallback: if manual_csv had no valid entries, use manual_mode_csv (farmwalk ranking data) as calibration
+                if (manualEntries.length === 0) {
+                    try {
+                        const res2 = await fetch(FARM_CONFIG[currentFarmId].manual_mode_csv + "&t=" + Date.now());
+                        const txt2 = await res2.text();
+                        Papa.parse(txt2, {
+                            header: false, skipEmptyLines: true,
+                            complete: (results) => {
+                                const rows = results.data || [];
+                                if (rows.length < 2) return;
+                                // First row: ["Date", "25/02/2026", "18/02/2026", ...]
+                                const headerRow = rows[0];
+                                const latestDateStr = (headerRow[1] || "").trim();
+                                const latestDate = parseStrangeDate(latestDateStr);
+                                if (!latestDate) return;
+                                // Remaining rows: ["W1", "2276", "1940", ...]
+                                for (let i = 1; i < rows.length; i++) {
+                                    const r = rows[i];
+                                    const name = (r[0] || "").trim();
+                                    const cover = safeNum(r[1]);
+                                    if (!name || isNaN(cover) || cover <= 0) continue;
+                                    manualEntries.push({ name, lower: normName(name), dateObj: latestDate, cover: Math.round(cover) });
+                                }
+                                console.log(`[Calibration] Loaded ${manualEntries.length} entries from manual_mode_csv farmwalk (${latestDateStr})`);
+                            }
+                        });
+                    } catch (e) { console.warn("Fallback manual_mode_csv load failed"); }
                 }
             }
-        });
 
-        // Store
-        sharedCalibrationModel = model || null;
-    } catch(e) {
-        sharedCalibrationModel = null;
-    }
-}
-/* --------------------------------------------------------------------------- */
+            async function loadStatusSheets() {
+                try {
+                    const [resEx] = await Promise.all([
+                        fetch(FARM_CONFIG[currentFarmId].exclusions_csv + "&t=" + Date.now())
+                    ]);
+                    const textEx = await resEx.text();
+                    textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+                        const cols = line.split(',').map(c => c.trim().toLowerCase());
+                        if (cols[0]) excludedPaddocks.set(cols[0], cols[1] || 'out');
+                    });
+                } catch (e) {
+                    console.warn("Status sheets not loaded");
+                }
+            }
 
-async function loadFeedSettings() {
-    loadLocalFeedSettings();
+            /* ---------- PRECOMPUTE TE RUAHETE CALIBRATION (READ EXCLUSIONS FIRST) ---------- */
+            async function precomputeSharedCalibrationFromTeRuahete() {
+                try {
+                    const farmId = 'teruahete';
 
-    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
-        try {
-            const res = await fetch(GOOGLE_SCRIPT_URL + "?farm=" + currentFarmId);
-            const data = await res.json();
-            if(data) {
-                setFeedInputs(data);
+                    // 1) Load exclusions for Te Ruahete first
+                    const exMap = new Map();
+                    try {
+                        const [resEx] = await Promise.all([
+                            fetch(FARM_CONFIG[farmId].exclusions_csv + "&t=" + Date.now())
+                        ]);
+                        const textEx = await resEx.text();
+                        textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+                            const cols = line.split(',').map(c => c.trim().toLowerCase());
+                            if (cols[0]) exMap.set(cols[0], cols[1] || 'out');
+                        });
+                    } catch (e) { }
+
+                    // 2) Load manual entries for Te Ruahete
+                    const manualLocal = [];
+                    try {
+                        const res = await fetch(FARM_CONFIG[farmId].manual_csv + "&t=" + Date.now());
+                        const txt = await res.text();
+                        Papa.parse(txt, {
+                            header: true, skipEmptyLines: true,
+                            complete: (results) => {
+                                const rows = results.data || [];
+                                const fields = (results.meta && results.meta.fields) ? results.meta.fields : [];
+                                const f = fields.map(h => (h || "").trim().toLowerCase());
+                                const idxName = f.findIndex(h => h.includes('paddock'));
+                                const idxDate = f.findIndex(h => h === 'date' || h.includes('date'));
+                                const idxCover = f.findIndex(h => h.includes('measured') || h.includes('manual') || h.includes('cover') || h.includes('kg'));
+                                rows.forEach(r => {
+                                    const name = (idxName >= 0 ? r[fields[idxName]] : r.paddock_name || r.paddock || r.name || "").toString().trim();
+                                    const dateObj = parseStrangeDate(idxDate >= 0 ? r[fields[idxDate]] : r.date);
+                                    const cover = safeNum(idxCover >= 0 ? r[fields[idxCover]] : (r.measured_cover || r.cover || r.manual_cover));
+                                    if (!name || !dateObj || isNaN(cover) || cover <= 0) return;
+                                    manualLocal.push({ name, lower: normName(name), dateObj, cover: Math.round(cover) });
+                                });
+                            }
+                        });
+                    } catch (e) { }
+
+                    // ✅ Fallback: if manual_csv had no entries, use manual_mode_csv farmwalk data
+                    if (manualLocal.length === 0) {
+                        try {
+                            const res2 = await fetch(FARM_CONFIG[farmId].manual_mode_csv + "&t=" + Date.now());
+                            const txt2 = await res2.text();
+                            Papa.parse(txt2, {
+                                header: false, skipEmptyLines: true,
+                                complete: (results) => {
+                                    const rows = results.data || [];
+                                    if (rows.length < 2) return;
+                                    const headerRow = rows[0];
+                                    const latestDateStr = (headerRow[1] || "").trim();
+                                    const latestDate = parseStrangeDate(latestDateStr);
+                                    if (!latestDate) return;
+                                    for (let i = 1; i < rows.length; i++) {
+                                        const r = rows[i];
+                                        const name = (r[0] || "").trim();
+                                        const cover = safeNum(r[1]);
+                                        if (!name || isNaN(cover) || cover <= 0) continue;
+                                        manualLocal.push({ name, lower: normName(name), dateObj: latestDate, cover: Math.round(cover) });
+                                    }
+                                    console.log(`[Precompute] Loaded ${manualLocal.length} entries from manual_mode_csv farmwalk (${latestDateStr})`);
+                                }
+                            });
+                        } catch (e) { }
+                    }
+
+                    // 3) Load shared NDVI CSV and build history (no UI)
+                    const response = await fetch(SHARED_NDVI_CSV + "&t=" + Date.now());
+                    const csvText = await response.text();
+
+                    let model = null;
+
+                    Papa.parse(csvText, {
+                        header: true, skipEmptyLines: true,
+                        complete: (results) => {
+                            const grouped = {};
+                            const updateCol = results.meta.fields.find(c => c.toLowerCase().includes('update')) || 'latest-update';
+
+                            results.data.forEach(row => {
+                                const name = row.paddock_name; if (!name) return;
+                                const ndvi = parseFloat(row.ndvi_mean || row.ndvi_effective);
+                                const cloud = parseFloat(row.cloud_pc) || 0;
+                                const dateObj = parseStrangeDate(row.date);
+                                const rawUrl = (row[updateCol] || row.map_id || "").trim();
+                                if (!dateObj) return;
+                                if (!grouped[name]) grouped[name] = [];
+                                grouped[name].push({ name, ndvi, cloud, dateObj, url: rawUrl.replace(/['"]+/g, '') });
+                            });
+
+                            const pick = pickSceneTimestamp(grouped);
+                            const tsLocal = pick.ts;
+
+                            const historyLocal = {};
+                            Object.keys(grouped).forEach(name => {
+                                let all = grouped[name].slice().sort((a, b) => b.dateObj - a.dateObj);
+                                let selected = (tsLocal !== null) ? (all.find(e => e.dateObj && e.dateObj.getTime() === tsLocal) || null) : null;
+                                let ordered = selected ? [selected] : [];
+                                ordered = ordered.concat(all.filter(e => !selected || e.dateObj.getTime() < tsLocal));
+
+                                historyLocal[name] = ordered.map(entry => {
+                                    let cover = 0;
+                                    if (!isNaN(entry.ndvi)) {
+                                        let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
+                                        let mod = (entry.cloud <= 10) ? 1 : (entry.cloud > 30 ? 1 : (entry.cloud > 20 ? 1 : 1.0));
+                                        cover = Math.max(0, Math.round(base * mod));
+                                    }
+                                    return { ...entry, cover_raw: cover, cover: cover, formattedDate: fmtNZ(entry.dateObj) };
+                                });
+                            });
+
+                            // Estimate growth using Te Ruahete exclusions/partials (no area weighting)
+                            const gLocal = (function estimateGrowthNoArea(history) {
+                                let tWGrowth = 0, tAreaG = 0;
+                                Object.keys(history).forEach(name => {
+                                    const sorted = history[name]; if (!sorted || sorted.length < 2) return;
+                                    const latest = sorted[0]; const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
+                                    if (!previous || !latest || !latest.dateObj || !previous.dateObj) return;
+                                    const dayDiff = (latest.dateObj - previous.dateObj) / 86400000;
+                                    if (dayDiff <= 0) return;
+                                    const lc = latest.cover_raw; const pc = previous.cover_raw;
+                                    if (!(lc > pc)) return;
+                                    const g = Math.round((lc - pc) / dayDiff);
+                                    if (!isFinite(g) || g <= 0) return;
+
+                                    const isOut = !!exMap.get(normName(name));
+                                    if (isOut) return;
+
+                                    // Skip if high cloud cover (NDVI < 0.3)
+                                    if (latest.ndvi < NDVI_LOW_THRESHOLD) return;
+
+                                    tWGrowth += g;
+                                    tAreaG += 1;
+                                });
+                                return tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
+                            })(historyLocal);
+
+                            // Build model using Te Ruahete exclusions/partials
+                            const historyLower = {};
+                            Object.keys(historyLocal).forEach(k => { historyLower[normName(k)] = historyLocal[k]; });
+
+                            const pairs = [];
+                            for (const m of manualLocal) {
+                                const hist = historyLower[m.lower]; if (!hist || hist.length === 0) continue;
+
+                                const s = hist[0]; if (!s || !s.dateObj) continue;
+                                const gapDays = Math.abs((m.dateObj - s.dateObj) / 86400000);
+                                if (gapDays > GAP_DAYS_MAX) continue;
+
+                                const satRaw = s.cover_raw; if (!isFinite(satRaw) || satRaw <= 0) continue;
+                                const manualProjected = m.cover - (gLocal * gapDays);
+                                if (!isFinite(manualProjected) || manualProjected <= 0) continue;
+
+                                if (manualProjected < satRaw * GRAZE_FACTOR) continue;
+                                const ratio = manualProjected / satRaw;
+                                if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
+
+                                pairs.push({ x: satRaw, y: manualProjected });
+                            }
+
+                            if (pairs.length >= 4) {
+                                const n = pairs.length;
+                                const meanX = pairs.reduce((a, p) => a + p.x, 0) / n;
+                                const meanY = pairs.reduce((a, p) => a + p.y, 0) / n;
+                                let num = 0, den = 0;
+                                pairs.forEach(p => { num += (p.x - meanX) * (p.y - meanY); den += (p.x - meanX) * (p.x - meanX); });
+                                const a = den !== 0 ? (num / den) : 1;
+                                const b = meanY - a * meanX;
+
+                                let ssTot = 0, ssRes = 0;
+                                pairs.forEach(p => {
+                                    const pred = a * p.x + b;
+                                    ssTot += (p.y - meanY) * (p.y - meanY);
+                                    ssRes += (p.y - pred) * (p.y - pred);
+                                });
+
+                                model = { a, b, r2: ssTot !== 0 ? (1 - ssRes / ssTot) : 0, count: n };
+                            } else {
+                                model = { a: 1.01, b: -239, r2: 0, count: pairs.length, isDefault: true };
+                            }
+                        }
+                    });
+
+                    // Store
+                    sharedCalibrationModel = model || null;
+                } catch (e) {
+                    sharedCalibrationModel = null;
+                }
+            }
+            /* --------------------------------------------------------------------------- */
+
+            async function loadFeedSettings() {
+                loadLocalFeedSettings();
+
+                if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                    try {
+                        const res = await fetch(GOOGLE_SCRIPT_URL + "?farm=" + currentFarmId);
+                        const data = await res.json();
+                        if (data) {
+                            setFeedInputs(data);
+                            calculateFeedLogic();
+                        }
+                    } catch (e) { console.log("Cloud load failed, using local/csv"); }
+                } else {
+                    try {
+                        const res = await fetch(FARM_CONFIG[currentFarmId].feed_settings_csv + "&t=" + Date.now());
+                        const txt = await res.text();
+                        Papa.parse(txt, {
+                            header: true, skipEmptyLines: true,
+                            complete: (results) => {
+                                const data = results.data[0];
+                                if (data && !localStorage.getItem(currentFarmId + '_feed_residual')) {
+                                    document.getElementById('inp-residual').value = data.post_grazing_residual || 1500;
+                                    document.getElementById('inp-cows').value = data.cow_numbers || 500;
+                                    document.getElementById('inp-intake').value = data.intake_per_cow || 18;
+                                    document.getElementById('inp-round').value = data.rotation_length || 25;
+                                    document.getElementById('inp-actual-pre').value = data.target_pre_grazing_cover || 2800;
+                                    calculateFeedLogic();
+                                }
+                            }
+                        });
+                    } catch (e) { }
+                }
+            }
+
+            function setFeedInputs(data) {
+                if (data.residual) document.getElementById('inp-residual').value = data.residual;
+                if (data.cows) document.getElementById('inp-cows').value = data.cows;
+                if (data.intake) document.getElementById('inp-intake').value = data.intake;
+                if (data.round) document.getElementById('inp-round').value = data.round;
+                if (data.pre) document.getElementById('inp-actual-pre').value = data.pre;
+            }
+
+            function loadLocalFeedSettings() {
+                const p = currentFarmId + '_';
+                if (localStorage.getItem(p + 'feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem(p + 'feed_residual');
+                if (localStorage.getItem(p + 'feed_cows')) document.getElementById('inp-cows').value = localStorage.getItem(p + 'feed_cows');
+                if (localStorage.getItem(p + 'feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem(p + 'feed_intake');
+                if (localStorage.getItem(p + 'feed_round')) document.getElementById('inp-round').value = localStorage.getItem(p + 'feed_round');
+                if (localStorage.getItem(p + 'feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem(p + 'feed_actual_pre');
                 calculateFeedLogic();
             }
-        } catch(e) { console.log("Cloud load failed, using local/csv"); }
-    } else {
-        try {
-            const res = await fetch(FARM_CONFIG[currentFarmId].feed_settings_csv + "&t=" + Date.now());
-            const txt = await res.text();
-            Papa.parse(txt, {
-                header: true, skipEmptyLines: true,
-                complete: (results) => {
-                    const data = results.data[0]; 
-                    if(data && !localStorage.getItem(currentFarmId + '_feed_residual')) {
-                        document.getElementById('inp-residual').value = data.post_grazing_residual || 1500;
-                        document.getElementById('inp-cows').value = data.cow_numbers || 500;
-                        document.getElementById('inp-intake').value = data.intake_per_cow || 18;
-                        document.getElementById('inp-round').value = data.rotation_length || 25;
-                        document.getElementById('inp-actual-pre').value = data.target_pre_grazing_cover || 2800;
-                        calculateFeedLogic();
+
+            async function init() {
+                map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 20 }).setView(FARM_CONFIG.wainono.center, 12);
+                L.control.zoom({ position: 'bottomright' }).addTo(map);
+                baseLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+
+                const calibHoverArea = document.getElementById('calib-hover-area');
+                const calibText = document.getElementById('calib-text');
+                if (calibHoverArea && calibText) {
+                    calibHoverArea.addEventListener('mouseenter', () => { calibText.style.display = 'block'; });
+                    calibHoverArea.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
+                }
+
+                // ✅ ALWAYS compute calibration from TE RUAHETE first (reads its exclusions/partials before model build)
+                await precomputeSharedCalibrationFromTeRuahete();
+
+                // Initial data load for the current farm (default wainono)
+                startDataLoad();
+                switchDashboardMode('manual');
+            }
+
+            async function startDataLoad() {
+                await loadFeedSettings();
+                await Promise.all([loadStatusSheets(), loadManualSheet()]);
+                await loadGeoJSON();
+            }
+
+            async function loadGeoJSON() {
+                try {
+                    const response = await fetch(FARM_CONFIG[currentFarmId].geojson + "?t=" + Date.now());
+                    const data = await response.json();
+                    data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
+                    geoLayer = L.geoJSON(data, {
+                        style: { color: 'white', weight: 1.5, fillOpacity: 0.1 },
+                        onEachFeature: (feature, layer) => {
+                            const pName = feature.properties.name;
+                            paddockMap[pName] = layer;
+                            layer.bindTooltip("", { permanent: true, direction: 'center', className: 'paddock-label' });
+                            layer.on('mouseover', function () { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.add('show-label'); });
+                            layer.on('mouseout', function () { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.remove('show-label'); });
+                            layer.on('click', (e) => {
+                                L.DomEvent.stopPropagation(e);
+                                const p = getCurrentModeData().find(d => d.name === pName);
+                                const isOut = p ? p.isOut : true;
+                                const isCloud = p ? p.isCloud : false;
+                                const color = isOut ? '#e74c3c' : (isCloud ? 'var(--cloud)' : 'var(--accent)');
+                                focusPaddockOnMap(pName, color);
+                                const cardId = `card-${pName.replace(/\s+/g, '-')}`;
+                                const card = document.getElementById(cardId);
+                                if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.click(); }
+                            });
+                        }
+                    }).addTo(map);
+                    map.fitBounds(geoLayer.getBounds());
+                    loadCSV();
+                    loadManualRankCSV();
+                } catch (e) { }
+            }
+
+            /* Dashboard Mode Switching */
+            function switchDashboardMode(mode) {
+                currentDashboardMode = mode;
+                document.getElementById('btn-mode-sat').classList.toggle('active', mode === 'satellite');
+                document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual');
+                document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
+
+                document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
+                document.getElementById('sat-layer-controls').style.display = (mode === 'satellite') ? 'flex' : 'none';
+                document.getElementById('latest-date').style.display = (mode === 'satellite') ? 'block' : 'none';
+                document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
+
+                document.getElementById('farm-select-container').style.display = (mode === 'satellite') ? 'flex' : 'none';
+
+                if (mode === 'feed') {
+                    calculateFeedLogic();
+                } else if (mode === 'manual') {
+                    if (ndviLayer) map.removeLayer(ndviLayer);
+                    document.getElementById('legend').style.display = 'block';
+                    setLayerMode('cover');
+                } else if (mode === 'satellite') {
+                    setLayerMode('ndvi');
+                } else {
+                    setLayerMode(currentViewMode);
+                }
+
+                renderDashboard();
+                updateGeoStyles();
+            }
+
+            function getCurrentModeData() {
+                return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed') ? manualModeData : satellitePaddockData;
+            }
+
+            /* Satellite Logic */
+            function pickSceneTimestamp(grouped) {
+                const set = new Set();
+                Object.values(grouped).forEach(arr => arr.forEach(e => { if (e.dateObj) set.add(e.dateObj.getTime()); }));
+                const dates = Array.from(set).sort((a, b) => b - a);
+                if (dates.length === 0) return { ts: null, fallback: false };
+
+                // Look further back in case of prolonged cloudy periods
+                const candidates = dates.slice(0, Math.max(SCENE_LOOKBACK, 5));
+                let ts = null; let fallback = false;
+
+                for (let i = 0; i < candidates.length; i++) {
+                    const t = candidates[i];
+                    const entries = Object.values(grouped).map(arr => arr.find(e => e.dateObj && e.dateObj.getTime() === t)).filter(Boolean);
+                    if (entries.length === 0) continue;
+
+                    const sceneCloud = entries[0].cloud || 0;
+                    const ndvis = entries.map(e => e.ndvi).filter(v => isFinite(v));
+                    if (ndvis.length === 0) continue;
+
+                    const pctLow = ndvis.filter(v => v < NDVI_LOW_THRESHOLD).length / ndvis.length;
+
+                    // Strict cloud filter: no scene > 20% cloud, no scene with too many low NDVI readings
+                    if (sceneCloud < 20 && pctLow < NDVI_LOW_MAX_PCT) {
+                        ts = t;
+                        fallback = (i > 0);
+                        break;
                     }
                 }
-            });
-        } catch(e) {}
-    }
-}
 
-function setFeedInputs(data) {
-    if(data.residual) document.getElementById('inp-residual').value = data.residual;
-    if(data.cows) document.getElementById('inp-cows').value = data.cows;
-    if(data.intake) document.getElementById('inp-intake').value = data.intake;
-    if(data.round) document.getElementById('inp-round').value = data.round;
-    if(data.pre) document.getElementById('inp-actual-pre').value = data.pre;
-}
-
-function loadLocalFeedSettings() {
-    const p = currentFarmId + '_';
-    if(localStorage.getItem(p+'feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem(p+'feed_residual');
-    if(localStorage.getItem(p+'feed_cows')) document.getElementById('inp-cows').value = localStorage.getItem(p+'feed_cows');
-    if(localStorage.getItem(p+'feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem(p+'feed_intake');
-    if(localStorage.getItem(p+'feed_round')) document.getElementById('inp-round').value = localStorage.getItem(p+'feed_round');
-    if(localStorage.getItem(p+'feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem(p+'feed_actual_pre');
-    calculateFeedLogic();
-}
-
-async function init() {
-    map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 20 }).setView(FARM_CONFIG.wainono.center, 12);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-    baseLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
-    
-    const calibHoverArea = document.getElementById('calib-hover-area');
-    const calibText = document.getElementById('calib-text');
-    if (calibHoverArea && calibText) {
-        calibHoverArea.addEventListener('mouseenter', () => { calibText.style.display = 'block'; });
-        calibHoverArea.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
-    }
-
-    // ✅ ALWAYS compute calibration from TE RUAHETE first (reads its exclusions/partials before model build)
-    await precomputeSharedCalibrationFromTeRuahete();
-    
-    // Initial data load for the current farm (default wainono)
-    startDataLoad();
-    switchDashboardMode('manual');
-}
-
-async function startDataLoad() {
-    await loadFeedSettings();
-    await Promise.all([loadStatusSheets(), loadManualSheet()]);
-    await loadGeoJSON();
-}
-
-async function loadGeoJSON() {
-    try {
-        const response = await fetch(FARM_CONFIG[currentFarmId].geojson + "?t=" + Date.now());
-        const data = await response.json();
-        data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
-        geoLayer = L.geoJSON(data, {
-            style: { color: 'white', weight: 1.5, fillOpacity: 0.1 },
-            onEachFeature: (feature, layer) => {
-                const pName = feature.properties.name;
-                paddockMap[pName] = layer;
-                layer.bindTooltip("", { permanent: true, direction: 'center', className: 'paddock-label' });
-                layer.on('mouseover', function() { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.add('show-label'); });
-                layer.on('mouseout', function() { const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.remove('show-label'); });
-                layer.on('click', (e) => {
-                    L.DomEvent.stopPropagation(e);
-                    const p = getCurrentModeData().find(d => d.name === pName);
-                    const isOut = p ? p.isOut : true;
-                    const isPartial = p ? p.isPartial : false;
-                    const color = isOut ? '#e74c3c' : (isPartial ? 'var(--partial)' : 'var(--accent)');
-                    focusPaddockOnMap(pName, color);
-                    const cardId = `card-${pName.replace(/\s+/g, '-')}`;
-                    const card = document.getElementById(cardId);
-                    if(card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.click(); }
-                });
-            }
-        }).addTo(map);
-        map.fitBounds(geoLayer.getBounds());
-        loadCSV();
-        loadManualRankCSV();
-    } catch (e) {}
-}
-
-/* Dashboard Mode Switching */
-function switchDashboardMode(mode) {
-    currentDashboardMode = mode;
-    document.getElementById('btn-mode-sat').classList.toggle('active', mode === 'satellite');
-    document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual');
-    document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
-    
-    document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
-    document.getElementById('sat-layer-controls').style.display = (mode === 'satellite') ? 'flex' : 'none';
-    document.getElementById('latest-date').style.display = (mode === 'satellite') ? 'block' : 'none';
-    document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
-    
-    document.getElementById('farm-select-container').style.display = (mode === 'satellite') ? 'flex' : 'none';
-    
-    if (mode === 'feed') {
-        calculateFeedLogic();
-    } else if (mode === 'manual') {
-        if (ndviLayer) map.removeLayer(ndviLayer);
-        document.getElementById('legend').style.display = 'block';
-        setLayerMode('cover');
-    } else if (mode === 'satellite') {
-        setLayerMode('ndvi');
-    } else {
-        setLayerMode(currentViewMode);
-    }
-    
-    renderDashboard();
-    updateGeoStyles();
-}
-
-function getCurrentModeData() {
-    return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed') ? manualModeData : satellitePaddockData;
-}
-
-/* Satellite Logic */
-function pickSceneTimestamp(grouped){
-    const set = new Set();
-    Object.values(grouped).forEach(arr => arr.forEach(e => { if(e.dateObj) set.add(e.dateObj.getTime()); }));
-    const dates = Array.from(set).sort((a,b)=>b-a);
-    if(dates.length === 0) return { ts: null, fallback: false };
-    const candidates = dates.slice(0, SCENE_LOOKBACK);
-    let ts = null; let fallback = false;
-    for (let i=0;i<candidates.length;i++){
-        const t = candidates[i];
-        const ndvis = Object.values(grouped).map(arr => arr.find(e => e.dateObj && e.dateObj.getTime() === t)).filter(Boolean).map(e => e.ndvi).filter(v => isFinite(v));
-        if(ndvis.length === 0) continue;
-        const pctLow = ndvis.filter(v => v < NDVI_LOW_THRESHOLD).length / ndvis.length;
-        if(pctLow < NDVI_LOW_MAX_PCT){ ts = t; fallback = (i > 0); break; }
-    }
-    if(ts === null){ ts = candidates[0]; fallback = true; }
-    return { ts, fallback };
-}
-
-function estimateFarmGrowthRate(history){
-    let tWGrowth = 0, tAreaG = 0;
-    Object.keys(history).forEach(name => {
-        const sorted = history[name]; if(!sorted || sorted.length < 2) return;
-        const latest = sorted[0]; const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
-        if(!previous || !latest || !latest.dateObj || !previous.dateObj) return;
-        const dayDiff = (latest.dateObj - previous.dateObj)/86400000;
-        if(dayDiff <= 0) return;
-        const lc = latest.cover_raw; const pc = previous.cover_raw;
-        if(!(lc > pc)) return;
-        const g = Math.round((lc - pc)/dayDiff);
-        if(!isFinite(g) || g <= 0) return;
-        
-        const isOut = !!excludedPaddocks.get(normName(name)); 
-        const isPartial = partialPaddocks.has(normName(name));
-        if(isOut || isPartial) return; 
-
-        const area = areaLookup[name] || 0;
-        if(area > 0){ tWGrowth += g * area; tAreaG += area; } else { tWGrowth += g; tAreaG += 1; }
-    });
-    return tAreaG > 0 ? Math.round(tWGrowth/tAreaG) : 0;
-}
-
-function buildCalibrationModel(historyLower){
-    const pairs = [];
-    for(const m of manualEntries){
-        const hist = historyLower[m.lower]; if(!hist || hist.length === 0) continue;
-        if (partialPaddocks.has(m.lower)) continue;
-        
-        const s = hist[0]; if(!s || !s.dateObj) continue;
-        const gapDays = Math.abs((m.dateObj - s.dateObj)/86400000);
-        if(gapDays > GAP_DAYS_MAX) continue;
-        const satRaw = s.cover_raw; if(!isFinite(satRaw) || satRaw <= 0) continue;
-        const manualProjected = m.cover - (farmGrowthRate * gapDays);
-        if(!isFinite(manualProjected) || manualProjected <= 0) continue;
-        if(manualProjected < satRaw * GRAZE_FACTOR) continue;
-        const ratio = manualProjected / satRaw;
-        if(ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
-        pairs.push({ x: satRaw, y: manualProjected });
-    }
-    if(pairs.length < 4) return null;
-    const n = pairs.length;
-    const meanX = pairs.reduce((a,p)=>a+p.x,0)/n; const meanY = pairs.reduce((a,p)=>a+p.y,0)/n;
-    let num=0, den=0; pairs.forEach(p => { num += (p.x-meanX)*(p.y-meanY); den += (p.x-meanX)*(p.x-meanX); });
-    const a = den !== 0 ? (num/den) : 1; const b = meanY - a*meanX;
-    let ssTot=0, ssRes=0; pairs.forEach(p => { const pred = a*p.x + b; ssTot += (p.y-meanY)*(p.y-meanY); ssRes += (p.y-pred)*(p.y-pred); });
-    return { a, b, r2: ssTot !== 0 ? (1 - ssRes/ssTot) : 0, count: n };
-}
-
-function applyCalibrationToHistory(history){
-    if(!calibrationModel) return;
-    Object.keys(history).forEach(name => {
-        history[name].forEach(e => {
-            const raw = e.cover_raw; if(!isFinite(raw)) return;
-            const cal = calibrationModel.a * raw + calibrationModel.b;
-            e.cover = Math.max(0, Math.round(cal));
-        });
-    });
-}
-
-function updateCalibrationUI(){
-    const box = document.getElementById('calibration-box');
-    const pill = document.getElementById('calib-pill');
-    const text = document.getElementById('calib-text');
-    if(!calibrationModel){ box.style.display = 'none'; return; }
-    if(currentDashboardMode === 'satellite') box.style.display = 'block';
-    let label = 'WEAK'; let cls = 'bad';
-    if (calibrationModel.r2 >= 0.85){ label = 'HIGH'; cls = 'good'; }
-    else if (calibrationModel.r2 >= 0.70){ label = 'GOOD'; cls = 'good'; }
-    else if (calibrationModel.r2 >= 0.50){ label = 'LOW'; cls = 'warn'; }
-    pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
-    text.innerHTML = `<div><b style="color:#2c3e50;">R²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> cover = ${calibrationModel.a.toFixed(2)}×raw + ${Math.round(calibrationModel.b)}</div>`;
-}
-
-async function loadCSV() {
-    try {
-        const response = await fetch(FARM_CONFIG[currentFarmId].data_csv + "&t=" + Date.now());
-        const csvText = await response.text();
-        Papa.parse(csvText, {
-            header: true, skipEmptyLines: true,
-            complete: (results) => {
-                const grouped = {};
-                const updateCol = results.meta.fields.find(c => c.toLowerCase().includes('update')) || 'latest-update';
-                results.data.forEach(row => {
-                    const name = row.paddock_name; if(!name) return;
-                    const ndvi = parseFloat(row.ndvi_mean || row.ndvi_effective);
-                    const cloud = parseFloat(row.cloud_pc) || 0;
-                    const dateObj = parseStrangeDate(row.date);
-                    const rawUrl = (row[updateCol] || row.map_id || "").trim();
-                    if(!dateObj) return;
-                    if(!grouped[name]) grouped[name] = [];
-                    grouped[name].push({ name, ndvi, cloud, dateObj, url: rawUrl.replace(/['"]+/g, '') });
-                });
-
-                const pick = pickSceneTimestamp(grouped);
-                selectedSceneTs = pick.ts;
-                document.getElementById('fallback-warning').style.display = pick.fallback ? 'block' : 'none';
-                
-                satelliteHistory = {};
-                Object.keys(grouped).forEach(name => {
-                    let all = grouped[name].slice().sort((a,b) => b.dateObj - a.dateObj);
-                    let selected = (selectedSceneTs !== null) ? (all.find(e => e.dateObj && e.dateObj.getTime() === selectedSceneTs) || null) : null;
-                    let ordered = selected ? [selected] : [];
-                    ordered = ordered.concat(all.filter(e => !selected || e.dateObj.getTime() < selectedSceneTs));
-                    satelliteHistory[name] = ordered.map(entry => {
-                        let cover = 0;
-                        if (!isNaN(entry.ndvi)) {
-                            let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
-                            let mod = (entry.cloud <= 10) ? 1 : (entry.cloud > 30 ? 1 : (entry.cloud > 20 ? 1 : 1.0));
-                            cover = Math.max(0, Math.round(base * mod));
+                if (ts === null) {
+                    // Fallback to the scene with the lowest cloud cover
+                    let bestT = candidates[0];
+                    let minCloud = Infinity;
+                    for (let i = 0; i < candidates.length; i++) {
+                        const t = candidates[i];
+                        const entries = Object.values(grouped)
+                            .map(arr => arr.find(e => e.dateObj && e.dateObj.getTime() === t))
+                            .filter(Boolean);
+                        if (entries.length > 0) {
+                            const sc = entries[0].cloud || 0;
+                            if (sc < minCloud) {
+                                minCloud = sc;
+                                bestT = t;
+                                fallback = (i > 0);
+                            }
                         }
-                        return { ...entry, cover_raw: cover, cover: cover, formattedDate: fmtNZ(entry.dateObj) };
+                    }
+                    ts = bestT;
+                }
+                return { ts, fallback };
+            }
+
+            function estimateFarmGrowthRate(history) {
+                let tWGrowth = 0, tAreaG = 0;
+                Object.keys(history).forEach(name => {
+                    const sorted = history[name]; if (!sorted || sorted.length < 2) return;
+                    const latest = sorted[0]; const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
+                    if (!previous || !latest || !latest.dateObj || !previous.dateObj) return;
+                    const dayDiff = (latest.dateObj - previous.dateObj) / 86400000;
+                    if (dayDiff <= 0) return;
+                    const lc = latest.cover_raw; const pc = previous.cover_raw;
+                    if (!(lc > pc)) return;
+                    const g = Math.round((lc - pc) / dayDiff);
+                    if (!isFinite(g) || g <= 0) return;
+
+                    const isOut = !!excludedPaddocks.get(normName(name));
+                    if (isOut) return;
+
+                    // Skip if high cloud cover (NDVI < 0.3)
+                    if (latest.ndvi < NDVI_LOW_THRESHOLD) return;
+
+                    const area = areaLookup[name] || 0;
+                    if (area > 0) { tWGrowth += g * area; tAreaG += area; } else { tWGrowth += g; tAreaG += 1; }
+                });
+                return tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
+            }
+
+            function buildCalibrationModel(historyLower) {
+                const pairs = [];
+                for (const m of manualEntries) {
+                    const hist = historyLower[m.lower]; if (!hist || hist.length === 0) continue;
+
+                    const s = hist[0]; if (!s || !s.dateObj) continue;
+                    const gapDays = Math.abs((m.dateObj - s.dateObj) / 86400000);
+                    if (gapDays > GAP_DAYS_MAX) continue;
+                    const satRaw = s.cover_raw; if (!isFinite(satRaw) || satRaw <= 0) continue;
+                    const manualProjected = m.cover - (farmGrowthRate * gapDays);
+                    if (!isFinite(manualProjected) || manualProjected <= 0) continue;
+                    if (manualProjected < satRaw * GRAZE_FACTOR) continue;
+                    const ratio = manualProjected / satRaw;
+                    if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
+                    pairs.push({ x: satRaw, y: manualProjected });
+                }
+                if (pairs.length < 4) return { a: 1.01, b: -239, r2: 0, count: pairs.length, isDefault: true };
+                const n = pairs.length;
+                const meanX = pairs.reduce((a, p) => a + p.x, 0) / n; const meanY = pairs.reduce((a, p) => a + p.y, 0) / n;
+                let num = 0, den = 0; pairs.forEach(p => { num += (p.x - meanX) * (p.y - meanY); den += (p.x - meanX) * (p.x - meanX); });
+                const a = den !== 0 ? (num / den) : 1; const b = meanY - a * meanX;
+                let ssTot = 0, ssRes = 0; pairs.forEach(p => { const pred = a * p.x + b; ssTot += (p.y - meanY) * (p.y - meanY); ssRes += (p.y - pred) * (p.y - pred); });
+                return { a, b, r2: ssTot !== 0 ? (1 - ssRes / ssTot) : 0, count: n };
+            }
+
+            function applyCalibrationToHistory(history) {
+                if (!calibrationModel) return;
+                Object.keys(history).forEach(name => {
+                    history[name].forEach(e => {
+                        const raw = e.cover_raw; if (!isFinite(raw)) return;
+                        const cal = calibrationModel.a * raw + calibrationModel.b;
+                        e.cover = Math.max(0, Math.round(cal));
                     });
                 });
-
-                // Always compute growth for the ACTIVE farm (uses its own exclusions/partials)
-                farmGrowthRate = estimateFarmGrowthRate(satelliteHistory);
-
-                // ✅ Calibration rules:
-                // - Te Ruahete: build model (after exclusions already loaded) AND store as sharedCalibrationModel
-                // - Wainono: apply sharedCalibrationModel (Te Ruahete) to Wainono
-                const historyLower = {};
-                Object.keys(satelliteHistory).forEach(k => { historyLower[normName(k)] = satelliteHistory[k]; });
-
-                if (currentFarmId === 'teruahete') {
-                    calibrationModel = buildCalibrationModel(historyLower);
-                    sharedCalibrationModel = calibrationModel;   // store and reuse
-                } else {
-                    calibrationModel = sharedCalibrationModel;   // apply Te Ruahete model to Wainono
-                    // If for any reason Te Ruahete model is missing, fallback to local build (keeps it running)
-                    if(!calibrationModel) calibrationModel = buildCalibrationModel(historyLower);
-                }
-
-                applyCalibrationToHistory(satelliteHistory);
-                updateCalibrationUI();
-                processSatelliteData();
             }
-        });
-    } catch (e) {}
-}
 
-function processSatelliteData() {
-    let globalLatestDate = "";
-    satellitePaddockData = Object.keys(satelliteHistory).map(name => {
-        const sorted = satelliteHistory[name]; const latest = sorted[0];
-        const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
-        const area = areaLookup[name] || 0; const lowerName = name.toLowerCase();
-        const isOut = !!excludedPaddocks.get(normName(name)); const isPartial = partialPaddocks.has(lowerName) && !isOut;
-        if (latest.formattedDate && (!globalLatestDate || latest.formattedDate !== "")) globalLatestDate = latest.formattedDate;
-        let growthRate = null;
-        if (previous && latest.dateObj && previous.dateObj) {
-            const dayDiff = (latest.dateObj - previous.dateObj) / 86400000;
-            if (dayDiff > 0 && latest.cover > previous.cover) growthRate = Math.round((latest.cover - previous.cover) / dayDiff);
-        }
-        const manual = findBestManualForPaddock(name);
-        return { name, latest, previous, growthRate, area, isOut, reason: excludedPaddocks.get(lowerName), isPartial, manual, mStatus: manual ? manualCalibratorStatus(manual, latest.cover_raw, lowerName) : { ok:false, reason:"", className:"" } };
-    });
-    document.getElementById('latest-date').innerText = `LATEST IMAGERY: ${globalLatestDate}`;
-    
-    const topPaddock = satellitePaddockData.find(p => p.latest.url && p.latest.url.length > 10 && !p.isOut);
-    if(topPaddock) updateMapTile(topPaddock.latest.url);
+            function updateCalibrationUI() {
+                const box = document.getElementById('calibration-box');
+                const pill = document.getElementById('calib-pill');
+                const text = document.getElementById('calib-text');
+                if (!calibrationModel) { box.style.display = 'none'; return; }
+                if (currentDashboardMode === 'satellite') box.style.display = 'block';
+                let label = 'WEAK'; let cls = 'bad';
+                if (calibrationModel.isDefault) { label = 'DEFAULT'; cls = 'warn'; }
+                else if (calibrationModel.r2 >= 0.85) { label = 'HIGH'; cls = 'good'; }
+                else if (calibrationModel.r2 >= 0.70) { label = 'GOOD'; cls = 'good'; }
+                else if (calibrationModel.r2 >= 0.50) { label = 'LOW'; cls = 'warn'; }
+                pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
+                text.innerHTML = `<div><b style="color:#2c3e50;">R²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> cover = ${calibrationModel.a.toFixed(2)}×raw + ${Math.round(calibrationModel.b)}</div>`;
+            }
 
-    if (currentDashboardMode === 'satellite') renderDashboard();
-}
+            async function loadCSV() {
+                try {
+                    const response = await fetch(FARM_CONFIG[currentFarmId].data_csv + "&t=" + Date.now());
+                    const csvText = await response.text();
+                    Papa.parse(csvText, {
+                        header: true, skipEmptyLines: true,
+                        complete: (results) => {
+                            const grouped = {};
+                            const updateCol = results.meta.fields.find(c => c.toLowerCase().includes('update')) || 'latest-update';
+                            results.data.forEach(row => {
+                                const name = row.paddock_name; if (!name) return;
+                                const ndvi = parseFloat(row.ndvi_mean || row.ndvi_effective);
+                                const cloud = parseFloat(row.cloud_pc) || 0;
+                                const dateObj = parseStrangeDate(row.date);
+                                const rawUrl = (row[updateCol] || row.map_id || "").trim();
+                                if (!dateObj) return;
+                                if (!grouped[name]) grouped[name] = [];
+                                grouped[name].push({ name, ndvi, cloud, dateObj, url: rawUrl.replace(/['"]+/g, '') });
+                            });
 
-function manualCalibratorStatus(manual, satRaw, lowerName){
-    if(!manual || !selectedSceneTs) return { ok:false, reason:"", className:"" };
-    if(partialPaddocks.has(lowerName)) return { ok:false, reason:"partial", className:"bad" };
-    if(manual.gapDays > GAP_DAYS_MAX) return { ok:false, reason:`gap ${manual.gapDays.toFixed(0)}d`, className:"bad" };
-    const projected = manual.cover - (farmGrowthRate * manual.gapDays);
-    if(!isFinite(projected) || projected <= 0 || !isFinite(satRaw) || satRaw <= 0) return { ok:false, reason:"invalid", className:"bad" };
-    if(projected < satRaw * GRAZE_FACTOR) return { ok:false, reason:"likely grazed", className:"bad" };
-    const ratio = projected / satRaw;
-    if(ratio < RATIO_MIN || ratio > RATIO_MAX) return { ok:false, reason:"outlier", className:"bad" };
-    return { ok:true, reason:"used", className:"" };
-}
+                            const pick = pickSceneTimestamp(grouped);
+                            selectedSceneTs = pick.ts;
+                            document.getElementById('fallback-warning').style.display = pick.fallback ? 'block' : 'none';
 
-function findBestManualForPaddock(paddockName){
-    const lower = normName(paddockName); let best = null; let bestAbs = Infinity;
-    for(const m of manualEntries){
-        if(m.lower !== lower || !selectedSceneTs) continue;
-        const gapDays = Math.abs((m.dateObj - new Date(selectedSceneTs))/86400000);
-        if(gapDays < bestAbs){ bestAbs = gapDays; best = { ...m, gapDays }; }
-    }
-    return best;
-}
+                            satelliteHistory = {};
+                            Object.keys(grouped).forEach(name => {
+                                let all = grouped[name].slice().sort((a, b) => b.dateObj - a.dateObj);
+                                let selected = (selectedSceneTs !== null) ? (all.find(e => e.dateObj && e.dateObj.getTime() === selectedSceneTs) || null) : null;
+                                let ordered = selected ? [selected] : [];
+                                ordered = ordered.concat(all.filter(e => !selected || e.dateObj.getTime() < selectedSceneTs));
+                                satelliteHistory[name] = ordered.map(entry => {
+                                    let cover = 0;
+                                    if (!isNaN(entry.ndvi)) {
+                                        let base = 331.62 * Math.exp(2.4555 * entry.ndvi);
+                                        let mod = (entry.cloud <= 10) ? 1 : (entry.cloud > 30 ? 1 : (entry.cloud > 20 ? 1 : 1.0));
+                                        cover = Math.max(0, Math.round(base * mod));
+                                    }
+                                    return { ...entry, cover_raw: cover, cover: cover, formattedDate: fmtNZ(entry.dateObj) };
+                                });
+                            });
 
-/* Rendering */
-function renderDashboard() {
-    const data = getCurrentModeData();
-    const sorted = [...data].sort((a, b) => {
-        if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
-        return b.latest.cover - a.latest.cover;
-    });
+                            // Always compute growth for the ACTIVE farm (uses its own exclusions/cloud cover)
+                            farmGrowthRate = estimateFarmGrowthRate(satelliteHistory);
 
-    let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
-    sorted.forEach(p => {
-        if (p.area > 0 && !p.isOut) {
-            tWCover += (p.latest.cover * p.area); tAreaC += p.area;
-            if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * p.area); tAreaG += p.area; }
-        }
-    });
+                            // ✅ Calibration rules:
+                            // - Te Ruahete: build model (after exclusions already loaded) AND store as sharedCalibrationModel
+                            // - Wainono: apply sharedCalibrationModel (Te Ruahete) to Wainono
+                            const historyLower = {};
+                            Object.keys(satelliteHistory).forEach(k => { historyLower[normName(k)] = satelliteHistory[k]; });
 
-    const avgCoverVal = tAreaC > 0 ? Math.round(tWCover/tAreaC) : 0;
-    const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth/tAreaG) : 0;
-    
-    document.getElementById('total-avg').innerText = avgCoverVal.toLocaleString();
-    document.getElementById('avg-growth').innerText = "+" + avgGrowthVal;
-    document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
+                            if (currentFarmId === 'teruahete') {
+                                calibrationModel = buildCalibrationModel(historyLower);
+                                sharedCalibrationModel = calibrationModel;   // store and reuse
+                            } else {
+                                calibrationModel = sharedCalibrationModel;   // apply Te Ruahete model to Wainono
+                                // If for any reason Te Ruahete model is missing, fallback to local build (keeps it running)
+                                if (!calibrationModel) calibrationModel = buildCalibrationModel(historyLower);
+                            }
 
-    document.getElementById('feed-area-total').innerText = tAreaC.toFixed(1);
-    document.getElementById('feed-avg-cover').innerText = avgCoverVal;
-    document.getElementById('feed-avg-growth').innerText = avgGrowthVal;
-    
-    calculateFeedLogic();
+                            applyCalibrationToHistory(satelliteHistory);
+                            updateCalibrationUI();
+                            processSatelliteData();
+                        }
+                    });
+                } catch (e) { }
+            }
 
-    const list = document.getElementById('list'); list.innerHTML = "";
-    sorted.forEach(p => {
-        const div = document.createElement('div');
-        div.className = `card ${p.isOut ? 'is-out' : ''} ${p.isPartial ? 'is-partial' : ''}`;
-        div.id = `card-${p.name.replace(/\s+/g, '-')}`;
-        
-        let badges = "";
-        if (p.isOut) badges += `<span class="badge" style="background:${p.reason && p.reason.toUpperCase()==='CROP'?'var(--warning)':'var(--out)'}">${(p.reason || 'OUT').toUpperCase()}</span>`;
-        if (p.isPartial) badges += `<span class="badge" style="background:var(--partial)">PARTIAL GRAZED</span>`;
-        
-        if (currentDashboardMode === 'satellite' && p.manual && calibrationModel) {
-            badges += `<span class="badge" style="background:var(--prev)">M</span>`;
-        }
+            function processSatelliteData() {
+                let globalLatestDate = "";
+                satellitePaddockData = Object.keys(satelliteHistory).map(name => {
+                    const sorted = satelliteHistory[name]; const latest = sorted[0];
+                    const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
+                    const area = areaLookup[name] || 0; const lowerName = name.toLowerCase();
+                    const isOut = !!excludedPaddocks.get(normName(name));
+                    const isCloud = !isOut && (latest.ndvi < NDVI_LOW_THRESHOLD || latest.cloud > 20);
+                    if (latest.formattedDate && (!globalLatestDate || latest.formattedDate !== "")) globalLatestDate = latest.formattedDate;
+                    let growthRate = null;
+                    if (previous && latest.dateObj && previous.dateObj) {
+                        const dayDiff = (latest.dateObj - previous.dateObj) / 86400000;
+                        if (dayDiff > 0 && latest.cover > previous.cover) growthRate = Math.round((latest.cover - previous.cover) / dayDiff);
+                    }
+                    const manual = findBestManualForPaddock(name);
+                    return { name, latest, previous, growthRate, area, isOut, reason: excludedPaddocks.get(lowerName), isCloud, manual, mStatus: manual ? manualCalibratorStatus(manual, latest.cover_raw, lowerName) : { ok: false, reason: "", className: "" } };
+                });
+                document.getElementById('latest-date').innerText = `LATEST IMAGERY: ${globalLatestDate}`;
 
-        const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+                const topPaddock = satellitePaddockData.find(p => p.latest.url && p.latest.url.length > 10 && !p.isOut);
+                if (topPaddock) updateMapTile(topPaddock.latest.url);
 
-        div.innerHTML = `
+                if (currentDashboardMode === 'satellite') renderDashboard();
+            }
+
+            function manualCalibratorStatus(manual, satRaw, lowerName) {
+                if (!manual || !selectedSceneTs) return { ok: false, reason: "", className: "" };
+                if (manual.gapDays > GAP_DAYS_MAX) return { ok: false, reason: `gap ${manual.gapDays.toFixed(0)}d`, className: "bad" };
+                const projected = manual.cover - (farmGrowthRate * manual.gapDays);
+                if (!isFinite(projected) || projected <= 0 || !isFinite(satRaw) || satRaw <= 0) return { ok: false, reason: "invalid", className: "bad" };
+                if (projected < satRaw * GRAZE_FACTOR) return { ok: false, reason: "likely grazed", className: "bad" };
+                const ratio = projected / satRaw;
+                if (ratio < RATIO_MIN || ratio > RATIO_MAX) return { ok: false, reason: "outlier", className: "bad" };
+                return { ok: true, reason: "used", className: "" };
+            }
+
+            function findBestManualForPaddock(paddockName) {
+                const lower = normName(paddockName); let best = null; let bestAbs = Infinity;
+                for (const m of manualEntries) {
+                    if (m.lower !== lower || !selectedSceneTs) continue;
+                    const gapDays = Math.abs((m.dateObj - new Date(selectedSceneTs)) / 86400000);
+                    if (gapDays < bestAbs) { bestAbs = gapDays; best = { ...m, gapDays }; }
+                }
+                return best;
+            }
+
+            /* Rendering */
+            function renderDashboard() {
+                const data = getCurrentModeData();
+                const sorted = [...data].sort((a, b) => {
+                    if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
+                    return b.latest.cover - a.latest.cover;
+                });
+
+                let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
+                sorted.forEach(p => {
+                    if (p.area > 0 && !p.isOut && !p.isCloud) {
+                        tWCover += (p.latest.cover * p.area); tAreaC += p.area;
+                        if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * p.area); tAreaG += p.area; }
+                    }
+                });
+
+                const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
+                const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
+
+                document.getElementById('total-avg').innerText = avgCoverVal.toLocaleString();
+                document.getElementById('avg-growth').innerText = "+" + avgGrowthVal;
+                document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
+
+                document.getElementById('feed-area-total').innerText = tAreaC.toFixed(1);
+                document.getElementById('feed-avg-cover').innerText = avgCoverVal;
+                document.getElementById('feed-avg-growth').innerText = avgGrowthVal;
+
+                calculateFeedLogic();
+
+                const list = document.getElementById('list'); list.innerHTML = "";
+                sorted.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = `card ${p.isOut ? 'is-out' : ''} ${p.isCloud ? 'is-cloud' : ''}`;
+                    div.id = `card-${p.name.replace(/\s+/g, '-')}`;
+
+                    let badges = "";
+                    if (p.isOut) badges += `<span class="badge" style="background:${p.reason && p.reason.toUpperCase() === 'CROP' ? 'var(--warning)' : 'var(--out)'}">${(p.reason || 'OUT').toUpperCase()}</span>`;
+                    if (p.isCloud) badges += `<span class="badge" style="background:var(--cloud)">HIGH CLOUD COVER</span>`;
+
+                    if (currentDashboardMode === 'satellite' && p.manual && calibrationModel) {
+                        badges += `<span class="badge" style="background:var(--prev)">M</span>`;
+                    }
+
+                    const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+
+                    div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gaap:10px">
-                <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.isPartial ? 'var(--partial)' : 'var(--accent)')}">${p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.latest.formattedDate}</small>${manualHtml}</div>
+                <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.isCloud ? 'var(--cloud)' : 'var(--accent)')}">${p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.latest.formattedDate}</small>${manualHtml}</div>
                 ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
             </div>
-            ${(p.growthRate && !p.isOut) ? `<div style="position:absolute; top:14px; right:60px; text-align:right"><span style="color:var(--growth); font-weight:bold">${p.growthRate>0?'+':''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
+            ${(p.growthRate && !p.isOut) ? `<div style="position:absolute; top:14px; right:60px; text-align:right"><span style="color:var(--growth); font-weight:bold">${p.growthRate > 0 ? '+' : ''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
         `;
-        
-        div.onclick = () => {
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
-            div.classList.add('active');
-            if (currentDashboardMode === 'satellite') updateMapTile(p.latest.url);
-            focusPaddockOnMap(p.name, p.isOut ? '#e74c3c' : (p.isPartial ? 'var(--partial)' : 'var(--accent)'));
-        };
-        list.appendChild(div);
-    });
-}
 
-/* Map Logic */
-function getCoverColor(cover) {
-    if (cover > 2800) return '#00441b'; if (cover > 2400) return '#006d2c';
-    if (cover > 2000) return '#238b45'; if (cover > 1600) return '#41ab5d';
-    if (cover > 1200) return '#74c476'; return '#a1d99b'; 
-}
-
-function updateGeoStyles() {
-    if (!geoLayer) return;
-    const currentData = getCurrentModeData();
-    geoLayer.eachLayer(layer => {
-        const pName = layer.feature.properties.name;
-        const p = currentData.find(pd => pd.name === pName);
-        if (!p) return;
-        layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>`);
-        
-        if (currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentViewMode === 'cover') {
-            let color = getCoverColor(p.latest.cover);
-            if (p.isOut) color = '#ff7675'; else if (p.isPartial) color = '#3498db';
-            layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', weight: 1 });
-        } else {
-            layer.setStyle({ fillColor: 'transparent', fillOpacity: 0.1, color: 'white', weight: 1.5 });
-        }
-    });
-}
-
-function setLayerMode(mode) {
-    currentViewMode = mode;
-    document.getElementById('btn-ndvi').classList.toggle('active', mode === 'ndvi');
-    document.getElementById('btn-cover').classList.toggle('active', mode === 'cover');
-    document.getElementById('legend').style.display = (mode === 'cover') ? 'block' : 'none';
-    if (ndviLayer) { 
-        if (mode === 'ndvi' && currentDashboardMode === 'satellite') ndviLayer.addTo(map); 
-        else map.removeLayer(ndviLayer); 
-    }
-    updateGeoStyles();
-}
-
-function updateMapTile(url) {
-    if(!url || url.length < 10) return;
-    if(ndviLayer) map.removeLayer(ndviLayer);
-    ndviLayer = L.tileLayer(url, { opacity: 0.7, maxZoom: 20 });
-    if (currentDashboardMode === 'satellite' && currentViewMode === 'ndvi') ndviLayer.addTo(map);
-}
-
-document.getElementById('search').oninput = (e) => {
-    const q = e.target.value.toLowerCase();
-    document.querySelectorAll('.card').forEach(c => c.style.display = c.querySelector('b').innerText.toLowerCase().includes(q) ? 'block' : 'none');
-};
-
-/* FEED CALCULATOR LOGIC */
-function saveAndRecalc() {
-    const p = currentFarmId + '_';
-    localStorage.setItem(p+'feed_residual', document.getElementById('inp-residual').value);
-    localStorage.setItem(p+'feed_cows', document.getElementById('inp-cows').value);
-    localStorage.setItem(p+'feed_intake', document.getElementById('inp-intake').value);
-    localStorage.setItem(p+'feed_round', document.getElementById('inp-round').value);
-    localStorage.setItem(p+'feed_actual_pre', document.getElementById('inp-actual-pre').value);
-    calculateFeedLogic();
-}
-
-function calculateFeedLogic() {
-    const residual = safeNum(document.getElementById('inp-residual').value);
-    const cows = safeNum(document.getElementById('inp-cows').value);
-    const intake = safeNum(document.getElementById('inp-intake').value);
-    const round = safeNum(document.getElementById('inp-round').value);
-    const totalArea = safeNum(document.getElementById('feed-area-total').innerText);
-    const actualPre = safeNum(document.getElementById('inp-actual-pre').value);
-
-    let preGrazeTarget = 0;
-    if (totalArea > 0) {
-        preGrazeTarget = ((cows * intake * round) / totalArea) + residual;
-    }
-    document.getElementById('res-target-pre').innerText = Math.round(preGrazeTarget);
-    document.getElementById('feed-target-copy').innerText = Math.round(preGrazeTarget);
-
-    let areaDay = 0;
-    if (round > 0) areaDay = totalArea / round;
-    document.getElementById('res-area-day').innerText = areaDay.toFixed(2);
-
-    let areaCow = 0;
-    if (cows > 0) areaCow = (areaDay / cows) * 10000;
-    document.getElementById('res-area-cow').innerText = Math.round(areaCow);
-
-    let supp = 0;
-    if (cows > 0) {
-        supp = (preGrazeTarget - actualPre) * areaDay / cows;
-    }
-    document.getElementById('res-supp').innerText = supp.toFixed(1);
-
-    renderFeedWedge(manualModeData, preGrazeTarget, residual);
-}
-
-function renderFeedWedge(paddockData, targetPre, targetRes) {
-    const ctx = document.getElementById('wedgeChart').getContext('2d');
-    const activePaddocks = paddockData.filter(p => !p.isOut).sort((a,b) => b.latest.cover - a.latest.cover);
-    const labels = activePaddocks.map(p => p.name);
-    const dataCover = activePaddocks.map(p => p.latest.cover);
-    
-    const demandLine = [];
-    const count = activePaddocks.length;
-    if (count > 0) {
-        const slope = (targetRes - targetPre) / (count - 1 || 1);
-        for(let i=0; i<count; i++) {
-            demandLine.push(targetPre + (slope * i));
-        }
-    }
-
-    if (wedgeChartInstance) wedgeChartInstance.destroy();
-
-    wedgeChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    type: 'line',
-                    label: 'Demand Line',
-                    data: demandLine,
-                    borderColor: '#e74c3c',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    borderDash: [5, 5],
-                    fill: false,
-                    tension: 0
-                },
-                {
-                    type: 'bar',
-                    label: 'Cover (kgDM/ha)',
-                    data: dataCover,
-                    backgroundColor: '#2ecc71',
-                    borderRadius: 3,
-                    barPercentage: 0.95,
-                    categoryPercentage: 0.95
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: { display: true, position:'top', align:'end' },
-                tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } }
-            },
-            scales: {
-                y: { beginAtZero: true, title: {display:true, text:'kgDM/ha', font:{size:10, weight:'bold'}} },
-                x: { ticks: { maxRotation: 90, minRotation: 90, font: {size: 9} } }
+                    div.onclick = () => {
+                        document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+                        div.classList.add('active');
+                        if (currentDashboardMode === 'satellite') updateMapTile(p.latest.url);
+                        focusPaddockOnMap(p.name, p.isOut ? '#e74c3c' : (p.isCloud ? 'var(--cloud)' : 'var(--accent)'));
+                    };
+                    list.appendChild(div);
+                });
             }
-        }
-    });
-}
 
-function saveToCloud() {
-    if(!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) {
-        alert("Please set the GOOGLE_SCRIPT_URL variable in the code to enable cloud saving.");
-        return;
-    }
-    const btn = document.querySelector('.btn-save');
-    const msg = document.getElementById('save-msg');
-    
-    btn.disabled = true;
-    btn.innerText = "SAVING...";
-    
-    const payload = {
-        farm: currentFarmId,
-        residual: document.getElementById('inp-residual').value,
-        cows: document.getElementById('inp-cows').value,
-        intake: document.getElementById('inp-intake').value,
-        round: document.getElementById('inp-round').value,
-        pre: document.getElementById('inp-actual-pre').value
-    };
+            /* Map Logic */
+            function getCoverColor(cover) {
+                if (cover > 2800) return '#00441b'; if (cover > 2400) return '#006d2c';
+                if (cover > 2000) return '#238b45'; if (cover > 1600) return '#41ab5d';
+                if (cover > 1200) return '#74c476'; return '#a1d99b';
+            }
 
-    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
-    .then(res => res.json())
-    .then(data => {
-        btn.disabled = false;
-        btn.innerText = "SAVE TO CLOUD";
-        msg.style.display = 'inline-block';
-        setTimeout(() => msg.style.display = 'none', 3000);
-    })
-    .catch(err => {
-        btn.disabled = false;
-        btn.innerText = "ERROR";
-        console.error(err);
-    });
-}
+            function updateGeoStyles() {
+                if (!geoLayer) return;
+                const currentData = getCurrentModeData();
+                geoLayer.eachLayer(layer => {
+                    const pName = layer.feature.properties.name;
+                    const p = currentData.find(pd => pd.name === pName);
+                    if (!p) return;
+                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>`);
 
-init();
-</script>
+                    if (currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentViewMode === 'cover') {
+                        let color = getCoverColor(p.latest.cover);
+                        if (p.isOut) color = '#ff7675'; else if (p.isCloud) color = '#3498db';
+                        layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', weight: 1 });
+                    } else {
+                        layer.setStyle({ fillColor: 'transparent', fillOpacity: 0.1, color: 'white', weight: 1.5 });
+                    }
+                });
+            }
+
+            function setLayerMode(mode) {
+                currentViewMode = mode;
+                document.getElementById('btn-ndvi').classList.toggle('active', mode === 'ndvi');
+                document.getElementById('btn-cover').classList.toggle('active', mode === 'cover');
+                document.getElementById('legend').style.display = (mode === 'cover') ? 'block' : 'none';
+                if (ndviLayer) {
+                    if (mode === 'ndvi' && currentDashboardMode === 'satellite') ndviLayer.addTo(map);
+                    else map.removeLayer(ndviLayer);
+                }
+                updateGeoStyles();
+            }
+
+            function updateMapTile(url) {
+                if (!url || url.length < 10) return;
+                if (ndviLayer) map.removeLayer(ndviLayer);
+                ndviLayer = L.tileLayer(url, { opacity: 0.7, maxZoom: 20 });
+                if (currentDashboardMode === 'satellite' && currentViewMode === 'ndvi') ndviLayer.addTo(map);
+            }
+
+            document.getElementById('search').oninput = (e) => {
+                const q = e.target.value.toLowerCase();
+                document.querySelectorAll('.card').forEach(c => c.style.display = c.querySelector('b').innerText.toLowerCase().includes(q) ? 'block' : 'none');
+            };
+
+            /* FEED CALCULATOR LOGIC */
+            function saveAndRecalc() {
+                const p = currentFarmId + '_';
+                localStorage.setItem(p + 'feed_residual', document.getElementById('inp-residual').value);
+                localStorage.setItem(p + 'feed_cows', document.getElementById('inp-cows').value);
+                localStorage.setItem(p + 'feed_intake', document.getElementById('inp-intake').value);
+                localStorage.setItem(p + 'feed_round', document.getElementById('inp-round').value);
+                localStorage.setItem(p + 'feed_actual_pre', document.getElementById('inp-actual-pre').value);
+                calculateFeedLogic();
+            }
+
+            function calculateFeedLogic() {
+                const residual = safeNum(document.getElementById('inp-residual').value);
+                const cows = safeNum(document.getElementById('inp-cows').value);
+                const intake = safeNum(document.getElementById('inp-intake').value);
+                const round = safeNum(document.getElementById('inp-round').value);
+                const totalArea = safeNum(document.getElementById('feed-area-total').innerText);
+                const actualPre = safeNum(document.getElementById('inp-actual-pre').value);
+
+                let preGrazeTarget = 0;
+                if (totalArea > 0) {
+                    preGrazeTarget = ((cows * intake * round) / totalArea) + residual;
+                }
+                document.getElementById('res-target-pre').innerText = Math.round(preGrazeTarget);
+                document.getElementById('feed-target-copy').innerText = Math.round(preGrazeTarget);
+
+                let areaDay = 0;
+                if (round > 0) areaDay = totalArea / round;
+                document.getElementById('res-area-day').innerText = areaDay.toFixed(2);
+
+                let areaCow = 0;
+                if (cows > 0) areaCow = (areaDay / cows) * 10000;
+                document.getElementById('res-area-cow').innerText = Math.round(areaCow);
+
+                let supp = 0;
+                if (cows > 0) {
+                    supp = (preGrazeTarget - actualPre) * areaDay / cows;
+                }
+                document.getElementById('res-supp').innerText = supp.toFixed(1);
+
+                renderFeedWedge(manualModeData, preGrazeTarget, residual);
+            }
+
+            function renderFeedWedge(paddockData, targetPre, targetRes) {
+                const ctx = document.getElementById('wedgeChart').getContext('2d');
+                const activePaddocks = paddockData.filter(p => !p.isOut).sort((a, b) => b.latest.cover - a.latest.cover);
+                const labels = activePaddocks.map(p => p.name);
+                const dataCover = activePaddocks.map(p => p.latest.cover);
+
+                const demandLine = [];
+                const count = activePaddocks.length;
+                if (count > 0) {
+                    const slope = (targetRes - targetPre) / (count - 1 || 1);
+                    for (let i = 0; i < count; i++) {
+                        demandLine.push(targetPre + (slope * i));
+                    }
+                }
+
+                if (wedgeChartInstance) wedgeChartInstance.destroy();
+
+                wedgeChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                type: 'line',
+                                label: 'Demand Line',
+                                data: demandLine,
+                                borderColor: '#e74c3c',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Cover (kgDM/ha)',
+                                data: dataCover,
+                                backgroundColor: '#2ecc71',
+                                borderRadius: 3,
+                                barPercentage: 0.95,
+                                categoryPercentage: 0.95
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: true, position: 'top', align: 'end' },
+                            tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'kgDM/ha', font: { size: 10, weight: 'bold' } } },
+                            x: { ticks: { maxRotation: 90, minRotation: 90, font: { size: 9 } } }
+                        }
+                    }
+                });
+            }
+
+            function saveToCloud() {
+                if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) {
+                    alert("Please set the GOOGLE_SCRIPT_URL variable in the code to enable cloud saving.");
+                    return;
+                }
+                const btn = document.querySelector('.btn-save');
+                const msg = document.getElementById('save-msg');
+
+                btn.disabled = true;
+                btn.innerText = "SAVING...";
+
+                const payload = {
+                    farm: currentFarmId,
+                    residual: document.getElementById('inp-residual').value,
+                    cows: document.getElementById('inp-cows').value,
+                    intake: document.getElementById('inp-intake').value,
+                    round: document.getElementById('inp-round').value,
+                    pre: document.getElementById('inp-actual-pre').value
+                };
+
+                fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+                    .then(res => res.json())
+                    .then(data => {
+                        btn.disabled = false;
+                        btn.innerText = "SAVE TO CLOUD";
+                        msg.style.display = 'inline-block';
+                        setTimeout(() => msg.style.display = 'none', 3000);
+                    })
+                    .catch(err => {
+                        btn.disabled = false;
+                        btn.innerText = "ERROR";
+                        console.error(err);
+                    });
+            }
+
+            init();
+        </script>
 </body>
+
 </html>
