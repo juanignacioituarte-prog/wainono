@@ -4782,6 +4782,11 @@
                         const cowNum = savedHerdCows[brk.group] || 0;
 
                         if (cowNum > 0) {
+                            const intake = safeNum(document.getElementById('inp-intake')?.value, 18);
+                            const harvestedYield = (cowNum * intake) / brk.areaHa;
+                            const impliedCover = residual + harvestedYield;
+                            const estDiff = Math.abs(impliedCover - estimatedCover);
+
                             const totalKg = Math.max(0, estimatedCover - residual) * brk.areaHa;
                             valStr = (totalKg / cowNum).toFixed(1) + ' kg';
                             
@@ -4789,24 +4794,48 @@
                                 `Base Cover: ${baseCover.toFixed(0)} kgDM/ha\n` +
                                 `Growth: ${grower.toFixed(1)} kgDM/ha/day\n` +
                                 `Days Since Image: ${daysSince.toFixed(1)} days\n` +
-                                `Est. Cover: ${estimatedCover.toFixed(0)} kgDM/ha\n` +
-                                `Residual: ${residual} kgDM/ha\n` +
+                                `Sat. Est. Cover: ${estimatedCover.toFixed(0)} kgDM/ha\n` +
+                                `Residual Target: ${residual} kgDM/ha\n` +
                                 `Area: ${brk.areaHa.toFixed(2)} ha\n` +
-                                `Cows: ${cowNum}`;
+                                `Cows: ${cowNum}\n` +
+                                `Per Cow Intake: ${intake}kg\n` +
+                                `──────────────────\n` +
+                                `Implied Pre-Grazing Cover: ${impliedCover.toFixed(0)} kgDM/ha`;
+
+                            const statusIndicator = estDiff > 500 
+                                ? `<span style="color:#e74c3c;" title="Warning: Satellite estimates differed from cow intake by ${Math.round(estDiff)}kg">\u26a0\ufe0f</span>` 
+                                : `<span style="color:#2ecc71;" title="Satellite estimates tightly match expected cow intake.">\u2714\ufe0f</span>`;
+
+                            secondaryMetricHtml = `
+                                <div title="${calcParamsText}" style="cursor:help; display:inline-block;">
+                                    <span class="label">EST. KG/COW</span>
+                                    <div style="font-size:13px; font-weight:600; color:var(--accent);">
+                                        ${valStr}
+                                    </div>
+                                    <div style="margin-top:4px; margin-bottom:2px; height:1px; background:#eee;"></div>
+                                    <span class="label" style="color:#e67e22;">IMPLIED YIELD</span>
+                                    <div style="font-size:12px; font-weight:bold; color:#2c3e50; line-height:1.1;">
+                                        ${impliedCover.toFixed(0)} kgDM ${statusIndicator}
+                                    </div>
+                                </div>`;
                         } else {
                             calcParamsText = 'Cow number not set for group';
+                            secondaryMetricHtml = `
+                                <div title="${calcParamsText}" style="cursor:help; display:inline-block;">
+                                    <span class="label">EST. KG/COW</span>
+                                    <div style="font-size:13px; font-weight:600; color:var(--accent);">--</div>
+                                </div>`;
                         }
                     }
                 }
 
-                secondaryMetricHtml = `
-                    <div title="${calcParamsText}" style="cursor:help; display:inline-block;">
-                        <span class="label">EST. KG/COW</span>
-                        <div style="font-size:13px; font-weight:600; color:var(--accent);">
-                            ${valStr}
-                        </div>
-                        <div style="font-size:10px; color:#95a5a6; margin-top:2px;">per cow</div>
-                    </div>`;
+                if (secondaryMetricHtml === '') {
+                    secondaryMetricHtml = `
+                        <div title="${calcParamsText}" style="cursor:help; display:inline-block;">
+                            <span class="label">EST. KG/COW</span>
+                            <div style="font-size:13px; font-weight:600; color:var(--accent);">--</div>
+                        </div>`;
+                }
             }
             
             const gColor = getGroupColor(brk.group);
