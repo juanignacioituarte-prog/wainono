@@ -2592,11 +2592,7 @@
             const pairs = [];
             for (const m of manualEntries) {
                 const hist = historyLower[m.lower]; if (!hist || hist.length === 0) continue;
-                if (usePartialCalibration) {
-                    if (!partialPaddocks.has(m.lower)) continue;
-                } else {
-                    if (partialPaddocks.has(m.lower)) continue;
-                }
+                if (partialPaddocks.has(m.lower)) continue;
 
                 const s = hist[0]; if (!s || !s.dateObj) continue;
                 const signedGapDays = (s.dateObj - m.dateObj) / 86400000;
@@ -2786,11 +2782,7 @@
 
         function manualCalibratorStatus(manual, satRaw, lowerName) {
             if (!manual || !selectedSceneTs) return { ok: false, reason: "", className: "" };
-            if (usePartialCalibration) {
-                if (!partialPaddocks.has(lowerName)) return { ok: false, reason: "not partial", className: "bad" };
-            } else {
-                if (partialPaddocks.has(lowerName)) return { ok: false, reason: "partial", className: "bad" };
-            }
+            if (partialPaddocks.has(lowerName)) return { ok: false, reason: "partial", className: "bad" };
             if (manual.gapDays > GAP_DAYS_MAX) return { ok: false, reason: `gap ${manual.gapDays.toFixed(0)}d`, className: "bad" };
             const projected = manual.cover + (manualFarmGrowthRate * manual.signedGap);
             if (!isFinite(projected) || projected <= 0 || !isFinite(satRaw) || satRaw <= 0) return { ok: false, reason: "invalid", className: "bad" };
