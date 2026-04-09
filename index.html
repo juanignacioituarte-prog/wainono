@@ -3866,6 +3866,10 @@
                     }
                 }
 
+                let hrsStr = prompt(`Enter Time of Stay for ${breakName} (in hours):`, "24");
+                let hrsNum = !hrsStr ? 24 : parseFloat(hrsStr);
+                if (!isFinite(hrsNum) || hrsNum <= 0) hrsNum = 24;
+
                 const newBreak = {
                     id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
                     name: breakName,
@@ -3873,6 +3877,7 @@
                     vertices: [...drawingVertices],
                     areaSqm: areaSqm,
                     areaHa: areaHa,
+                    timeStayHrs: hrsNum,
                     distanceMeters: distanceMeters,
                     cropWidthMeters: cropWidthMeters,
                     cropMode: isLineMode ? 'line' : 'polygon',
@@ -4783,7 +4788,9 @@
 
                         if (cowNum > 0) {
                             const intake = safeNum(document.getElementById('inp-intake')?.value, 18);
-                            const harvestedYield = (cowNum * intake) / brk.areaHa;
+                            const stayHrs = brk.timeStayHrs || 24;
+                            const scaledIntake = intake * (stayHrs / 24);
+                            const harvestedYield = (cowNum * scaledIntake) / brk.areaHa;
                             const impliedCover = residual + harvestedYield;
                             const estDiff = Math.abs(impliedCover - estimatedCover);
 
@@ -4798,7 +4805,8 @@
                                 `Residual Target: ${residual} kgDM/ha\n` +
                                 `Area: ${brk.areaHa.toFixed(2)} ha\n` +
                                 `Cows: ${cowNum}\n` +
-                                `Per Cow Intake: ${intake}kg\n` +
+                                `Per Cow Intake: ${intake}kg/day\n` +
+                                `Time of Stay: ${stayHrs} hrs\n` +
                                 `──────────────────\n` +
                                 `Implied Pre-Grazing Cover: ${impliedCover.toFixed(0)} kgDM/ha`;
 
