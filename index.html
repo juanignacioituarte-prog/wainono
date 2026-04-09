@@ -2595,19 +2595,24 @@
                 if (partialPaddocks.has(m.lower)) continue;
 
                 const s = hist[0]; if (!s || !s.dateObj) continue;
+                
                 const signedGapDays = (s.dateObj - m.dateObj) / 86400000;
                 if (Math.abs(signedGapDays) > GAP_DAYS_MAX) continue;
                 const manualProjected = m.cover + (manualFarmGrowthRate * signedGapDays);
                 if (!isFinite(manualProjected) || manualProjected <= 0) continue;
-                
+
+                const satRaw = s.cover_raw; 
+                if (isFinite(satRaw) && satRaw > 0) {
+                    if (manualProjected < satRaw * GRAZE_FACTOR) continue;
+                    const ratio = manualProjected / satRaw;
+                    if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
+                }
+
                 if (usePartialCalibration) {
                     const ndvi = s.ndvi; if (!isFinite(ndvi)) continue;
                     pairs.push({ x: ndvi, y: manualProjected });
                 } else {
-                    const satRaw = s.cover_raw; if (!isFinite(satRaw) || satRaw <= 0) continue;
-                    if (manualProjected < satRaw * GRAZE_FACTOR) continue;
-                    const ratio = manualProjected / satRaw;
-                    if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
+                    if (!isFinite(satRaw) || satRaw <= 0) continue;
                     pairs.push({ x: satRaw, y: manualProjected });
                 }
             }
