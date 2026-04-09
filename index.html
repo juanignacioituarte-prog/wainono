@@ -3917,6 +3917,7 @@
                         areaSqm: areaSqm,
                         areaHa: areaHa,
                         timeStayHrs: hrsNum,
+                        shiftType: shiftType,
                         manualResidual: manualResidual,
                         distanceMeters: distanceMeters,
                         cropWidthMeters: cropWidthMeters,
@@ -4899,6 +4900,7 @@
                                  title="${isAudioActive ? 'Stop Audio Aid' : 'Start Audio Aid'}">
                              ${isAudioActive ? '\u23f9\ufe0f' : '\u25b6\ufe0f'}
                          </button>
+                         <button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration \u0026 Residual">\u2699\ufe0f</button>
                          <button class="btn-edit-break" style="position:static;" onclick="event.stopPropagation(); startEditBreak('${brk.id}')" title="Edit vertices">\u270e</button>
                          <button class="btn-delete-break" style="position:static;" onclick="promptDeleteBreak('${brk.id}', event)" title="Delete break">\ud83d\uddd1\ufe0f</button>
                        </div>`
@@ -4933,6 +4935,43 @@
         }
 
         /* ===================== BREAK EDITING ===================== */
+        function editBreakDetails(id) {
+            const brk = savedBreaks.find(b => b.id === id);
+            if (!brk) return;
+            
+            let defaultRes = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
+            document.getElementById('modal-break-residual').value = defaultRes;
+            if (brk.shiftType) document.getElementById('modal-break-shift').value = brk.shiftType;
+            else document.getElementById('modal-break-shift').value = '24';
+            
+            const modal = document.getElementById('finish-break-modal');
+            modal.style.display = 'flex';
+            
+            document.getElementById('btn-save-break-details').onclick = () => {
+                modal.style.display = 'none';
+                
+                const shiftType = document.getElementById('modal-break-shift').value;
+                let hrsNum = 24;
+                if (shiftType === 'long') hrsNum = 24 * (safeNum(document.getElementById('inp-long-pct').value, 60) / 100);
+                else if (shiftType === 'short') hrsNum = 24 * (safeNum(document.getElementById('inp-short-pct').value, 40) / 100);
+                else if (shiftType === 'am') hrsNum = 24 * (safeNum(document.getElementById('inp-am-pct').value, 60) / 100);
+                else if (shiftType === 'pm') hrsNum = 24 * (safeNum(document.getElementById('inp-pm-pct').value, 40) / 100);
+                
+                const manRes = parseFloat(document.getElementById('modal-break-residual').value);
+                const manualResidual = isFinite(manRes) && manRes > 0 ? manRes : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
+
+                brk.timeStayHrs = hrsNum;
+                brk.shiftType = shiftType;
+                brk.manualResidual = manualResidual;
+                brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.lastEditedAt = new Date().toISOString();
+                
+                saveBreaks();
+                if (currentDashboardMode === 'breaks') renderBreaksDashboard();
+                else renderBreaksOnMap();
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            };
+        }
 
         function startEditBreak(breakId) {
             if (isDrawingBreak) return;
