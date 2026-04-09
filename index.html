@@ -1545,6 +1545,9 @@
                             CALIBRATION CONFIDENCE</div>
                         <span id="calib-pill" class="calib-pill">--</span>
                     </div>
+                    <div style="margin-top:4px;">
+                        <button id="btn-calib-toggle" onclick="toggleCalibrationModel()" style="font-size:10px; padding:3px 8px; border-radius:4px; cursor:pointer; background:#f0f0f0; border:1px solid #ccc; font-weight:bold; color:#333; transition: background 0.2s;">Use Partial Farmwalk: OFF</button>
+                    </div>
                     <div id="calib-text" style="margin-top:6px; line-height:1.35; display:none;">--</div>
                 </div>
 
@@ -1712,6 +1715,8 @@
         let selectedSceneTs = null;
         let satelliteHistory = {};
         let wedgeChartInstance = null;
+        let usePartialCalibration = false;
+        let manualFarmGrowthRate = 0;
 
         /* Break Management State */
         const BREAK_GROUPS = [
@@ -2055,6 +2060,15 @@
                                 });
                             }
                         });
+                        
+                        let tWGrowth = 0, tAreaG = 0;
+                        manualModeData.forEach(p => {
+                            if (!p.isOut && p.area > 0 && p.growthRate && p.growthRate > 0) {
+                                tWGrowth += p.growthRate * p.area;
+                                tAreaG += p.area;
+                            }
+                        });
+                        manualFarmGrowthRate = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
 
                         if (currentDashboardMode === 'manual') {
                             renderDashboard();
@@ -2578,35 +2592,75 @@
             const pairs = [];
             for (const m of manualEntries) {
                 const hist = historyLower[m.lower]; if (!hist || hist.length === 0) continue;
-                if (partialPaddocks.has(m.lower)) continue;
+                if (usePartialCalibration) {
+                    if (!partialPaddocks.has(m.lower)) continue;
+                } else {
+                    if (partialPaddocks.has(m.lower)) continue;
+                }
 
                 const s = hist[0]; if (!s || !s.dateObj) continue;
-                const gapDays = Math.abs((m.dateObj - s.dateObj) / 86400000);
-                if (gapDays > GAP_DAYS_MAX) continue;
-                const satRaw = s.cover_raw; if (!isFinite(satRaw) || satRaw <= 0) continue;
-                const manualProjected = m.cover - (farmGrowthRate * gapDays);
+                const signedGapDays = (s.dateObj - m.dateObj) / 86400000;
+                if (Math.abs(signedGapDays) > GAP_DAYS_MAX) continue;
+                const manualProjected = m.cover + (manualFarmGrowthRate * signedGapDays);
                 if (!isFinite(manualProjected) || manualProjected <= 0) continue;
-                if (manualProjected < satRaw * GRAZE_FACTOR) continue;
-                const ratio = manualProjected / satRaw;
-                if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
-                pairs.push({ x: satRaw, y: manualProjected });
+                
+                if (usePartialCalibration) {
+                    const ndvi = s.ndvi; if (!isFinite(ndvi)) continue;
+                    pairs.push({ x: ndvi, y: manualProjected });
+                } else {
+                    const satRaw = s.cover_raw; if (!isFinite(satRaw) || satRaw <= 0) continue;
+                    if (manualProjected < satRaw * GRAZE_FACTOR) continue;
+                    const ratio = manualProjected / satRaw;
+                    if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
+                    pairs.push({ x: satRaw, y: manualProjected });
+                }
             }
             if (pairs.length < 4) return null;
             const n = pairs.length;
-            const meanX = pairs.reduce((a, p) => a + p.x, 0) / n; const meanY = pairs.reduce((a, p) => a + p.y, 0) / n;
-            let num = 0, den = 0; pairs.forEach(p => { num += (p.x - meanX) * (p.y - meanY); den += (p.x - meanX) * (p.x - meanX); });
-            const a = den !== 0 ? (num / den) : 1; const b = meanY - a * meanX;
-            let ssTot = 0, ssRes = 0; pairs.forEach(p => { const pred = a * p.x + b; ssTot += (p.y - meanY) * (p.y - meanY); ssRes += (p.y - pred) * (p.y - pred); });
-            return { a, b, r2: ssTot !== 0 ? (1 - ssRes / ssTot) : 0, count: n };
+            
+            if (usePartialCalibration) {
+                const logPairs = pairs.map(p => ({ x: p.x, Y: Math.log(p.y), origY: p.y }));
+                const meanX = logPairs.reduce((a, p) => a + p.x, 0) / n;
+                const meanY = logPairs.reduce((a, p) => a + p.Y, 0) / n;
+                let num = 0, den = 0; 
+                logPairs.forEach(p => { num += (p.x - meanX) * (p.Y - meanY); den += (p.x - meanX) * (p.x - meanX); });
+                const B = den !== 0 ? (num / den) : 0; 
+                const lnA = meanY - B * meanX;
+                const A = Math.exp(lnA);
+                
+                const meanOrigY = pairs.reduce((a, p) => a + p.y, 0) / n;
+                let ssTot = 0, ssRes = 0;
+                pairs.forEach(p => { 
+                    const pred = A * Math.exp(B * p.x); 
+                    ssTot += (p.y - meanOrigY) * (p.y - meanOrigY); 
+                    ssRes += (p.y - pred) * (p.y - pred); 
+                });
+                return { type: 'exponential', A, B, r2: ssTot !== 0 ? (1 - ssRes / ssTot) : 0, count: n };
+            } else {
+                const meanX = pairs.reduce((a, p) => a + p.x, 0) / n; const meanY = pairs.reduce((a, p) => a + p.y, 0) / n;
+                let num = 0, den = 0; pairs.forEach(p => { num += (p.x - meanX) * (p.y - meanY); den += (p.x - meanX) * (p.x - meanX); });
+                const a = den !== 0 ? (num / den) : 1; const b = meanY - a * meanX;
+                let ssTot = 0, ssRes = 0; pairs.forEach(p => { const pred = a * p.x + b; ssTot += (p.y - meanY) * (p.y - meanY); ssRes += (p.y - pred) * (p.y - pred); });
+                return { type: 'linear', a, b, r2: ssTot !== 0 ? (1 - ssRes / ssTot) : 0, count: n };
+            }
         }
 
         function applyCalibrationToHistory(history) {
-            if (!calibrationModel) return;
             Object.keys(history).forEach(name => {
                 history[name].forEach(e => {
-                    const raw = e.cover_raw; if (!isFinite(raw)) return;
-                    const cal = calibrationModel.a * raw + calibrationModel.b;
-                    e.cover = Math.max(0, Math.round(cal));
+                    if (!calibrationModel) {
+                        e.cover = e.cover_raw;
+                        return;
+                    }
+                    if (calibrationModel.type === 'exponential') {
+                        if (!isFinite(e.ndvi)) { e.cover = e.cover_raw; return; }
+                        const cal = calibrationModel.A * Math.exp(calibrationModel.B * e.ndvi);
+                        e.cover = Math.max(0, Math.round(cal));
+                    } else {
+                        const raw = e.cover_raw; if (!isFinite(raw)) return;
+                        const cal = calibrationModel.a * raw + calibrationModel.b;
+                        e.cover = Math.max(0, Math.round(cal));
+                    }
                 });
             });
         }
@@ -2615,14 +2669,44 @@
             const box = document.getElementById('calibration-box');
             const pill = document.getElementById('calib-pill');
             const text = document.getElementById('calib-text');
-            if (!calibrationModel) { box.style.display = 'none'; return; }
-            if (currentDashboardMode === 'satellite') box.style.display = 'block';
+            if (currentDashboardMode !== 'satellite') { box.style.display = 'none'; return; }
+            box.style.display = 'block';
+            if (!calibrationModel) {
+                pill.className = `calib-pill warn`; pill.textContent = `N/A`;
+                text.innerHTML = `<div>Not enough ${usePartialCalibration ? 'partial' : 'main'} calibrators.</div>`;
+                return;
+            }
             let label = 'WEAK'; let cls = 'bad';
             if (calibrationModel.r2 >= 0.85) { label = 'HIGH'; cls = 'good'; }
             else if (calibrationModel.r2 >= 0.70) { label = 'GOOD'; cls = 'good'; }
             else if (calibrationModel.r2 >= 0.50) { label = 'LOW'; cls = 'warn'; }
             pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
-            text.innerHTML = `<div><b style="color:#2c3e50;">R²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> cover = ${calibrationModel.a.toFixed(2)}×raw + ${Math.round(calibrationModel.b)}</div>`;
+            
+            const equationHtml = calibrationModel.type === 'exponential' 
+                ? `cover = ${Math.round(calibrationModel.A)}×exp(${calibrationModel.B.toFixed(2)}×ndvi)` 
+                : `cover = ${calibrationModel.a.toFixed(2)}×raw + ${Math.round(calibrationModel.b)}`;
+                
+            text.innerHTML = `<div><b style="color:#2c3e50;">R²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
+        }
+
+        function toggleCalibrationModel() {
+            usePartialCalibration = !usePartialCalibration;
+            const btn = document.getElementById('btn-calib-toggle');
+            if (btn) {
+                btn.textContent = 'Use Partial Farmwalk: ' + (usePartialCalibration ? 'ON' : 'OFF');
+                btn.style.background = usePartialCalibration ? '#d1ecf1' : '#f0f0f0';
+                btn.style.color = usePartialCalibration ? '#0c5460' : '#333';
+                btn.style.borderColor = usePartialCalibration ? '#bee5eb' : '#ccc';
+            }
+            
+            const historyLower = {}; Object.keys(satelliteHistory).forEach(k => { historyLower[normName(k)] = satelliteHistory[k]; });
+            calibrationModel = buildCalibrationModel(historyLower);
+            
+            applyCalibrationToHistory(satelliteHistory);
+            updateCalibrationUI();
+            processSatelliteData();
+            updateGeoStyles();
+            setLayerMode(currentViewMode);
         }
 
         async function loadCSV() {
@@ -2702,9 +2786,13 @@
 
         function manualCalibratorStatus(manual, satRaw, lowerName) {
             if (!manual || !selectedSceneTs) return { ok: false, reason: "", className: "" };
-            if (partialPaddocks.has(lowerName)) return { ok: false, reason: "partial", className: "bad" };
+            if (usePartialCalibration) {
+                if (!partialPaddocks.has(lowerName)) return { ok: false, reason: "not partial", className: "bad" };
+            } else {
+                if (partialPaddocks.has(lowerName)) return { ok: false, reason: "partial", className: "bad" };
+            }
             if (manual.gapDays > GAP_DAYS_MAX) return { ok: false, reason: `gap ${manual.gapDays.toFixed(0)}d`, className: "bad" };
-            const projected = manual.cover - (farmGrowthRate * manual.gapDays);
+            const projected = manual.cover + (manualFarmGrowthRate * manual.signedGap);
             if (!isFinite(projected) || projected <= 0 || !isFinite(satRaw) || satRaw <= 0) return { ok: false, reason: "invalid", className: "bad" };
             if (projected < satRaw * GRAZE_FACTOR) return { ok: false, reason: "likely grazed", className: "bad" };
             const ratio = projected / satRaw;
@@ -2716,8 +2804,9 @@
             const lower = normName(paddockName); let best = null; let bestAbs = Infinity;
             for (const m of manualEntries) {
                 if (m.lower !== lower || !selectedSceneTs) continue;
-                const gapDays = Math.abs((m.dateObj - new Date(selectedSceneTs)) / 86400000);
-                if (gapDays < bestAbs) { bestAbs = gapDays; best = { ...m, gapDays }; }
+                const signedGap = (new Date(selectedSceneTs) - m.dateObj) / 86400000;
+                const gapDays = Math.abs(signedGap);
+                if (gapDays < bestAbs) { bestAbs = gapDays; best = { ...m, gapDays, signedGap }; }
             }
             return best;
         }
