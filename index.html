@@ -1295,6 +1295,30 @@
         </div>
     </div>
 
+    <!-- Finish Break Details Modal -->
+    <div id="finish-break-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:10000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:20px; border-radius:12px; width:80%; max-width:320px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+            <h3 style="margin-top:0; color:#2c3e50; text-align:center;">Break Details</h3>
+            
+            <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Time of Stay (Shift)</label>
+            <select id="modal-break-shift" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9;">
+                <option value="24">24 Hours (Full Day)</option>
+                <option value="long">Long Break</option>
+                <option value="short">Short Break</option>
+                <option value="am">AM Shift</option>
+                <option value="pm">PM Shift</option>
+            </select>
+
+            <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Target Residual (kgDM/ha)</label>
+            <input type="number" id="modal-break-residual" style="width:100%; padding:10px; margin-bottom:20px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9; box-sizing:border-box;" placeholder="1500" />
+            
+            <div style="display:flex; gap:10px;">
+                <button onclick="document.getElementById('finish-break-modal').style.display='none'" style="flex:1; padding:10px; background:#f5f5f5; border:1px solid #ddd; border-radius:6px; color:#555; font-weight:bold; cursor:pointer;">CANCEL</button>
+                <button id="btn-save-break-details" style="flex:1; padding:10px; background:#2ecc71; border:none; border-radius:6px; color:white; font-weight:bold; cursor:pointer;">SAVE BREAK</button>
+            </div>
+        </div>
+    </div>
+
     <div id="login-screen">
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
         <h2>River Terrace Farm App</h2>
@@ -3866,32 +3890,50 @@
                     }
                 }
 
-                let hrsStr = prompt(`Enter Time of Stay for ${breakName} (in hours):`, "24");
-                let hrsNum = !hrsStr ? 24 : parseFloat(hrsStr);
-                if (!isFinite(hrsNum) || hrsNum <= 0) hrsNum = 24;
-
-                const newBreak = {
-                    id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-                    name: breakName,
-                    paddock: paddockName,
-                    vertices: [...drawingVertices],
-                    areaSqm: areaSqm,
-                    areaHa: areaHa,
-                    timeStayHrs: hrsNum,
-                    distanceMeters: distanceMeters,
-                    cropWidthMeters: cropWidthMeters,
-                    cropMode: isLineMode ? 'line' : 'polygon',
-                    createdAt: new Date().toISOString(),
-                    createdBy: localStorage.getItem('auth_name') || 'Unknown User',
-                    group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
-                };
+                let defaultRes = safeNum(document.getElementById('inp-residual')?.value, 1500);
+                document.getElementById('modal-break-residual').value = defaultRes;
                 
-                console.log("New break created:", newBreak);
-                savedBreaks.unshift(newBreak); // Add to the TOP
-                saveBreaks();
-                cleanupDrawing();
-                renderBreaksDashboard();
-                renderBreaksOnMap();
+                const modal = document.getElementById('finish-break-modal');
+                modal.style.display = 'flex';
+                
+                document.getElementById('btn-save-break-details').onclick = () => {
+                    modal.style.display = 'none';
+                    
+                    const shiftType = document.getElementById('modal-break-shift').value;
+                    let hrsNum = 24;
+                    if (shiftType === 'long') hrsNum = 24 * (safeNum(document.getElementById('inp-long-pct').value, 60) / 100);
+                    else if (shiftType === 'short') hrsNum = 24 * (safeNum(document.getElementById('inp-short-pct').value, 40) / 100);
+                    else if (shiftType === 'am') hrsNum = 24 * (safeNum(document.getElementById('inp-am-pct').value, 60) / 100);
+                    else if (shiftType === 'pm') hrsNum = 24 * (safeNum(document.getElementById('inp-pm-pct').value, 40) / 100);
+                    
+                    const manRes = parseFloat(document.getElementById('modal-break-residual').value);
+                    const manualResidual = isFinite(manRes) && manRes > 0 ? manRes : defaultRes;
+
+                    const newBreak = {
+                        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+                        name: breakName,
+                        paddock: paddockName,
+                        vertices: [...drawingVertices],
+                        areaSqm: areaSqm,
+                        areaHa: areaHa,
+                        timeStayHrs: hrsNum,
+                        manualResidual: manualResidual,
+                        distanceMeters: distanceMeters,
+                        cropWidthMeters: cropWidthMeters,
+                        cropMode: isLineMode ? 'line' : 'polygon',
+                        createdAt: new Date().toISOString(),
+                        createdBy: localStorage.getItem('auth_name') || 'Unknown User',
+                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
+                    };
+                    
+                    console.log("New break created:", newBreak);
+                    savedBreaks.unshift(newBreak); // Add to the TOP
+                    saveBreaks();
+                    cleanupDrawing();
+                    renderBreaksDashboard();
+                    renderBreaksOnMap();
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                };
             } catch (e) {
                 console.error("Error in finishBreak:", e);
                 alert("Failed to save break: " + e.message);
@@ -4782,7 +4824,7 @@
                         const grower = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
                         const baseCover = parseFloat(p.latest.cover) || 0;
                         const estimatedCover = baseCover + (grower * daysSince);
-                        const residual = parseFloat(localStorage.getItem('feed_residual')) || 1500;
+                        const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
                         const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
                         const cowNum = savedHerdCows[brk.group] || 0;
 
