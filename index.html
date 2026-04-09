@@ -2602,11 +2602,6 @@
                 if (!isFinite(manualProjected) || manualProjected <= 0) continue;
 
                 const satRaw = s.cover_raw; 
-                if (isFinite(satRaw) && satRaw > 0) {
-                    if (manualProjected < satRaw * GRAZE_FACTOR) continue;
-                    const ratio = manualProjected / satRaw;
-                    if (ratio < RATIO_MIN || ratio > RATIO_MAX) continue;
-                }
 
                 if (usePartialCalibration) {
                     const ndvi = s.ndvi; if (!isFinite(ndvi)) continue;
@@ -2791,9 +2786,6 @@
             if (manual.gapDays > GAP_DAYS_MAX) return { ok: false, reason: `gap ${manual.gapDays.toFixed(0)}d`, className: "bad" };
             const projected = manual.cover + (manualFarmGrowthRate * manual.signedGap);
             if (!isFinite(projected) || projected <= 0 || !isFinite(satRaw) || satRaw <= 0) return { ok: false, reason: "invalid", className: "bad" };
-            if (projected < satRaw * GRAZE_FACTOR) return { ok: false, reason: "likely grazed", className: "bad" };
-            const ratio = projected / satRaw;
-            if (ratio < RATIO_MIN || ratio > RATIO_MAX) return { ok: false, reason: "outlier", className: "bad" };
             return { ok: true, reason: "used", className: "" };
         }
 
