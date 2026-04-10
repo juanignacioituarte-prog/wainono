@@ -1,0 +1,18 @@
+{
+  "name": "River Terrace Farm Monitor",
+  "short_name": "RT Farm",
+  "description": "Farm monitoring dashboard with satellite NDVI, farmwalk data, feed wedge, and break management.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7f6",
+  "theme_color": "#2ecc71",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
