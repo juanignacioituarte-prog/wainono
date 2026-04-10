@@ -1495,6 +1495,10 @@
                         <input type="number" id="inp-intake" value="18" oninput="saveAndRecalc()">
                     </div>
                     <div class="input-group">
+                        <label>In-Shed/Crop Supplement (kgDM/cow)</label>
+                        <input type="number" id="inp-inshed" value="0" oninput="saveAndRecalc()">
+                    </div>
+                    <div class="input-group">
                         <label>Rotation Length (days)</label>
                         <input type="number" id="inp-round" value="25" oninput="saveAndRecalc()">
                     </div>
@@ -2223,6 +2227,10 @@
                 document.getElementById('inp-intake').value = data.intake;
                 localStorage.setItem('feed_intake', data.intake);
             }
+            if (data.inshed !== undefined) {
+                document.getElementById('inp-inshed').value = data.inshed;
+                localStorage.setItem('feed_inshed', data.inshed);
+            }
             if (data.round) {
                 document.getElementById('inp-round').value = data.round;
                 localStorage.setItem('feed_round', data.round);
@@ -2282,6 +2290,7 @@
                 if (cDisp) cDisp.innerText = cVal;
             }
             if (localStorage.getItem('feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem('feed_intake');
+            if (localStorage.getItem('feed_inshed')) document.getElementById('inp-inshed').value = localStorage.getItem('feed_inshed');
             if (localStorage.getItem('feed_round')) document.getElementById('inp-round').value = localStorage.getItem('feed_round');
             if (localStorage.getItem('feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem('feed_actual_pre');
             
@@ -3326,6 +3335,7 @@
             localStorage.setItem('feed_residual', document.getElementById('inp-residual').value);
             localStorage.setItem('feed_cows', document.getElementById('inp-cows').value);
             localStorage.setItem('feed_intake', document.getElementById('inp-intake').value);
+            localStorage.setItem('feed_inshed', document.getElementById('inp-inshed').value);
             localStorage.setItem('feed_round', document.getElementById('inp-round').value);
             localStorage.setItem('feed_actual_pre', document.getElementById('inp-actual-pre').value);
             
@@ -3381,6 +3391,8 @@
             const residual = safeNum(document.getElementById('inp-residual').value);
             const cows = safeNum(document.getElementById('inp-cows').value);
             const intake = safeNum(document.getElementById('inp-intake').value);
+            const inshed = safeNum(document.getElementById('inp-inshed').value);
+            const cropFeed = safeNum(document.getElementById('inp-crop-feed').value);
             const round = safeNum(document.getElementById('inp-round').value);
             const totalArea = safeNum(document.getElementById('feed-area-total').innerText);
             const actualPre = safeNum(document.getElementById('inp-actual-pre').value);
@@ -3388,7 +3400,8 @@
             // Pre-grazing Target
             let preGrazeTarget = 0;
             if (totalArea > 0) {
-                preGrazeTarget = ((cows * intake * round) / totalArea) + residual;
+                const effectivePastureDemand = Math.max(0, intake - inshed - cropFeed);
+                preGrazeTarget = ((cows * effectivePastureDemand * round) / totalArea) + residual;
             }
             document.getElementById('res-target-pre').innerText = Math.round(preGrazeTarget);
             document.getElementById('feed-target-copy').innerText = Math.round(preGrazeTarget);
@@ -3590,6 +3603,7 @@
                 residual: document.getElementById('inp-residual').value,
                 cows: document.getElementById('inp-cows').value,
                 intake: document.getElementById('inp-intake').value,
+                inshed: document.getElementById('inp-inshed').value,
                 round: document.getElementById('inp-round').value,
                 pre: document.getElementById('inp-actual-pre').value,
                 herdCows: JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}'),
