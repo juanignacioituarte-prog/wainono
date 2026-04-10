@@ -3894,6 +3894,33 @@
                         const reqM2 = (hDemand / paddockYield) * 10000;
                         cropWidthMeters = reqM2 / distanceMeters;
                     }
+                    
+                    const newBreak = {
+                        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+                        name: breakName,
+                        paddock: paddockName,
+                        vertices: [...drawingVertices],
+                        areaSqm: areaSqm,
+                        areaHa: areaHa,
+                        timeStayHrs: 24,
+                        shiftType: '24',
+                        manualResidual: 0,
+                        distanceMeters: distanceMeters,
+                        cropWidthMeters: cropWidthMeters,
+                        cropMode: 'line',
+                        createdAt: new Date().toISOString(),
+                        createdBy: localStorage.getItem('auth_name') || 'Unknown User',
+                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
+                    };
+                    
+                    console.log("New crop line created:", newBreak);
+                    savedBreaks.unshift(newBreak);
+                    saveBreaks();
+                    cleanupDrawing();
+                    if (currentDashboardMode === 'breaks') renderBreaksDashboard();
+                    else renderBreaksOnMap();
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    return;
                 }
 
                 let defaultRes = safeNum(document.getElementById('inp-residual')?.value, 1500);
@@ -4888,7 +4915,7 @@
                                  title="${isAudioActive ? 'Stop Audio Aid' : 'Start Audio Aid'}">
                              ${isAudioActive ? '\u23f9\ufe0f' : '\u25b6\ufe0f'}
                          </button>
-                         <button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration \u0026 Residual">\u2699\ufe0f</button>
+                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration \\u0026 Residual">\\u2699\\ufe0f</button>`}
                          <button class="btn-edit-break" style="position:static;" onclick="event.stopPropagation(); startEditBreak('${brk.id}')" title="Edit vertices">\u270e</button>
                          <button class="btn-delete-break" style="position:static;" onclick="promptDeleteBreak('${brk.id}', event)" title="Delete break">\ud83d\uddd1\ufe0f</button>
                        </div>`
