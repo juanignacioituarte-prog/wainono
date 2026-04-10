@@ -1301,13 +1301,19 @@
             <h3 style="margin-top:0; color:#2c3e50; text-align:center;">Break Details</h3>
             
             <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Time of Stay (Shift)</label>
-            <select id="modal-break-shift" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9;">
+            <select id="modal-break-shift" style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9;" onchange="document.getElementById('custom-hrs-container').style.display = this.value === 'custom' ? 'block' : 'none'">
                 <option value="24">24 Hours (Full Day)</option>
                 <option value="long">Long Break</option>
                 <option value="short">Short Break</option>
                 <option value="am">AM Shift</option>
                 <option value="pm">PM Shift</option>
+                <option value="custom">Custom (Hours)</option>
             </select>
+
+            <div id="custom-hrs-container" style="display:none; margin-bottom:15px;">
+                <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Custom Hours</label>
+                <input type="number" id="modal-break-custom-hrs" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9; box-sizing:border-box;" placeholder="e.g. 5" />
+            </div>
 
             <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Residual (Target/Actual)</label>
             <input type="number" id="modal-break-residual" style="width:100%; padding:10px; margin-bottom:20px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9; box-sizing:border-box;" placeholder="1500" />
@@ -3901,7 +3907,8 @@
                     
                     const shiftType = document.getElementById('modal-break-shift').value;
                     let hrsNum = 24;
-                    if (shiftType === 'long') hrsNum = 24 * (safeNum(document.getElementById('inp-long-pct').value, 60) / 100);
+                    if (shiftType === 'custom') hrsNum = parseFloat(document.getElementById('modal-break-custom-hrs').value) || 24;
+                    else if (shiftType === 'long') hrsNum = 24 * (safeNum(document.getElementById('inp-long-pct').value, 60) / 100);
                     else if (shiftType === 'short') hrsNum = 24 * (safeNum(document.getElementById('inp-short-pct').value, 40) / 100);
                     else if (shiftType === 'am') hrsNum = 24 * (safeNum(document.getElementById('inp-am-pct').value, 60) / 100);
                     else if (shiftType === 'pm') hrsNum = 24 * (safeNum(document.getElementById('inp-pm-pct').value, 40) / 100);
@@ -4925,6 +4932,9 @@
             if (brk.shiftType) document.getElementById('modal-break-shift').value = brk.shiftType;
             else document.getElementById('modal-break-shift').value = '24';
             
+            document.getElementById('custom-hrs-container').style.display = (brk.shiftType === 'custom') ? 'block' : 'none';
+            if (brk.shiftType === 'custom') document.getElementById('modal-break-custom-hrs').value = brk.timeStayHrs;
+            
             const modal = document.getElementById('finish-break-modal');
             modal.style.display = 'flex';
             
@@ -4933,7 +4943,8 @@
                 
                 const shiftType = document.getElementById('modal-break-shift').value;
                 let hrsNum = 24;
-                if (shiftType === 'long') hrsNum = 24 * (safeNum(document.getElementById('inp-long-pct').value, 60) / 100);
+                if (shiftType === 'custom') hrsNum = parseFloat(document.getElementById('modal-break-custom-hrs').value) || 24;
+                else if (shiftType === 'long') hrsNum = 24 * (safeNum(document.getElementById('inp-long-pct').value, 60) / 100);
                 else if (shiftType === 'short') hrsNum = 24 * (safeNum(document.getElementById('inp-short-pct').value, 40) / 100);
                 else if (shiftType === 'am') hrsNum = 24 * (safeNum(document.getElementById('inp-am-pct').value, 60) / 100);
                 else if (shiftType === 'pm') hrsNum = 24 * (safeNum(document.getElementById('inp-pm-pct').value, 40) / 100);
