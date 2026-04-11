@@ -3438,7 +3438,6 @@
             
             // ----- CROP MANAGEMENT HERD CALCULATIONS -----
             const cropYield = safeNum(document.getElementById('inp-crop-yield').value);
-            const cropFeed = safeNum(document.getElementById('inp-crop-feed').value);
             const cropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
             let cropHtml = '';
             let herdCropM2Map = {};
