@@ -4928,7 +4928,7 @@
                                  title="${isAudioActive ? 'Stop Audio Aid' : 'Start Audio Aid'}">
                              ${isAudioActive ? '\u23f9\ufe0f' : '\u25b6\ufe0f'}
                          </button>
-                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration \\u0026 Residual">\\u2699\\ufe0f</button>`}
+                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">⚙️</button>`}
                          <button class="btn-edit-break" style="position:static;" onclick="event.stopPropagation(); startEditBreak('${brk.id}')" title="Edit vertices">\u270e</button>
                          <button class="btn-delete-break" style="position:static;" onclick="promptDeleteBreak('${brk.id}', event)" title="Delete break">\ud83d\uddd1\ufe0f</button>
                        </div>`
