@@ -2427,7 +2427,25 @@
                     herdGrid.appendChild(div);
                 });
             }
+            updateEditGroupSelect();
             calculateFeedLogic();
+        }
+
+        function updateEditGroupSelect() {
+            const el = document.getElementById('edit-group-select');
+            if (!el) return;
+            el.innerHTML = '';
+            BREAK_GROUPS.forEach(g => {
+                if(g.id === 'all') return;
+                const opt = document.createElement('option');
+                opt.value = g.id;
+                opt.innerText = g.name;
+                el.appendChild(opt);
+            });
+            const optCrop = document.createElement('option');
+            optCrop.value = 'crops';
+            optCrop.innerText = 'Crops';
+            el.appendChild(optCrop);
         }
 
         async function init() {
