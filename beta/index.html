@@ -3603,8 +3603,9 @@
                         hHtml += `<div><span>AM:</span> <b>${amHa.toFixed(2)} ha</b></div>
                                   <div><span>PM:</span> <b>${pmHa.toFixed(2)} ha</b></div>`;
                     } else {
-                        const longHa = hAreaHa * longPct;
-                        const shortHa = hAreaHa * shortPct;
+                        const hArea2Day = hAreaHa * 2;
+                        const longHa = hArea2Day * longPct;
+                        const shortHa = hArea2Day * shortPct;
                         hHtml += `<div><span>Long:</span> <b>${longHa.toFixed(2)} ha</b></div>
                                   <div><span>Short:</span> <b>${shortHa.toFixed(2)} ha</b></div>`;
                     }
