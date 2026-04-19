@@ -1805,12 +1805,12 @@
             }
         }
 
-        function saveManualBreak(id, shift, value) {
+        function saveManualBreak(id, key, value) {
             if (!manualBreakOverrides[id]) manualBreakOverrides[id] = {};
-            if (value === "") {
-                delete manualBreakOverrides[id][shift];
+            if (value === "" || value === false || value === null) {
+                delete manualBreakOverrides[id][key];
             } else {
-                manualBreakOverrides[id][shift] = parseFloat(value);
+                manualBreakOverrides[id][key] = value;
             }
             localStorage.setItem('manual_break_overrides', JSON.stringify(manualBreakOverrides));
             saveAndRecalc();
@@ -3515,6 +3515,28 @@
             let grassHtml = '';
             const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
             
+            // 1. Calculate manual pool
+            let totalManualCows = 0;
+            let totalManualArea = 0;
+            let totalCowsAllHerds = 0;
+
+            BREAK_GROUPS.forEach(g => {
+                const hCows = savedHerdCows[g.id] || 0;
+                if (hCows > 0 && g.on_grass) {
+                    totalCowsAllHerds += hCows;
+                    const overrides = manualBreakOverrides[g.id] || {};
+                    if (overrides['fixed_area_enabled']) {
+                        totalManualCows += hCows;
+                        totalManualArea += (parseFloat(overrides['fixed_area_val']) || 0);
+                    }
+                }
+            });
+
+            // 2. Proportional pool
+            const remainingArea = Math.max(0, areaDay - totalManualArea);
+            const remainingCows = Math.max(0, totalCowsAllHerds - totalManualCows);
+            const remainingAreaPerCow = remainingCows > 0 ? (remainingArea / remainingCows) * 10000 : 0;
+            
             // ----- CROP MANAGEMENT HERD CALCULATIONS -----
             const cropYield = safeNum(document.getElementById('inp-crop-yield').value);
             const cropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
@@ -3550,24 +3572,37 @@
 
                 // Grass Math
                 if (hCows > 0 && g.on_grass) {
-                    let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
-                        <div style="font-weight:bold; color:${g.color}; margin-bottom:4px;">${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></div>
-                        <div style="display:flex; justify-content:space-between; font-size:12px;">`;
-
                     const overrides = manualBreakOverrides[g.id] || {};
+                    const isFixed = overrides['fixed_area_enabled'] === true;
+                    const fixedVal = parseFloat(overrides['fixed_area_val']) || 0;
+                    
+                    const hAreaHa = isFixed ? fixedVal : ((remainingAreaPerCow * hCows) / 10000);
 
+                    let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div style="font-weight:bold; color:${g.color}; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></span>
+                            <label style="font-size:10px; font-weight:normal; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                                <input type="checkbox" ${isFixed ? 'checked' : ''} onchange="saveManualBreak('${g.id}', 'fixed_area_enabled', this.checked)"> Fixed Area
+                            </label>
+                        </div>`;
+
+                    if (isFixed) {
+                        hHtml += `<div style="margin-bottom:8px; text-align:right;">
+                            <input type="number" step="0.1" style="width:70px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:right; font-weight:bold;" value="${overrides['fixed_area_val'] !== undefined ? overrides['fixed_area_val'] : ''}" placeholder="ha/day" onchange="saveManualBreak('${g.id}', 'fixed_area_val', this.value)"> <span style="font-size:11px; font-weight:bold;">ha/day</span>
+                        </div>`;
+                    }
+
+                    hHtml += `<div style="display:flex; justify-content:space-between; font-size:12px;">`;
                     if (freq === 'tad') {
-                        const hAreaHa = (areaCow * hCows) / 10000;
                         const amHa = hAreaHa * amPct;
                         const pmHa = hAreaHa * pmPct;
-                        hHtml += `<div><span>AM:</span> <input type="number" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${amHa.toFixed(2)}" value="${overrides['am'] !== undefined ? overrides['am'] : ''}" onchange="saveManualBreak('${g.id}', 'am', this.value)"> <b>ha</b></div>
-                                  <div><span>PM:</span> <input type="number" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${pmHa.toFixed(2)}" value="${overrides['pm'] !== undefined ? overrides['pm'] : ''}" onchange="saveManualBreak('${g.id}', 'pm', this.value)"> <b>ha</b></div>`;
+                        hHtml += `<div><span>AM:</span> <b>${amHa.toFixed(2)} ha</b></div>
+                                  <div><span>PM:</span> <b>${pmHa.toFixed(2)} ha</b></div>`;
                     } else {
-                        const hArea2Day = ((areaCow * 2) * hCows) / 10000;
-                        const longHa = hArea2Day * longPct;
-                        const shortHa = hArea2Day * shortPct;
-                        hHtml += `<div><span>Long:</span> <input type="number" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${longHa.toFixed(2)}" value="${overrides['long'] !== undefined ? overrides['long'] : ''}" onchange="saveManualBreak('${g.id}', 'long', this.value)"> <b>ha</b></div>
-                                  <div><span>Short:</span> <input type="number" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${shortHa.toFixed(2)}" value="${overrides['short'] !== undefined ? overrides['short'] : ''}" onchange="saveManualBreak('${g.id}', 'short', this.value)"> <b>ha</b></div>`;
+                        const longHa = hAreaHa * longPct;
+                        const shortHa = hAreaHa * shortPct;
+                        hHtml += `<div><span>Long:</span> <b>${longHa.toFixed(2)} ha</b></div>
+                                  <div><span>Short:</span> <b>${shortHa.toFixed(2)} ha</b></div>`;
                     }
                     hHtml += `</div></div>`;
                     grassHtml += hHtml;
