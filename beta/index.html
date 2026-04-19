@@ -3521,13 +3521,16 @@
             let totalCowsAllHerds = 0;
 
             BREAK_GROUPS.forEach(g => {
+                if (g.id === 'all') return;
                 const hCows = savedHerdCows[g.id] || 0;
                 if (hCows > 0 && g.on_grass) {
                     totalCowsAllHerds += hCows;
                     const overrides = manualBreakOverrides[g.id] || {};
-                    if (overrides['fixed_area_enabled']) {
+                    const isFixed = overrides['fixed_area_enabled'] === true;
+                    const fixedVal = parseFloat(overrides['fixed_area_val']);
+                    if (isFixed && !isNaN(fixedVal) && fixedVal >= 0) {
                         totalManualCows += hCows;
-                        totalManualArea += (parseFloat(overrides['fixed_area_val']) || 0);
+                        totalManualArea += fixedVal;
                     }
                 }
             });
@@ -3573,20 +3576,21 @@
                 // Grass Math
                 if (hCows > 0 && g.on_grass) {
                     const overrides = manualBreakOverrides[g.id] || {};
-                    const isFixed = overrides['fixed_area_enabled'] === true;
-                    const fixedVal = parseFloat(overrides['fixed_area_val']) || 0;
+                    const isFixedEnabled = overrides['fixed_area_enabled'] === true;
+                    const parsedFixedVal = parseFloat(overrides['fixed_area_val']);
+                    const isValidFixed = isFixedEnabled && !isNaN(parsedFixedVal) && parsedFixedVal >= 0;
                     
-                    const hAreaHa = isFixed ? fixedVal : ((remainingAreaPerCow * hCows) / 10000);
+                    const hAreaHa = isValidFixed ? parsedFixedVal : ((remainingAreaPerCow * hCows) / 10000);
 
                     let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
                         <div style="font-weight:bold; color:${g.color}; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
                             <span>${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></span>
                             <label style="font-size:10px; font-weight:normal; display:flex; align-items:center; gap:4px; cursor:pointer;">
-                                <input type="checkbox" ${isFixed ? 'checked' : ''} onchange="saveManualBreak('${g.id}', 'fixed_area_enabled', this.checked)"> Fixed Area
+                                <input type="checkbox" ${isFixedEnabled ? 'checked' : ''} onchange="saveManualBreak('${g.id}', 'fixed_area_enabled', this.checked)"> Fixed Area
                             </label>
                         </div>`;
 
-                    if (isFixed) {
+                    if (isFixedEnabled) {
                         hHtml += `<div style="margin-bottom:8px; text-align:right;">
                             <input type="number" step="0.1" style="width:70px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:right; font-weight:bold;" value="${overrides['fixed_area_val'] !== undefined ? overrides['fixed_area_val'] : ''}" placeholder="ha/day" onchange="saveManualBreak('${g.id}', 'fixed_area_val', this.value)"> <span style="font-size:11px; font-weight:bold;">ha/day</span>
                         </div>`;
