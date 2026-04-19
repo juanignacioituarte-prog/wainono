@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -1430,8 +1430,11 @@
             </div>
 
             <div class="feed-card">
-                <div class="feed-title">Herd Management</div>
-                <div class="calc-grid" id="herd-inputs"></div>
+                <div class="feed-title-row">
+                    <div class="feed-title">Herd Management</div>
+                    <button class="btn-save" onclick="addCustomHerd()">+ ADD HERD</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px;" id="herd-inputs"></div>
             </div>
 
             <div class="feed-card">
@@ -1442,7 +1445,7 @@
                         <input type="number" id="inp-crop-yield" value="20000" oninput="saveAndRecalc()">
                     </div>
                     <div class="input-group">
-                        <label>Target Feed (kgDM/cow)</label>
+                        <label>Default Target Feed (kgDM/cow)</label>
                         <input type="number" id="inp-crop-feed" value="4" oninput="saveAndRecalc()">
                     </div>
                 </div>
@@ -1452,8 +1455,8 @@
                         <span>EST. YIELD (kgDM/ha)</span>
                     </div>
                 </div>
-                <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:10px; margin-bottom:5px;">Herds in Crops:</div>
-                <div id="crop-herd-toggles" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; font-size:12px;"></div>
+                <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:10px; margin-bottom:5px; display:none;">Herds in Crops:</div>
+                <div id="crop-herd-toggles" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:15px; font-size:12px;"></div>
                 <div id="crop-herd-outputs"></div>
             </div>
 
@@ -1753,13 +1756,66 @@
         let manualFarmGrowthRate = 0;
 
         /* Break Management State */
-        const BREAK_GROUPS = [
-            { id: 'all', name: 'All Herds', color: '#7f8c8d' },
-            { id: '1st', name: '1st Herd', color: '#3498db' },
-            { id: '2nd', name: '2nd Herd', color: '#2ecc71' },
-            { id: '3rd', name: '3rd Herd', color: '#f39c12' },
-            { id: 'pennos', name: 'Pennos', color: '#e74c3c' }
+        let default_BREAK_GROUPS = [
+            { id: 'all', name: 'All Herds', color: '#7f8c8d', on_grass: false, on_crop: false, custom_crop_feed: null },
+            { id: '1st', name: '1st Herd', color: '#3498db', on_grass: true, on_crop: false, custom_crop_feed: null },
+            { id: '2nd', name: '2nd Herd', color: '#2ecc71', on_grass: true, on_crop: false, custom_crop_feed: null },
+            { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: null },
+            { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: null }
         ];
+        let BREAK_GROUPS = JSON.parse(localStorage.getItem('custom_herds')) || default_BREAK_GROUPS;
+        let manualBreakOverrides = JSON.parse(localStorage.getItem('manual_break_overrides')) || {};
+
+        function saveHerdSettings() {
+            localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
+            saveAndRecalc();
+            loadFeedSettings();
+        }
+
+        function addCustomHerd() {
+            const name = prompt("Enter new herd name:");
+            if (!name) return;
+            const newId = 'herd_' + Date.now();
+            const colors = ['#1abc9c', '#9b59b6', '#34495e', '#f1c40f', '#e67e22', '#e84393', '#00cec9', '#fdcb6e'];
+            const color = colors[BREAK_GROUPS.length % colors.length];
+            
+            BREAK_GROUPS.push({
+                id: newId,
+                name: name,
+                color: color,
+                on_grass: true,
+                on_crop: false,
+                custom_crop_feed: null,
+                is_oad: false
+            });
+            saveHerdSettings();
+        }
+
+        function updateCustomHerd(id, field, value) {
+            const h = BREAK_GROUPS.find(g => g.id === id);
+            if (h) {
+                h[field] = value;
+                saveHerdSettings();
+            }
+        }
+
+        function deleteCustomHerd(id) {
+            if(confirm("Are you sure you want to remove this herd?")) {
+                BREAK_GROUPS = BREAK_GROUPS.filter(g => g.id !== id);
+                saveHerdSettings();
+            }
+        }
+
+        function saveManualBreak(id, key, value) {
+            if (!manualBreakOverrides[id]) manualBreakOverrides[id] = {};
+            if (value === "" || value === false || value === null) {
+                delete manualBreakOverrides[id][key];
+            } else {
+                manualBreakOverrides[id][key] = value;
+            }
+            localStorage.setItem('manual_break_overrides', JSON.stringify(manualBreakOverrides));
+            saveAndRecalc();
+        }
         let activeBreakGroup = 'all';
         let cropYields = {}; // { paddockName: yield }
         let allCropPaddocks = []; // List of paddock names with 'CROP' status
@@ -2309,29 +2365,57 @@
 
             // Load Herd Inputs
             const herdGrid = document.getElementById('herd-inputs');
-            const cropToggleGrid = document.getElementById('crop-herd-toggles');
-            if (herdGrid && cropToggleGrid) {
+            if (herdGrid) {
                 herdGrid.innerHTML = '';
-                cropToggleGrid.innerHTML = '';
                 const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
-                const savedCropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
                 
                 BREAK_GROUPS.forEach(g => {
                     if (g.id === 'all') return;
                     const val = savedHerdCows[g.id] || 0;
+                    if(g.on_grass === undefined) g.on_grass = true;
+                    if(g.on_crop === undefined) g.on_crop = false;
                     
-                    // Main Herd Row
                     const div = document.createElement('div');
-                    div.className = 'input-group';
-                    div.innerHTML = `<label style="color:${g.color}; font-weight:bold;">${g.name}</label><input type="number" id="herd-cows-${g.id}" value="${val}" oninput="saveAndRecalc()">`;
-                    herdGrid.appendChild(div);
+                    div.style.cssText = `background:#fff; padding:12px; border-radius:8px; border:1px solid #ddd; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.05);`;
                     
-                    // Crop Toggle
-                    const isChecked = savedCropHerds.includes(g.id) ? 'checked' : '';
-                    const toggleDiv = document.createElement('label');
-                    toggleDiv.style.cssText = `display:flex; align-items:center; gap:4px; color:${g.color}; font-weight:bold; cursor:pointer;`;
-                    toggleDiv.innerHTML = `<input type="checkbox" id="crop-toggle-${g.id}" value="${g.id}" ${isChecked} onchange="saveAndRecalc()"> ${g.name}`;
-                    cropToggleGrid.appendChild(toggleDiv);
+                    let html = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:14px; height:14px; border-radius:3px; background:${g.color};"></div>
+                                <input type="text" style="font-weight:bold; color:var(--text); border:none; background:transparent; font-size:14px; width:120px; outline:none; border-bottom:1px dashed #ccc; padding-bottom:2px;" value="${g.name}" onchange="updateCustomHerd('${g.id}', 'name', this.value)">
+                            </div>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <div style="display:flex; flex-direction:column; align-items:center;">
+                                    <label style="font-size:9px; color:#95a5a6; font-weight:bold; text-transform:uppercase;">Cows</label>
+                                    <input type="number" id="herd-cows-${g.id}" value="${val}" style="width:50px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-weight:bold;" oninput="saveAndRecalc()">
+                                </div>
+                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">×</button>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; align-items:center; background:#f9f9f9; padding:8px; border-radius:6px;">
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
+                                <input type="checkbox" ${g.on_grass ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_grass', this.checked)"> On Grass
+                            </label>
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
+                                <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crop
+                            </label>
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer; margin-left:auto; background:#fff; padding:2px 6px; border:1px solid #ddd; border-radius:4px;">
+                                <input type="checkbox" ${g.is_oad ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'is_oad', this.checked)"> OAD
+                            </label>
+                        </div>
+                    `;
+                    
+                    if (g.on_crop) {
+                        html += `
+                            <div style="display:flex; align-items:center; gap:4px; margin-left:auto;">
+                                <label style="font-weight:600; color:#555;">Target (kg):</label>
+                                <input type="number" step="0.1" style="width:50px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center;" value="${g.custom_crop_feed !== null && g.custom_crop_feed !== undefined ? g.custom_crop_feed : ''}" placeholder="Global" onchange="updateCustomHerd('${g.id}', 'custom_crop_feed', this.value !== '' ? parseFloat(this.value) : null)">
+                            </div>
+                        `;
+                    }
+                    html += `</div>`;
+                    div.innerHTML = html;
+                    herdGrid.appendChild(div);
                 });
             }
             calculateFeedLogic();
@@ -2628,8 +2712,44 @@
         }
 
         function buildCalibrationModel(historyLower) {
+            // --- COWGORITHM INJECTION (BETA ONLY) ---
+            let sumIntake = 0; let countIntake = 0; let activeIntake = 18;
+            savedBreaks.forEach(brk => {
+                if (brk.cropMode === 'line' || !brk.paddock) return;
+                const me = manualEntries.find(m => m.lower === brk.paddock.toLowerCase());
+                if (!me) return;
+                const manualDaysDiff = Math.abs((new Date(brk.createdAt) - me.dateObj) / 86400000);
+                if (manualDaysDiff <= GAP_DAYS_MAX) {
+                    const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : 1500;
+                    const cowNum = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                    if (cowNum > 0 && brk.timeStayHrs > 0) {
+                        const trueI = ((me.cover - residual) * brk.areaHa) / (cowNum * (brk.timeStayHrs / 24));
+                        if (trueI > 5 && trueI < 30) { sumIntake += trueI; countIntake++; }
+                    }
+                }
+            });
+            if (countIntake > 0) activeIntake = sumIntake / countIntake;
+            
+            const virtualEntries = [];
+            savedBreaks.forEach(brk => {
+                if (brk.cropMode === 'line' || !brk.paddock) return;
+                const hasManual = manualEntries.some(me => me.lower === brk.paddock.toLowerCase() && Math.abs((new Date(brk.createdAt) - me.dateObj) / 86400000) <= GAP_DAYS_MAX);
+                if (hasManual) return; 
+                
+                const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : 1500;
+                const cowNum = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                if (cowNum > 0 && brk.timeStayHrs > 0) {
+                    const harvestedYield = (cowNum * activeIntake * (brk.timeStayHrs / 24)) / brk.areaHa;
+                    const impliedCover = residual + harvestedYield;
+                    virtualEntries.push({ dateObj: new Date(brk.createdAt), paddock: brk.paddock, lower: brk.paddock.toLowerCase(), cover: impliedCover, isVirtual: true });
+                }
+            });
+            
+            const combinedEntries = [...manualEntries, ...virtualEntries];
+            // --- END COWGORITHM ---
+
             const pairs = [];
-            for (const m of manualEntries) {
+            for (const m of combinedEntries) {
                 const hist = historyLower[m.lower]; if (!hist || hist.length === 0) continue;
                 if (partialPaddocks.has(m.lower)) continue;
 
@@ -3400,6 +3520,74 @@
             let grassHtml = '';
             const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
             
+            // 1. Calculate manual pool
+            let totalManualCows = 0;
+            let totalManualArea = 0;
+            let totalCowsAllHerds = 0;
+            
+            const globalFreq = document.querySelector('input[name="milking_freq"]:checked').value;
+            let herdLockedCache = {};
+
+            BREAK_GROUPS.forEach(g => {
+                if (g.id === 'all') return;
+                const hCows = savedHerdCows[g.id] || 0;
+                if (hCows > 0 && g.on_grass) {
+                    totalCowsAllHerds += hCows;
+                    
+                    const overrides = manualBreakOverrides[g.id] || {};
+                    let lockedDailyArea = 0;
+                    let isLocked = false;
+                    let amVal = parseFloat(overrides['am']); let amLocked = !isNaN(amVal) && amVal > 0;
+                    let pmVal = parseFloat(overrides['pm']); let pmLocked = !isNaN(pmVal) && pmVal > 0;
+                    let longVal = parseFloat(overrides['long']); let longLocked = !isNaN(longVal) && longVal > 0;
+                    let shortVal = parseFloat(overrides['short']); let shortLocked = !isNaN(shortVal) && shortVal > 0;
+
+                    if (g.is_oad) {
+                        let oadVal = globalFreq === '3in2' ? longVal : amVal;
+                        let oadLocked = globalFreq === '3in2' ? longLocked : amLocked;
+                        if (oadLocked) {
+                            lockedDailyArea = oadVal;
+                            isLocked = true;
+                        }
+                    } else if (globalFreq === 'tad') {
+                        if (amLocked && pmLocked) {
+                            lockedDailyArea = amVal + pmVal;
+                            isLocked = true;
+                        } else if (amLocked) {
+                            lockedDailyArea = amVal / amPct;
+                            isLocked = true;
+                        } else if (pmLocked) {
+                            lockedDailyArea = pmVal / pmPct;
+                            isLocked = true;
+                        }
+                    } else if (globalFreq === '3in2') {
+                        if (longLocked && shortLocked) {
+                            lockedDailyArea = (longVal + shortVal) / 2;
+                            isLocked = true;
+                        } else if (longLocked) {
+                            lockedDailyArea = (longVal / longPct) / 2;
+                            isLocked = true;
+                        } else if (shortLocked) {
+                            lockedDailyArea = (shortVal / shortPct) / 2;
+                            isLocked = true;
+                        }
+                    }
+
+                    herdLockedCache[g.id] = { isLocked: isLocked, lockedDailyArea: lockedDailyArea, isOAD: g.is_oad };
+
+                    if (isLocked) {
+                        totalManualCows += hCows;
+                        totalManualArea += lockedDailyArea;
+                    }
+                }
+            });
+
+            // 2. Proportional pool
+            const remainingArea = Math.max(0, areaDay - totalManualArea);
+            const remainingCows = Math.max(0, totalCowsAllHerds - totalManualCows);
+            const remainingAreaPerCow = remainingCows > 0 ? (remainingArea / remainingCows) * 10000 : 0;
+            
+            let totalGrassAssigned = 0;
             // ----- CROP MANAGEMENT HERD CALCULATIONS -----
             const cropYield = safeNum(document.getElementById('inp-crop-yield').value);
             const cropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
@@ -3432,32 +3620,54 @@
             BREAK_GROUPS.forEach(g => {
                 if (g.id === 'all') return;
                 const hCows = savedHerdCows[g.id] || 0;
-                if (hCows <= 0) return;
 
                 // Grass Math
-                let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
-                    <div style="font-weight:bold; color:${g.color}; margin-bottom:4px;">${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></div>
-                    <div style="display:flex; justify-content:space-between; font-size:12px;">`;
+                if (hCows > 0 && g.on_grass) {
+                    const cache = herdLockedCache[g.id];
+                    const hAreaHa = cache.isLocked ? cache.lockedDailyArea : ((remainingAreaPerCow * hCows) / 10000);
+                    
+                    totalGrassAssigned += hAreaHa;
 
-                if (freq === 'tad') {
-                    const hAreaHa = (areaCow * hCows) / 10000;
-                    const amHa = hAreaHa * amPct;
-                    const pmHa = hAreaHa * pmPct;
-                    hHtml += `<div><span>AM:</span> <b>${amHa.toFixed(2)} ha</b></div><div><span>PM:</span> <b>${pmHa.toFixed(2)} ha</b></div>`;
-                } else {
-                    const hArea2Day = ((areaCow * 2) * hCows) / 10000;
-                    const longHa = hArea2Day * longPct;
-                    const shortHa = hArea2Day * shortPct;
-                    hHtml += `<div><span>Long:</span> <b>${longHa.toFixed(2)} ha</b></div><div><span>Short:</span> <b>${shortHa.toFixed(2)} ha</b></div>`;
+                    let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div style="font-weight:bold; color:${g.color}; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></span>
+                        </div>`;
+
+                    hHtml += `<div style="display:flex; justify-content:space-between; font-size:12px;">`;
+                    
+                    const overrides = manualBreakOverrides[g.id] || {};
+
+                    if (cache.isOAD) {
+                        const oadStr = hAreaHa.toFixed(2);
+                        if (globalFreq === '3in2') {
+                            hHtml += `<div><span>Long:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${oadStr}" value="${overrides['long'] !== undefined ? overrides['long'] : ''}" onchange="saveManualBreak('${g.id}', 'long', this.value)"> <b>ha</b></div>
+                                      <div><span style="color:#aaa;">Short:</span> <b style="color:#aaa;">_._ ha</b></div>`;
+                        } else {
+                            hHtml += `<div><span>AM:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${oadStr}" value="${overrides['am'] !== undefined ? overrides['am'] : ''}" onchange="saveManualBreak('${g.id}', 'am', this.value)"> <b>ha</b></div>
+                                      <div><span style="color:#aaa;">PM:</span> <b style="color:#aaa;">_._ ha</b></div>`;
+                        }
+                    } else if (globalFreq === 'tad') {
+                        const amStr = (hAreaHa * amPct).toFixed(2);
+                        const pmStr = (hAreaHa * pmPct).toFixed(2);
+                        hHtml += `<div><span>AM:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${amStr}" value="${overrides['am'] !== undefined ? overrides['am'] : ''}" onchange="saveManualBreak('${g.id}', 'am', this.value)"> <b>ha</b></div>
+                                  <div><span>PM:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${pmStr}" value="${overrides['pm'] !== undefined ? overrides['pm'] : ''}" onchange="saveManualBreak('${g.id}', 'pm', this.value)"> <b>ha</b></div>`;
+                    } else if (globalFreq === '3in2') {
+                        const hArea2Day = hAreaHa * 2;
+                        const longStr = (hArea2Day * longPct).toFixed(2);
+                        const shortStr = (hArea2Day * shortPct).toFixed(2);
+                        hHtml += `<div><span>Long:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${longStr}" value="${overrides['long'] !== undefined ? overrides['long'] : ''}" onchange="saveManualBreak('${g.id}', 'long', this.value)"> <b>ha</b></div>
+                                  <div><span>Short:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${shortStr}" value="${overrides['short'] !== undefined ? overrides['short'] : ''}" onchange="saveManualBreak('${g.id}', 'short', this.value)"> <b>ha</b></div>`;
+                    }
+                    hHtml += `</div></div>`;
+                    grassHtml += hHtml;
                 }
-                hHtml += `</div></div>`;
-                grassHtml += hHtml;
 
                 // Crop Math
-                if (cropHerds.includes(g.id)) {
+                if (hCows > 0 && g.on_crop) {
                     let cAreaM2 = 0;
                     if (cropYield > 0) {
-                        const hDemand = cropFeed * hCows;
+                        const effectiveCropFeed = (g.custom_crop_feed !== null && g.custom_crop_feed !== undefined && String(g.custom_crop_feed).trim() !== '') ? parseFloat(g.custom_crop_feed) : cropFeed;
+                        const hDemand = effectiveCropFeed * hCows;
                         cAreaM2 = (hDemand / cropYield) * 10000;
                     }
                     herdCropM2Map[g.id] = cAreaM2;
@@ -3471,6 +3681,11 @@
             localStorage.setItem('feed_crop_m2_per_herd', JSON.stringify(herdCropM2Map));
 
             document.getElementById('grass-herd-outputs').innerHTML = grassHtml || '<div class="muted" style="font-size:11px; text-align:center;">No cows allocated to herds.</div>';
+            
+            if (totalGrassAssigned > 0) {
+                document.getElementById('grass-herd-outputs').innerHTML += `<div style="text-align:right; font-weight:bold; font-size:12px; color:#2ecc71; margin-top:8px;">Total Used: ${totalGrassAssigned.toFixed(2)} ha/day</div>`;
+            }
+
             document.getElementById('crop-herd-outputs').innerHTML = cropHtml || '<div class="muted" style="font-size:11px; text-align:center;">No herds ticked for crops.</div>';
 
             renderFeedWedge(manualModeData, preGrazeTarget, residual);
