@@ -2238,6 +2238,7 @@
                     if (data) {
                         // Cloud data found, update UI
                         setFeedInputs(data);
+                        loadLocalFeedSettings();
                         calculateFeedLogic();
                     }
                 } catch (e) { console.log("Cloud load failed, using local/csv"); }
@@ -2332,6 +2333,14 @@
             }
             if (data.cropHerds) {
                 localStorage.setItem('herd_in_crops', JSON.stringify(data.cropHerds));
+            }
+            if (data.customHerds) {
+                BREAK_GROUPS = data.customHerds;
+                localStorage.setItem('custom_herds', JSON.stringify(data.customHerds));
+            }
+            if (data.manualBreaks) {
+                manualBreakOverrides = data.manualBreaks;
+                localStorage.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
             }
             // Always reload the UI after settings are injected
             loadLocalFeedSettings();
@@ -3793,7 +3802,9 @@
                 cropYield: document.getElementById('inp-crop-yield').value,
                 cropFeed: document.getElementById('inp-crop-feed').value,
                 cropYields: cropYields,
-                cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]')
+                cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
+                customHerds: BREAK_GROUPS,
+                manualBreaks: manualBreakOverrides
             };
 
             fetch(GOOGLE_SCRIPT_URL, {
