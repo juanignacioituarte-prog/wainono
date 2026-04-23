@@ -4720,10 +4720,9 @@
                 
                 const coords = brk.vertices.map(v => [v.lat, v.lng]);
                 const gColor = getGroupColor(brk.group);
-                const isCrop = brk.group === 'crops';
                 // If it's a crop, check if it was explicitly saved as a line.
                 // For backwards compatibility before this feature, default old crops to 'line'
-                const isLineMode = isCrop && (brk.cropMode === 'line' || brk.cropMode == null);
+                const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
                 
                 let renderLayer;
                 let measureStr;
@@ -4818,7 +4817,7 @@
             breakLayers.forEach((l, i) => {
                 if (!l) return;
                 const brk = savedBreaks[i];
-                const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
+                const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
                 if (isLineMode) {
                     l.setStyle({ weight: 4, opacity: 0.9, color: getGroupColor(brk.group) });
                 } else {
@@ -4826,7 +4825,7 @@
                 }
             });
             const targetBrk = savedBreaks[idx];
-            const isTargetLineMode = targetBrk.group === 'crops' && (targetBrk.cropMode === 'line' || targetBrk.cropMode == null);
+            const isTargetLineMode = targetBrk.cropMode === 'line' || (targetBrk.group === 'crops' && targetBrk.cropMode == null);
             if (isTargetLineMode) {
                 layer.setStyle({ weight: 6, opacity: 1, color: getGroupColor(targetBrk.group) });
             } else {
@@ -5065,7 +5064,7 @@
         }
 
         function renderBreakCardHtml(brk) {
-            const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
+            const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
             const measureStr = isLineMode 
                 ? (brk.distanceMeters ? brk.distanceMeters.toFixed(0) + ' meters' : '0 meters')
                 : (brk.areaHa >= 1 ? brk.areaHa.toFixed(2) + ' ha' : Math.round(brk.areaSqm) + ' m\u00b2');
@@ -5287,7 +5286,7 @@
             if (editPolygon) map.removeLayer(editPolygon);
             const brk = savedBreaks.find(b => b.id === editingBreakId);
             const gColor = brk ? getGroupColor(brk.group) : '#e67e22';
-            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
+            const isLineMode = brk ? (brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null)) : false;
 
             if (editVertices.length >= 3 && !isLineMode) {
                 const coords = editVertices.map(v => [v.lat, v.lng]);
@@ -5364,7 +5363,7 @@
         function updateEditInfo() {
             let info = `${editVertices.length} points`;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
-            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
+            const isLineMode = brk ? (brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null)) : false;
 
             if (isLineMode && editVertices.length >= 2) {
                 const distMeters = calculateLineDistance(editVertices);
@@ -5380,7 +5379,7 @@
         function deleteEditVertex() {
             if (editSelectedIdx < 0 || editSelectedIdx >= editVertices.length) return;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
-            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
+            const isLineMode = brk ? (brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null)) : false;
             
             if (!isLineMode && editVertices.length <= 3) {
                 alert('A break must have at least 3 points.');
@@ -5404,7 +5403,7 @@
             const brk = savedBreaks.find(b => b.id === editingBreakId);
             if (!brk) return;
             
-            const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
+            const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
             
             if (!isLineMode && editVertices.length < 3) return;
             if (isLineMode && editVertices.length < 2) return;
