@@ -1634,6 +1634,7 @@
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('herd_management'); toggleSettingsMenu();">Manage Herds</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
@@ -1801,6 +1802,20 @@
             <p style="font-size:10px; color:#95a5a6; margin-top:0; margin-bottom:10px;">Tap any week to isolate its breaks on the map.</p>
             <div id="weekly-report-content"></div>
         </div>
+
+        <div id="herd-management-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin-top:0; margin-bottom:0;">Manage Herds</h3>
+                <button onclick="switchDashboardMode('feed')" style="background:#2ecc71; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">Done</button>
+            </div>
+            <p style="font-size:12px; color:#666; margin-bottom:15px;">Configure your herds, change colors, and manage the rotation groups.</p>
+            
+            <button onclick="addCustomHerd()" style="width:100%; padding:10px; background:white; border:2px dashed #8e44ad; color:#8e44ad; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:20px;">+ CREATE NEW HERD</button>
+            
+            <div id="herd-management-list" style="display:flex; flex-direction:column; gap:12px;">
+                <!-- Herds listed here -->
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1898,7 +1913,39 @@
             if(confirm("Are you sure you want to remove this herd?")) {
                 BREAK_GROUPS = BREAK_GROUPS.filter(g => g.id !== id);
                 saveHerdSettings();
+                if (currentDashboardMode === 'herd_management') renderHerdManagement();
             }
+        }
+
+        function renderHerdManagement() {
+            const container = document.getElementById('herd-management-list');
+            if (!container) return;
+            
+            container.innerHTML = BREAK_GROUPS.map(g => {
+                if (g.id === 'all') return ''; // Don't allow editing the 'All' group directly
+                return `
+                    <div style="background:white; border-radius:10px; padding:15px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
+                            <input type="color" value="${g.color || '#8e44ad'}" 
+                                onchange="updateCustomHerd('${g.id}', 'color', this.value); renderHerdManagement();"
+                                style="width:30px; height:30px; border:none; border-radius:4px; cursor:pointer; background:none;">
+                            <input type="text" value="${g.name}" 
+                                onchange="updateCustomHerd('${g.id}', 'name', this.value); renderHerdManagement();"
+                                style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px; font-weight:bold; font-size:14px; color:var(--text);">
+                            <button onclick="deleteCustomHerd('${g.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:18px;">🗑️</button>
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#666; cursor:pointer;">
+                                <input type="checkbox" ${g.on_grass ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_grass', this.checked)"> On Grass
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#666; cursor:pointer;">
+                                <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crops
+                            </label>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function saveManualBreak(id, key, value) {
@@ -3005,6 +3052,17 @@
                     weeklyFilterRange = null;
                     renderWeeklyReport();
                     renderBreaksOnMap();
+                    return;
+                } else if (mode === 'herd_management') {
+                    document.getElementById('map').style.display = 'none';
+                    document.getElementById('list').style.display = 'none';
+                    document.getElementById('admin-view').style.display = 'none';
+                    if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
+                    if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
+                    document.getElementById('herd-management-view').style.display = 'block';
+                    
+                    renderHerdManagement();
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     return;
                 } else {
                     setLayerMode(currentViewMode);
