@@ -6265,6 +6265,18 @@
 
             if (!userEmail) return;
 
+            // Admin gets in immediately — no CSV check needed
+            if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+                localStorage.setItem('auth_email', userEmail);
+                localStorage.setItem('auth_name', "Admin");
+                document.getElementById('login-screen').style.display = 'none';
+                const adminMenu = document.getElementById('menu-item-admin');
+                if (adminMenu) adminMenu.style.display = 'block';
+                init();
+                loadBreaks();
+                return;
+            }
+
             document.getElementById('debug-email').innerText = "Checking authorization...";
 
             // Fetch authorized list from config spreadsheet CSV
