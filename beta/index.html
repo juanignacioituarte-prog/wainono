@@ -1470,7 +1470,9 @@
             <div class="feed-card">
                 <div class="feed-title-row">
                     <div class="feed-title">Predicted Feed Wedge Planner</div>
-                    <button class="btn-save" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
+                    <div style="flex:1;"></div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kgDM/ha</div>
+                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
                 </div>
                 <div class="calc-grid" style="margin-bottom:15px;">
                     <div class="input-group">
@@ -3918,6 +3920,12 @@
                     }
                 }
             }
+            
+            const finalTotalCover = simPaddocks.reduce((sum, p) => sum + (p.latest.cover * p.area), 0);
+            const expectedApc = totalAreaHa > 0 ? (finalTotalCover / totalAreaHa) : 0;
+            const apcEl = document.getElementById('predict-apc');
+            if (apcEl) apcEl.innerText = Math.round(expectedApc).toLocaleString();
+
             renderPredictedWedge(simPaddocks, targetPre, targetRes);
         }
 
