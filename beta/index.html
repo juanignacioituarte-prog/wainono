@@ -3915,58 +3915,6 @@
             
             const dailyDemandKg = cows * intake;
             
-            let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
-            
-            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
-            const areaPerDayHa = totalAreaHa / (rotationDays || 1);
-            const targetPre = (dailyDemandKg / areaPerDayHa) + targetRes;
-            
-            const nowTime = Date.now();
-            simPaddocks.forEach(p => {
-                const fwTs = p.latest.ts || 0;
-                const pNorm = normName(p.name);
-                const paddockBreaks = savedBreaks.filter(b => b.paddock && normName(b.paddock) === pNorm && b.createdAt);
-                
-                let sumGrazedArea = 0;
-                let sumGrazedCover = 0;
-                
-                if (paddockBreaks.length > 0 && fwTs > 0) {
-                    const recentBreaks = paddockBreaks.filter(b => new Date(b.createdAt).getTime() > fwTs);
-                    recentBreaks.forEach(b => {
-                        const bArea = Number(b.areaHa) || 0;
-                        if (bArea > 0) {
-                            const bTs = new Date(b.createdAt).getTime();
-                            const bRes = (b.manualResidual > 0) ? b.manualResidual : targetRes;
-                            const daysSinceBreak = Math.max(0, (nowTime - bTs) / 86400000);
-                            const bCoverToday = bRes + (dailyGrowth * daysSinceBreak);
-                            
-                            sumGrazedArea += bArea;
-                            sumGrazedCover += (bCoverToday * bArea);
-                        }
-                    });
-                }
-                
-                if (sumGrazedArea > p.area) sumGrazedArea = p.area;
-                
-                const ungrazedArea = Math.max(0, p.area - sumGrazedArea);
-                let ungrazedCoverToday = p.latest.cover;
-                
-                if (fwTs > 0) {
-                    const daysSinceFW = Math.max(0, (nowTime - fwTs) / 86400000);
-                    ungrazedCoverToday += (dailyGrowth * Math.round(daysSinceFW)); // Use Math.round to match whole days for growth rate expectation
-                }
-                
-                if (p.area > 0) {
-                    p.latest.cover = (sumGrazedCover + (ungrazedCoverToday * ungrazedArea)) / p.area;
-                    p.grazedSinceFW = (sumGrazedArea > 0 && sumGrazedArea < p.area * 0.98); // Mark as active if partially grazed
-                } else {
-                    p.latest.cover = ungrazedCoverToday;
-                    p.grazedSinceFW = false;
-                }
-            });
-            
-
-
             const isDryOffMode = document.getElementById('inp-dryoff-toggle').checked;
             const dryOffEvents = [];
             if (isDryOffMode) {
@@ -3981,56 +3929,33 @@
                 dryOffEvents.sort((a, b) => a.ts - b.ts);
             }
 
+            let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
+            
+            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
+            const areaPerDayHa = totalAreaHa / (rotationDays || 1);
+            const targetPre = (dailyDemandKg / areaPerDayHa) + targetRes;
             const maxSuppPerCow = parseFloat(document.getElementById('inp-predict-max-supp').value) || 20;
             
-            // --- CATCH-UP PHASE: Graze the area that should have been eaten since the Farmwalk ---
+            // 1. Initial State: Starting from Farmwalk Cover + Catch-up growth
             const fwDate = manualModeData[0]?.latest?.ts ? new Date(manualModeData[0].latest.ts) : null;
-            if (fwDate) {
-                const daysSinceFW = Math.max(0, Math.round((nowTime - fwDate.getTime()) / 86400000));
-                if (daysSinceFW > 0) {
-                    let totalAreaToHaveGrazed = daysSinceFW * areaPerDayHa;
-                    // Subtract area already accounted for by manual breaks
-                    let areaAlreadyGrazedWithBreaks = 0;
-                    simPaddocks.forEach(p => {
-                        const pNorm = normName(p.name);
-                        const pBreaks = savedBreaks.filter(b => b.paddock && normName(b.paddock) === pNorm && new Date(b.createdAt).getTime() > fwDate.getTime());
-                        pBreaks.forEach(b => areaAlreadyGrazedWithBreaks += (b.areaHa || 0));
-                    });
-                    
-                    let catchUpRemaining = Math.max(0, totalAreaToHaveGrazed - areaAlreadyGrazedWithBreaks);
-                    if (catchUpRemaining > 0) {
-                        // Graze the highest cover paddocks that DON'T have recent breaks
-                        simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
-                        for (let p of simPaddocks) {
-                            if (catchUpRemaining <= 0) break;
-                            const pNorm = normName(p.name);
-                            const hasBreak = savedBreaks.some(b => b.paddock && normName(b.paddock) === pNorm && new Date(b.createdAt).getTime() > fwDate.getTime());
-                            if (!hasBreak) {
-                                const take = Math.min(p.area, catchUpRemaining);
-                                const fraction = take / p.area;
-                                p.latest.cover = (p.latest.cover * (1 - fraction)) + (targetRes * fraction);
-                                catchUpRemaining -= take;
-                                if (fraction > 0.5) p.grazedSinceFW = true; // Mark as done so we don't double-count in simulation
-                            }
-                        }
-                    }
+            const daysSinceFW = fwDate ? Math.max(0, (nowTime - fwDate.getTime()) / 86400000) : 0;
+            
+            simPaddocks.forEach(p => {
+                p.currentCover = p.latest.cover;
+                if (fwDate) {
+                    p.currentCover += (dailyGrowth * Math.round(daysSinceFW));
                 }
-            }
+            });
 
+            // 2. Sort by current cover (highest first) - this is our fixed grazing sequence
+            simPaddocks.sort((a, b) => b.currentCover - a.currentCover);
+
+            // 3. Sequential Simulation
+            let totalAreaPassed = daysSinceFW * areaPerDayHa; 
             let finalCows = cows;
             let finalDailyDemandKg = dailyDemandKg;
 
             for (let day = 0; day < daysAhead; day++) {
-                simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
-                simPaddocks.sort((a, b) => {
-                    // Prioritize paddocks that are already partially grazed
-                    const aActive = (a.grazedSinceFW && a.latest.cover > targetRes);
-                    const bActive = (b.grazedSinceFW && b.latest.cover > targetRes);
-                    if (aActive && !bActive) return -1;
-                    if (!aActive && bActive) return 1;
-                    return b.latest.cover - a.latest.cover;
-                });
-                
                 let currentDayTs = nowTime + (day * 86400000);
                 let currentCows = cows;
                 if (isDryOffMode) {
@@ -4040,43 +3965,98 @@
                 }
                 let currentDailyDemandKg = currentCows * intake;
                 
-                // Logic: How much pasture must we take to not exceed maxSuppPerCow?
+                const areaToGrazeToday = areaPerDayHa;
                 const maxSuppTotalKg = currentCows * maxSuppPerCow;
                 const minPastureReqKg = Math.max(0, currentDailyDemandKg - maxSuppTotalKg);
 
-                // Find avg cover of paddocks we graze today
-                let areaToGraze = areaPerDayHa;
-                let grazingAreaSum = 0;
-                let grazingCoverSum = 0;
-                for (let i = 0; i < simPaddocks.length; i++) {
-                    if (grazingAreaSum >= areaToGraze) break;
-                    let p = simPaddocks[i];
-                    let take = Math.min(p.area, areaToGraze - grazingAreaSum);
-                    grazingAreaSum += take;
-                    grazingCoverSum += (p.latest.cover * take);
-                }
-                const avgPre = (grazingAreaSum > 0) ? (grazingCoverSum / grazingAreaSum) : 0;
-                
-                // We either graze to targetRes, or lower if we hit the supplement cap
-                const pastureNeededToHitTargetRes = (avgPre - targetRes) * areaToGraze;
-                const actualPastureTakenKg = Math.max(minPastureReqKg, pastureNeededToHitTargetRes);
-                const dayResidual = (areaToGraze > 0) ? (avgPre - (actualPastureTakenKg / areaToGraze)) : targetRes;
+                // Everyone grows
+                simPaddocks.forEach(p => p.currentCover += dailyGrowth);
 
-                let areaRemaining = areaToGraze;
-                for (let i = 0; i < simPaddocks.length; i++) {
-                    if (areaRemaining <= 0) break;
-                    let p = simPaddocks[i];
+                // Where is our cursor in the farm?
+                // We assume we are grazing sequentially from the top of the wedge.
+                // totalAreaPassed is how much area we have grazed since the farmwalk.
+                let cursorStart = totalAreaPassed % totalAreaHa;
+                let cursorEnd = (totalAreaPassed + areaToGrazeToday) % totalAreaHa;
+                
+                // Graze the paddocks in the [cursorStart, cursorEnd] range
+                let areaInFarm = 0;
+                let dayGrazedCoverSum = 0;
+                let dayGrazedAreaSum = 0;
+
+                simPaddocks.forEach(p => {
+                    let paddockStart = areaInFarm;
+                    let paddockEnd = areaInFarm + p.area;
                     
-                    const fractionArea = Math.min(1, areaRemaining / p.area);
-                    areaRemaining -= (fractionArea * p.area);
-                    p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (dayResidual * fractionArea);
+                    // Does our daily grazing range [cursorStart, cursorStart + areaToGraze] overlap this paddock?
+                    let start = Math.max(paddockStart, cursorStart);
+                    let end = Math.min(paddockEnd, cursorStart + areaToGrazeToday);
+                    
+                    if (start < end) {
+                        let take = end - start;
+                        dayGrazedAreaSum += take;
+                        dayGrazedCoverSum += (p.currentCover * take);
+                    }
+                    areaInFarm = paddockEnd;
+                });
+
+                // Wrap around logic if cursor crosses the end of the farm
+                if (cursorStart + areaToGrazeToday > totalAreaHa) {
+                    let overflow = (cursorStart + areaToGrazeToday) - totalAreaHa;
+                    let areaInFarm2 = 0;
+                    simPaddocks.forEach(p => {
+                        let paddockStart = areaInFarm2;
+                        let paddockEnd = areaInFarm2 + p.area;
+                        let start = Math.max(paddockStart, 0);
+                        let end = Math.min(paddockEnd, overflow);
+                        if (start < end) {
+                            let take = end - start;
+                            dayGrazedAreaSum += take;
+                            dayGrazedCoverSum += (p.currentCover * take);
+                        }
+                        areaInFarm2 = paddockEnd;
+                    });
                 }
+
+                // Adjust residual based on supplement cap
+                const dayAvgPre = dayGrazedAreaSum > 0 ? (dayGrazedCoverSum / dayGrazedAreaSum) : targetRes;
+                const pastureNeededToHitTarget = (dayAvgPre - targetRes) * areaToGrazeToday;
+                const actualPastureTaken = Math.max(minPastureReqKg, pastureNeededToHitTarget);
+                const dayResidual = areaToGrazeToday > 0 ? (dayAvgPre - (actualPastureTaken / areaToGrazeToday)) : targetRes;
+
+                // Apply the grazing to the paddocks in the range
+                let areaInFarm3 = 0;
+                simPaddocks.forEach(p => {
+                    let pStart = areaInFarm3;
+                    let pEnd = areaInFarm3 + p.area;
+                    let start = Math.max(pStart, cursorStart);
+                    let end = Math.min(pEnd, cursorStart + areaToGrazeToday);
+                    if (start < end) {
+                        let fraction = (end - start) / p.area;
+                        p.currentCover = (p.currentCover * (1 - fraction)) + (dayResidual * fraction);
+                    }
+                    // Handle wrap
+                    if (cursorStart + areaToGrazeToday > totalAreaHa) {
+                        let overflow = (cursorStart + areaToGrazeToday) - totalAreaHa;
+                        let start2 = Math.max(pStart, 0);
+                        let end2 = Math.min(pEnd, overflow);
+                        if (start2 < end2) {
+                            let fraction2 = (end2 - start2) / p.area;
+                            p.currentCover = (p.currentCover * (1 - fraction2)) + (dayResidual * fraction2);
+                        }
+                    }
+                    areaInFarm3 = pEnd;
+                });
+
+                totalAreaPassed += areaToGrazeToday;
 
                 if (day === daysAhead - 1) {
                     finalCows = currentCows;
-                    finalDailyDemandKg = currentCows * intake;
+                    finalDailyDemandKg = currentDailyDemandKg;
                 }
             }
+
+            // Map currentCover back to latest.cover for rendering
+            simPaddocks.forEach(p => p.latest.cover = p.currentCover);
             const finalTargetPre = (finalDailyDemandKg / areaPerDayHa) + targetRes;
             
             const finalTotalCover = simPaddocks.reduce((sum, p) => sum + (p.latest.cover * p.area), 0);
