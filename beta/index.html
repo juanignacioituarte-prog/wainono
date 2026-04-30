@@ -1468,6 +1468,26 @@
             </div>
 
             <div class="feed-card">
+                <div class="feed-title-row">
+                    <div class="feed-title">Predicted Feed Wedge Planner</div>
+                    <button class="btn-save" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
+                </div>
+                <div class="calc-grid" style="margin-bottom:15px;">
+                    <div class="input-group">
+                        <label>Days Ahead</label>
+                        <input type="number" id="inp-predict-days" value="14" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Expected Growth Rate (kgDM/ha/day)</label>
+                        <input type="number" id="inp-predict-growth" value="35" oninput="updatePredictedWedge()">
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <canvas id="predictedWedgeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="feed-card">
                 <div class="feed-title">Rotation Parameters</div>
                 <div class="calc-grid">
                     <div class="input-group">
@@ -1752,6 +1772,7 @@
         let selectedSceneTs = null;
         let satelliteHistory = {};
         let wedgeChartInstance = null;
+        let predictedWedgeChartInstance = null;
         let usePartialCalibration = false;
         let manualFarmGrowthRate = 0;
 
@@ -3716,6 +3737,7 @@
             document.getElementById('crop-herd-outputs').innerHTML = cropHtml || '<div class="muted" style="font-size:11px; text-align:center;">No herds ticked for crops.</div>';
 
             renderFeedWedge(manualModeData, preGrazeTarget, residual);
+            updatePredictedWedge();
         }
 
         function renderFeedWedge(paddockData, targetPre, targetRes) {
@@ -3783,6 +3805,103 @@
                             ticks: { maxRotation: 90, minRotation: 90, font: { size: 9 } }
                         }
                     }
+                }
+            });
+        }
+
+        function fetchWeatherAndOptimizeGrowth(event) {
+            const lat = -37.8;
+            const lon = 175.3;
+            const btn = event ? event.target : null;
+            if (btn) btn.innerText = "FETCHING...";
+
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&timezone=Pacific%2FAuckland&forecast_days=14`)
+                .then(res => res.json())
+                .then(data => {
+                    const maxTemps = data.daily.temperature_2m_max;
+                    const minTemps = data.daily.temperature_2m_min;
+                    let avgTemp = 0;
+                    for(let i=0; i<maxTemps.length; i++) {
+                        avgTemp += (maxTemps[i] + minTemps[i]) / 2;
+                    }
+                    avgTemp = avgTemp / maxTemps.length;
+                    
+                    let estimatedGrowth = 10 + Math.max(0, (avgTemp - 5) * 2.5);
+                    estimatedGrowth = Math.min(100, Math.max(5, Math.round(estimatedGrowth)));
+                    
+                    document.getElementById('inp-predict-growth').value = estimatedGrowth;
+                    if (btn) btn.innerText = "🌤️ OPTIMIZE FROM WEATHER";
+                    updatePredictedWedge();
+                })
+                .catch(err => {
+                    console.error("Weather fetch failed:", err);
+                    alert("Failed to fetch weather data.");
+                    if (btn) btn.innerText = "🌤️ OPTIMIZE FROM WEATHER";
+                });
+        }
+
+        function updatePredictedWedge() {
+            if (currentDashboardMode !== 'feed' || !manualModeData) return;
+            
+            const daysAhead = parseInt(document.getElementById('inp-predict-days').value) || 14;
+            const dailyGrowth = parseFloat(document.getElementById('inp-predict-growth').value) || 0;
+            const cows = parseInt(document.getElementById('inp-cows').value) || 0;
+            const intake = parseFloat(document.getElementById('inp-intake').value) || 18;
+            const dailyDemandKg = cows * intake;
+            const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
+            
+            let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
+            
+            for (let day = 0; day < daysAhead; day++) {
+                simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
+                simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+                let demandRemaining = dailyDemandKg;
+                
+                for (let i = 0; i < simPaddocks.length; i++) {
+                    if (demandRemaining <= 0) break;
+                    const p = simPaddocks[i];
+                    if (p.latest.cover <= targetRes) continue;
+                    
+                    const availableKg = (p.latest.cover - targetRes) * p.areaHa;
+                    if (availableKg <= demandRemaining) {
+                        demandRemaining -= availableKg;
+                        p.latest.cover = targetRes;
+                    } else {
+                        const drop = demandRemaining / p.areaHa;
+                        p.latest.cover -= drop;
+                        demandRemaining = 0;
+                    }
+                }
+            }
+            renderPredictedWedge(simPaddocks, targetRes);
+        }
+
+        function renderPredictedWedge(simPaddocks, targetRes) {
+            const ctx = document.getElementById('predictedWedgeChart').getContext('2d');
+            simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+            const labels = simPaddocks.map(p => p.name);
+            const dataCover = simPaddocks.map(p => p.latest.cover);
+            const targetPre = simPaddocks.length > 0 ? simPaddocks[0].latest.cover : 3000;
+            const demandLine = [];
+            const count = simPaddocks.length;
+            if (count > 0) {
+                const slope = (targetRes - targetPre) / (count - 1 || 1);
+                for (let i = 0; i < count; i++) demandLine.push(targetPre + (slope * i));
+            }
+            if (predictedWedgeChartInstance) predictedWedgeChartInstance.destroy();
+            predictedWedgeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { type: 'line', label: 'Predicted Demand Line', data: demandLine, borderColor: '#3498db', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], fill: false, tension: 0 },
+                        { type: 'bar', label: 'Predicted Cover (kgDM/ha)', data: dataCover, backgroundColor: '#9b59b6', borderRadius: 3, barPercentage: 0.95, categoryPercentage: 0.95 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: true, position: 'top', align: 'end' }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } } },
+                    scales: { y: { beginAtZero: true, title: { display: true, text: 'kgDM/ha', font: { size: 10, weight: 'bold' } } }, x: { ticks: { maxRotation: 90, minRotation: 90, font: { size: 9 } } } }
                 }
             });
         }
