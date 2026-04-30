@@ -1471,7 +1471,8 @@
                 <div class="feed-title-row">
                     <div class="feed-title">Predicted Feed Wedge Planner</div>
                     <div style="flex:1;"></div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kgDM/ha</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kg</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--warning); margin-left:15px;">Expected Supp: <span id="predict-supp">0.0</span> kg/cow</div>
                     <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
                 </div>
                 <div class="calc-grid" style="margin-bottom:15px;">
@@ -3954,17 +3955,7 @@
                 simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
                 simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
                 
-                let currentDayTs = nowTime + (day * 86400000);
-                let currentCows = cows;
-                if (isDryOffMode) {
-                    dryOffEvents.forEach(ev => {
-                        if (ev.ts <= currentDayTs) currentCows = Math.max(0, currentCows - ev.cows);
-                    });
-                }
-                let currentDailyDemandKg = currentCows * intake;
-                
                 let areaRemaining = areaPerDayHa;
-                let demandRemaining = currentDailyDemandKg;
                 
                 for (let i = 0; i < simPaddocks.length; i++) {
                     if (areaRemaining <= 0) break;
@@ -3973,18 +3964,7 @@
                     
                     const fractionArea = Math.min(1, areaRemaining / p.area);
                     areaRemaining -= (fractionArea * p.area);
-                    
-                    const availableKgInFraction = (p.latest.cover - targetRes) * (fractionArea * p.area);
-                    
-                    if (demandRemaining >= availableKgInFraction) {
-                        demandRemaining -= availableKgInFraction;
-                        p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (targetRes * fractionArea);
-                    } else {
-                        const coverDropInFraction = demandRemaining / (fractionArea * p.area);
-                        const grazedCover = p.latest.cover - coverDropInFraction;
-                        p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (grazedCover * fractionArea);
-                        demandRemaining = 0;
-                    }
+                    p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (targetRes * fractionArea);
                 }
             }
             
@@ -4002,6 +3982,24 @@
             const expectedApc = totalAreaHa > 0 ? (finalTotalCover / totalAreaHa) : 0;
             const apcEl = document.getElementById('predict-apc');
             if (apcEl) apcEl.innerText = Math.round(expectedApc).toLocaleString();
+            
+            let finalAreaSum = 0;
+            let finalCoverSum = 0;
+            simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+            for (let p of simPaddocks) {
+                if (finalAreaSum >= areaPerDayHa) break;
+                let take = Math.min(p.area, areaPerDayHa - finalAreaSum);
+                finalAreaSum += take;
+                finalCoverSum += (p.latest.cover * take);
+            }
+            const expectedAvgAvailablePreGraze = (finalAreaSum > 0) ? (finalCoverSum / finalAreaSum) : 0;
+            const expectedPastureOfferedPerDay = (expectedAvgAvailablePreGraze - targetRes) * areaPerDayHa;
+            let expectedSupplementKgDay = finalDailyDemandKg - expectedPastureOfferedPerDay;
+            if (expectedSupplementKgDay < 0) expectedSupplementKgDay = 0;
+            const expectedSuppPerCow = finalCows > 0 ? (expectedSupplementKgDay / finalCows) : 0;
+            
+            const suppEl = document.getElementById('predict-supp');
+            if (suppEl) suppEl.innerText = expectedSuppPerCow.toFixed(1);
 
             renderPredictedWedge(simPaddocks, finalTargetPre, targetRes);
         }
