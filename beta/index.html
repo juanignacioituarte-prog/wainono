@@ -3849,6 +3849,8 @@
             const intake = parseFloat(document.getElementById('inp-intake').value) || 18;
             const dailyDemandKg = cows * intake;
             const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
+            const targetPreText = document.getElementById('res-target-pre').innerText || "3000";
+            const targetPre = parseFloat(targetPreText.replace(/,/g, '')) || 3000;
             
             let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
             
@@ -3873,15 +3875,14 @@
                     }
                 }
             }
-            renderPredictedWedge(simPaddocks, targetRes);
+            renderPredictedWedge(simPaddocks, targetPre, targetRes);
         }
 
-        function renderPredictedWedge(simPaddocks, targetRes) {
+        function renderPredictedWedge(simPaddocks, targetPre, targetRes) {
             const ctx = document.getElementById('predictedWedgeChart').getContext('2d');
             simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
             const labels = simPaddocks.map(p => p.name);
             const dataCover = simPaddocks.map(p => p.latest.cover);
-            const targetPre = simPaddocks.length > 0 ? simPaddocks[0].latest.cover : 3000;
             const demandLine = [];
             const count = simPaddocks.length;
             if (count > 0) {
