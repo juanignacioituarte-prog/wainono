@@ -443,6 +443,31 @@
             font-weight: 600;
         }
 
+        /* Cow Tracking Styles */
+        .cow-wrapper { background: transparent; }
+        .cow-marker {
+            width: 20px; height: 20px; border-radius: 50%; border: 3px solid white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); background-color: #8e44ad;
+            transition: all 0.3s; position: relative; box-sizing: border-box;
+        }
+        .cow-head {
+            width: 6px; height: 8px; background: #fff; border-radius: 3px;
+            position: absolute; top: -4px; left: 4px; box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+        .cow-marker.safe { background-color: #8e44ad; }
+        .cow-marker.warning { background-color: #f39c12; animation: pulse-warning 1s infinite alternate; }
+        .cow-marker.shocking { background-color: #e74c3c; animation: pulse-shock 0.2s infinite alternate; }
+        @keyframes pulse-warning { from { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.7); } to { box-shadow: 0 0 0 12px rgba(243, 156, 18, 0); } }
+        @keyframes pulse-shock { from { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.9); } to { box-shadow: 0 0 0 16px rgba(231, 76, 60, 0); } }
+        .cow-status-pill {
+            display: inline-block; padding: 6px 12px; border-radius: 12px;
+            font-size: 0.8rem; font-weight: 600; margin-top: 10px;
+            background: rgba(0, 0, 0, 0.05); color: #777; border: 1px solid #ddd;
+        }
+        .cow-status-pill.safe { color: #8e44ad; background: rgba(142, 68, 173, 0.1); border-color: #8e44ad; }
+        .cow-status-pill.warning { color: #f39c12; background: rgba(243, 156, 18, 0.1); border-color: #f39c12; }
+        .cow-status-pill.shocking { color: #e74c3c; background: rgba(231, 76, 60, 0.1); border-color: #e74c3c; }
+
         /* Feed Calculations View */
         #feed-view {
             flex-grow: 1;
@@ -1327,7 +1352,7 @@
 
     <div id="login-screen">
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
-        <h2>🟪 River Terrace Beta Emulator</h2>
+        <h2>­ƒƒ¬ River Terrace Beta Emulator</h2>
         <div id="g_id_onload" data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
             data-callback="handleCredentialResponse" data-auto_prompt="false">
         </div>
@@ -1353,7 +1378,7 @@
                 <line x1="65" y1="50" x2="100" y2="50" />
             </svg>
         </div>
-        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">📍</button>
+        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">­ƒôì</button>
         <div class="map-controls">
             <div id="latest-date" class="date-label">LATEST DATA: --</div>
             <div id="sat-layer-controls" class="layer-group">
@@ -1364,7 +1389,7 @@
             <div id="legend" class="legend-box">
                 <div class="legend-header" onclick="toggleLegend()">
                     <span>COVER SCALE (kgDM/ha)</span>
-                    <span id="legend-toggle-icon">▼</span>
+                    <span id="legend-toggle-icon">Ôû╝</span>
                 </div>
                 <div id="legend-content" class="legend-content">
                     <div class="legend-item">
@@ -1522,7 +1547,7 @@
                     </div>
                     <div class="result-highlight">
                         <h3 id="res-area-cow">0</h3>
-                        <small>Area per Cow (m²/day)</small>
+                        <small>Area per Cow (m┬▓/day)</small>
                     </div>
                 </div>
             </div>
@@ -1551,7 +1576,7 @@
                     <div style="flex:1;"></div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kg</div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: var(--warning); margin-left:15px;">Expected Supp: <span id="predict-supp">0.0</span> kg/cow</div>
-                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
+                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">­ƒîñ´©Å OPTIMIZE FROM WEATHER</button>
                 </div>
                 <div class="calc-grid" style="margin-bottom:15px;">
                     <div class="input-group">
@@ -1602,11 +1627,11 @@
     </div>
 
     <div id="sidebar">
-        <button class="minimize-btn" onclick="toggleSidebar()">◀</button>
+        <button class="minimize-btn" onclick="toggleSidebar()">ÔùÇ</button>
         <div id="sidebar-content" style="display:flex; flex-direction:column; height:100%; width:100%;">
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
+                <button class="btn-dots" onclick="toggleSettingsMenu()">Ôï«</button>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
@@ -1622,11 +1647,11 @@
                     <button id="btn-mode-breaks" class="mode-btn"
                         onclick="switchDashboardMode('breaks')">BREAKS</button>
                 </div>
-                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">▼</button>
+                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">Ôû╝</button>
             </div>
 
             <div id="header-details" class="header-collapsible">
-                <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER
+                <div id="fallback-warning" class="fallback-alert" style="display:none;">ÔÜá´©Å RECENT DATA LOW (UNDER
                     0.3) -
                     SHOWING PREVIOUS DATE</div>
 
@@ -1659,6 +1684,30 @@
             </div>
 
             <input type="text" id="search" placeholder="Search paddocks..." style="margin-top:8px;">
+        </div>
+
+        <!-- Cow Emulator Panel -->
+        <div id="cow-emulator-panel" style="padding: 15px; border-bottom: 1px solid #eee; background: #fafafa;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="font-size: 11px; font-weight: 800; color: #8e44ad; text-transform: uppercase;">Collar Connection</div>
+                <label style="font-size: 10px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #8e44ad; font-weight: bold;">
+                    <input type="checkbox" id="emulator-mode" checked> LOCAL EMULATOR
+                </label>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div id="cow-status" class="cow-status-pill">Offline / Waiting...</div>
+                <div style="text-align: right;">
+                    <div style="font-size: 9px; color: #999; font-weight: bold; text-transform: uppercase;">Motion Status</div>
+                    <div id="movement-status" style="font-size: 11px; font-weight: bold; color: #8e44ad;">RESTING</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; display: flex; gap: 6px;">
+                <button class="btn-small" onclick="sendCowCommand('turn_left')" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 11px;">↺ LEFT</button>
+                <button id="btn-toggle-walk" class="btn-small" onclick="sendCowCommand('toggle_walk')" style="flex: 2; padding: 8px; border: 1px solid #8e44ad; border-radius: 6px; background: #8e44ad; color: white; cursor: pointer; font-size: 11px; font-weight: bold;">WALK / STOP</button>
+                <button class="btn-small" onclick="sendCowCommand('turn_right')" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 11px;">RIGHT ↻</button>
+            </div>
         </div>
         <div id="list">Loading data...</div>
 
@@ -1999,6 +2048,101 @@
             }
         }
 
+        /* === Virtual Cow System === */
+        let cowMarker = null;
+        let virtualCow = {
+            lat: -42.684140,
+            lon: 172.887952,
+            heading: 45,
+            moving: false,
+            status: 'safe',
+            speed: 0.0000013 // degrees per tick (~0.15m per 100ms = 1.5m/s)
+        };
+
+        function simulateVirtualCow() {
+            if (!document.getElementById('emulator-mode').checked) return;
+
+            if (virtualCow.moving) {
+                // Apply a tiny bit of random drift for realism
+                const drift = (Math.random() - 0.5) * 4;
+                virtualCow.heading += drift;
+
+                // Move forward
+                const rad = (virtualCow.heading - 90) * (Math.PI / 180);
+                virtualCow.lat -= Math.sin(rad) * virtualCow.speed;
+                virtualCow.lon += Math.cos(rad) * virtualCow.speed;
+            }
+
+            // Check fencing logic against savedBreaks
+            if (savedBreaks.length > 0) {
+                // Find the first visible/active break for simulation
+                const activeBreak = savedBreaks[0]; 
+                if (activeBreak.vertices && activeBreak.vertices.length > 2) {
+                    const polyCoords = activeBreak.vertices.map(v => [v.lng, v.lat]);
+                    polyCoords.push(polyCoords[0]); // close polygon
+                    const polyGeo = turf.polygon([polyCoords]);
+                    const pt = turf.point([virtualCow.lon, virtualCow.lat]);
+                    
+                    const isInside = turf.booleanPointInPolygon(pt, polyGeo);
+                    
+                    // Calculate distance to nearest edge
+                    let minDist = 999;
+                    try {
+                        const line = turf.lineString(polyCoords);
+                        minDist = turf.pointToLineDistance(pt, line, { units: 'meters' });
+                    } catch(e) {}
+
+                    if (!isInside) {
+                        virtualCow.status = 'shocking';
+                        virtualCow.heading += 5; // Auto-correction
+                    } else if (minDist < 8) {
+                        virtualCow.status = minDist < 4 ? 'warning_right' : 'warning_left';
+                        virtualCow.heading += 1;
+                    } else {
+                        virtualCow.status = 'safe';
+                    }
+                }
+            } else {
+                virtualCow.status = 'safe';
+            }
+
+            updateCowOnMap(virtualCow.lat, virtualCow.lon, virtualCow.status, virtualCow.heading, virtualCow.moving);
+        }
+
+        function updateCowOnMap(lat, lon, status, heading, moving) {
+            let className = status;
+            if (status.startsWith('warning')) className = 'warning';
+
+            const htmlContent = `<div class="cow-marker ${className}" style="transform: rotate(${heading}deg);">
+                                   <div class="cow-head"></div>
+                               </div>`;
+            if (!cowMarker) {
+                cowMarker = L.marker([lat, lon], {
+                    icon: L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [20, 20], iconAnchor: [10, 10] }),
+                    zIndexOffset: 10000
+                }).addTo(map);
+            } else {
+                cowMarker.setLatLng([lat, lon]);
+                cowMarker.setIcon(L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [20, 20], iconAnchor: [10, 10] }));
+            }
+
+            const statusEl = document.getElementById('cow-status');
+            statusEl.className = `cow-status-pill ${className}`;
+            if (status === 'safe') statusEl.innerHTML = 'ÔùÅ SAFE';
+            else if (status === 'shocking') statusEl.innerHTML = 'ÔÜí SHOCKING';
+            else statusEl.innerHTML = 'ÔÜá WARNING';
+
+            document.getElementById('movement-status').innerText = moving ? "WALKING" : "RESTING";
+        }
+
+        function sendCowCommand(action) {
+            if (action === 'turn_left') virtualCow.heading -= 15;
+            if (action === 'turn_right') virtualCow.heading += 15;
+            if (action === 'toggle_walk') virtualCow.moving = !virtualCow.moving;
+        }
+
+        setInterval(simulateVirtualCow, 100);
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const btn = document.querySelector('.minimize-btn');
@@ -2006,11 +2150,11 @@
             const isMinimized = sidebar.classList.contains('minimized');
             
             if (window.innerWidth > 768) {
-                btn.innerHTML = isMinimized ? '▶' : '◀';
+                btn.innerHTML = isMinimized ? 'ÔûÂ' : 'ÔùÇ';
                 sidebar.style.width = isMinimized ? '40px' : '380px';
                 sidebar.style.height = '100%';
             } else {
-                btn.innerHTML = isMinimized ? '▲' : '▼';
+                btn.innerHTML = isMinimized ? 'Ôû▓' : 'Ôû╝';
                 const sideH = isMinimized ? '0px' : '55vh';
                 sidebar.style.height = sideH;
                 document.documentElement.style.setProperty('--sidebar-h', sideH);
@@ -2028,7 +2172,7 @@
             const content = document.getElementById('legend-content');
             const icon = document.getElementById('legend-toggle-icon');
             const isCollapsed = content.classList.toggle('collapsed');
-            icon.textContent = isCollapsed ? '▶' : '▼';
+            icon.textContent = isCollapsed ? 'ÔûÂ' : 'Ôû╝';
         }
 
         // Auto-collapse header and legend on mobile
@@ -2043,7 +2187,7 @@
                 const legendContent = document.getElementById('legend-content');
                 const legendIcon = document.getElementById('legend-toggle-icon');
                 if (legendContent) legendContent.classList.add('collapsed');
-                if (legendIcon) legendIcon.textContent = '▶';
+                if (legendIcon) legendIcon.textContent = 'ÔûÂ';
             }, 500);
         }
 
@@ -2454,7 +2598,7 @@
                                     <label style="font-size:9px; color:#95a5a6; font-weight:bold; text-transform:uppercase;">Cows</label>
                                     <input type="number" id="herd-cows-${g.id}" value="${val}" style="width:50px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-weight:bold;" oninput="saveAndRecalc()">
                                 </div>
-                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">×</button>
+                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">├ù</button>
                             </div>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; align-items:center; background:#f9f9f9; padding:8px; border-radius:6px;">
@@ -2921,10 +3065,10 @@
             pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
             
             const equationHtml = calibrationModel.type === 'exponential' 
-                ? `cover = ${Math.round(calibrationModel.A)}×exp(${calibrationModel.B.toFixed(2)}×ndvi)` 
-                : `cover = ${calibrationModel.a.toFixed(2)}×raw + ${Math.round(calibrationModel.b)}`;
+                ? `cover = ${Math.round(calibrationModel.A)}├ùexp(${calibrationModel.B.toFixed(2)}├ùndvi)` 
+                : `cover = ${calibrationModel.a.toFixed(2)}├ùraw + ${Math.round(calibrationModel.b)}`;
                 
-            text.innerHTML = `<div><b style="color:#2c3e50;">R²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
+            text.innerHTML = `<div><b style="color:#2c3e50;">R┬▓</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
         }
 
         function toggleCalibrationModel() {
@@ -3088,7 +3232,7 @@
                     badges += `<span class="badge" style="background:var(--prev)">M</span>`;
                 }
 
-                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> ÔÇó </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
 
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
@@ -3756,7 +3900,7 @@
                     herdCropM2Map[g.id] = cAreaM2;
                     cropHtml += `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #eee;">
                         <span style="font-weight:bold; color:${g.color}; font-size:12px;">${g.name}</span>
-                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m²/day</span></span>
+                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m┬▓/day</span></span>
                     </div>`;
                 }
             });
@@ -3865,13 +4009,13 @@
                     estimatedGrowth = Math.min(100, Math.max(5, Math.round(estimatedGrowth)));
                     
                     document.getElementById('inp-predict-growth').value = estimatedGrowth;
-                    if (btn) btn.innerText = "🌤️ OPTIMIZE FROM WEATHER";
+                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
                     updatePredictedWedge();
                 })
                 .catch(err => {
                     console.error("Weather fetch failed:", err);
                     alert("Failed to fetch weather data.");
-                    if (btn) btn.innerText = "🌤️ OPTIMIZE FROM WEATHER";
+                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
                 });
         }
 
@@ -5382,7 +5526,7 @@
                         </div>
                         <div style="text-align:right;">
                             <div style="font-weight:bold; color:var(--accent); font-size:18px;">${w.totalArea.toFixed(2)} <span style="font-size:11px; font-weight:normal; color:#7f8c8d;">ha</span></div>
-                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map ➔'}</div>
+                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map Ô×ö'}</div>
                         </div>
                     </div>`;
                 });
@@ -5499,7 +5643,7 @@
                                  title="${isAudioActive ? 'Stop Audio Aid' : 'Start Audio Aid'}">
                              ${isAudioActive ? '\u23f9\ufe0f' : '\u25b6\ufe0f'}
                          </button>
-                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">⚙️</button>`}
+                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">ÔÜÖ´©Å</button>`}
                          <button class="btn-edit-break" style="position:static;" onclick="event.stopPropagation(); startEditBreak('${brk.id}')" title="Edit vertices">\u270e</button>
                          <button class="btn-delete-break" style="position:static;" onclick="promptDeleteBreak('${brk.id}', event)" title="Delete break">\ud83d\uddd1\ufe0f</button>
                        </div>`
@@ -5907,7 +6051,7 @@
                     row.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:6px; border:1px solid #eee; font-size:13px;";
                     row.innerHTML = `
                             <span>${email}</span>
-                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">✕</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
+                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">Ô£ò</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
                         `;
                     listDiv.appendChild(row);
                 });
@@ -5950,15 +6094,15 @@
     <!-- Break Drawing Toolbar (Moved Outside Map for Z-Index Stability) -->
     <div id="break-toolbar" class="break-toolbar" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
         <div class="toolbar-toggles">
-            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> 🎯 Use Crosshair</label>
-            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> 🔒 Lock Points</label>
+            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> ­ƒÄ» Use Crosshair</label>
+            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> ­ƒöÆ Lock Points</label>
         </div>
         <button class="btn-drop" id="btn-drop-point" onclick="event.stopPropagation(); addPointFromCrosshair()">DROP POINT</button>
         <span class="vertex-count" id="vertex-count">0 points</span>
-        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">↩ Undo</button>
-        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">⬡ Follow Contour</button>
-        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>✓ Finish</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">✕ Cancel</button>
+        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">Ôå® Undo</button>
+        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">Ô¼í Follow Contour</button>
+        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>Ô£ô Finish</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">Ô£ò Cancel</button>
     </div>
 
     <!-- Break Edit Toolbar -->
@@ -5971,9 +6115,9 @@
             <option value="pennos">Pennos</option>
             <option value="crops">Crops</option>
         </select>
-        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>✕ Delete Point</button>
-        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">✓ Done</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">✕ Cancel</button>
+        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>Ô£ò Delete Point</button>
+        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">Ô£ô Done</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">Ô£ò Cancel</button>
     </div>
 
 </body>
