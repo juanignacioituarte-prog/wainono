@@ -3922,6 +3922,7 @@
                 const pNorm = normName(p.name);
                 const paddockBreaks = savedBreaks.filter(b => b.paddock && normName(b.paddock) === pNorm && b.createdAt);
                 
+                let wasGrazedSinceFW = false;
                 if (paddockBreaks.length > 0) {
                     paddockBreaks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                     const latestBreak = paddockBreaks[0];
@@ -3931,7 +3932,13 @@
                         const resUsed = (latestBreak.manualResidual > 0) ? latestBreak.manualResidual : targetRes;
                         const daysSinceBreak = Math.max(0, (nowTime - breakTs) / 86400000);
                         p.latest.cover = resUsed + (dailyGrowth * daysSinceBreak);
+                        wasGrazedSinceFW = true;
                     }
+                }
+                
+                if (!wasGrazedSinceFW && fwTs > 0) {
+                    const daysSinceFW = Math.max(0, (nowTime - fwTs) / 86400000);
+                    p.latest.cover += (dailyGrowth * daysSinceFW);
                 }
             });
             
