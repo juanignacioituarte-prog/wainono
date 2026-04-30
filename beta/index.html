@@ -3864,12 +3864,12 @@
                     const p = simPaddocks[i];
                     if (p.latest.cover <= targetRes) continue;
                     
-                    const availableKg = (p.latest.cover - targetRes) * p.areaHa;
+                    const availableKg = (p.latest.cover - targetRes) * p.area;
                     if (availableKg <= demandRemaining) {
                         demandRemaining -= availableKg;
                         p.latest.cover = targetRes;
                     } else {
-                        const drop = demandRemaining / p.areaHa;
+                        const drop = demandRemaining / p.area;
                         p.latest.cover -= drop;
                         demandRemaining = 0;
                     }
