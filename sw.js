@@ -1,7 +1,8 @@
-const CACHE_NAME = 'rt-farm-v1.0.18';
+const CACHE_NAME = 'rt-farm-v1.0.21';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
+    './beta/index.html',
     './icon-512.png',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
