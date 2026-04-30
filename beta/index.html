@@ -2372,43 +2372,69 @@
                 return;
             }
             
-            container.innerHTML = virtualCows.map(cow => {
-                const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || BREAK_GROUPS[0];
-                let statusColor = '#27ae60';
-                if (cow.status.startsWith('warning')) statusColor = '#f39c12';
-                if (cow.status === 'shocking') statusColor = '#e74c3c';
+            // Group by herd
+            const herds = {};
+            virtualCows.forEach(cow => {
+                if (!herds[cow.herdId]) herds[cow.herdId] = { cows: [], status: 'safe' };
+                herds[cow.herdId].cows.push(cow);
+                if (cow.status === 'shocking') herds[cow.herdId].status = 'shocking';
+                else if (cow.status.startsWith('warning') && herds[cow.herdId].status !== 'shocking') herds[cow.herdId].status = 'warning';
+            });
+
+            container.innerHTML = Object.keys(herds).map(herdId => {
+                const group = herds[herdId];
+                const herd = BREAK_GROUPS.find(g => g.id === herdId) || { name: 'Unknown', color: '#777' };
                 
+                let statusColor = '#27ae60';
+                if (group.status === 'warning') statusColor = '#f39c12';
+                if (group.status === 'shocking') statusColor = '#e74c3c';
+                
+                const warningCount = group.cows.filter(c => c.status.startsWith('warning')).length;
+                const shockCount = group.cows.filter(c => c.status === 'shocking').length;
+                let statusText = 'ALL SAFE';
+                if (shockCount > 0) statusText = `${shockCount} SHOCKING`;
+                else if (warningCount > 0) statusText = `${warningCount} WARNING`;
+
+                // Find target for the herd (use first cow's target)
+                const targetId = group.cows[0].targetBreakId;
+
                 return `
-                    <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px;">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                            <b style="color:${herd.color}">● COW #${cow.id.slice(-4)}</b>
-                            <span style="color:${statusColor}; font-weight:800; font-size:9px;">${cow.status.toUpperCase()}</span>
+                    <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <b style="color:${herd.color}; font-size:12px;">● ${herd.name.toUpperCase()} (${group.cows.length})</b>
+                            <span style="color:${statusColor}; font-weight:800; font-size:10px;">${statusText}</span>
                         </div>
                         
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:8px;">
-                            <div>
-                                <label style="font-size:9px; color:#999; display:block;">HERD</label>
-                                <select onchange="updateCowHerd('${cow.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
-                                    ${BREAK_GROUPS.map(g => `<option value="${g.id}" ${cow.herdId === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div>
-                                <label style="font-size:9px; color:#999; display:block;">MOVE TO</label>
-                                <select onchange="updateCowTarget('${cow.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
-                                    <option value="">(Current)</option>
-                                    ${savedBreaks.map(b => `<option value="${b.id}" ${cow.targetBreakId === b.id ? 'selected' : ''}>${b.name || b.paddock}</option>`).join('')}
-                                </select>
-                            </div>
+                        <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; margin-bottom:8px;">
+                            <select onchange="moveHerdToBreak('${herdId}', this.value)" style="width:100%; font-size:11px; padding:4px; border:1px solid #ddd; border-radius:4px;">
+                                <option value="">MOVE HERD TO...</option>
+                                ${savedBreaks.map(b => `<option value="${b.id}" ${targetId === b.id ? 'selected' : ''}>${b.name || b.paddock}</option>`).join('')}
+                            </select>
+                            <button onclick="teleportHerdToBreak('${herdId}')" style="background:#8e44ad; color:white; border:none; padding:5px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;" title="Instant Teleport">TELEPORT</button>
                         </div>
                         
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:9px; color:#bbb;">Mode: ${cow.mode.toUpperCase()}</span>
-                            <button onclick="removeVirtualCow('${cow.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;">Delete</button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#bbb;">
+                            <span>Mode: ${group.cows[0].mode.toUpperCase()}</span>
+                            <button onclick="deleteHerdCows('${herdId}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px; opacity:0.6;">Clear Cows</button>
                         </div>
                     </div>
                 `;
             }).join('');
         }
+
+        window.deleteHerdCows = function(herdId) {
+            if(confirm("Remove all virtual cows for this herd?")) {
+                virtualCows = virtualCows.filter(c => c.herdId !== herdId);
+                // Clean up markers
+                Object.keys(cowMarkers).forEach(id => {
+                    if (id.includes(herdId)) {
+                        map.removeLayer(cowMarkers[id]);
+                        delete cowMarkers[id];
+                    }
+                });
+                renderCowManager();
+            }
+        };
 
         window.updateCowHerd = function(cowId, herdId) {
             const cow = virtualCows.find(c => c.id === cowId);
