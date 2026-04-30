@@ -1574,6 +1574,10 @@
                         <label>Simulated Intake (kgDM)</label>
                         <input type="number" id="inp-predict-intake" placeholder="Auto" oninput="updatePredictedWedge()">
                     </div>
+                    <div class="input-group">
+                        <label>Max Supp Allowed (kg/cow)</label>
+                        <input type="number" id="inp-predict-max-supp" value="20" oninput="updatePredictedWedge()">
+                    </div>
                 </div>
                 
                 <div style="margin-bottom: 15px; padding: 15px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;">
@@ -3954,8 +3958,10 @@
                 
                 if (p.area > 0) {
                     p.latest.cover = (sumGrazedCover + (ungrazedCoverToday * ungrazedArea)) / p.area;
+                    p.grazedSinceFW = (sumGrazedArea > 0 && sumGrazedArea < p.area * 0.98); // Mark as active if partially grazed
                 } else {
                     p.latest.cover = ungrazedCoverToday;
+                    p.grazedSinceFW = false;
                 }
             });
             
@@ -3975,31 +3981,68 @@
                 dryOffEvents.sort((a, b) => a.ts - b.ts);
             }
 
+            const maxSuppPerCow = parseFloat(document.getElementById('inp-predict-max-supp').value) || 20;
+            
+            let finalCows = cows;
+            let finalDailyDemandKg = dailyDemandKg;
+
             for (let day = 0; day < daysAhead; day++) {
                 simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
-                simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+                simPaddocks.sort((a, b) => {
+                    // Prioritize paddocks that are already partially grazed
+                    const aActive = (a.grazedSinceFW && a.latest.cover > targetRes);
+                    const bActive = (b.grazedSinceFW && b.latest.cover > targetRes);
+                    if (aActive && !bActive) return -1;
+                    if (!aActive && bActive) return 1;
+                    return b.latest.cover - a.latest.cover;
+                });
                 
-                let areaRemaining = areaPerDayHa;
+                let currentDayTs = nowTime + (day * 86400000);
+                let currentCows = cows;
+                if (isDryOffMode) {
+                    dryOffEvents.forEach(ev => {
+                        if (ev.ts <= currentDayTs) currentCows = Math.max(0, currentCows - ev.cows);
+                    });
+                }
+                let currentDailyDemandKg = currentCows * intake;
                 
+                // Logic: How much pasture must we take to not exceed maxSuppPerCow?
+                const maxSuppTotalKg = currentCows * maxSuppPerCow;
+                const minPastureReqKg = Math.max(0, currentDailyDemandKg - maxSuppTotalKg);
+
+                // Find avg cover of paddocks we graze today
+                let areaToGraze = areaPerDayHa;
+                let grazingAreaSum = 0;
+                let grazingCoverSum = 0;
+                for (let i = 0; i < simPaddocks.length; i++) {
+                    if (grazingAreaSum >= areaToGraze) break;
+                    let p = simPaddocks[i];
+                    let take = Math.min(p.area, areaToGraze - grazingAreaSum);
+                    grazingAreaSum += take;
+                    grazingCoverSum += (p.latest.cover * take);
+                }
+                const avgPre = (grazingAreaSum > 0) ? (grazingCoverSum / grazingAreaSum) : 0;
+                
+                // We either graze to targetRes, or lower if we hit the supplement cap
+                const pastureNeededToHitTargetRes = (avgPre - targetRes) * areaToGraze;
+                const actualPastureTakenKg = Math.max(minPastureReqKg, pastureNeededToHitTargetRes);
+                const dayResidual = (areaToGraze > 0) ? (avgPre - (actualPastureTakenKg / areaToGraze)) : targetRes;
+
+                let areaRemaining = areaToGraze;
                 for (let i = 0; i < simPaddocks.length; i++) {
                     if (areaRemaining <= 0) break;
-                    const p = simPaddocks[i];
-                    if (p.latest.cover <= targetRes) continue;
+                    let p = simPaddocks[i];
                     
                     const fractionArea = Math.min(1, areaRemaining / p.area);
                     areaRemaining -= (fractionArea * p.area);
-                    p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (targetRes * fractionArea);
+                    p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (dayResidual * fractionArea);
+                }
+
+                if (day === daysAhead - 1) {
+                    finalCows = currentCows;
+                    finalDailyDemandKg = currentCows * intake;
                 }
             }
-            
-            let finalCows = cows;
-            const simEndTime = nowTime + (daysAhead * 86400000);
-            if (isDryOffMode) {
-                dryOffEvents.forEach(ev => {
-                    if (ev.ts <= simEndTime) finalCows = Math.max(0, finalCows - ev.cows);
-                });
-            }
-            const finalDailyDemandKg = finalCows * intake;
             const finalTargetPre = (finalDailyDemandKg / areaPerDayHa) + targetRes;
             
             const finalTotalCover = simPaddocks.reduce((sum, p) => sum + (p.latest.cover * p.area), 0);
