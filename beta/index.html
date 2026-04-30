@@ -3983,6 +3983,40 @@
 
             const maxSuppPerCow = parseFloat(document.getElementById('inp-predict-max-supp').value) || 20;
             
+            // --- CATCH-UP PHASE: Graze the area that should have been eaten since the Farmwalk ---
+            const fwDate = manualModeData[0]?.latest?.ts ? new Date(manualModeData[0].latest.ts) : null;
+            if (fwDate) {
+                const daysSinceFW = Math.max(0, Math.round((nowTime - fwDate.getTime()) / 86400000));
+                if (daysSinceFW > 0) {
+                    let totalAreaToHaveGrazed = daysSinceFW * areaPerDayHa;
+                    // Subtract area already accounted for by manual breaks
+                    let areaAlreadyGrazedWithBreaks = 0;
+                    simPaddocks.forEach(p => {
+                        const pNorm = normName(p.name);
+                        const pBreaks = savedBreaks.filter(b => b.paddock && normName(b.paddock) === pNorm && new Date(b.createdAt).getTime() > fwDate.getTime());
+                        pBreaks.forEach(b => areaAlreadyGrazedWithBreaks += (b.areaHa || 0));
+                    });
+                    
+                    let catchUpRemaining = Math.max(0, totalAreaToHaveGrazed - areaAlreadyGrazedWithBreaks);
+                    if (catchUpRemaining > 0) {
+                        // Graze the highest cover paddocks that DON'T have recent breaks
+                        simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+                        for (let p of simPaddocks) {
+                            if (catchUpRemaining <= 0) break;
+                            const pNorm = normName(p.name);
+                            const hasBreak = savedBreaks.some(b => b.paddock && normName(b.paddock) === pNorm && new Date(b.createdAt).getTime() > fwDate.getTime());
+                            if (!hasBreak) {
+                                const take = Math.min(p.area, catchUpRemaining);
+                                const fraction = take / p.area;
+                                p.latest.cover = (p.latest.cover * (1 - fraction)) + (targetRes * fraction);
+                                catchUpRemaining -= take;
+                                if (fraction > 0.5) p.grazedSinceFW = true; // Mark as done so we don't double-count in simulation
+                            }
+                        }
+                    }
+                }
+            }
+
             let finalCows = cows;
             let finalDailyDemandKg = dailyDemandKg;
 
