@@ -3845,9 +3845,7 @@
             
             const daysAhead = parseInt(document.getElementById('inp-predict-days').value) || 14;
             const dailyGrowth = parseFloat(document.getElementById('inp-predict-growth').value) || 0;
-            const cows = parseInt(document.getElementById('inp-cows').value) || 0;
-            const intake = parseFloat(document.getElementById('inp-intake').value) || 18;
-            const dailyDemandKg = cows * intake;
+            const rotationDays = parseInt(document.getElementById('inp-rotation').value) || 30;
             const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
             const targetPreText = document.getElementById('res-target-pre').innerText || "3000";
             const targetPre = parseFloat(targetPreText.replace(/,/g, '')) || 3000;
@@ -3873,24 +3871,26 @@
                 }
             });
             
+            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
+            const areaPerDayHa = totalAreaHa / (rotationDays || 1);
+
             for (let day = 0; day < daysAhead; day++) {
                 simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
                 simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
-                let demandRemaining = dailyDemandKg;
+                let areaRemaining = areaPerDayHa;
                 
                 for (let i = 0; i < simPaddocks.length; i++) {
-                    if (demandRemaining <= 0) break;
+                    if (areaRemaining <= 0) break;
                     const p = simPaddocks[i];
                     if (p.latest.cover <= targetRes) continue;
                     
-                    const availableKg = (p.latest.cover - targetRes) * p.area;
-                    if (availableKg <= demandRemaining) {
-                        demandRemaining -= availableKg;
+                    if (p.area <= areaRemaining) {
+                        areaRemaining -= p.area;
                         p.latest.cover = targetRes;
                     } else {
-                        const drop = demandRemaining / p.area;
-                        p.latest.cover -= drop;
-                        demandRemaining = 0;
+                        const fraction = areaRemaining / p.area;
+                        p.latest.cover = (p.latest.cover * (1 - fraction)) + (targetRes * fraction);
+                        areaRemaining = 0;
                     }
                 }
             }
