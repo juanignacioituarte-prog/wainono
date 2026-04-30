@@ -1364,7 +1364,7 @@
             <div id="debug-email" style="font-size:13px; color:#666; margin-bottom:10px; background:#f0f0f0; padding:5px; border-radius:4px; font-family:monospace;">Checking...</div>
             <p style="font-size:12px; margin-bottom: 10px;">If this is your first time, the Admin needs to approve your email.</p>
             <a href="#" id="request-access-btn" class="btn-request-access" target="_blank" style="margin-top:0;">Request Access</a>
-            <div style="margin-top:10px; font-size:10px; color:#999;">App Version: 1.0.18</div>
+            <div style="margin-top:10px; font-size:10px; color:#999;">App Version: 1.0.19</div>
         </div>
     </div>
 
@@ -6392,6 +6392,9 @@
                 },
                 error: function(err) {
                     console.error("Auth fetch failed:", err);
+                    const debugEl = document.getElementById('debug-email');
+                    if (debugEl) debugEl.innerText = "Error: Could not reach authorization server. Check connection.";
+                    
                     if (userEmail === ADMIN_EMAIL.toLowerCase()) {
                         localStorage.setItem('auth_email', userEmail);
                         localStorage.setItem('auth_name', "Admin");
@@ -6399,8 +6402,7 @@
                         init();
                         loadBreaks();
                     } else {
-                        localStorage.removeItem('auth_email');
-                        showUnauthorized(userEmail);
+                        showUnauthorized(userEmail, true);
                     }
                 }
             });
@@ -6415,14 +6417,30 @@
             }
         });
 
-        function showUnauthorized(email) {
-            document.querySelector('.g_id_signin').classList.add('hidden');
-            document.getElementById('unauth-msg').classList.remove('hidden');
-            document.getElementById('unauth-msg').innerHTML = `
-                <p style="font-weight:bold;">Not Authorized</p>
-                <p style="font-size:14px; margin-bottom: 5px;">Email: ${email}</p>
-                <p style="font-size:12px; margin-bottom: 5px;">This account is not on the authorized list.</p>
-                <a href="mailto:${ADMIN_EMAIL}?subject=Farm App Access Request&body=Hi, please grant access to the River Terrace Farm App for my email: ${email}" class="btn-request-access" target="_blank">Request Access</a>
+        function clearAuthSession() {
+            localStorage.removeItem('auth_email');
+            localStorage.removeItem('auth_name');
+            location.reload();
+        }
+
+        function showUnauthorized(email, isError = false) {
+            const signinBtn = document.querySelector('.g_id_signin');
+            if (signinBtn) signinBtn.classList.add('hidden');
+            
+            const msgEl = document.getElementById('unauth-msg');
+            if (!msgEl) return;
+            
+            msgEl.classList.remove('hidden');
+            msgEl.innerHTML = `
+                <p style="font-weight:bold; color:#e74c3c;">${isError ? 'Connection Error' : 'Not Authorized'}</p>
+                <p style="font-size:13px; margin-bottom: 10px;">Email: <b>${email}</b></p>
+                <p style="font-size:12px; margin-bottom: 15px;">${isError ? 'We couldn\'t verify your access. Please check your internet and try again.' : 'This account is not on the authorized list. The Admin must approve your access.'}</p>
+                
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button onclick="location.reload()" style="padding:10px; background:#2ecc71; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Retry Now</button>
+                    <a href="mailto:${ADMIN_EMAIL}?subject=Farm App Access Request&body=Access request for ${email}" class="btn-request-access" style="margin-top:0;">Request Access</a>
+                    <button onclick="clearAuthSession()" style="background:none; border:none; color:#999; font-size:11px; cursor:pointer; text-decoration:underline;">Try a different account</button>
+                </div>
             `;
         }
 
