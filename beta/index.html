@@ -1943,6 +1943,17 @@
                                 <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crops
                             </label>
                         </div>
+
+                        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px; align-items:center;">
+                            <div style="flex:1;">
+                                <label style="font-size:9px; color:#999; display:block;">MOVE HERD TO</label>
+                                <select onchange="moveHerdToBreak('${g.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
+                                    <option value="">(None)</option>
+                                    ${savedBreaks.map(b => `<option value="${b.id}">${b.name || b.paddock}</option>`).join('')}
+                                </select>
+                            </div>
+                            <button onclick="teleportHerdToBreak('${g.id}')" style="background:#8e44ad; color:white; border:none; padding:6px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer; align-self:flex-end;">TELEPORT</button>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -2089,11 +2100,61 @@
         let virtualCows = []; 
         let cowMarkers = {};
         
-        function addVirtualCow(herdId = null) {
-            const id = 'cow_' + Date.now() + Math.floor(Math.random()*1000);
-            const center = map.getCenter();
+        function initializeVirtualHerd() {
+            // Clear existing
+            Object.keys(cowMarkers).forEach(id => {
+                map.removeLayer(cowMarkers[id]);
+                delete cowMarkers[id];
+            });
+            virtualCows = [];
             
-            // Random offset from center to avoid overlap
+            const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+            
+            BREAK_GROUPS.forEach(herd => {
+                if (herd.id === 'all') return;
+                const count = parseInt(savedHerdCows[herd.id]) || 0;
+                
+                // Find a starting break for this herd to teleport to
+                const startingBreak = savedBreaks.find(b => b.groupId === herd.id);
+                let startPos = null;
+                
+                if (startingBreak && startingBreak.vertices && startingBreak.vertices.length > 2) {
+                    const polyCoords = startingBreak.vertices.map(v => [v.lng, v.lat]);
+                    polyCoords.push(polyCoords[0]);
+                    const center = turf.center(turf.polygon([polyCoords]));
+                    startPos = { lat: center.geometry.coordinates[1], lon: center.geometry.coordinates[0] };
+                } else {
+                    const center = map.getCenter();
+                    startPos = { lat: center.lat, lon: center.lng };
+                }
+
+                for (let i = 0; i < count; i++) {
+                    const id = 'cow_' + herd.id + '_' + i;
+                    // Random offset within ~20m of startPos
+                    const lat = startPos.lat + (Math.random() - 0.5) * 0.0003;
+                    const lon = startPos.lon + (Math.random() - 0.5) * 0.0003;
+                    
+                    virtualCows.push({
+                        id: id,
+                        lat: lat,
+                        lon: lon,
+                        heading: Math.random() * 360,
+                        moving: false,
+                        status: 'safe',
+                        speed: 0.0000008 + (Math.random() * 0.0000005),
+                        herdId: herd.id,
+                        targetBreakId: startingBreak ? startingBreak.id : null,
+                        mode: 'graze'
+                    });
+                }
+            });
+            
+            renderCowManager();
+        }
+
+        function addVirtualCow(herdId = null) {
+            const id = 'cow_manual_' + Date.now();
+            const center = map.getCenter();
             const lat = center.lat + (Math.random() - 0.5) * 0.0005;
             const lon = center.lng + (Math.random() - 0.5) * 0.0005;
             
@@ -2104,13 +2165,48 @@
                 heading: Math.random() * 360,
                 moving: false,
                 status: 'safe',
-                speed: 0.0000010 + (Math.random() * 0.0000006), // randomized speed
+                speed: 0.0000010 + (Math.random() * 0.0000006),
                 herdId: herdId || (BREAK_GROUPS.length > 1 ? BREAK_GROUPS[1].id : 'all'),
                 targetBreakId: null,
-                mode: 'graze' // 'graze' or 'move'
+                mode: 'graze'
             };
             
             virtualCows.push(newCow);
+            renderCowManager();
+        }
+
+        function moveHerdToBreak(herdId, breakId) {
+            virtualCows.forEach(cow => {
+                if (cow.herdId === herdId) {
+                    cow.targetBreakId = breakId || null;
+                    cow.mode = breakId ? 'move' : 'graze';
+                }
+            });
+            renderCowManager();
+        }
+
+        function teleportHerdToBreak(herdId, targetBreakId = null) {
+            const herdCows = virtualCows.filter(c => c.herdId === herdId);
+            if (herdCows.length === 0) return;
+            
+            const bId = targetBreakId || herdCows[0].targetBreakId;
+            const targetBreak = savedBreaks.find(b => b.id === bId);
+            
+            if (targetBreak && targetBreak.vertices && targetBreak.vertices.length > 2) {
+                const polyCoords = targetBreak.vertices.map(v => [v.lng, v.lat]);
+                polyCoords.push(polyCoords[0]);
+                const center = turf.center(turf.polygon([polyCoords]));
+                const lat = center.geometry.coordinates[1];
+                const lon = center.geometry.coordinates[0];
+                
+                herdCows.forEach(cow => {
+                    cow.lat = lat + (Math.random() - 0.5) * 0.0003;
+                    cow.lon = lon + (Math.random() - 0.5) * 0.0003;
+                    cow.targetBreakId = bId;
+                    cow.mode = 'graze';
+                    cow.status = 'safe';
+                });
+            }
             renderCowManager();
         }
 
@@ -2125,13 +2221,12 @@
 
         function toggleEmulator(on) {
             if (!on) {
-                // Remove all markers
                 Object.keys(cowMarkers).forEach(id => {
                     map.removeLayer(cowMarkers[id]);
                     delete cowMarkers[id];
                 });
             } else {
-                if (virtualCows.length === 0) addVirtualCow();
+                initializeVirtualHerd();
             }
         }
 
@@ -2310,7 +2405,7 @@
         // Initialize with one cow if emulator is on
         setTimeout(() => {
             if (document.getElementById('emulator-mode').checked && virtualCows.length === 0) {
-                addVirtualCow();
+                initializeVirtualHerd();
             }
         }, 2000);
 
