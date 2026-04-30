@@ -1364,7 +1364,7 @@
             <div id="debug-email" style="font-size:13px; color:#666; margin-bottom:10px; background:#f0f0f0; padding:5px; border-radius:4px; font-family:monospace;">Checking...</div>
             <p style="font-size:12px; margin-bottom: 10px;">If this is your first time, the Admin needs to approve your email.</p>
             <a href="#" id="request-access-btn" class="btn-request-access" target="_blank" style="margin-top:0;">Request Access</a>
-            <div style="margin-top:10px; font-size:10px; color:#999;">App Version: 1.0.19</div>
+            <div style="margin-top:10px; font-size:10px; color:#999;">App Version: 1.0.20</div>
         </div>
     </div>
 
@@ -6341,21 +6341,29 @@
         window.handleCredentialResponse = function (response) {
             let userEmail;
             
-            // If response is passed from Google Sign-In
             if (response && response.credential) {
                 const responsePayload = parseJwt(response.credential);
                 userEmail = responsePayload.email.toLowerCase();
             } else {
-                // If checking from localStorage auto-login
                 userEmail = (response || "").toLowerCase();
             }
 
             if (!userEmail) return;
 
-            const debugEl = document.getElementById('debug-email');
-            if (debugEl) debugEl.innerText = "Checking authorization...";
+            // 1. IMMEDIATE ADMIN BYPASS
+            if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+                localStorage.setItem('auth_email', userEmail);
+                localStorage.setItem('auth_name', "Admin");
+                document.getElementById('login-screen').style.display = 'none';
+                init();
+                loadBreaks();
+                return; // Stop here, no need to fetch CSV
+            }
 
-            // Fetch authorized list from config spreadsheet CSV
+            const debugEl = document.getElementById('debug-email');
+            if (debugEl) debugEl.innerHTML = `Verifying: <b>${userEmail}</b>...`;
+
+            // 2. FETCH AUTHORIZED LIST FOR OTHERS
             Papa.parse(AUTH_CSV_URL + "&t=" + Date.now(), {
                 download: true,
                 header: false,
@@ -6369,41 +6377,21 @@
                         });
                     }
 
-                    if (userEmail === ADMIN_EMAIL.toLowerCase() || authorizedMap.hasOwnProperty(userEmail)) {
-                        // Authorized! Keep email and name in local storage for next time
-                        const userName = authorizedMap[userEmail] || "Admin";
+                    if (authorizedMap.hasOwnProperty(userEmail)) {
+                        const userName = authorizedMap[userEmail];
                         localStorage.setItem('auth_email', userEmail);
                         localStorage.setItem('auth_name', userName);
-                        
                         document.getElementById('login-screen').style.display = 'none';
-                        
-                        // If Admin, show the "Invite Users" menu item
-                        if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-                            const adminMenu = document.getElementById('menu-item-admin');
-                            if (adminMenu) adminMenu.style.display = 'block';
-                        }
-                        
                         init();
                         loadBreaks();
                     } else {
-                        localStorage.removeItem('auth_email');
                         showUnauthorized(userEmail);
                     }
                 },
                 error: function(err) {
                     console.error("Auth fetch failed:", err);
-                    const debugEl = document.getElementById('debug-email');
-                    if (debugEl) debugEl.innerText = "Error: Could not reach authorization server. Check connection.";
-                    
-                    if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-                        localStorage.setItem('auth_email', userEmail);
-                        localStorage.setItem('auth_name', "Admin");
-                        document.getElementById('login-screen').style.display = 'none';
-                        init();
-                        loadBreaks();
-                    } else {
-                        showUnauthorized(userEmail, true);
-                    }
+                    if (debugEl) debugEl.innerText = "Connection error. Retry login.";
+                    showUnauthorized(userEmail, true);
                 }
             });
         };
