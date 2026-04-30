@@ -3854,6 +3854,25 @@
             
             let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
             
+            const nowTime = Date.now();
+            simPaddocks.forEach(p => {
+                const fwTs = p.latest.ts || 0;
+                const pNorm = normName(p.name);
+                const paddockBreaks = savedBreaks.filter(b => b.paddock && normName(b.paddock) === pNorm && b.createdAt);
+                
+                if (paddockBreaks.length > 0) {
+                    paddockBreaks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                    const latestBreak = paddockBreaks[0];
+                    const breakTs = new Date(latestBreak.createdAt).getTime();
+                    
+                    if (breakTs > fwTs) {
+                        const resUsed = (latestBreak.manualResidual > 0) ? latestBreak.manualResidual : targetRes;
+                        const daysSinceBreak = Math.max(0, (nowTime - breakTs) / 86400000);
+                        p.latest.cover = resUsed + (dailyGrowth * daysSinceBreak);
+                    }
+                }
+            });
+            
             for (let day = 0; day < daysAhead; day++) {
                 simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
                 simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
