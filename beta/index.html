@@ -1496,6 +1496,21 @@
                         <input type="number" id="inp-predict-intake" placeholder="Auto" oninput="updatePredictedWedge()">
                     </div>
                 </div>
+                
+                <div style="margin-bottom: 15px; padding: 15px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="font-weight: bold; color: var(--primary);">Dry Off Mode (Zero Pasture)</label>
+                        <label class="switch">
+                            <input type="checkbox" id="inp-dryoff-toggle" onchange="toggleDryOffMode(); updatePredictedWedge();">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div id="dryoff-container" style="display:none; flex-direction:column; gap:10px; margin-top:15px;">
+                        <div id="dryoff-list"></div>
+                        <button class="btn-save" onclick="addDryOffEntry()" style="background:var(--secondary); align-self:flex-start; font-size:0.9rem;">+ ADD DRY OFF EVENT</button>
+                    </div>
+                </div>
+
                 <div class="chart-box">
                     <canvas id="predictedWedgeChart"></canvas>
                 </div>
@@ -3854,6 +3869,27 @@
                 });
         }
 
+        function toggleDryOffMode() {
+            const isChecked = document.getElementById('inp-dryoff-toggle').checked;
+            document.getElementById('dryoff-container').style.display = isChecked ? 'flex' : 'none';
+        }
+        
+        function addDryOffEntry() {
+            const list = document.getElementById('dryoff-list');
+            const row = document.createElement('div');
+            row.className = 'dryoff-row';
+            row.style.display = 'flex';
+            row.style.gap = '10px';
+            row.style.marginBottom = '5px';
+            row.style.alignItems = 'center';
+            row.innerHTML = `
+                <input type="date" class="dryoff-date" style="flex:1; padding:5px; border-radius:4px; border:1px solid #ccc;" onchange="updatePredictedWedge()">
+                <input type="number" class="dryoff-cows" placeholder="Cows dried off" style="flex:1; padding:5px; border-radius:4px; border:1px solid #ccc;" onchange="updatePredictedWedge()">
+                <button onclick="this.parentElement.remove(); updatePredictedWedge();" style="background:#ff4444; color:white; border:none; border-radius:4px; padding:5px 10px; cursor:pointer;">X</button>
+            `;
+            list.appendChild(row);
+        }
+
         function updatePredictedWedge() {
             if (currentDashboardMode !== 'feed' || !manualModeData) return;
             
@@ -3900,33 +3936,74 @@
             
 
 
+            const isDryOffMode = document.getElementById('inp-dryoff-toggle').checked;
+            const dryOffEvents = [];
+            if (isDryOffMode) {
+                document.querySelectorAll('.dryoff-row').forEach(row => {
+                    const dStr = row.querySelector('.dryoff-date').value;
+                    const cNum = parseInt(row.querySelector('.dryoff-cows').value) || 0;
+                    if (dStr && cNum > 0) {
+                        const ts = new Date(dStr).getTime();
+                        if (!isNaN(ts)) dryOffEvents.push({ ts, cows: cNum });
+                    }
+                });
+                dryOffEvents.sort((a, b) => a.ts - b.ts);
+            }
+
             for (let day = 0; day < daysAhead; day++) {
                 simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
                 simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+                
+                let currentDayTs = nowTime + (day * 86400000);
+                let currentCows = cows;
+                if (isDryOffMode) {
+                    dryOffEvents.forEach(ev => {
+                        if (ev.ts <= currentDayTs) currentCows = Math.max(0, currentCows - ev.cows);
+                    });
+                }
+                let currentDailyDemandKg = currentCows * intake;
+                
                 let areaRemaining = areaPerDayHa;
+                let demandRemaining = currentDailyDemandKg;
                 
                 for (let i = 0; i < simPaddocks.length; i++) {
                     if (areaRemaining <= 0) break;
                     const p = simPaddocks[i];
                     if (p.latest.cover <= targetRes) continue;
                     
-                    if (p.area <= areaRemaining) {
-                        areaRemaining -= p.area;
-                        p.latest.cover = targetRes;
+                    const fractionArea = Math.min(1, areaRemaining / p.area);
+                    areaRemaining -= (fractionArea * p.area);
+                    
+                    const availableKgInFraction = (p.latest.cover - targetRes) * (fractionArea * p.area);
+                    
+                    if (demandRemaining >= availableKgInFraction) {
+                        demandRemaining -= availableKgInFraction;
+                        p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (targetRes * fractionArea);
                     } else {
-                        const fraction = areaRemaining / p.area;
-                        p.latest.cover = (p.latest.cover * (1 - fraction)) + (targetRes * fraction);
-                        areaRemaining = 0;
+                        const coverDropInFraction = demandRemaining / (fractionArea * p.area);
+                        const grazedCover = p.latest.cover - coverDropInFraction;
+                        p.latest.cover = (p.latest.cover * (1 - fractionArea)) + (grazedCover * fractionArea);
+                        demandRemaining = 0;
                     }
                 }
             }
+            
+            let finalCows = cows;
+            const simEndTime = nowTime + (daysAhead * 86400000);
+            if (isDryOffMode) {
+                dryOffEvents.forEach(ev => {
+                    if (ev.ts <= simEndTime) finalCows = Math.max(0, finalCows - ev.cows);
+                });
+            }
+            const finalDailyDemandKg = finalCows * intake;
+            const finalTargetPre = (finalDailyDemandKg / areaPerDayHa) + targetRes;
             
             const finalTotalCover = simPaddocks.reduce((sum, p) => sum + (p.latest.cover * p.area), 0);
             const expectedApc = totalAreaHa > 0 ? (finalTotalCover / totalAreaHa) : 0;
             const apcEl = document.getElementById('predict-apc');
             if (apcEl) apcEl.innerText = Math.round(expectedApc).toLocaleString();
 
-            renderPredictedWedge(simPaddocks, targetPre, targetRes);
+            renderPredictedWedge(simPaddocks, finalTargetPre, targetRes);
         }
 
         function renderPredictedWedge(simPaddocks, targetPre, targetRes) {
