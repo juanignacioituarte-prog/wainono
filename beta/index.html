@@ -2112,10 +2112,7 @@
             
             BREAK_GROUPS.forEach(herd => {
                 if (herd.id === 'all') return;
-                let count = parseInt(savedHerdCows[herd.id]) || 0;
-                
-                // PERFORMANCE: Cap simulated cows to avoid lag
-                if (count > 50) count = 50; 
+                const count = parseInt(savedHerdCows[herd.id]) || 0;
                 
                 // Find a starting break for this herd to teleport to
                 const startingBreak = savedBreaks.find(b => b.groupId === herd.id);
@@ -2302,10 +2299,14 @@
                     cow.status = 'safe';
                 }
 
-                    cow.status = 'safe';
-                }
-
-                // Social distancing removed for performance (was O(N^2))
+                // Apply Herding Social Distance (avoid bunching)
+                virtualCows.forEach(other => {
+                    if (other.id === cow.id) return;
+                    const d = Math.sqrt(Math.pow(cow.lat - other.lat, 2) + Math.pow(cow.lon - other.lon, 2));
+                    if (d < 0.00005) { // Very close
+                        cow.heading += 5; // Steer away
+                    }
+                });
 
                 // Execute Step
                 if (cow.moving) {
@@ -2320,46 +2321,25 @@
         }
 
         function updateCowMarker(cow) {
-            let statusClass = cow.status;
-            if (cow.status.startsWith('warning')) statusClass = 'warning';
+            let className = cow.status;
+            if (cow.status.startsWith('warning')) className = 'warning';
             
+            // Get herd color
+            const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || BREAK_GROUPS[0];
+            const color = herd.color || '#8e44ad';
+
+            const htmlContent = `<div class="cow-marker ${className}" style="transform: rotate(${cow.heading}deg); background-color: ${color}; width:16px; height:16px;">
+                                   <div class="cow-head" style="left:3px; width:4px;"></div>
+                               </div>`;
+                               
             if (!cowMarkers[cow.id]) {
-                const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || BREAK_GROUPS[0];
-                const color = herd.color || '#8e44ad';
-                const htmlContent = `<div id="marker-inner-${cow.id}" class="cow-marker ${statusClass}" style="transform: rotate(${cow.heading}deg); background-color: ${color}; width:16px; height:16px;">
-                                       <div class="cow-head" style="left:3px; width:4px;"></div>
-                                   </div>`;
-                
                 cowMarkers[cow.id] = L.marker([cow.lat, cow.lon], {
                     icon: L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [16, 16], iconAnchor: [8, 8] }),
                     zIndexOffset: 10000
                 }).addTo(map);
-                cow.lastLat = cow.lat;
-                cow.lastLon = cow.lon;
-                cow.lastHeading = cow.heading;
-                cow.lastStatus = statusClass;
             } else {
-                const marker = cowMarkers[cow.id];
-                const distSq = Math.pow(cow.lat - cow.lastLat, 2) + Math.pow(cow.lon - cow.lastLon, 2);
-                
-                // Only update position if moved significantly or status changed
-                if (distSq > 0.0000000001 || statusClass !== cow.lastStatus || Math.abs(cow.heading - cow.lastHeading) > 2) {
-                    marker.setLatLng([cow.lat, cow.lon]);
-                    
-                    const inner = document.getElementById(`marker-inner-${cow.id}`);
-                    if (inner) {
-                        if (statusClass !== cow.lastStatus) {
-                            inner.classList.remove('safe', 'warning', 'shocking');
-                            inner.classList.add(statusClass);
-                        }
-                        inner.style.transform = `rotate(${cow.heading}deg)`;
-                    }
-                    
-                    cow.lastLat = cow.lat;
-                    cow.lastLon = cow.lon;
-                    cow.lastHeading = cow.heading;
-                    cow.lastStatus = statusClass;
-                }
+                cowMarkers[cow.id] = cowMarkers[cow.id].setLatLng([cow.lat, cow.lon]);
+                cowMarkers[cow.id].setIcon(L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [16, 16], iconAnchor: [8, 8] }));
             }
         }
 
@@ -6265,18 +6245,6 @@
 
             if (!userEmail) return;
 
-            // Admin gets in immediately — no CSV check needed
-            if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-                localStorage.setItem('auth_email', userEmail);
-                localStorage.setItem('auth_name', "Admin");
-                document.getElementById('login-screen').style.display = 'none';
-                const adminMenu = document.getElementById('menu-item-admin');
-                if (adminMenu) adminMenu.style.display = 'block';
-                init();
-                loadBreaks();
-                return;
-            }
-
             document.getElementById('debug-email').innerText = "Checking authorization...";
 
             // Fetch authorized list from config spreadsheet CSV
@@ -6337,6 +6305,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             const savedEmail = localStorage.getItem('auth_email');
             if (savedEmail) {
+                // Skips Google prompt, attempts authentication silently
                 handleCredentialResponse(savedEmail);
             }
         });
