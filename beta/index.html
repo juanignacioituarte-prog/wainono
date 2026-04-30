@@ -3922,23 +3922,39 @@
                 const pNorm = normName(p.name);
                 const paddockBreaks = savedBreaks.filter(b => b.paddock && normName(b.paddock) === pNorm && b.createdAt);
                 
-                let wasGrazedSinceFW = false;
-                if (paddockBreaks.length > 0) {
-                    paddockBreaks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-                    const latestBreak = paddockBreaks[0];
-                    const breakTs = new Date(latestBreak.createdAt).getTime();
-                    
-                    if (breakTs > fwTs) {
-                        const resUsed = (latestBreak.manualResidual > 0) ? latestBreak.manualResidual : targetRes;
-                        const daysSinceBreak = Math.max(0, (nowTime - breakTs) / 86400000);
-                        p.latest.cover = resUsed + (dailyGrowth * daysSinceBreak);
-                        wasGrazedSinceFW = true;
-                    }
+                let sumGrazedArea = 0;
+                let sumGrazedCover = 0;
+                
+                if (paddockBreaks.length > 0 && fwTs > 0) {
+                    const recentBreaks = paddockBreaks.filter(b => new Date(b.createdAt).getTime() > fwTs);
+                    recentBreaks.forEach(b => {
+                        const bArea = Number(b.areaHa) || 0;
+                        if (bArea > 0) {
+                            const bTs = new Date(b.createdAt).getTime();
+                            const bRes = (b.manualResidual > 0) ? b.manualResidual : targetRes;
+                            const daysSinceBreak = Math.max(0, (nowTime - bTs) / 86400000);
+                            const bCoverToday = bRes + (dailyGrowth * daysSinceBreak);
+                            
+                            sumGrazedArea += bArea;
+                            sumGrazedCover += (bCoverToday * bArea);
+                        }
+                    });
                 }
                 
-                if (!wasGrazedSinceFW && fwTs > 0) {
+                if (sumGrazedArea > p.area) sumGrazedArea = p.area;
+                
+                const ungrazedArea = Math.max(0, p.area - sumGrazedArea);
+                let ungrazedCoverToday = p.latest.cover;
+                
+                if (fwTs > 0) {
                     const daysSinceFW = Math.max(0, (nowTime - fwTs) / 86400000);
-                    p.latest.cover += (dailyGrowth * daysSinceFW);
+                    ungrazedCoverToday += (dailyGrowth * Math.round(daysSinceFW)); // Use Math.round to match whole days for growth rate expectation
+                }
+                
+                if (p.area > 0) {
+                    p.latest.cover = (sumGrazedCover + (ungrazedCoverToday * ungrazedArea)) / p.area;
+                } else {
+                    p.latest.cover = ungrazedCoverToday;
                 }
             });
             
