@@ -1352,7 +1352,7 @@
 
     <div id="login-screen">
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
-        <h2>­ƒƒ¬ River Terrace Beta Emulator</h2>
+        <h2>🐄 River Terrace Beta Emulator</h2>
         <div id="g_id_onload" data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
             data-callback="handleCredentialResponse" data-auto_prompt="false">
         </div>
@@ -1378,7 +1378,7 @@
                 <line x1="65" y1="50" x2="100" y2="50" />
             </svg>
         </div>
-        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">­ƒôì</button>
+        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">📍</button>
         <div class="map-controls">
             <div id="latest-date" class="date-label">LATEST DATA: --</div>
             <div id="sat-layer-controls" class="layer-group">
@@ -1389,7 +1389,7 @@
             <div id="legend" class="legend-box">
                 <div class="legend-header" onclick="toggleLegend()">
                     <span>COVER SCALE (kgDM/ha)</span>
-                    <span id="legend-toggle-icon">Ôû╝</span>
+                    <span id="legend-toggle-icon">▼</span>
                 </div>
                 <div id="legend-content" class="legend-content">
                     <div class="legend-item">
@@ -1576,7 +1576,7 @@
                     <div style="flex:1;"></div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kg</div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: var(--warning); margin-left:15px;">Expected Supp: <span id="predict-supp">0.0</span> kg/cow</div>
-                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">­ƒîñ´©Å OPTIMIZE FROM WEATHER</button>
+                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
                 </div>
                 <div class="calc-grid" style="margin-bottom:15px;">
                     <div class="input-group">
@@ -1627,11 +1627,11 @@
     </div>
 
     <div id="sidebar">
-        <button class="minimize-btn" onclick="toggleSidebar()">ÔùÇ</button>
+        <button class="minimize-btn" onclick="toggleSidebar()">≡</button>
         <div id="sidebar-content" style="display:flex; flex-direction:column; height:100%; width:100%;">
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <button class="btn-dots" onclick="toggleSettingsMenu()">Ôï«</button>
+                <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
@@ -1647,13 +1647,11 @@
                     <button id="btn-mode-breaks" class="mode-btn"
                         onclick="switchDashboardMode('breaks')">BREAKS</button>
                 </div>
-                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">Ôû╝</button>
+                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">▼</button>
             </div>
 
             <div id="header-details" class="header-collapsible">
-                <div id="fallback-warning" class="fallback-alert" style="display:none;">ÔÜá´©Å RECENT DATA LOW (UNDER
-                    0.3) -
-                    SHOWING PREVIOUS DATE</div>
+                <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
 
                 <div id="calibration-box" class="calib-box" style="display:none;">
                     <div class="calib-row" id="calib-hover-area">
@@ -2221,7 +2219,7 @@
                 return `
                     <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                            <b style="color:${herd.color}">ÔùÅ COW #${cow.id.slice(-4)}</b>
+                            <b style="color:${herd.color}">● COW #${cow.id.slice(-4)}</b>
                             <span style="color:${statusColor}; font-weight:800; font-size:9px;">${cow.status.toUpperCase()}</span>
                         </div>
                         
