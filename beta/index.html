@@ -1478,8 +1478,12 @@
                         <input type="number" id="inp-predict-days" value="14" oninput="updatePredictedWedge()">
                     </div>
                     <div class="input-group">
-                        <label>Expected Growth Rate (kgDM/ha/day)</label>
+                        <label>Expected Growth (kgDM/ha/day)</label>
                         <input type="number" id="inp-predict-growth" value="35" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Simulated Rotation (Days)</label>
+                        <input type="number" id="inp-predict-rotation" value="30" oninput="updatePredictedWedge()">
                     </div>
                 </div>
                 <div class="chart-box">
@@ -3845,12 +3849,21 @@
             
             const daysAhead = parseInt(document.getElementById('inp-predict-days').value) || 14;
             const dailyGrowth = parseFloat(document.getElementById('inp-predict-growth').value) || 0;
-            const rotationDays = parseInt(document.getElementById('inp-rotation').value) || 30;
+            
+            const simRotInput = document.getElementById('inp-predict-rotation');
+            const rotationDays = (simRotInput && simRotInput.value !== "") ? parseInt(simRotInput.value) : (parseInt(document.getElementById('inp-rotation').value) || 30);
+            
             const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
-            const targetPreText = document.getElementById('res-target-pre').innerText || "3000";
-            const targetPre = parseFloat(targetPreText.replace(/,/g, '')) || 3000;
+            
+            const cows = parseInt(document.getElementById('inp-cows').value) || 0;
+            const intake = parseFloat(document.getElementById('inp-intake').value) || 18;
+            const dailyDemandKg = cows * intake;
             
             let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
+            
+            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
+            const areaPerDayHa = totalAreaHa / (rotationDays || 1);
+            const targetPre = (dailyDemandKg / areaPerDayHa) + targetRes;
             
             const nowTime = Date.now();
             simPaddocks.forEach(p => {
@@ -3871,8 +3884,7 @@
                 }
             });
             
-            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
-            const areaPerDayHa = totalAreaHa / (rotationDays || 1);
+
 
             for (let day = 0; day < daysAhead; day++) {
                 simPaddocks.forEach(p => p.latest.cover += dailyGrowth);
