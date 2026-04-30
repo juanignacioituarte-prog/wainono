@@ -2334,6 +2334,13 @@
                     icon: L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [16, 16], iconAnchor: [8, 8] }),
                     zIndexOffset: 10000
                 }).addTo(map);
+                
+                // Add click listener for Cow Card
+                cowMarkers[cow.id].on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    openCowCard(cow.id);
+                });
+                
                 cow.lastLat = cow.lat;
                 cow.lastLon = cow.lon;
                 cow.lastHeading = cow.heading;
@@ -2399,13 +2406,13 @@
                 const targetId = group.cows[0].targetBreakId;
 
                 return `
-                    <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.05); cursor:pointer;" onclick="openCowCard('${group.cows[0].id}')">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                             <b style="color:${herd.color}; font-size:12px;">● ${herd.name.toUpperCase()} (${group.cows.length})</b>
                             <span style="color:${statusColor}; font-weight:800; font-size:10px;">${statusText}</span>
                         </div>
                         
-                        <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; margin-bottom:8px;">
+                        <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; margin-bottom:8px;" onclick="event.stopPropagation()">
                             <select onchange="moveHerdToBreak('${herdId}', this.value)" style="width:100%; font-size:11px; padding:4px; border:1px solid #ddd; border-radius:4px;">
                                 <option value="">MOVE HERD TO...</option>
                                 ${savedBreaks.map(b => `<option value="${b.id}" ${targetId === b.id ? 'selected' : ''}>${b.name || b.paddock}</option>`).join('')}
@@ -2413,7 +2420,7 @@
                             <button onclick="teleportHerdToBreak('${herdId}')" style="background:#8e44ad; color:white; border:none; padding:5px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;" title="Instant Teleport">TELEPORT</button>
                         </div>
                         
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#bbb;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#bbb;" onclick="event.stopPropagation()">
                             <span>Mode: ${group.cows[0].mode.toUpperCase()}</span>
                             <button onclick="deleteHerdCows('${herdId}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px; opacity:0.6;">Clear Cows</button>
                         </div>
@@ -2448,6 +2455,60 @@
             renderCowManager();
         };
 
+        let currentCardCowId = null;
+        window.openCowCard = function(cowId) {
+            const cow = virtualCows.find(c => c.id === cowId);
+            if (!cow) return;
+            currentCardCowId = cowId;
+            
+            const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || { name: 'Unknown', color: '#777' };
+            
+            document.getElementById('cow-card-title').innerText = `Cow #${cowId.split('_').pop()}`;
+            document.getElementById('cow-card-herd').innerText = herd.name;
+            document.getElementById('cow-card-herd').style.color = herd.color;
+            
+            // Mock data
+            document.getElementById('cow-card-birthid').innerText = `RT-${2023 + Math.floor(Math.random()*2)}-${100 + Math.floor(Math.random()*800)}`;
+            document.getElementById('cow-card-eid').innerText = `982 000123${cowId.split('_').pop().padStart(3, '0')}`;
+            
+            const batt = 40 + Math.floor(Math.random()*60);
+            const battEl = document.getElementById('cow-card-battery');
+            battEl.innerText = `${batt}%`;
+            battEl.style.color = batt < 20 ? '#e74c3c' : (batt < 50 ? '#f39c12' : '#27ae60');
+            
+            document.getElementById('cow-card-solar').innerText = `${(1.5 + Math.random()*2).toFixed(1)}V`;
+            
+            // Population Herd Selector
+            const select = document.getElementById('cow-card-herd-select');
+            if (select) {
+                select.innerHTML = BREAK_GROUPS.map(g => `<option value="${g.id}" ${cow.herdId === g.id ? 'selected' : ''}>${g.name}</option>`).join('');
+            }
+            
+            document.getElementById('cow-card-modal').style.display = 'flex';
+        };
+
+        window.updateCowCardHerd = function(herdId) {
+            if (!currentCardCowId) return;
+            const cow = virtualCows.find(c => c.id === currentCardCowId);
+            if (cow) {
+                cow.herdId = herdId;
+                // If the herd has an active break, move cow to it
+                const targetBreak = savedBreaks.find(b => b.groupId === herdId);
+                cow.targetBreakId = targetBreak ? targetBreak.id : null;
+                cow.mode = targetBreak ? 'move' : 'graze';
+                
+                // Refresh card UI
+                const herd = BREAK_GROUPS.find(g => g.id === herdId);
+                const herdEl = document.getElementById('cow-card-herd');
+                if (herdEl) {
+                    herdEl.innerText = herd.name;
+                    herdEl.style.color = herd.color;
+                }
+                
+                renderCowManager();
+            }
+        };
+
         // Initialize with one cow if emulator is on
         setTimeout(() => {
             if (document.getElementById('emulator-mode').checked && virtualCows.length === 0) {
@@ -2464,11 +2525,11 @@
             const isMinimized = sidebar.classList.contains('minimized');
             
             if (window.innerWidth > 768) {
-                btn.innerHTML = isMinimized ? 'ÔûÂ' : 'ÔùÇ';
+                btn.innerHTML = isMinimized ? '▶' : '◀';
                 sidebar.style.width = isMinimized ? '40px' : '380px';
                 sidebar.style.height = '100%';
             } else {
-                btn.innerHTML = isMinimized ? 'Ôû▓' : 'Ôû╝';
+                btn.innerHTML = isMinimized ? '▲' : '▼';
                 const sideH = isMinimized ? '0px' : '55vh';
                 sidebar.style.height = sideH;
                 document.documentElement.style.setProperty('--sidebar-h', sideH);
@@ -2486,7 +2547,7 @@
             const content = document.getElementById('legend-content');
             const icon = document.getElementById('legend-toggle-icon');
             const isCollapsed = content.classList.toggle('collapsed');
-            icon.textContent = isCollapsed ? 'ÔûÂ' : 'Ôû╝';
+            icon.textContent = isCollapsed ? '▲' : '▼';
         }
 
         // Auto-collapse header and legend on mobile
@@ -6286,12 +6347,13 @@
                 userEmail = responsePayload.email.toLowerCase();
             } else {
                 // If checking from localStorage auto-login
-                userEmail = response;
+                userEmail = (response || "").toLowerCase();
             }
 
             if (!userEmail) return;
 
-            document.getElementById('debug-email').innerText = "Checking authorization...";
+            const debugEl = document.getElementById('debug-email');
+            if (debugEl) debugEl.innerText = "Checking authorization...";
 
             // Fetch authorized list from config spreadsheet CSV
             Papa.parse(AUTH_CSV_URL + "&t=" + Date.now(), {
@@ -6299,15 +6361,17 @@
                 header: false,
                 complete: function(results) {
                     const authorizedMap = {};
-                    results.data.forEach(row => {
-                        const email = (row[0] || "").trim().toLowerCase();
-                        const name = (row[1] || "Unknown User").trim();
-                        if (email) authorizedMap[email] = name;
-                    });
+                    if (results && results.data) {
+                        results.data.forEach(row => {
+                            const email = (row[0] || "").trim().toLowerCase();
+                            const name = (row[1] || "Unknown User").trim();
+                            if (email) authorizedMap[email] = name;
+                        });
+                    }
 
                     if (userEmail === ADMIN_EMAIL.toLowerCase() || authorizedMap.hasOwnProperty(userEmail)) {
                         // Authorized! Keep email and name in local storage for next time
-                        const userName = authorizedMap[userEmail] || "Admin"; // Fallback to Admin if admin email
+                        const userName = authorizedMap[userEmail] || "Admin";
                         localStorage.setItem('auth_email', userEmail);
                         localStorage.setItem('auth_name', userName);
                         
@@ -6322,7 +6386,6 @@
                         init();
                         loadBreaks();
                     } else {
-                        // If they failed authorization, make sure they are signed out locally
                         localStorage.removeItem('auth_email');
                         showUnauthorized(userEmail);
                     }
@@ -6330,17 +6393,13 @@
                 error: function(err) {
                     console.error("Auth fetch failed:", err);
                     if (userEmail === ADMIN_EMAIL.toLowerCase()) {
-                         // Always fallback to allow admin even if CSV fails
                         localStorage.setItem('auth_email', userEmail);
                         localStorage.setItem('auth_name', "Admin");
                         document.getElementById('login-screen').style.display = 'none';
-                        const adminMenu = document.getElementById('menu-item-admin');
-                        if (adminMenu) adminMenu.style.display = 'block';
                         init();
                         loadBreaks();
                     } else {
                         localStorage.removeItem('auth_email');
-                        localStorage.removeItem('auth_name');
                         showUnauthorized(userEmail);
                     }
                 }
@@ -6423,18 +6482,18 @@
         }
     </script>
 
-    <!-- Break Drawing Toolbar (Moved Outside Map for Z-Index Stability) -->
+    <!-- Break Drawing Toolbar -->
     <div id="break-toolbar" class="break-toolbar" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
         <div class="toolbar-toggles">
-            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> ­ƒÄ» Use Crosshair</label>
-            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> ­ƒöÆ Lock Points</label>
+            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> 🎯 Use Crosshair</label>
+            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> 🔒 Lock Points</label>
         </div>
         <button class="btn-drop" id="btn-drop-point" onclick="event.stopPropagation(); addPointFromCrosshair()">DROP POINT</button>
         <span class="vertex-count" id="vertex-count">0 points</span>
-        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">Ôå® Undo</button>
-        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">Ô¼í Follow Contour</button>
-        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>Ô£ô Finish</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">Ô£ò Cancel</button>
+        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">↶ Undo</button>
+        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">📐 Follow Contour</button>
+        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>✔ Finish</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">✖ Cancel</button>
     </div>
 
     <!-- Break Edit Toolbar -->
@@ -6447,9 +6506,73 @@
             <option value="pennos">Pennos</option>
             <option value="crops">Crops</option>
         </select>
-        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>Ô£ò Delete Point</button>
-        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">Ô£ô Done</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">Ô£ò Cancel</button>
+        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>✖ Delete Point</button>
+        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">✔ Done</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">✖ Cancel</button>
+    </div>
+
+    <!-- Individual Cow Card Modal -->
+    <div id="cow-card-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:20000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:20px; border-radius:15px; width:90%; max-width:350px; box-shadow:0 10px 30px rgba(0,0,0,0.5); position:relative; overflow-y:auto; max-height:90vh;">
+            <button onclick="document.getElementById('cow-card-modal').style.display='none'" style="position:absolute; top:10px; right:10px; background:none; border:none; font-size:20px; cursor:pointer; color:#999;">✖</button>
+            
+            <div style="text-align:center; margin-bottom:20px;">
+                <div id="cow-card-icon" style="font-size:50px; margin-bottom:10px;">🐄</div>
+                <h2 id="cow-card-title" style="margin:0; color:#2c3e50;">Cow #1234</h2>
+                <div id="cow-card-herd" style="font-size:12px; font-weight:bold; text-transform:uppercase; margin-top:5px;">1st Herd</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+                <div style="background:#f9f9f9; padding:10px; border-radius:8px;">
+                    <small style="color:#999; display:block; font-size:9px;">BIRTH ID</small>
+                    <span id="cow-card-birthid" style="font-weight:bold; font-size:13px;">RT-2024-99</span>
+                </div>
+                <div style="background:#f9f9f9; padding:10px; border-radius:8px;">
+                    <small style="color:#999; display:block; font-size:9px;">EID (RFID)</small>
+                    <span id="cow-card-eid" style="font-weight:bold; font-size:13px;">982 000123...</span>
+                </div>
+            </div>
+
+            <div style="background:#f9f9f9; padding:15px; border-radius:10px; margin-bottom:20px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                    <div>
+                        <small style="color:#999; display:block; font-size:9px;">BATTERY LEVEL</small>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <span id="cow-card-battery" style="font-weight:bold; font-size:16px; color:#27ae60;">88%</span>
+                            <span style="font-size:14px;">🔋</span>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <small style="color:#999; display:block; font-size:9px;">SOLAR CHARGE</small>
+                        <div style="display:flex; align-items:center; gap:5px; justify-content:flex-end;">
+                            <span id="cow-card-solar" style="font-weight:bold; font-size:16px; color:#f1c40f;">2.4V</span>
+                            <span style="font-size:14px;">☀️</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="border-top:1px solid #eee; padding-top:12px;">
+                    <small style="color:#999; display:block; font-size:9px; margin-bottom:5px;">ACTIVITY & RUMINATION (Last 24h)</small>
+                    <div style="height:60px; background:#fff; border:1px solid #eee; border-radius:4px; display:flex; align-items:flex-end; gap:2px; padding:4px;">
+                        <!-- Mock graph bars -->
+                        ${Array(24).fill(0).map(() => `<div style="flex:1; background:#3498db; height:${20 + Math.random()*70}%; border-radius:1px;"></div>`).join('')}
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:9px; color:#bbb; margin-top:4px;">
+                        <span>24h ago</span>
+                        <span>Rumination: 480 min/day</span>
+                        <span>Now</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label style="font-size:11px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">CHANGE HERD ASSIGNMENT</label>
+                <select id="cow-card-herd-select" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:13px;" onchange="updateCowCardHerd(this.value)">
+                    <!-- Options populated via JS -->
+                </select>
+            </div>
+
+            <button onclick="document.getElementById('cow-card-modal').style.display='none'" style="width:100%; padding:12px; background:#2ecc71; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">DONE</button>
+        </div>
     </div>
 
 </body>
