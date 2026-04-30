@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -1352,7 +1352,7 @@
 
     <div id="login-screen">
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
-        <h2>🐄 River Terrace Beta Emulator</h2>
+        <h2>ðŸ„ River Terrace Beta Emulator</h2>
         <div id="g_id_onload" data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
             data-callback="handleCredentialResponse" data-auto_prompt="false">
         </div>
@@ -1378,7 +1378,7 @@
                 <line x1="65" y1="50" x2="100" y2="50" />
             </svg>
         </div>
-        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">📍</button>
+        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">ðŸ“</button>
         <div class="map-controls">
             <div id="latest-date" class="date-label">LATEST DATA: --</div>
             <div id="sat-layer-controls" class="layer-group">
@@ -1389,7 +1389,7 @@
             <div id="legend" class="legend-box">
                 <div class="legend-header" onclick="toggleLegend()">
                     <span>COVER SCALE (kgDM/ha)</span>
-                    <span id="legend-toggle-icon">▼</span>
+                    <span id="legend-toggle-icon">â–¼</span>
                 </div>
                 <div id="legend-content" class="legend-content">
                     <div class="legend-item">
@@ -1547,7 +1547,7 @@
                     </div>
                     <div class="result-highlight">
                         <h3 id="res-area-cow">0</h3>
-                        <small>Area per Cow (m┬▓/day)</small>
+                        <small>Area per Cow (mâ”¬â–“/day)</small>
                     </div>
                 </div>
             </div>
@@ -1576,7 +1576,7 @@
                     <div style="flex:1;"></div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kg</div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: var(--warning); margin-left:15px;">Expected Supp: <span id="predict-supp">0.0</span> kg/cow</div>
-                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
+                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">ðŸŒ¤ï¸ OPTIMIZE FROM WEATHER</button>
                 </div>
                 <div class="calc-grid" style="margin-bottom:15px;">
                     <div class="input-group">
@@ -1627,11 +1627,11 @@
     </div>
 
     <div id="sidebar">
-        <button class="minimize-btn" onclick="toggleSidebar()">≡</button>
+        <button class="minimize-btn" onclick="toggleSidebar()">â‰¡</button>
         <div id="sidebar-content" style="display:flex; flex-direction:column; height:100%; width:100%;">
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
+                <button class="btn-dots" onclick="toggleSettingsMenu()">â‹®</button>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('herd_management'); toggleSettingsMenu();">Manage Herds</div>
@@ -1648,11 +1648,11 @@
                     <button id="btn-mode-breaks" class="mode-btn"
                         onclick="switchDashboardMode('breaks')">BREAKS</button>
                 </div>
-                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">▼</button>
+                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">â–¼</button>
             </div>
 
             <div id="header-details" class="header-collapsible">
-                <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
+                <div id="fallback-warning" class="fallback-alert" style="display:none;">âš ï¸ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
 
                 <div id="calibration-box" class="calib-box" style="display:none;">
                     <div class="calib-row" id="calib-hover-area">
@@ -1932,7 +1932,7 @@
                             <input type="text" value="${g.name}" 
                                 onchange="updateCustomHerd('${g.id}', 'name', this.value); renderHerdManagement();"
                                 style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px; font-weight:bold; font-size:14px; color:var(--text);">
-                            <button onclick="deleteCustomHerd('${g.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:18px;">🗑️</button>
+                            <button onclick="deleteCustomHerd('${g.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:18px;">ðŸ—‘ï¸</button>
                         </div>
                         
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
@@ -2438,7 +2438,7 @@
                 return `
                     <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <b style="color:${herd.color}; font-size:12px;">● ${herd.name.toUpperCase()} (${group.cows.length})</b>
+                            <b style="color:${herd.color}; font-size:12px;">â— ${herd.name.toUpperCase()} (${group.cows.length})</b>
                             <span style="color:${statusColor}; font-weight:800; font-size:10px;">${statusText}</span>
                         </div>
                         
@@ -2487,11 +2487,11 @@
             const isMinimized = sidebar.classList.contains('minimized');
             
             if (window.innerWidth > 768) {
-                btn.innerHTML = isMinimized ? '▶' : '◀';
+                btn.innerHTML = isMinimized ? 'â–¶' : 'â—€';
                 sidebar.style.width = isMinimized ? '40px' : '380px';
                 sidebar.style.height = '100%';
             } else {
-                btn.innerHTML = isMinimized ? '▲' : '▼';
+                btn.innerHTML = isMinimized ? 'â–²' : 'â–¼';
                 const sideH = isMinimized ? '0px' : '55vh';
                 sidebar.style.height = sideH;
                 document.documentElement.style.setProperty('--sidebar-h', sideH);
@@ -2509,7 +2509,7 @@
             const content = document.getElementById('legend-content');
             const icon = document.getElementById('legend-toggle-icon');
             const isCollapsed = content.classList.toggle('collapsed');
-            icon.textContent = isCollapsed ? '▲' : '▼';
+            icon.textContent = isCollapsed ? 'â–²' : 'â–¼';
         }
 
         // Auto-collapse header and legend on mobile
@@ -2524,7 +2524,7 @@
                 const legendContent = document.getElementById('legend-content');
                 const legendIcon = document.getElementById('legend-toggle-icon');
                 if (legendContent) legendContent.classList.add('collapsed');
-                if (legendIcon) legendIcon.textContent = 'ÔûÂ';
+                if (legendIcon) legendIcon.textContent = 'Ã”Ã»Ã‚';
             }, 500);
         }
 
@@ -2935,7 +2935,7 @@
                                     <label style="font-size:9px; color:#95a5a6; font-weight:bold; text-transform:uppercase;">Cows</label>
                                     <input type="number" id="herd-cows-${g.id}" value="${val}" style="width:50px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-weight:bold;" oninput="saveAndRecalc()">
                                 </div>
-                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">├ù</button>
+                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">â”œÃ¹</button>
                             </div>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; align-items:center; background:#f9f9f9; padding:8px; border-radius:6px;">
@@ -3420,10 +3420,10 @@
             pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
             
             const equationHtml = calibrationModel.type === 'exponential' 
-                ? `cover = ${Math.round(calibrationModel.A)}├ùexp(${calibrationModel.B.toFixed(2)}├ùndvi)` 
-                : `cover = ${calibrationModel.a.toFixed(2)}├ùraw + ${Math.round(calibrationModel.b)}`;
+                ? `cover = ${Math.round(calibrationModel.A)}â”œÃ¹exp(${calibrationModel.B.toFixed(2)}â”œÃ¹ndvi)` 
+                : `cover = ${calibrationModel.a.toFixed(2)}â”œÃ¹raw + ${Math.round(calibrationModel.b)}`;
                 
-            text.innerHTML = `<div><b style="color:#2c3e50;">R┬▓</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
+            text.innerHTML = `<div><b style="color:#2c3e50;">Râ”¬â–“</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
         }
 
         function toggleCalibrationModel() {
@@ -3587,7 +3587,7 @@
                     badges += `<span class="badge" style="background:var(--prev)">M</span>`;
                 }
 
-                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> ÔÇó </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> Ã”Ã‡Ã³ </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
 
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
@@ -4255,7 +4255,7 @@
                     herdCropM2Map[g.id] = cAreaM2;
                     cropHtml += `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #eee;">
                         <span style="font-weight:bold; color:${g.color}; font-size:12px;">${g.name}</span>
-                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m┬▓/day</span></span>
+                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">mâ”¬â–“/day</span></span>
                     </div>`;
                 }
             });
@@ -4364,13 +4364,13 @@
                     estimatedGrowth = Math.min(100, Math.max(5, Math.round(estimatedGrowth)));
                     
                     document.getElementById('inp-predict-growth').value = estimatedGrowth;
-                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
+                    if (btn) btn.innerText = "Â­Æ’Ã®Ã±Â´Â©Ã… OPTIMIZE FROM WEATHER";
                     updatePredictedWedge();
                 })
                 .catch(err => {
                     console.error("Weather fetch failed:", err);
                     alert("Failed to fetch weather data.");
-                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
+                    if (btn) btn.innerText = "Â­Æ’Ã®Ã±Â´Â©Ã… OPTIMIZE FROM WEATHER";
                 });
         }
 
@@ -5881,7 +5881,7 @@
                         </div>
                         <div style="text-align:right;">
                             <div style="font-weight:bold; color:var(--accent); font-size:18px;">${w.totalArea.toFixed(2)} <span style="font-size:11px; font-weight:normal; color:#7f8c8d;">ha</span></div>
-                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map Ô×ö'}</div>
+                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map Ã”Ã—Ã¶'}</div>
                         </div>
                     </div>`;
                 });
@@ -5998,7 +5998,7 @@
                                  title="${isAudioActive ? 'Stop Audio Aid' : 'Start Audio Aid'}">
                              ${isAudioActive ? '\u23f9\ufe0f' : '\u25b6\ufe0f'}
                          </button>
-                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">ÔÜÖ´©Å</button>`}
+                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">Ã”ÃœÃ–Â´Â©Ã…</button>`}
                          <button class="btn-edit-break" style="position:static;" onclick="event.stopPropagation(); startEditBreak('${brk.id}')" title="Edit vertices">\u270e</button>
                          <button class="btn-delete-break" style="position:static;" onclick="promptDeleteBreak('${brk.id}', event)" title="Delete break">\ud83d\uddd1\ufe0f</button>
                        </div>`
@@ -6406,7 +6406,7 @@
                     row.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:6px; border:1px solid #eee; font-size:13px;";
                     row.innerHTML = `
                             <span>${email}</span>
-                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">Ô£ò</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
+                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">Ã”Â£Ã²</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
                         `;
                     listDiv.appendChild(row);
                 });
@@ -6449,15 +6449,15 @@
     <!-- Break Drawing Toolbar (Moved Outside Map for Z-Index Stability) -->
     <div id="break-toolbar" class="break-toolbar" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
         <div class="toolbar-toggles">
-            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> ­ƒÄ» Use Crosshair</label>
-            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> ­ƒöÆ Lock Points</label>
+            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> Â­Æ’Ã„Â» Use Crosshair</label>
+            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> Â­Æ’Ã¶Ã† Lock Points</label>
         </div>
         <button class="btn-drop" id="btn-drop-point" onclick="event.stopPropagation(); addPointFromCrosshair()">DROP POINT</button>
         <span class="vertex-count" id="vertex-count">0 points</span>
-        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">Ôå® Undo</button>
-        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">Ô¼í Follow Contour</button>
-        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>Ô£ô Finish</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">Ô£ò Cancel</button>
+        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">Ã”Ã¥Â® Undo</button>
+        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">Ã”Â¼Ã­ Follow Contour</button>
+        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>Ã”Â£Ã´ Finish</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">Ã”Â£Ã² Cancel</button>
     </div>
 
     <!-- Break Edit Toolbar -->
@@ -6470,9 +6470,9 @@
             <option value="pennos">Pennos</option>
             <option value="crops">Crops</option>
         </select>
-        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>Ô£ò Delete Point</button>
-        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">Ô£ô Done</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">Ô£ò Cancel</button>
+        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>Ã”Â£Ã² Delete Point</button>
+        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">Ã”Â£Ã´ Done</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">Ã”Â£Ã² Cancel</button>
     </div>
 
 </body>
