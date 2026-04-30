@@ -1298,7 +1298,7 @@
     </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body>
+<body><script>if("serviceWorker" in navigator){navigator.serviceWorker.getRegistrations().then(regs=>{for(let r of regs){r.unregister();}}).then(()=>{location.reload(true);});}</script>
     <div id="distance-debug-overlay">
         <div id="debug-dist-val" style="font-weight:bold; color:#e74c3c; font-size:14px;">DISTANCE --m</div>
         <div id="debug-acc-val" style="font-size:10px; opacity:0.7;">GPS Acc: --m</div>
