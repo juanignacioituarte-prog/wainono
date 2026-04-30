@@ -3016,6 +3016,13 @@
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks') ? 'flex' : 'none';
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
+            
+            // Toggle Cow Emulator Visibility
+            const cowPanel = document.getElementById('cow-emulator-panel');
+            if (cowPanel) {
+                const showCow = (mode === 'satellite' || mode === 'manual' || mode === 'breaks');
+                cowPanel.style.display = showCow ? 'block' : 'none';
+            }
 
             // Map vs Overlay Logic
             if (mode === 'feed') {
