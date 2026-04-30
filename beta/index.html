@@ -1689,24 +1689,16 @@
         <!-- Cow Emulator Panel -->
         <div id="cow-emulator-panel" style="padding: 15px; border-bottom: 1px solid #eee; background: #fafafa;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div style="font-size: 11px; font-weight: 800; color: #8e44ad; text-transform: uppercase;">Collar Connection</div>
+                <div style="font-size: 11px; font-weight: 800; color: #8e44ad; text-transform: uppercase;">Virtual Herd Manager</div>
                 <label style="font-size: 10px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #8e44ad; font-weight: bold;">
-                    <input type="checkbox" id="emulator-mode" checked> LOCAL EMULATOR
+                    <input type="checkbox" id="emulator-mode" checked onchange="toggleEmulator(this.checked)"> EMULATOR ON
                 </label>
             </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div id="cow-status" class="cow-status-pill">Offline / Waiting...</div>
-                <div style="text-align: right;">
-                    <div style="font-size: 9px; color: #999; font-weight: bold; text-transform: uppercase;">Motion Status</div>
-                    <div id="movement-status" style="font-size: 11px; font-weight: bold; color: #8e44ad;">RESTING</div>
-                </div>
-            </div>
+            <button onclick="addVirtualCow()" style="width:100%; padding:8px; background:white; border:1px dashed #8e44ad; color:#8e44ad; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; margin-bottom:12px;">+ ADD VIRTUAL COW</button>
 
-            <div style="margin-top: 15px; display: flex; gap: 6px;">
-                <button class="btn-small" onclick="sendCowCommand('turn_left')" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 11px;">↺ LEFT</button>
-                <button id="btn-toggle-walk" class="btn-small" onclick="sendCowCommand('toggle_walk')" style="flex: 2; padding: 8px; border: 1px solid #8e44ad; border-radius: 6px; background: #8e44ad; color: white; cursor: pointer; font-size: 11px; font-weight: bold;">WALK / STOP</button>
-                <button class="btn-small" onclick="sendCowCommand('turn_right')" style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 11px;">RIGHT ↻</button>
+            <div id="cow-list-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right:5px;">
+                <!-- Cows will be listed here -->
             </div>
         </div>
         <div id="list">Loading data...</div>
@@ -2049,43 +2041,101 @@
         }
 
         /* === Virtual Cow System === */
-        let cowMarker = null;
-        let virtualCow = {
-            lat: -42.684140,
-            lon: 172.887952,
-            heading: 45,
-            moving: false,
-            status: 'safe',
-            speed: 0.0000013 // degrees per tick (~0.15m per 100ms = 1.5m/s)
-        };
+        let virtualCows = []; 
+        let cowMarkers = {};
+        
+        function addVirtualCow(herdId = null) {
+            const id = 'cow_' + Date.now() + Math.floor(Math.random()*1000);
+            const center = map.getCenter();
+            
+            // Random offset from center to avoid overlap
+            const lat = center.lat + (Math.random() - 0.5) * 0.0005;
+            const lon = center.lng + (Math.random() - 0.5) * 0.0005;
+            
+            const newCow = {
+                id: id,
+                lat: lat,
+                lon: lon,
+                heading: Math.random() * 360,
+                moving: false,
+                status: 'safe',
+                speed: 0.0000010 + (Math.random() * 0.0000006), // randomized speed
+                herdId: herdId || (BREAK_GROUPS.length > 1 ? BREAK_GROUPS[1].id : 'all'),
+                targetBreakId: null,
+                mode: 'graze' // 'graze' or 'move'
+            };
+            
+            virtualCows.push(newCow);
+            renderCowManager();
+        }
+
+        function removeVirtualCow(id) {
+            virtualCows = virtualCows.filter(c => c.id !== id);
+            if (cowMarkers[id]) {
+                map.removeLayer(cowMarkers[id]);
+                delete cowMarkers[id];
+            }
+            renderCowManager();
+        }
+
+        function toggleEmulator(on) {
+            if (!on) {
+                // Remove all markers
+                Object.keys(cowMarkers).forEach(id => {
+                    map.removeLayer(cowMarkers[id]);
+                    delete cowMarkers[id];
+                });
+            } else {
+                if (virtualCows.length === 0) addVirtualCow();
+            }
+        }
 
         function simulateVirtualCow() {
             if (!document.getElementById('emulator-mode').checked) return;
 
-            if (virtualCow.moving) {
-                // Apply a tiny bit of random drift for realism
-                const drift = (Math.random() - 0.5) * 4;
-                virtualCow.heading += drift;
+            virtualCows.forEach(cow => {
+                let targetPoint = null;
+                let targetBreak = null;
 
-                // Move forward
-                const rad = (virtualCow.heading - 90) * (Math.PI / 180);
-                virtualCow.lat -= Math.sin(rad) * virtualCow.speed;
-                virtualCow.lon += Math.cos(rad) * virtualCow.speed;
-            }
+                // 1. Identify Target
+                if (cow.targetBreakId) {
+                    targetBreak = savedBreaks.find(b => b.id === cow.targetBreakId);
+                } else {
+                    // Default to herd's break if assigned
+                    targetBreak = savedBreaks.find(b => b.groupId === cow.herdId);
+                }
 
-            // Check fencing logic against savedBreaks
-            if (savedBreaks.length > 0) {
-                // Find the first visible/active break for simulation
-                const activeBreak = savedBreaks[0]; 
-                if (activeBreak.vertices && activeBreak.vertices.length > 2) {
-                    const polyCoords = activeBreak.vertices.map(v => [v.lng, v.lat]);
-                    polyCoords.push(polyCoords[0]); // close polygon
+                if (targetBreak && targetBreak.vertices && targetBreak.vertices.length > 2) {
+                    const polyCoords = targetBreak.vertices.map(v => [v.lng, v.lat]);
+                    polyCoords.push(polyCoords[0]);
                     const polyGeo = turf.polygon([polyCoords]);
-                    const pt = turf.point([virtualCow.lon, virtualCow.lat]);
+                    const pt = turf.point([cow.lon, cow.lat]);
                     
                     const isInside = turf.booleanPointInPolygon(pt, polyGeo);
-                    
-                    // Calculate distance to nearest edge
+
+                    if (!isInside) {
+                        // Move towards the center of the target break
+                        const center = turf.center(polyGeo);
+                        targetPoint = { lat: center.geometry.coordinates[1], lon: center.geometry.coordinates[0] };
+                        cow.mode = 'move';
+                    } else {
+                        cow.mode = 'graze';
+                    }
+
+                    // 2. Movement Logic
+                    if (cow.mode === 'move' && targetPoint) {
+                        // Calculate heading to target
+                        const bearing = turf.bearing(pt, turf.point([targetPoint.lon, targetPoint.lat]));
+                        const diff = (bearing - cow.heading + 540) % 360 - 180;
+                        cow.heading += diff * 0.1; // Smooth rotation
+                        cow.moving = true;
+                    } else if (cow.mode === 'graze') {
+                        // Random grazing
+                        if (Math.random() < 0.05) cow.moving = !cow.moving;
+                        if (cow.moving && Math.random() < 0.1) cow.heading += (Math.random() - 0.5) * 10;
+                    }
+
+                    // 3. Collision / Fencing
                     let minDist = 999;
                     try {
                         const line = turf.lineString(polyCoords);
@@ -2093,53 +2143,131 @@
                     } catch(e) {}
 
                     if (!isInside) {
-                        virtualCow.status = 'shocking';
-                        virtualCow.heading += 5; // Auto-correction
-                    } else if (minDist < 8) {
-                        virtualCow.status = minDist < 4 ? 'warning_right' : 'warning_left';
-                        virtualCow.heading += 1;
+                        cow.status = 'shocking';
+                        // Force turn towards target
+                    } else if (minDist < 6) {
+                        cow.status = minDist < 3 ? 'warning_right' : 'warning_left';
+                        // Turn away from edge
+                        cow.heading += 5;
                     } else {
-                        virtualCow.status = 'safe';
+                        cow.status = 'safe';
                     }
+                } else {
+                    // No break - just random walk
+                    if (Math.random() < 0.02) cow.moving = !cow.moving;
+                    cow.heading += (Math.random() - 0.5) * 2;
+                    cow.status = 'safe';
                 }
-            } else {
-                virtualCow.status = 'safe';
-            }
 
-            updateCowOnMap(virtualCow.lat, virtualCow.lon, virtualCow.status, virtualCow.heading, virtualCow.moving);
+                // Apply Herding Social Distance (avoid bunching)
+                virtualCows.forEach(other => {
+                    if (other.id === cow.id) return;
+                    const d = Math.sqrt(Math.pow(cow.lat - other.lat, 2) + Math.pow(cow.lon - other.lon, 2));
+                    if (d < 0.00005) { // Very close
+                        cow.heading += 5; // Steer away
+                    }
+                });
+
+                // Execute Step
+                if (cow.moving) {
+                    const step = cow.status === 'safe' ? cow.speed : cow.speed * 0.5;
+                    const rad = (cow.heading - 90) * (Math.PI / 180);
+                    cow.lat -= Math.sin(rad) * step;
+                    cow.lon += Math.cos(rad) * step;
+                }
+
+                updateCowMarker(cow);
+            });
         }
 
-        function updateCowOnMap(lat, lon, status, heading, moving) {
-            let className = status;
-            if (status.startsWith('warning')) className = 'warning';
+        function updateCowMarker(cow) {
+            let className = cow.status;
+            if (cow.status.startsWith('warning')) className = 'warning';
+            
+            // Get herd color
+            const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || BREAK_GROUPS[0];
+            const color = herd.color || '#8e44ad';
 
-            const htmlContent = `<div class="cow-marker ${className}" style="transform: rotate(${heading}deg);">
-                                   <div class="cow-head"></div>
+            const htmlContent = `<div class="cow-marker ${className}" style="transform: rotate(${cow.heading}deg); background-color: ${color}; width:16px; height:16px;">
+                                   <div class="cow-head" style="left:3px; width:4px;"></div>
                                </div>`;
-            if (!cowMarker) {
-                cowMarker = L.marker([lat, lon], {
-                    icon: L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [20, 20], iconAnchor: [10, 10] }),
+                               
+            if (!cowMarkers[cow.id]) {
+                cowMarkers[cow.id] = L.marker([cow.lat, cow.lon], {
+                    icon: L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [16, 16], iconAnchor: [8, 8] }),
                     zIndexOffset: 10000
                 }).addTo(map);
             } else {
-                cowMarker.setLatLng([lat, lon]);
-                cowMarker.setIcon(L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [20, 20], iconAnchor: [10, 10] }));
+                cowMarkers[cow.id] = cowMarkers[cow.id].setLatLng([cow.lat, cow.lon]);
+                cowMarkers[cow.id].setIcon(L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [16, 16], iconAnchor: [8, 8] }));
             }
-
-            const statusEl = document.getElementById('cow-status');
-            statusEl.className = `cow-status-pill ${className}`;
-            if (status === 'safe') statusEl.innerHTML = 'ÔùÅ SAFE';
-            else if (status === 'shocking') statusEl.innerHTML = 'ÔÜí SHOCKING';
-            else statusEl.innerHTML = 'ÔÜá WARNING';
-
-            document.getElementById('movement-status').innerText = moving ? "WALKING" : "RESTING";
         }
 
-        function sendCowCommand(action) {
-            if (action === 'turn_left') virtualCow.heading -= 15;
-            if (action === 'turn_right') virtualCow.heading += 15;
-            if (action === 'toggle_walk') virtualCow.moving = !virtualCow.moving;
+        function renderCowManager() {
+            const container = document.getElementById('cow-list-container');
+            if (!container) return;
+            
+            if (virtualCows.length === 0) {
+                container.innerHTML = '<div style="font-size:10px; color:#999; text-align:center; padding:10px;">No cows in simulation</div>';
+                return;
+            }
+            
+            container.innerHTML = virtualCows.map(cow => {
+                const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || BREAK_GROUPS[0];
+                let statusColor = '#27ae60';
+                if (cow.status.startsWith('warning')) statusColor = '#f39c12';
+                if (cow.status === 'shocking') statusColor = '#e74c3c';
+                
+                return `
+                    <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                            <b style="color:${herd.color}">ÔùÅ COW #${cow.id.slice(-4)}</b>
+                            <span style="color:${statusColor}; font-weight:800; font-size:9px;">${cow.status.toUpperCase()}</span>
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:8px;">
+                            <div>
+                                <label style="font-size:9px; color:#999; display:block;">HERD</label>
+                                <select onchange="updateCowHerd('${cow.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
+                                    ${BREAK_GROUPS.map(g => `<option value="${g.id}" ${cow.herdId === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:9px; color:#999; display:block;">MOVE TO</label>
+                                <select onchange="updateCowTarget('${cow.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
+                                    <option value="">(Current)</option>
+                                    ${savedBreaks.map(b => `<option value="${b.id}" ${cow.targetBreakId === b.id ? 'selected' : ''}>${b.name || b.paddock}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:9px; color:#bbb;">Mode: ${cow.mode.toUpperCase()}</span>
+                            <button onclick="removeVirtualCow('${cow.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
+
+        window.updateCowHerd = function(cowId, herdId) {
+            const cow = virtualCows.find(c => c.id === cowId);
+            if (cow) cow.herdId = herdId;
+            renderCowManager();
+        };
+
+        window.updateCowTarget = function(cowId, breakId) {
+            const cow = virtualCows.find(c => c.id === cowId);
+            if (cow) cow.targetBreakId = breakId || null;
+            renderCowManager();
+        };
+
+        // Initialize with one cow if emulator is on
+        setTimeout(() => {
+            if (document.getElementById('emulator-mode').checked && virtualCows.length === 0) {
+                addVirtualCow();
+            }
+        }, 2000);
 
         setInterval(simulateVirtualCow, 100);
 
