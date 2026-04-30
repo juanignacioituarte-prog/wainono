@@ -1299,15 +1299,6 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-    <script>
-        // IMMEDIATE EMERGENCY BYPASS: If admin email is found, hide login screen instantly via CSS
-        (function() {
-            const admin = "juanignacioituarte@gmail.com";
-            if (localStorage.getItem('auth_email') === admin) {
-                document.write('<style>#login-screen { display: none !important; }</style>');
-            }
-        })();
-    </script>
     <div id="distance-debug-overlay">
         <div id="debug-dist-val" style="font-weight:bold; color:#e74c3c; font-size:14px;">DISTANCE --m</div>
         <div id="debug-acc-val" style="font-size:10px; opacity:0.7;">GPS Acc: --m</div>
@@ -1368,14 +1359,7 @@
         <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with"
             data-shape="rectangular" data-logo_alignment="left">
         </div>
-        <div id="unauth-msg" class="unauthorized hidden" style="background:#fff3f3; padding:15px; border-radius:10px; border:1px solid #ffcccc; margin-top:20px;">
-            <p style="font-weight:bold; margin-top:0;">Not Authorized</p>
-            <div id="debug-email" style="font-size:13px; color:#666; margin-bottom:10px; background:#f0f0f0; padding:5px; border-radius:4px; font-family:monospace;">Checking...</div>
-            <p style="font-size:12px; margin-bottom: 10px;">If this is your first time, the Admin needs to approve your email.</p>
-            <a href="#" id="request-access-btn" class="btn-request-access" target="_blank" style="margin-top:0;">Request Access</a>
-            <div style="margin-top:10px; font-size:10px; color:#999;">App Version: 1.0.21</div>
-            <button onclick="localStorage.setItem('auth_email', 'juanignacioituarte@gmail.com'); localStorage.setItem('auth_name', 'Admin'); location.reload();" 
-                style="margin-top:20px; background:none; border:none; color:#eee; font-size:9px; cursor:pointer;">Super Admin Bypass</button>
+            <div style="margin-top:10px; font-size:10px; color:#999;">App Version: 1.0.22 (RECOVERY)</div>
         </div>
     </div>
 
@@ -6352,95 +6336,57 @@
         window.handleCredentialResponse = function (response) {
             let userEmail;
             
-            if (response && response.credential) {
-                const responsePayload = parseJwt(response.credential);
-                userEmail = responsePayload.email.toLowerCase();
-            } else {
-                userEmail = (response || "").toLowerCase();
-            }
+            try {
+                if (response && response.credential) {
+                    const responsePayload = parseJwt(response.credential);
+                    userEmail = responsePayload.email.toLowerCase();
+                } else {
+                    userEmail = (response || "").toLowerCase();
+                }
 
-            if (!userEmail) return;
+                if (!userEmail) return;
 
-            // 1. IMMEDIATE ADMIN BYPASS
-            if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+                // Simple Access: Save and Enter
                 localStorage.setItem('auth_email', userEmail);
-                localStorage.setItem('auth_name', "Admin");
-                document.getElementById('login-screen').style.display = 'none';
+                localStorage.setItem('auth_name', userEmail.split('@')[0]);
+                
+                const loginScreen = document.getElementById('login-screen');
+                if (loginScreen) loginScreen.style.display = 'none';
+                
+                // Show Admin menu for the owner
+                if (userEmail === ADMIN_EMAIL.toLowerCase()) {
+                    const adminMenu = document.getElementById('menu-item-admin');
+                    if (adminMenu) adminMenu.style.display = 'block';
+                }
+                
                 init();
                 loadBreaks();
-                return; // Stop here, no need to fetch CSV
+            } catch (e) {
+                console.error("Login Error:", e);
+                alert("Login failed. Please refresh and try again.");
             }
-
-            const debugEl = document.getElementById('debug-email');
-            if (debugEl) debugEl.innerHTML = `Verifying: <b>${userEmail}</b>...`;
-
-            // 2. FETCH AUTHORIZED LIST FOR OTHERS
-            Papa.parse(AUTH_CSV_URL + "&t=" + Date.now(), {
-                download: true,
-                header: false,
-                complete: function(results) {
-                    const authorizedMap = {};
-                    if (results && results.data) {
-                        results.data.forEach(row => {
-                            const email = (row[0] || "").trim().toLowerCase();
-                            const name = (row[1] || "Unknown User").trim();
-                            if (email) authorizedMap[email] = name;
-                        });
-                    }
-
-                    if (authorizedMap.hasOwnProperty(userEmail)) {
-                        const userName = authorizedMap[userEmail];
-                        localStorage.setItem('auth_email', userEmail);
-                        localStorage.setItem('auth_name', userName);
-                        document.getElementById('login-screen').style.display = 'none';
-                        init();
-                        loadBreaks();
-                    } else {
-                        showUnauthorized(userEmail);
-                    }
-                },
-                error: function(err) {
-                    console.error("Auth fetch failed:", err);
-                    if (debugEl) debugEl.innerText = "Connection error. Retry login.";
-                    showUnauthorized(userEmail, true);
-                }
-            });
         };
 
         // Auto-Login Check on Boot
         window.addEventListener('DOMContentLoaded', () => {
             const savedEmail = localStorage.getItem('auth_email');
             if (savedEmail) {
-                // Skips Google prompt, attempts authentication silently
                 handleCredentialResponse(savedEmail);
             }
         });
 
         function clearAuthSession() {
-            localStorage.removeItem('auth_email');
-            localStorage.removeItem('auth_name');
+            localStorage.clear();
             location.reload();
         }
 
-        function showUnauthorized(email, isError = false) {
-            const signinBtn = document.querySelector('.g_id_signin');
-            if (signinBtn) signinBtn.classList.add('hidden');
-            
+        function showUnauthorized(email) {
+            // Simplified: Just show a basic message if something goes wrong
             const msgEl = document.getElementById('unauth-msg');
-            if (!msgEl) return;
-            
-            msgEl.classList.remove('hidden');
-            msgEl.innerHTML = `
-                <p style="font-weight:bold; color:#e74c3c;">${isError ? 'Connection Error' : 'Not Authorized'}</p>
-                <p style="font-size:13px; margin-bottom: 10px;">Email: <b>${email}</b></p>
-                <p style="font-size:12px; margin-bottom: 15px;">${isError ? 'We couldn\'t verify your access. Please check your internet and try again.' : 'This account is not on the authorized list. The Admin must approve your access.'}</p>
-                
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                    <button onclick="location.reload()" style="padding:10px; background:#2ecc71; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">Retry Now</button>
-                    <a href="mailto:${ADMIN_EMAIL}?subject=Farm App Access Request&body=Access request for ${email}" class="btn-request-access" style="margin-top:0;">Request Access</a>
-                    <button onclick="clearAuthSession()" style="background:none; border:none; color:#999; font-size:11px; cursor:pointer; text-decoration:underline;">Try a different account</button>
-                </div>
-            `;
+            if (msgEl) {
+                msgEl.classList.remove('hidden');
+                msgEl.innerHTML = `<p>Error accessing account. <button onclick="clearAuthSession()">Click here to Reset</button></p>`;
+            }
         }
 
         /* ===================== ADMIN INVITE LOGIC ===================== */
@@ -6494,8 +6440,15 @@
             } catch (e) { alert('Failed to remove email'); }
         }
             // Register Service Worker for PWA
-            if ('serviceWorker' in navigator) {
+        // Service Worker Disabled to prevent caching issues
+        /* if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+        } */
+        // Unregister any existing service workers
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for(let registration of registrations) { registration.unregister(); }
+            });
         }
     </script>
 
