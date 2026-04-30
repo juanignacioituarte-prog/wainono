@@ -443,6 +443,31 @@
             font-weight: 600;
         }
 
+        /* Cow Tracking Styles */
+        .cow-wrapper { background: transparent; }
+        .cow-marker {
+            width: 20px; height: 20px; border-radius: 50%; border: 3px solid white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); background-color: #8e44ad;
+            transition: all 0.3s; position: relative; box-sizing: border-box;
+        }
+        .cow-head {
+            width: 6px; height: 8px; background: #fff; border-radius: 3px;
+            position: absolute; top: -4px; left: 4px; box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+        .cow-marker.safe { background-color: #8e44ad; }
+        .cow-marker.warning { background-color: #f39c12; animation: pulse-warning 1s infinite alternate; }
+        .cow-marker.shocking { background-color: #e74c3c; animation: pulse-shock 0.2s infinite alternate; }
+        @keyframes pulse-warning { from { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.7); } to { box-shadow: 0 0 0 12px rgba(243, 156, 18, 0); } }
+        @keyframes pulse-shock { from { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.9); } to { box-shadow: 0 0 0 16px rgba(231, 76, 60, 0); } }
+        .cow-status-pill {
+            display: inline-block; padding: 6px 12px; border-radius: 12px;
+            font-size: 0.8rem; font-weight: 600; margin-top: 10px;
+            background: rgba(0, 0, 0, 0.05); color: #777; border: 1px solid #ddd;
+        }
+        .cow-status-pill.safe { color: #8e44ad; background: rgba(142, 68, 173, 0.1); border-color: #8e44ad; }
+        .cow-status-pill.warning { color: #f39c12; background: rgba(243, 156, 18, 0.1); border-color: #f39c12; }
+        .cow-status-pill.shocking { color: #e74c3c; background: rgba(231, 76, 60, 0.1); border-color: #e74c3c; }
+
         /* Feed Calculations View */
         #feed-view {
             flex-grow: 1;
@@ -1327,7 +1352,7 @@
 
     <div id="login-screen">
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
-        <h2>🟪 River Terrace Beta Emulator</h2>
+        <h2>🐄 River Terrace Beta Emulator</h2>
         <div id="g_id_onload" data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
             data-callback="handleCredentialResponse" data-auto_prompt="false">
         </div>
@@ -1430,8 +1455,11 @@
             </div>
 
             <div class="feed-card">
-                <div class="feed-title">Herd Management</div>
-                <div class="calc-grid" id="herd-inputs"></div>
+                <div class="feed-title-row">
+                    <div class="feed-title">Herd Management</div>
+                    <button class="btn-save" onclick="addCustomHerd()">+ ADD HERD</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px;" id="herd-inputs"></div>
             </div>
 
             <div class="feed-card">
@@ -1442,7 +1470,7 @@
                         <input type="number" id="inp-crop-yield" value="20000" oninput="saveAndRecalc()">
                     </div>
                     <div class="input-group">
-                        <label>Target Feed (kgDM/cow)</label>
+                        <label>Default Target Feed (kgDM/cow)</label>
                         <input type="number" id="inp-crop-feed" value="4" oninput="saveAndRecalc()">
                     </div>
                 </div>
@@ -1452,8 +1480,8 @@
                         <span>EST. YIELD (kgDM/ha)</span>
                     </div>
                 </div>
-                <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:10px; margin-bottom:5px;">Herds in Crops:</div>
-                <div id="crop-herd-toggles" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px; font-size:12px;"></div>
+                <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:10px; margin-bottom:5px; display:none;">Herds in Crops:</div>
+                <div id="crop-herd-toggles" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:15px; font-size:12px;"></div>
                 <div id="crop-herd-outputs"></div>
             </div>
 
@@ -1463,6 +1491,7 @@
                     <canvas id="wedgeChart"></canvas>
                 </div>
             </div>
+
 
             <div class="feed-card">
                 <div class="feed-title">Rotation Parameters</div>
@@ -1518,7 +1547,7 @@
                     </div>
                     <div class="result-highlight">
                         <h3 id="res-area-cow">0</h3>
-                        <small>Area per Cow (m²/day)</small>
+                        <small>Area per Cow (m┬▓/day)</small>
                     </div>
                 </div>
             </div>
@@ -1540,17 +1569,72 @@
                     </div>
                 </div>
             </div>
+
+            <div class="feed-card">
+                <div class="feed-title-row">
+                    <div class="feed-title">Predicted Feed Wedge Planner</div>
+                    <div style="flex:1;"></div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kg</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--warning); margin-left:15px;">Expected Supp: <span id="predict-supp">0.0</span> kg/cow</div>
+                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
+                </div>
+                <div class="calc-grid" style="margin-bottom:15px;">
+                    <div class="input-group">
+                        <label>Days Ahead</label>
+                        <input type="number" id="inp-predict-days" value="14" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Expected Growth (kgDM/ha/day)</label>
+                        <input type="number" id="inp-predict-growth" value="35" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Simulated Rotation (Days)</label>
+                        <input type="number" id="inp-predict-rotation" value="30" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Simulated Cows</label>
+                        <input type="number" id="inp-predict-cows" placeholder="Auto" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Simulated Intake (kgDM)</label>
+                        <input type="number" id="inp-predict-intake" placeholder="Auto" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Max Supp Allowed (kg/cow)</label>
+                        <input type="number" id="inp-predict-max-supp" value="20" oninput="updatePredictedWedge()">
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 15px; padding: 15px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label style="font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                            <input type="checkbox" id="inp-dryoff-toggle" style="width: 20px; height: 20px;" onclick="document.getElementById('dryoff-container').style.display = this.checked ? 'flex' : 'none'; updatePredictedWedge();">
+                            Dry Off Mode (Zero Pasture)
+                        </label>
+                    </div>
+                    <div id="dryoff-container" style="display:none; flex-direction:column; gap:10px; margin-top:15px;">
+                        <div id="dryoff-list"></div>
+                        <button class="btn-save" onclick="addDryOffEntry()" style="background:var(--secondary); align-self:flex-start; font-size:0.9rem;">+ ADD DRY OFF EVENT</button>
+                    </div>
+                </div>
+
+                <div class="chart-box">
+                    <canvas id="predictedWedgeChart"></canvas>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <div id="sidebar">
-        <button class="minimize-btn" onclick="toggleSidebar()">◀</button>
+        <button class="minimize-btn" onclick="toggleSidebar()">≡</button>
         <div id="sidebar-content" style="display:flex; flex-direction:column; height:100%; width:100%;">
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('herd_management'); toggleSettingsMenu();">Manage Herds</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
@@ -1568,9 +1652,7 @@
             </div>
 
             <div id="header-details" class="header-collapsible">
-                <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER
-                    0.3) -
-                    SHOWING PREVIOUS DATE</div>
+                <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
 
                 <div id="calibration-box" class="calib-box" style="display:none;">
                     <div class="calib-row" id="calib-hover-area">
@@ -1601,6 +1683,22 @@
             </div>
 
             <input type="text" id="search" placeholder="Search paddocks..." style="margin-top:8px;">
+        </div>
+
+        <!-- Cow Emulator Panel -->
+        <div id="cow-emulator-panel" style="padding: 15px; border-bottom: 1px solid #eee; background: #fafafa;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="font-size: 11px; font-weight: 800; color: #8e44ad; text-transform: uppercase;">Virtual Herd Manager</div>
+                <label style="font-size: 10px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #8e44ad; font-weight: bold;">
+                    <input type="checkbox" id="emulator-mode" checked onchange="toggleEmulator(this.checked)"> EMULATOR ON
+                </label>
+            </div>
+            
+            <button onclick="addVirtualCow()" style="width:100%; padding:8px; background:white; border:1px dashed #8e44ad; color:#8e44ad; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; margin-bottom:12px;">+ ADD VIRTUAL COW</button>
+
+            <div id="cow-list-container" style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right:5px;">
+                <!-- Cows will be listed here -->
+            </div>
         </div>
         <div id="list">Loading data...</div>
 
@@ -1704,6 +1802,20 @@
             <p style="font-size:10px; color:#95a5a6; margin-top:0; margin-bottom:10px;">Tap any week to isolate its breaks on the map.</p>
             <div id="weekly-report-content"></div>
         </div>
+
+        <div id="herd-management-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin-top:0; margin-bottom:0;">Manage Herds</h3>
+                <button onclick="switchDashboardMode('feed')" style="background:#2ecc71; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">Done</button>
+            </div>
+            <p style="font-size:12px; color:#666; margin-bottom:15px;">Configure your herds, change colors, and manage the rotation groups.</p>
+            
+            <button onclick="addCustomHerd()" style="width:100%; padding:10px; background:white; border:2px dashed #8e44ad; color:#8e44ad; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:20px;">+ CREATE NEW HERD</button>
+            
+            <div id="herd-management-list" style="display:flex; flex-direction:column; gap:12px;">
+                <!-- Herds listed here -->
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1749,17 +1861,114 @@
         let selectedSceneTs = null;
         let satelliteHistory = {};
         let wedgeChartInstance = null;
+        let predictedWedgeChartInstance = null;
         let usePartialCalibration = false;
         let manualFarmGrowthRate = 0;
 
         /* Break Management State */
-        const BREAK_GROUPS = [
-            { id: 'all', name: 'All Herds', color: '#7f8c8d' },
-            { id: '1st', name: '1st Herd', color: '#3498db' },
-            { id: '2nd', name: '2nd Herd', color: '#2ecc71' },
-            { id: '3rd', name: '3rd Herd', color: '#f39c12' },
-            { id: 'pennos', name: 'Pennos', color: '#e74c3c' }
+        let default_BREAK_GROUPS = [
+            { id: 'all', name: 'All Herds', color: '#7f8c8d', on_grass: false, on_crop: false, custom_crop_feed: null },
+            { id: '1st', name: '1st Herd', color: '#3498db', on_grass: true, on_crop: false, custom_crop_feed: null },
+            { id: '2nd', name: '2nd Herd', color: '#2ecc71', on_grass: true, on_crop: false, custom_crop_feed: null },
+            { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: null },
+            { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: null }
         ];
+        let BREAK_GROUPS = JSON.parse(localStorage.getItem('custom_herds')) || default_BREAK_GROUPS;
+        let manualBreakOverrides = JSON.parse(localStorage.getItem('manual_break_overrides')) || {};
+
+        function saveHerdSettings() {
+            localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
+            saveAndRecalc();
+            loadFeedSettings();
+        }
+
+        function addCustomHerd() {
+            const name = prompt("Enter new herd name:");
+            if (!name) return;
+            const newId = 'herd_' + Date.now();
+            const colors = ['#1abc9c', '#9b59b6', '#34495e', '#f1c40f', '#e67e22', '#e84393', '#00cec9', '#fdcb6e'];
+            const color = colors[BREAK_GROUPS.length % colors.length];
+            
+            BREAK_GROUPS.push({
+                id: newId,
+                name: name,
+                color: color,
+                on_grass: true,
+                on_crop: false,
+                custom_crop_feed: null,
+                is_oad: false
+            });
+            saveHerdSettings();
+        }
+
+        function updateCustomHerd(id, field, value) {
+            const h = BREAK_GROUPS.find(g => g.id === id);
+            if (h) {
+                h[field] = value;
+                saveHerdSettings();
+            }
+        }
+
+        function deleteCustomHerd(id) {
+            if(confirm("Are you sure you want to remove this herd?")) {
+                BREAK_GROUPS = BREAK_GROUPS.filter(g => g.id !== id);
+                saveHerdSettings();
+                if (currentDashboardMode === 'herd_management') renderHerdManagement();
+            }
+        }
+
+        function renderHerdManagement() {
+            const container = document.getElementById('herd-management-list');
+            if (!container) return;
+            
+            container.innerHTML = BREAK_GROUPS.map(g => {
+                if (g.id === 'all') return ''; // Don't allow editing the 'All' group directly
+                return `
+                    <div style="background:white; border-radius:10px; padding:15px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
+                            <input type="color" value="${g.color || '#8e44ad'}" 
+                                onchange="updateCustomHerd('${g.id}', 'color', this.value); renderHerdManagement();"
+                                style="width:30px; height:30px; border:none; border-radius:4px; cursor:pointer; background:none;">
+                            <input type="text" value="${g.name}" 
+                                onchange="updateCustomHerd('${g.id}', 'name', this.value); renderHerdManagement();"
+                                style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px; font-weight:bold; font-size:14px; color:var(--text);">
+                            <button onclick="deleteCustomHerd('${g.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:18px;">🗑️</button>
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#666; cursor:pointer;">
+                                <input type="checkbox" ${g.on_grass ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_grass', this.checked)"> On Grass
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#666; cursor:pointer;">
+                                <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crops
+                            </label>
+                        </div>
+
+                        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px; align-items:center;">
+                            <div style="flex:1;">
+                                <label style="font-size:9px; color:#999; display:block;">MOVE HERD TO</label>
+                                <select onchange="moveHerdToBreak('${g.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
+                                    <option value="">(None)</option>
+                                    ${savedBreaks.map(b => `<option value="${b.id}">${b.name || b.paddock}</option>`).join('')}
+                                </select>
+                            </div>
+                            <button onclick="teleportHerdToBreak('${g.id}')" style="background:#8e44ad; color:white; border:none; padding:6px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer; align-self:flex-end;">TELEPORT</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function saveManualBreak(id, key, value) {
+            if (!manualBreakOverrides[id]) manualBreakOverrides[id] = {};
+            if (value === "" || value === false || value === null) {
+                delete manualBreakOverrides[id][key];
+            } else {
+                manualBreakOverrides[id][key] = value;
+            }
+            localStorage.setItem('manual_break_overrides', JSON.stringify(manualBreakOverrides));
+            saveAndRecalc();
+        }
         let activeBreakGroup = 'all';
         let cropYields = {}; // { paddockName: yield }
         let allCropPaddocks = []; // List of paddock names with 'CROP' status
@@ -1887,6 +2096,341 @@
             }
         }
 
+        /* === Virtual Cow System === */
+        let virtualCows = []; 
+        let cowMarkers = {};
+        
+        function initializeVirtualHerd() {
+            // Clear existing
+            Object.keys(cowMarkers).forEach(id => {
+                map.removeLayer(cowMarkers[id]);
+                delete cowMarkers[id];
+            });
+            virtualCows = [];
+            
+            const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+            
+            BREAK_GROUPS.forEach(herd => {
+                if (herd.id === 'all') return;
+                let count = parseInt(savedHerdCows[herd.id]) || 0;
+                
+                // PERFORMANCE: Cap simulated cows to avoid lag
+                if (count > 50) count = 50; 
+                
+                // Find a starting break for this herd to teleport to
+                const startingBreak = savedBreaks.find(b => b.groupId === herd.id);
+                let startPos = null;
+                
+                if (startingBreak && startingBreak.vertices && startingBreak.vertices.length > 2) {
+                    const polyCoords = startingBreak.vertices.map(v => [v.lng, v.lat]);
+                    polyCoords.push(polyCoords[0]);
+                    const center = turf.center(turf.polygon([polyCoords]));
+                    startPos = { lat: center.geometry.coordinates[1], lon: center.geometry.coordinates[0] };
+                } else {
+                    const center = map.getCenter();
+                    startPos = { lat: center.lat, lon: center.lng };
+                }
+
+                for (let i = 0; i < count; i++) {
+                    const id = 'cow_' + herd.id + '_' + i;
+                    // Random offset within ~20m of startPos
+                    const lat = startPos.lat + (Math.random() - 0.5) * 0.0003;
+                    const lon = startPos.lon + (Math.random() - 0.5) * 0.0003;
+                    
+                    virtualCows.push({
+                        id: id,
+                        lat: lat,
+                        lon: lon,
+                        heading: Math.random() * 360,
+                        moving: false,
+                        status: 'safe',
+                        speed: 0.0000008 + (Math.random() * 0.0000005),
+                        herdId: herd.id,
+                        targetBreakId: startingBreak ? startingBreak.id : null,
+                        mode: 'graze'
+                    });
+                }
+            });
+            
+            renderCowManager();
+        }
+
+        function addVirtualCow(herdId = null) {
+            const id = 'cow_manual_' + Date.now();
+            const center = map.getCenter();
+            const lat = center.lat + (Math.random() - 0.5) * 0.0005;
+            const lon = center.lng + (Math.random() - 0.5) * 0.0005;
+            
+            const newCow = {
+                id: id,
+                lat: lat,
+                lon: lon,
+                heading: Math.random() * 360,
+                moving: false,
+                status: 'safe',
+                speed: 0.0000010 + (Math.random() * 0.0000006),
+                herdId: herdId || (BREAK_GROUPS.length > 1 ? BREAK_GROUPS[1].id : 'all'),
+                targetBreakId: null,
+                mode: 'graze'
+            };
+            
+            virtualCows.push(newCow);
+            renderCowManager();
+        }
+
+        function moveHerdToBreak(herdId, breakId) {
+            virtualCows.forEach(cow => {
+                if (cow.herdId === herdId) {
+                    cow.targetBreakId = breakId || null;
+                    cow.mode = breakId ? 'move' : 'graze';
+                }
+            });
+            renderCowManager();
+        }
+
+        function teleportHerdToBreak(herdId, targetBreakId = null) {
+            const herdCows = virtualCows.filter(c => c.herdId === herdId);
+            if (herdCows.length === 0) return;
+            
+            const bId = targetBreakId || herdCows[0].targetBreakId;
+            const targetBreak = savedBreaks.find(b => b.id === bId);
+            
+            if (targetBreak && targetBreak.vertices && targetBreak.vertices.length > 2) {
+                const polyCoords = targetBreak.vertices.map(v => [v.lng, v.lat]);
+                polyCoords.push(polyCoords[0]);
+                const center = turf.center(turf.polygon([polyCoords]));
+                const lat = center.geometry.coordinates[1];
+                const lon = center.geometry.coordinates[0];
+                
+                herdCows.forEach(cow => {
+                    cow.lat = lat + (Math.random() - 0.5) * 0.0003;
+                    cow.lon = lon + (Math.random() - 0.5) * 0.0003;
+                    cow.targetBreakId = bId;
+                    cow.mode = 'graze';
+                    cow.status = 'safe';
+                });
+            }
+            renderCowManager();
+        }
+
+        function removeVirtualCow(id) {
+            virtualCows = virtualCows.filter(c => c.id !== id);
+            if (cowMarkers[id]) {
+                map.removeLayer(cowMarkers[id]);
+                delete cowMarkers[id];
+            }
+            renderCowManager();
+        }
+
+        function toggleEmulator(on) {
+            if (!on) {
+                Object.keys(cowMarkers).forEach(id => {
+                    map.removeLayer(cowMarkers[id]);
+                    delete cowMarkers[id];
+                });
+            } else {
+                initializeVirtualHerd();
+            }
+        }
+
+        function simulateVirtualCow() {
+            if (!document.getElementById('emulator-mode').checked) return;
+
+            virtualCows.forEach(cow => {
+                let targetPoint = null;
+                let targetBreak = null;
+
+                // 1. Identify Target
+                if (cow.targetBreakId) {
+                    targetBreak = savedBreaks.find(b => b.id === cow.targetBreakId);
+                } else {
+                    // Default to herd's break if assigned
+                    targetBreak = savedBreaks.find(b => b.groupId === cow.herdId);
+                }
+
+                if (targetBreak && targetBreak.vertices && targetBreak.vertices.length > 2) {
+                    const polyCoords = targetBreak.vertices.map(v => [v.lng, v.lat]);
+                    polyCoords.push(polyCoords[0]);
+                    const polyGeo = turf.polygon([polyCoords]);
+                    const pt = turf.point([cow.lon, cow.lat]);
+                    
+                    const isInside = turf.booleanPointInPolygon(pt, polyGeo);
+
+                    if (!isInside) {
+                        // Move towards the center of the target break
+                        const center = turf.center(polyGeo);
+                        targetPoint = { lat: center.geometry.coordinates[1], lon: center.geometry.coordinates[0] };
+                        cow.mode = 'move';
+                    } else {
+                        cow.mode = 'graze';
+                    }
+
+                    // 2. Movement Logic
+                    if (cow.mode === 'move' && targetPoint) {
+                        // Calculate heading to target
+                        const bearing = turf.bearing(pt, turf.point([targetPoint.lon, targetPoint.lat]));
+                        const diff = (bearing - cow.heading + 540) % 360 - 180;
+                        cow.heading += diff * 0.1; // Smooth rotation
+                        cow.moving = true;
+                    } else if (cow.mode === 'graze') {
+                        // Random grazing
+                        if (Math.random() < 0.05) cow.moving = !cow.moving;
+                        if (cow.moving && Math.random() < 0.1) cow.heading += (Math.random() - 0.5) * 10;
+                    }
+
+                    // 3. Collision / Fencing
+                    let minDist = 999;
+                    try {
+                        const line = turf.lineString(polyCoords);
+                        minDist = turf.pointToLineDistance(pt, line, { units: 'meters' });
+                    } catch(e) {}
+
+                    if (!isInside) {
+                        cow.status = 'shocking';
+                        // Force turn towards target
+                    } else if (minDist < 6) {
+                        cow.status = minDist < 3 ? 'warning_right' : 'warning_left';
+                        // Turn away from edge
+                        cow.heading += 5;
+                    } else {
+                        cow.status = 'safe';
+                    }
+                } else {
+                    // No break - just random walk
+                    if (Math.random() < 0.02) cow.moving = !cow.moving;
+                    cow.heading += (Math.random() - 0.5) * 2;
+                    cow.status = 'safe';
+                }
+
+                    cow.status = 'safe';
+                }
+
+                // Social distancing removed for performance (was O(N^2))
+
+                // Execute Step
+                if (cow.moving) {
+                    const step = cow.status === 'safe' ? cow.speed : cow.speed * 0.5;
+                    const rad = (cow.heading - 90) * (Math.PI / 180);
+                    cow.lat -= Math.sin(rad) * step;
+                    cow.lon += Math.cos(rad) * step;
+                }
+
+                updateCowMarker(cow);
+            });
+        }
+
+        function updateCowMarker(cow) {
+            let statusClass = cow.status;
+            if (cow.status.startsWith('warning')) statusClass = 'warning';
+            
+            if (!cowMarkers[cow.id]) {
+                const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || BREAK_GROUPS[0];
+                const color = herd.color || '#8e44ad';
+                const htmlContent = `<div id="marker-inner-${cow.id}" class="cow-marker ${statusClass}" style="transform: rotate(${cow.heading}deg); background-color: ${color}; width:16px; height:16px;">
+                                       <div class="cow-head" style="left:3px; width:4px;"></div>
+                                   </div>`;
+                
+                cowMarkers[cow.id] = L.marker([cow.lat, cow.lon], {
+                    icon: L.divIcon({ className: 'cow-wrapper', html: htmlContent, iconSize: [16, 16], iconAnchor: [8, 8] }),
+                    zIndexOffset: 10000
+                }).addTo(map);
+                cow.lastLat = cow.lat;
+                cow.lastLon = cow.lon;
+                cow.lastHeading = cow.heading;
+                cow.lastStatus = statusClass;
+            } else {
+                const marker = cowMarkers[cow.id];
+                const distSq = Math.pow(cow.lat - cow.lastLat, 2) + Math.pow(cow.lon - cow.lastLon, 2);
+                
+                // Only update position if moved significantly or status changed
+                if (distSq > 0.0000000001 || statusClass !== cow.lastStatus || Math.abs(cow.heading - cow.lastHeading) > 2) {
+                    marker.setLatLng([cow.lat, cow.lon]);
+                    
+                    const inner = document.getElementById(`marker-inner-${cow.id}`);
+                    if (inner) {
+                        if (statusClass !== cow.lastStatus) {
+                            inner.classList.remove('safe', 'warning', 'shocking');
+                            inner.classList.add(statusClass);
+                        }
+                        inner.style.transform = `rotate(${cow.heading}deg)`;
+                    }
+                    
+                    cow.lastLat = cow.lat;
+                    cow.lastLon = cow.lon;
+                    cow.lastHeading = cow.heading;
+                    cow.lastStatus = statusClass;
+                }
+            }
+        }
+
+        function renderCowManager() {
+            const container = document.getElementById('cow-list-container');
+            if (!container) return;
+            
+            if (virtualCows.length === 0) {
+                container.innerHTML = '<div style="font-size:10px; color:#999; text-align:center; padding:10px;">No cows in simulation</div>';
+                return;
+            }
+            
+            container.innerHTML = virtualCows.map(cow => {
+                const herd = BREAK_GROUPS.find(g => g.id === cow.herdId) || BREAK_GROUPS[0];
+                let statusColor = '#27ae60';
+                if (cow.status.startsWith('warning')) statusColor = '#f39c12';
+                if (cow.status === 'shocking') statusColor = '#e74c3c';
+                
+                return `
+                    <div style="background:white; border:1px solid #eee; border-radius:8px; padding:10px; font-size:11px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                            <b style="color:${herd.color}">● COW #${cow.id.slice(-4)}</b>
+                            <span style="color:${statusColor}; font-weight:800; font-size:9px;">${cow.status.toUpperCase()}</span>
+                        </div>
+                        
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:8px;">
+                            <div>
+                                <label style="font-size:9px; color:#999; display:block;">HERD</label>
+                                <select onchange="updateCowHerd('${cow.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
+                                    ${BREAK_GROUPS.map(g => `<option value="${g.id}" ${cow.herdId === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:9px; color:#999; display:block;">MOVE TO</label>
+                                <select onchange="updateCowTarget('${cow.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
+                                    <option value="">(Current)</option>
+                                    ${savedBreaks.map(b => `<option value="${b.id}" ${cow.targetBreakId === b.id ? 'selected' : ''}>${b.name || b.paddock}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:9px; color:#bbb;">Mode: ${cow.mode.toUpperCase()}</span>
+                            <button onclick="removeVirtualCow('${cow.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:10px;">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.updateCowHerd = function(cowId, herdId) {
+            const cow = virtualCows.find(c => c.id === cowId);
+            if (cow) cow.herdId = herdId;
+            renderCowManager();
+        };
+
+        window.updateCowTarget = function(cowId, breakId) {
+            const cow = virtualCows.find(c => c.id === cowId);
+            if (cow) cow.targetBreakId = breakId || null;
+            renderCowManager();
+        };
+
+        // Initialize with one cow if emulator is on
+        setTimeout(() => {
+            if (document.getElementById('emulator-mode').checked && virtualCows.length === 0) {
+                initializeVirtualHerd();
+            }
+        }, 2000);
+
+        setInterval(simulateVirtualCow, 100);
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const btn = document.querySelector('.minimize-btn');
@@ -1894,11 +2438,11 @@
             const isMinimized = sidebar.classList.contains('minimized');
             
             if (window.innerWidth > 768) {
-                btn.innerHTML = isMinimized ? '▶' : '◀';
+                btn.innerHTML = isMinimized ? 'ÔûÂ' : 'ÔùÇ';
                 sidebar.style.width = isMinimized ? '40px' : '380px';
                 sidebar.style.height = '100%';
             } else {
-                btn.innerHTML = isMinimized ? '▲' : '▼';
+                btn.innerHTML = isMinimized ? 'Ôû▓' : 'Ôû╝';
                 const sideH = isMinimized ? '0px' : '55vh';
                 sidebar.style.height = sideH;
                 document.documentElement.style.setProperty('--sidebar-h', sideH);
@@ -1916,7 +2460,7 @@
             const content = document.getElementById('legend-content');
             const icon = document.getElementById('legend-toggle-icon');
             const isCollapsed = content.classList.toggle('collapsed');
-            icon.textContent = isCollapsed ? '▶' : '▼';
+            icon.textContent = isCollapsed ? 'ÔûÂ' : 'Ôû╝';
         }
 
         // Auto-collapse header and legend on mobile
@@ -1931,7 +2475,7 @@
                 const legendContent = document.getElementById('legend-content');
                 const legendIcon = document.getElementById('legend-toggle-icon');
                 if (legendContent) legendContent.classList.add('collapsed');
-                if (legendIcon) legendIcon.textContent = '▶';
+                if (legendIcon) legendIcon.textContent = 'ÔûÂ';
             }, 500);
         }
 
@@ -2182,6 +2726,7 @@
                     if (data) {
                         // Cloud data found, update UI
                         setFeedInputs(data);
+                        loadLocalFeedSettings();
                         calculateFeedLogic();
                     }
                 } catch (e) { console.log("Cloud load failed, using local/csv"); }
@@ -2277,6 +2822,14 @@
             if (data.cropHerds) {
                 localStorage.setItem('herd_in_crops', JSON.stringify(data.cropHerds));
             }
+            if (data.customHerds) {
+                BREAK_GROUPS = data.customHerds;
+                localStorage.setItem('custom_herds', JSON.stringify(data.customHerds));
+            }
+            if (data.manualBreaks) {
+                manualBreakOverrides = data.manualBreaks;
+                localStorage.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
+            }
             // Always reload the UI after settings are injected
             loadLocalFeedSettings();
         }
@@ -2309,32 +2862,78 @@
 
             // Load Herd Inputs
             const herdGrid = document.getElementById('herd-inputs');
-            const cropToggleGrid = document.getElementById('crop-herd-toggles');
-            if (herdGrid && cropToggleGrid) {
+            if (herdGrid) {
                 herdGrid.innerHTML = '';
-                cropToggleGrid.innerHTML = '';
                 const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
-                const savedCropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
                 
                 BREAK_GROUPS.forEach(g => {
                     if (g.id === 'all') return;
                     const val = savedHerdCows[g.id] || 0;
+                    if(g.on_grass === undefined) g.on_grass = true;
+                    if(g.on_crop === undefined) g.on_crop = false;
                     
-                    // Main Herd Row
                     const div = document.createElement('div');
-                    div.className = 'input-group';
-                    div.innerHTML = `<label style="color:${g.color}; font-weight:bold;">${g.name}</label><input type="number" id="herd-cows-${g.id}" value="${val}" oninput="saveAndRecalc()">`;
-                    herdGrid.appendChild(div);
+                    div.style.cssText = `background:#fff; padding:12px; border-radius:8px; border:1px solid #ddd; position:relative; box-shadow:0 1px 3px rgba(0,0,0,0.05);`;
                     
-                    // Crop Toggle
-                    const isChecked = savedCropHerds.includes(g.id) ? 'checked' : '';
-                    const toggleDiv = document.createElement('label');
-                    toggleDiv.style.cssText = `display:flex; align-items:center; gap:4px; color:${g.color}; font-weight:bold; cursor:pointer;`;
-                    toggleDiv.innerHTML = `<input type="checkbox" id="crop-toggle-${g.id}" value="${g.id}" ${isChecked} onchange="saveAndRecalc()"> ${g.name}`;
-                    cropToggleGrid.appendChild(toggleDiv);
+                    let html = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:14px; height:14px; border-radius:3px; background:${g.color};"></div>
+                                <input type="text" style="font-weight:bold; color:var(--text); border:none; background:transparent; font-size:14px; width:120px; outline:none; border-bottom:1px dashed #ccc; padding-bottom:2px;" value="${g.name}" onchange="updateCustomHerd('${g.id}', 'name', this.value)">
+                            </div>
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <div style="display:flex; flex-direction:column; align-items:center;">
+                                    <label style="font-size:9px; color:#95a5a6; font-weight:bold; text-transform:uppercase;">Cows</label>
+                                    <input type="number" id="herd-cows-${g.id}" value="${val}" style="width:50px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-weight:bold;" oninput="saveAndRecalc()">
+                                </div>
+                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">├ù</button>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; align-items:center; background:#f9f9f9; padding:8px; border-radius:6px;">
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
+                                <input type="checkbox" ${g.on_grass ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_grass', this.checked)"> On Grass
+                            </label>
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
+                                <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crop
+                            </label>
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer; margin-left:auto; background:#fff; padding:2px 6px; border:1px solid #ddd; border-radius:4px;">
+                                <input type="checkbox" ${g.is_oad ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'is_oad', this.checked)"> OAD
+                            </label>
+                        </div>
+                    `;
+                    
+                    if (g.on_crop) {
+                        html += `
+                            <div style="display:flex; align-items:center; gap:4px; margin-left:auto;">
+                                <label style="font-weight:600; color:#555;">Target (kg):</label>
+                                <input type="number" step="0.1" style="width:50px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center;" value="${g.custom_crop_feed !== null && g.custom_crop_feed !== undefined ? g.custom_crop_feed : ''}" placeholder="Global" onchange="updateCustomHerd('${g.id}', 'custom_crop_feed', this.value !== '' ? parseFloat(this.value) : null)">
+                            </div>
+                        `;
+                    }
+                    html += `</div>`;
+                    div.innerHTML = html;
+                    herdGrid.appendChild(div);
                 });
             }
+            updateEditGroupSelect();
             calculateFeedLogic();
+        }
+
+        function updateEditGroupSelect() {
+            const el = document.getElementById('edit-group-select');
+            if (!el) return;
+            el.innerHTML = '';
+            BREAK_GROUPS.forEach(g => {
+                if(g.id === 'all') return;
+                const opt = document.createElement('option');
+                opt.value = g.id;
+                opt.innerText = g.name;
+                el.appendChild(opt);
+            });
+            const optCrop = document.createElement('option');
+            optCrop.value = 'crops';
+            optCrop.innerText = 'Crops';
+            el.appendChild(optCrop);
         }
 
         async function init() {
@@ -2437,6 +3036,13 @@
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks') ? 'flex' : 'none';
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
+            
+            // Toggle Cow Emulator Visibility
+            const cowPanel = document.getElementById('cow-emulator-panel');
+            if (cowPanel) {
+                const showCow = (mode === 'satellite' || mode === 'manual' || mode === 'breaks');
+                cowPanel.style.display = showCow ? 'block' : 'none';
+            }
 
             // Map vs Overlay Logic
             if (mode === 'feed') {
@@ -2568,6 +3174,17 @@
                     weeklyFilterRange = null;
                     renderWeeklyReport();
                     renderBreaksOnMap();
+                    return;
+                } else if (mode === 'herd_management') {
+                    document.getElementById('map').style.display = 'none';
+                    document.getElementById('list').style.display = 'none';
+                    document.getElementById('admin-view').style.display = 'none';
+                    if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
+                    if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
+                    document.getElementById('herd-management-view').style.display = 'block';
+                    
+                    renderHerdManagement();
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     return;
                 } else {
                     setLayerMode(currentViewMode);
@@ -2754,10 +3371,10 @@
             pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
             
             const equationHtml = calibrationModel.type === 'exponential' 
-                ? `cover = ${Math.round(calibrationModel.A)}×exp(${calibrationModel.B.toFixed(2)}×ndvi)` 
-                : `cover = ${calibrationModel.a.toFixed(2)}×raw + ${Math.round(calibrationModel.b)}`;
+                ? `cover = ${Math.round(calibrationModel.A)}├ùexp(${calibrationModel.B.toFixed(2)}├ùndvi)` 
+                : `cover = ${calibrationModel.a.toFixed(2)}├ùraw + ${Math.round(calibrationModel.b)}`;
                 
-            text.innerHTML = `<div><b style="color:#2c3e50;">R²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
+            text.innerHTML = `<div><b style="color:#2c3e50;">R┬▓</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
         }
 
         function toggleCalibrationModel() {
@@ -2921,7 +3538,7 @@
                     badges += `<span class="badge" style="background:var(--prev)">M</span>`;
                 }
 
-                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> ÔÇó </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
 
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
@@ -3436,6 +4053,74 @@
             let grassHtml = '';
             const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
             
+            // 1. Calculate manual pool
+            let totalManualCows = 0;
+            let totalManualArea = 0;
+            let totalCowsAllHerds = 0;
+            
+            const globalFreq = document.querySelector('input[name="milking_freq"]:checked').value;
+            let herdLockedCache = {};
+
+            BREAK_GROUPS.forEach(g => {
+                if (g.id === 'all') return;
+                const hCows = savedHerdCows[g.id] || 0;
+                if (hCows > 0 && g.on_grass) {
+                    totalCowsAllHerds += hCows;
+                    
+                    const overrides = manualBreakOverrides[g.id] || {};
+                    let lockedDailyArea = 0;
+                    let isLocked = false;
+                    let amVal = parseFloat(overrides['am']); let amLocked = !isNaN(amVal) && amVal > 0;
+                    let pmVal = parseFloat(overrides['pm']); let pmLocked = !isNaN(pmVal) && pmVal > 0;
+                    let longVal = parseFloat(overrides['long']); let longLocked = !isNaN(longVal) && longVal > 0;
+                    let shortVal = parseFloat(overrides['short']); let shortLocked = !isNaN(shortVal) && shortVal > 0;
+
+                    if (g.is_oad) {
+                        let oadVal = globalFreq === '3in2' ? longVal : amVal;
+                        let oadLocked = globalFreq === '3in2' ? longLocked : amLocked;
+                        if (oadLocked) {
+                            lockedDailyArea = oadVal;
+                            isLocked = true;
+                        }
+                    } else if (globalFreq === 'tad') {
+                        if (amLocked && pmLocked) {
+                            lockedDailyArea = amVal + pmVal;
+                            isLocked = true;
+                        } else if (amLocked) {
+                            lockedDailyArea = amVal / amPct;
+                            isLocked = true;
+                        } else if (pmLocked) {
+                            lockedDailyArea = pmVal / pmPct;
+                            isLocked = true;
+                        }
+                    } else if (globalFreq === '3in2') {
+                        if (longLocked && shortLocked) {
+                            lockedDailyArea = (longVal + shortVal) / 2;
+                            isLocked = true;
+                        } else if (longLocked) {
+                            lockedDailyArea = (longVal / longPct) / 2;
+                            isLocked = true;
+                        } else if (shortLocked) {
+                            lockedDailyArea = (shortVal / shortPct) / 2;
+                            isLocked = true;
+                        }
+                    }
+
+                    herdLockedCache[g.id] = { isLocked: isLocked, lockedDailyArea: lockedDailyArea, isOAD: g.is_oad };
+
+                    if (isLocked) {
+                        totalManualCows += hCows;
+                        totalManualArea += lockedDailyArea;
+                    }
+                }
+            });
+
+            // 2. Proportional pool
+            const remainingArea = Math.max(0, areaDay - totalManualArea);
+            const remainingCows = Math.max(0, totalCowsAllHerds - totalManualCows);
+            const remainingAreaPerCow = remainingCows > 0 ? (remainingArea / remainingCows) * 10000 : 0;
+            
+            let totalGrassAssigned = 0;
             // ----- CROP MANAGEMENT HERD CALCULATIONS -----
             const cropYield = safeNum(document.getElementById('inp-crop-yield').value);
             const cropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
@@ -3468,38 +4153,60 @@
             BREAK_GROUPS.forEach(g => {
                 if (g.id === 'all') return;
                 const hCows = savedHerdCows[g.id] || 0;
-                if (hCows <= 0) return;
 
                 // Grass Math
-                let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
-                    <div style="font-weight:bold; color:${g.color}; margin-bottom:4px;">${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></div>
-                    <div style="display:flex; justify-content:space-between; font-size:12px;">`;
+                if (hCows > 0 && g.on_grass) {
+                    const cache = herdLockedCache[g.id];
+                    const hAreaHa = cache.isLocked ? cache.lockedDailyArea : ((remainingAreaPerCow * hCows) / 10000);
+                    
+                    totalGrassAssigned += hAreaHa;
 
-                if (freq === 'tad') {
-                    const hAreaHa = (areaCow * hCows) / 10000;
-                    const amHa = hAreaHa * amPct;
-                    const pmHa = hAreaHa * pmPct;
-                    hHtml += `<div><span>AM:</span> <b>${amHa.toFixed(2)} ha</b></div><div><span>PM:</span> <b>${pmHa.toFixed(2)} ha</b></div>`;
-                } else {
-                    const hArea2Day = ((areaCow * 2) * hCows) / 10000;
-                    const longHa = hArea2Day * longPct;
-                    const shortHa = hArea2Day * shortPct;
-                    hHtml += `<div><span>Long:</span> <b>${longHa.toFixed(2)} ha</b></div><div><span>Short:</span> <b>${shortHa.toFixed(2)} ha</b></div>`;
+                    let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div style="font-weight:bold; color:${g.color}; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></span>
+                        </div>`;
+
+                    hHtml += `<div style="display:flex; justify-content:space-between; font-size:12px;">`;
+                    
+                    const overrides = manualBreakOverrides[g.id] || {};
+
+                    if (cache.isOAD) {
+                        const oadStr = hAreaHa.toFixed(2);
+                        if (globalFreq === '3in2') {
+                            hHtml += `<div><span>Long:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${oadStr}" value="${overrides['long'] !== undefined ? overrides['long'] : ''}" onchange="saveManualBreak('${g.id}', 'long', this.value)"> <b>ha</b></div>
+                                      <div><span style="color:#aaa;">Short:</span> <b style="color:#aaa;">_._ ha</b></div>`;
+                        } else {
+                            hHtml += `<div><span>AM:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${oadStr}" value="${overrides['am'] !== undefined ? overrides['am'] : ''}" onchange="saveManualBreak('${g.id}', 'am', this.value)"> <b>ha</b></div>
+                                      <div><span style="color:#aaa;">PM:</span> <b style="color:#aaa;">_._ ha</b></div>`;
+                        }
+                    } else if (globalFreq === 'tad') {
+                        const amStr = (hAreaHa * amPct).toFixed(2);
+                        const pmStr = (hAreaHa * pmPct).toFixed(2);
+                        hHtml += `<div><span>AM:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${amStr}" value="${overrides['am'] !== undefined ? overrides['am'] : ''}" onchange="saveManualBreak('${g.id}', 'am', this.value)"> <b>ha</b></div>
+                                  <div><span>PM:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${pmStr}" value="${overrides['pm'] !== undefined ? overrides['pm'] : ''}" onchange="saveManualBreak('${g.id}', 'pm', this.value)"> <b>ha</b></div>`;
+                    } else if (globalFreq === '3in2') {
+                        const hArea2Day = hAreaHa * 2;
+                        const longStr = (hArea2Day * longPct).toFixed(2);
+                        const shortStr = (hArea2Day * shortPct).toFixed(2);
+                        hHtml += `<div><span>Long:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${longStr}" value="${overrides['long'] !== undefined ? overrides['long'] : ''}" onchange="saveManualBreak('${g.id}', 'long', this.value)"> <b>ha</b></div>
+                                  <div><span>Short:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${shortStr}" value="${overrides['short'] !== undefined ? overrides['short'] : ''}" onchange="saveManualBreak('${g.id}', 'short', this.value)"> <b>ha</b></div>`;
+                    }
+                    hHtml += `</div></div>`;
+                    grassHtml += hHtml;
                 }
-                hHtml += `</div></div>`;
-                grassHtml += hHtml;
 
                 // Crop Math
-                if (cropHerds.includes(g.id)) {
+                if (hCows > 0 && g.on_crop) {
                     let cAreaM2 = 0;
                     if (cropYield > 0) {
-                        const hDemand = cropFeed * hCows;
+                        const effectiveCropFeed = (g.custom_crop_feed !== null && g.custom_crop_feed !== undefined && String(g.custom_crop_feed).trim() !== '') ? parseFloat(g.custom_crop_feed) : cropFeed;
+                        const hDemand = effectiveCropFeed * hCows;
                         cAreaM2 = (hDemand / cropYield) * 10000;
                     }
                     herdCropM2Map[g.id] = cAreaM2;
                     cropHtml += `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #eee;">
                         <span style="font-weight:bold; color:${g.color}; font-size:12px;">${g.name}</span>
-                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m²/day</span></span>
+                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m┬▓/day</span></span>
                     </div>`;
                 }
             });
@@ -3507,9 +4214,15 @@
             localStorage.setItem('feed_crop_m2_per_herd', JSON.stringify(herdCropM2Map));
 
             document.getElementById('grass-herd-outputs').innerHTML = grassHtml || '<div class="muted" style="font-size:11px; text-align:center;">No cows allocated to herds.</div>';
+            
+            if (totalGrassAssigned > 0) {
+                document.getElementById('grass-herd-outputs').innerHTML += `<div style="text-align:right; font-weight:bold; font-size:12px; color:#2ecc71; margin-top:8px;">Total Used: ${totalGrassAssigned.toFixed(2)} ha/day</div>`;
+            }
+
             document.getElementById('crop-herd-outputs').innerHTML = cropHtml || '<div class="muted" style="font-size:11px; text-align:center;">No herds ticked for crops.</div>';
 
             renderFeedWedge(manualModeData, preGrazeTarget, residual);
+            updatePredictedWedge();
         }
 
         function renderFeedWedge(paddockData, targetPre, targetRes) {
@@ -3581,6 +4294,276 @@
             });
         }
 
+        function fetchWeatherAndOptimizeGrowth(event) {
+            const lat = -37.8;
+            const lon = 175.3;
+            const btn = event ? event.target : null;
+            if (btn) btn.innerText = "FETCHING...";
+
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&timezone=Pacific%2FAuckland&forecast_days=14`)
+                .then(res => res.json())
+                .then(data => {
+                    const maxTemps = data.daily.temperature_2m_max;
+                    const minTemps = data.daily.temperature_2m_min;
+                    let avgTemp = 0;
+                    for(let i=0; i<maxTemps.length; i++) {
+                        avgTemp += (maxTemps[i] + minTemps[i]) / 2;
+                    }
+                    avgTemp = avgTemp / maxTemps.length;
+                    
+                    let estimatedGrowth = 10 + Math.max(0, (avgTemp - 5) * 2.5);
+                    estimatedGrowth = Math.min(100, Math.max(5, Math.round(estimatedGrowth)));
+                    
+                    document.getElementById('inp-predict-growth').value = estimatedGrowth;
+                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
+                    updatePredictedWedge();
+                })
+                .catch(err => {
+                    console.error("Weather fetch failed:", err);
+                    alert("Failed to fetch weather data.");
+                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
+                });
+        }
+
+        function toggleDryOffMode() {
+            const isChecked = document.getElementById('inp-dryoff-toggle').checked;
+            document.getElementById('dryoff-container').style.display = isChecked ? 'flex' : 'none';
+        }
+        
+        function addDryOffEntry() {
+            const list = document.getElementById('dryoff-list');
+            const row = document.createElement('div');
+            row.className = 'dryoff-row';
+            row.style.display = 'flex';
+            row.style.gap = '10px';
+            row.style.marginBottom = '5px';
+            row.style.alignItems = 'center';
+            row.innerHTML = `
+                <input type="date" class="dryoff-date" style="flex:1; padding:5px; border-radius:4px; border:1px solid #ccc;" onchange="updatePredictedWedge()">
+                <input type="number" class="dryoff-cows" placeholder="Cows dried off" style="flex:1; padding:5px; border-radius:4px; border:1px solid #ccc;" onchange="updatePredictedWedge()">
+                <button onclick="this.parentElement.remove(); updatePredictedWedge();" style="background:#ff4444; color:white; border:none; border-radius:4px; padding:5px 10px; cursor:pointer;">X</button>
+            `;
+            list.appendChild(row);
+        }
+
+        function updatePredictedWedge() {
+            if (currentDashboardMode !== 'feed' || !manualModeData) return;
+            
+            const daysAhead = parseInt(document.getElementById('inp-predict-days').value) || 14;
+            const dailyGrowth = parseFloat(document.getElementById('inp-predict-growth').value) || 0;
+            
+            const simRotInput = document.getElementById('inp-predict-rotation');
+            const rotationDays = (simRotInput && simRotInput.value !== "") ? parseInt(simRotInput.value) : (parseInt(document.getElementById('inp-rotation').value) || 30);
+            
+            const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
+            
+            const simCowsInput = document.getElementById('inp-predict-cows');
+            const cows = (simCowsInput && simCowsInput.value !== "") ? parseInt(simCowsInput.value) : (parseInt(document.getElementById('inp-cows').value) || 0);
+            
+            const simIntakeInput = document.getElementById('inp-predict-intake');
+            const intake = (simIntakeInput && simIntakeInput.value !== "") ? parseFloat(simIntakeInput.value) : (parseFloat(document.getElementById('inp-intake').value) || 18);
+            
+            const dailyDemandKg = cows * intake;
+            
+            const isDryOffMode = document.getElementById('inp-dryoff-toggle').checked;
+            const dryOffEvents = [];
+            if (isDryOffMode) {
+                document.querySelectorAll('.dryoff-row').forEach(row => {
+                    const dStr = row.querySelector('.dryoff-date').value;
+                    const cNum = parseInt(row.querySelector('.dryoff-cows').value) || 0;
+                    if (dStr && cNum > 0) {
+                        const ts = new Date(dStr).getTime();
+                        if (!isNaN(ts)) dryOffEvents.push({ ts, cows: cNum });
+                    }
+                });
+                dryOffEvents.sort((a, b) => a.ts - b.ts);
+            }
+
+            let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
+            
+            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
+            const areaPerDayHa = totalAreaHa / (rotationDays || 1);
+            const targetPre = (dailyDemandKg / areaPerDayHa) + targetRes;
+            const maxSuppPerCow = parseFloat(document.getElementById('inp-predict-max-supp').value) || 20;
+            
+            // 1. Initial State: Starting from Farmwalk Cover + Catch-up growth
+            const fwDate = manualModeData[0]?.latest?.ts ? new Date(manualModeData[0].latest.ts) : null;
+            const daysSinceFW = fwDate ? Math.max(0, (nowTime - fwDate.getTime()) / 86400000) : 0;
+            
+            simPaddocks.forEach(p => {
+                p.currentCover = p.latest.cover;
+                if (fwDate) {
+                    p.currentCover += (dailyGrowth * Math.round(daysSinceFW));
+                }
+            });
+
+            // 2. Sort by current cover (highest first) - this is our fixed grazing sequence
+            simPaddocks.sort((a, b) => b.currentCover - a.currentCover);
+
+            // 3. Sequential Simulation
+            let totalAreaPassed = daysSinceFW * areaPerDayHa; 
+            let finalCows = cows;
+            let finalDailyDemandKg = dailyDemandKg;
+
+            for (let day = 0; day < daysAhead; day++) {
+                let currentDayTs = nowTime + (day * 86400000);
+                let currentCows = cows;
+                if (isDryOffMode) {
+                    dryOffEvents.forEach(ev => {
+                        if (ev.ts <= currentDayTs) currentCows = Math.max(0, currentCows - ev.cows);
+                    });
+                }
+                let currentDailyDemandKg = currentCows * intake;
+                
+                const areaToGrazeToday = areaPerDayHa;
+                const maxSuppTotalKg = currentCows * maxSuppPerCow;
+                const minPastureReqKg = Math.max(0, currentDailyDemandKg - maxSuppTotalKg);
+
+                // Everyone grows
+                simPaddocks.forEach(p => p.currentCover += dailyGrowth);
+
+                // Where is our cursor in the farm?
+                // We assume we are grazing sequentially from the top of the wedge.
+                // totalAreaPassed is how much area we have grazed since the farmwalk.
+                let cursorStart = totalAreaPassed % totalAreaHa;
+                let cursorEnd = (totalAreaPassed + areaToGrazeToday) % totalAreaHa;
+                
+                // Graze the paddocks in the [cursorStart, cursorEnd] range
+                let areaInFarm = 0;
+                let dayGrazedCoverSum = 0;
+                let dayGrazedAreaSum = 0;
+
+                simPaddocks.forEach(p => {
+                    let paddockStart = areaInFarm;
+                    let paddockEnd = areaInFarm + p.area;
+                    
+                    // Does our daily grazing range [cursorStart, cursorStart + areaToGraze] overlap this paddock?
+                    let start = Math.max(paddockStart, cursorStart);
+                    let end = Math.min(paddockEnd, cursorStart + areaToGrazeToday);
+                    
+                    if (start < end) {
+                        let take = end - start;
+                        dayGrazedAreaSum += take;
+                        dayGrazedCoverSum += (p.currentCover * take);
+                    }
+                    areaInFarm = paddockEnd;
+                });
+
+                // Wrap around logic if cursor crosses the end of the farm
+                if (cursorStart + areaToGrazeToday > totalAreaHa) {
+                    let overflow = (cursorStart + areaToGrazeToday) - totalAreaHa;
+                    let areaInFarm2 = 0;
+                    simPaddocks.forEach(p => {
+                        let paddockStart = areaInFarm2;
+                        let paddockEnd = areaInFarm2 + p.area;
+                        let start = Math.max(paddockStart, 0);
+                        let end = Math.min(paddockEnd, overflow);
+                        if (start < end) {
+                            let take = end - start;
+                            dayGrazedAreaSum += take;
+                            dayGrazedCoverSum += (p.currentCover * take);
+                        }
+                        areaInFarm2 = paddockEnd;
+                    });
+                }
+
+                // Adjust residual based on supplement cap
+                const dayAvgPre = dayGrazedAreaSum > 0 ? (dayGrazedCoverSum / dayGrazedAreaSum) : targetRes;
+                const pastureNeededToHitTarget = (dayAvgPre - targetRes) * areaToGrazeToday;
+                const actualPastureTaken = Math.max(minPastureReqKg, pastureNeededToHitTarget);
+                const dayResidual = areaToGrazeToday > 0 ? (dayAvgPre - (actualPastureTaken / areaToGrazeToday)) : targetRes;
+
+                // Apply the grazing to the paddocks in the range
+                let areaInFarm3 = 0;
+                simPaddocks.forEach(p => {
+                    let pStart = areaInFarm3;
+                    let pEnd = areaInFarm3 + p.area;
+                    let start = Math.max(pStart, cursorStart);
+                    let end = Math.min(pEnd, cursorStart + areaToGrazeToday);
+                    if (start < end) {
+                        let fraction = (end - start) / p.area;
+                        p.currentCover = (p.currentCover * (1 - fraction)) + (dayResidual * fraction);
+                    }
+                    // Handle wrap
+                    if (cursorStart + areaToGrazeToday > totalAreaHa) {
+                        let overflow = (cursorStart + areaToGrazeToday) - totalAreaHa;
+                        let start2 = Math.max(pStart, 0);
+                        let end2 = Math.min(pEnd, overflow);
+                        if (start2 < end2) {
+                            let fraction2 = (end2 - start2) / p.area;
+                            p.currentCover = (p.currentCover * (1 - fraction2)) + (dayResidual * fraction2);
+                        }
+                    }
+                    areaInFarm3 = pEnd;
+                });
+
+                totalAreaPassed += areaToGrazeToday;
+
+                if (day === daysAhead - 1) {
+                    finalCows = currentCows;
+                    finalDailyDemandKg = currentDailyDemandKg;
+                }
+            }
+
+            // Map currentCover back to latest.cover for rendering
+            simPaddocks.forEach(p => p.latest.cover = p.currentCover);
+            const finalTargetPre = (finalDailyDemandKg / areaPerDayHa) + targetRes;
+            
+            const finalTotalCover = simPaddocks.reduce((sum, p) => sum + (p.latest.cover * p.area), 0);
+            const expectedApc = totalAreaHa > 0 ? (finalTotalCover / totalAreaHa) : 0;
+            const apcEl = document.getElementById('predict-apc');
+            if (apcEl) apcEl.innerText = Math.round(expectedApc).toLocaleString();
+            
+            let finalAreaSum = 0;
+            let finalCoverSum = 0;
+            simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+            for (let p of simPaddocks) {
+                if (finalAreaSum >= areaPerDayHa) break;
+                let take = Math.min(p.area, areaPerDayHa - finalAreaSum);
+                finalAreaSum += take;
+                finalCoverSum += (p.latest.cover * take);
+            }
+            const expectedAvgAvailablePreGraze = (finalAreaSum > 0) ? (finalCoverSum / finalAreaSum) : 0;
+            const expectedPastureOfferedPerDay = (expectedAvgAvailablePreGraze - targetRes) * areaPerDayHa;
+            let expectedSupplementKgDay = finalDailyDemandKg - expectedPastureOfferedPerDay;
+            if (expectedSupplementKgDay < 0) expectedSupplementKgDay = 0;
+            const expectedSuppPerCow = finalCows > 0 ? (expectedSupplementKgDay / finalCows) : 0;
+            
+            const suppEl = document.getElementById('predict-supp');
+            if (suppEl) suppEl.innerText = expectedSuppPerCow.toFixed(1);
+
+            renderPredictedWedge(simPaddocks, finalTargetPre, targetRes);
+        }
+
+        function renderPredictedWedge(simPaddocks, targetPre, targetRes) {
+            const ctx = document.getElementById('predictedWedgeChart').getContext('2d');
+            simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+            const labels = simPaddocks.map(p => p.name);
+            const dataCover = simPaddocks.map(p => p.latest.cover);
+            const demandLine = [];
+            const count = simPaddocks.length;
+            if (count > 0) {
+                const slope = (targetRes - targetPre) / (count - 1 || 1);
+                for (let i = 0; i < count; i++) demandLine.push(targetPre + (slope * i));
+            }
+            if (predictedWedgeChartInstance) predictedWedgeChartInstance.destroy();
+            predictedWedgeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { type: 'line', label: 'Predicted Demand Line', data: demandLine, borderColor: '#3498db', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], fill: false, tension: 0 },
+                        { type: 'bar', label: 'Predicted Cover (kgDM/ha)', data: dataCover, backgroundColor: '#9b59b6', borderRadius: 3, barPercentage: 0.95, categoryPercentage: 0.95 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: true, position: 'top', align: 'end' }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } } },
+                    scales: { y: { beginAtZero: true, title: { display: true, text: 'kgDM/ha', font: { size: 10, weight: 'bold' } } }, x: { ticks: { maxRotation: 90, minRotation: 90, font: { size: 9 } } } }
+                }
+            });
+        }
+
         function saveToCloud(isAuto = false) {
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) {
                 if (!isAuto) alert("Please set the GOOGLE_SCRIPT_URL variable in the code to enable cloud saving.");
@@ -3614,7 +4597,9 @@
                 cropYield: document.getElementById('inp-crop-yield').value,
                 cropFeed: document.getElementById('inp-crop-feed').value,
                 cropYields: cropYields,
-                cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]')
+                cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
+                customHerds: BREAK_GROUPS,
+                manualBreaks: manualBreakOverrides
             };
 
             fetch(GOOGLE_SCRIPT_URL, {
@@ -4847,7 +5832,7 @@
                         </div>
                         <div style="text-align:right;">
                             <div style="font-weight:bold; color:var(--accent); font-size:18px;">${w.totalArea.toFixed(2)} <span style="font-size:11px; font-weight:normal; color:#7f8c8d;">ha</span></div>
-                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map ➔'}</div>
+                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map Ô×ö'}</div>
                         </div>
                     </div>`;
                 });
@@ -4857,7 +5842,7 @@
         }
 
         function renderBreakCardHtml(brk) {
-            const isLineMode = brk.cropMode === 'line';
+            const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
             const measureStr = isLineMode 
                 ? (brk.distanceMeters ? brk.distanceMeters.toFixed(0) + ' meters' : '0 meters')
                 : (brk.areaHa >= 1 ? brk.areaHa.toFixed(2) + ' ha' : Math.round(brk.areaSqm) + ' m\u00b2');
@@ -4964,7 +5949,7 @@
                                  title="${isAudioActive ? 'Stop Audio Aid' : 'Start Audio Aid'}">
                              ${isAudioActive ? '\u23f9\ufe0f' : '\u25b6\ufe0f'}
                          </button>
-                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">⚙️</button>`}
+                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">ÔÜÖ´©Å</button>`}
                          <button class="btn-edit-break" style="position:static;" onclick="event.stopPropagation(); startEditBreak('${brk.id}')" title="Edit vertices">\u270e</button>
                          <button class="btn-delete-break" style="position:static;" onclick="promptDeleteBreak('${brk.id}', event)" title="Delete break">\ud83d\uddd1\ufe0f</button>
                        </div>`
@@ -5079,7 +6064,7 @@
             if (editPolygon) map.removeLayer(editPolygon);
             const brk = savedBreaks.find(b => b.id === editingBreakId);
             const gColor = brk ? getGroupColor(brk.group) : '#e67e22';
-            const isLineMode = brk ? brk.cropMode === 'line' : false;
+            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
 
             if (editVertices.length >= 3 && !isLineMode) {
                 const coords = editVertices.map(v => [v.lat, v.lng]);
@@ -5156,7 +6141,7 @@
         function updateEditInfo() {
             let info = `${editVertices.length} points`;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
-            const isLineMode = brk ? brk.cropMode === 'line' : false;
+            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
 
             if (isLineMode && editVertices.length >= 2) {
                 const distMeters = calculateLineDistance(editVertices);
@@ -5172,7 +6157,7 @@
         function deleteEditVertex() {
             if (editSelectedIdx < 0 || editSelectedIdx >= editVertices.length) return;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
-            const isLineMode = brk ? brk.cropMode === 'line' : false;
+            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
             
             if (!isLineMode && editVertices.length <= 3) {
                 alert('A break must have at least 3 points.');
@@ -5196,7 +6181,7 @@
             const brk = savedBreaks.find(b => b.id === editingBreakId);
             if (!brk) return;
             
-            const isLineMode = brk.cropMode === 'line';
+            const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
             
             if (!isLineMode && editVertices.length < 3) return;
             if (isLineMode && editVertices.length < 2) return;
@@ -5372,7 +6357,7 @@
                     row.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:6px; border:1px solid #eee; font-size:13px;";
                     row.innerHTML = `
                             <span>${email}</span>
-                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">✕</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
+                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">Ô£ò</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
                         `;
                     listDiv.appendChild(row);
                 });
@@ -5415,15 +6400,15 @@
     <!-- Break Drawing Toolbar (Moved Outside Map for Z-Index Stability) -->
     <div id="break-toolbar" class="break-toolbar" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
         <div class="toolbar-toggles">
-            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> 🎯 Use Crosshair</label>
-            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> 🔒 Lock Points</label>
+            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> ­ƒÄ» Use Crosshair</label>
+            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> ­ƒöÆ Lock Points</label>
         </div>
         <button class="btn-drop" id="btn-drop-point" onclick="event.stopPropagation(); addPointFromCrosshair()">DROP POINT</button>
         <span class="vertex-count" id="vertex-count">0 points</span>
-        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">↩ Undo</button>
-        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">⬡ Follow Contour</button>
-        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>✓ Finish</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">✕ Cancel</button>
+        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">Ôå® Undo</button>
+        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">Ô¼í Follow Contour</button>
+        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>Ô£ô Finish</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">Ô£ò Cancel</button>
     </div>
 
     <!-- Break Edit Toolbar -->
@@ -5436,9 +6421,9 @@
             <option value="pennos">Pennos</option>
             <option value="crops">Crops</option>
         </select>
-        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>✕ Delete Point</button>
-        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">✓ Done</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">✕ Cancel</button>
+        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>Ô£ò Delete Point</button>
+        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">Ô£ô Done</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">Ô£ò Cancel</button>
     </div>
 
 </body>
