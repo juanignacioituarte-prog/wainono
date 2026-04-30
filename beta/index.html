@@ -1296,7 +1296,7 @@
             }
         }
     </style>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
 </head>
 <body>
     <div id="distance-debug-overlay">
@@ -1354,7 +1354,7 @@
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
         <h2>🐄 River Terrace Beta Emulator</h2>
         <div id="g_id_onload" data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
-            data-callback="handleCredentialResponse" data-auto_prompt="false">
+            data-auto_prompt="false">
         </div>
         <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with"
             data-shape="rectangular" data-logo_alignment="left">
@@ -6333,11 +6333,23 @@
             });
         };
 
-        // Auto-Login Check on Boot
+        // Auto-Login Check on Boot + explicit Google Sign-In init
         window.addEventListener('DOMContentLoaded', () => {
+            // Initialise Google Sign-In explicitly so the callback is always found
+            if (window.google && google.accounts) {
+                google.accounts.id.initialize({
+                    client_id: "299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com",
+                    callback: handleCredentialResponse,
+                    auto_select: false
+                });
+                google.accounts.id.renderButton(
+                    document.querySelector('.g_id_signin'),
+                    { theme: 'outline', size: 'large' }
+                );
+            }
+
             const savedEmail = localStorage.getItem('auth_email');
             if (savedEmail) {
-                // Skips Google prompt, attempts authentication silently
                 handleCredentialResponse(savedEmail);
             }
         });
