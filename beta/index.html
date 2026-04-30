@@ -1485,6 +1485,14 @@
                         <label>Simulated Rotation (Days)</label>
                         <input type="number" id="inp-predict-rotation" value="30" oninput="updatePredictedWedge()">
                     </div>
+                    <div class="input-group">
+                        <label>Simulated Cows</label>
+                        <input type="number" id="inp-predict-cows" placeholder="Auto" oninput="updatePredictedWedge()">
+                    </div>
+                    <div class="input-group">
+                        <label>Simulated Intake (kgDM)</label>
+                        <input type="number" id="inp-predict-intake" placeholder="Auto" oninput="updatePredictedWedge()">
+                    </div>
                 </div>
                 <div class="chart-box">
                     <canvas id="predictedWedgeChart"></canvas>
@@ -3855,8 +3863,12 @@
             
             const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
             
-            const cows = parseInt(document.getElementById('inp-cows').value) || 0;
-            const intake = parseFloat(document.getElementById('inp-intake').value) || 18;
+            const simCowsInput = document.getElementById('inp-predict-cows');
+            const cows = (simCowsInput && simCowsInput.value !== "") ? parseInt(simCowsInput.value) : (parseInt(document.getElementById('inp-cows').value) || 0);
+            
+            const simIntakeInput = document.getElementById('inp-predict-intake');
+            const intake = (simIntakeInput && simIntakeInput.value !== "") ? parseFloat(simIntakeInput.value) : (parseFloat(document.getElementById('inp-intake').value) || 18);
+            
             const dailyDemandKg = cows * intake;
             
             let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
