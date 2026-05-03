@@ -1295,6 +1295,25 @@
         </div>
     </div>
 
+    <!-- Custom Paddock Modal -->
+    <div id="custom-paddock-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:10000; align-items:center; justify-content:center;">
+        <div class="modal-content" style="background:white; padding:20px; border-radius:12px; width:80%; max-width:300px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+            <h3 style="margin-top:0;">Add Paddock Outside Map</h3>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; font-size:12px; margin-bottom:5px;">Paddock Name</label>
+                <input type="text" id="cp-modal-name" placeholder="e.g. Runoff 1" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:12px; margin-bottom:5px;">Estimated Yield (kgDM/ha)</label>
+                <input type="number" id="cp-modal-yield" value="20000" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="document.getElementById('custom-paddock-modal').style.display='none'" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:4px; background:white; cursor:pointer;">CANCEL</button>
+                <button onclick="startAddCustomPaddock()" style="flex:1; padding:10px; border:none; border-radius:4px; background:var(--accent); color:white; cursor:pointer; font-weight:bold;">START DRAWING</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Finish Break Details Modal -->
     <div id="finish-break-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:10000; align-items:center; justify-content:center;">
         <div style="background:white; padding:20px; border-radius:12px; width:80%; max-width:320px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
@@ -1449,12 +1468,14 @@
                         <input type="number" id="inp-crop-feed" value="4" oninput="saveAndRecalc()">
                     </div>
                 </div>
-                <div id="crop-paddock-yields-list" style="margin-top:15px; background:#f9f9f9; padding:10px; border-radius:6px; border:1px solid #eee;">
+                <button class="btn-save" style="margin-top:10px; width:100%; background:#8e44ad; border-color:#8e44ad; margin-bottom:15px;" onclick="showAddCustomPaddockModal()">+ ADD EXTERNAL PADDOCK</button>
+                <div id="crop-paddock-yields-list" style="background:#f9f9f9; padding:10px; border-radius:6px; border:1px solid #eee;">
                     <div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:10px; display:flex; justify-content:space-between;">
                         <span>CROP PADDOCK</span>
                         <span>EST. YIELD (kgDM/ha)</span>
                     </div>
                 </div>
+                <div id="custom-paddock-list" style="margin-top:10px; background:#f0f7ff; padding:10px; border-radius:8px; border:1px solid #d0e4ff; display:none;"></div>
                 <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:10px; margin-bottom:5px; display:none;">Herds in Crops:</div>
                 <div id="crop-herd-toggles" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:15px; font-size:12px;"></div>
                 <div id="crop-herd-outputs"></div>
@@ -1710,6 +1731,48 @@
     </div>
 </div>
 
+    <!-- Modals -->
+    <div id="custom-paddock-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:20000; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
+        <div style="background:white; padding:25px; border-radius:12px; width:100%; max-width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.2);">
+            <h3 style="margin-top:0; color:#8e44ad; display:flex; align-items:center; gap:10px;">
+                <span>+ ADD EXTERNAL PADDOCK</span>
+            </h3>
+            <p style="font-size:13px; color:#666; margin-bottom:20px;">Register an off-platform paddock by giving it a name and yield, then drawing its boundaries on the map.</p>
+            
+            <div class="input-group" style="margin-bottom:15px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">PADDOCK NAME</label>
+                <input type="text" id="cp-modal-name" placeholder="e.g. Back Block 1" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-weight:bold;">
+            </div>
+            
+            <div class="input-group" style="margin-bottom:20px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">ESTIMATED YIELD (kgDM/ha)</label>
+                <input type="number" id="cp-modal-yield" value="20000" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-weight:bold;">
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+                <button onclick="document.getElementById('custom-paddock-modal').style.display='none'" style="flex:1; padding:12px; border:1px solid #ddd; background:#f9f9f9; border-radius:8px; font-weight:bold; cursor:pointer;">CANCEL</button>
+                <button onclick="startAddCustomPaddock()" style="flex:2; padding:12px; border:none; background:#8e44ad; color:white; border-radius:8px; font-weight:bold; cursor:pointer;">DRAW ON MAP</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-paddock-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100001; align-items:center; justify-content:center;">
+        <div style="background:white; padding:25px; border-radius:12px; width:320px; text-align:center; box-shadow:0 10px-40px rgba(0,0,0,0.2);">
+            <div style="font-size:40px; margin-bottom:15px;">🗺️</div>
+            <h3 style="margin-top:0;">Select Whole Paddock?</h3>
+            <p style="font-size:14px; color:#666; margin-bottom:25px;">Do you want to use the entire area of <b id="confirm-paddock-name"></b> for this break?</p>
+            <div style="display:flex; gap:10px;">
+                <button id="btn-cancel-paddock" style="flex:1; padding:12px; border:1px solid #ddd; background:#f9f9f9; border-radius:8px; font-weight:bold; cursor:pointer;">NO</button>
+                <button id="btn-confirm-paddock" style="flex:1; padding:12px; border:none; background:var(--accent); color:white; border-radius:8px; font-weight:bold; cursor:pointer;">YES</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
     <script>
@@ -1819,6 +1882,10 @@
         let activeBreakGroup = 'all';
         let cropYields = {}; // { paddockName: yield }
         let allCropPaddocks = []; // List of paddock names with 'CROP' status
+        let customPaddocks = []; // Array of { id, name, yield, vertices, areaHa }
+        let pendingCPData = null; // Temporary storage for modal data during drawing
+        let customPaddockLayer = null;
+        let customPaddockLabelLayer = null;
 
         let activeSoundBreakId = null; 
         let audioCtx = null;
@@ -1866,41 +1933,57 @@
         /* Helpers */
         function normName(s) { return (s || "").trim().toLowerCase(); }
 
+        function isPointInLayer(layer, x, y) {
+            const ptL = L.latLng(y, x);
+            if (layer.getBounds && !layer.getBounds().contains(ptL)) return false;
+            let polys = layer.getLatLngs();
+            let rings = [];
+            function extractRings(arr) {
+                if (!arr || arr.length === 0) return;
+                if (arr[0] && typeof arr[0].lat === 'number') rings.push(arr);
+                else arr.forEach(extractRings);
+            }
+            extractRings(polys);
+            for (let poly of rings) {
+                let inside = false;
+                for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                    let xi = poly[i].lng, yi = poly[i].lat;
+                    let xj = poly[j].lng, yj = poly[j].lat;
+                    let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+                if (inside) return true;
+            }
+            return false;
+        }
+
         function getPaddockFromPoint(latlngRaw) {
             if (!latlngRaw) return null;
             let foundPaddock = null;
-            if (!geoLayer) return null;
             const ptX = latlngRaw.lng, ptY = latlngRaw.lat;
-            const ptL = L.latLng(ptY, ptX);
 
-            geoLayer.eachLayer(layer => {
-                if (foundPaddock) return;
-                if (!layer.getLatLngs) return; // Skip if not a polygon
-                if (layer.getBounds && !layer.getBounds().contains(ptL)) return;
-
-                let polys = layer.getLatLngs();
-                let rings = [];
-                function extractRings(arr) {
-                    if (!arr || arr.length === 0) return;
-                    if (arr[0] && typeof arr[0].lat === 'number') rings.push(arr);
-                    else arr.forEach(extractRings);
-                }
-                extractRings(polys);
-
-                for (let poly of rings) {
-                    let inside = false;
-                    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-                        let xi = poly[i].lng, yi = poly[i].lat;
-                        let xj = poly[j].lng, yj = poly[j].lat;
-                        let intersect = ((yi > ptY) != (yj > ptY)) && (ptX < (xj - xi) * (ptY - yi) / (yj - yi) + xi);
-                        if (intersect) inside = !inside;
+            // Check Custom first
+            if (customPaddockLayer) {
+                customPaddockLayer.eachLayer(layer => {
+                    if (foundPaddock) return;
+                    if (isPointInLayer(layer, ptX, ptY)) {
+                        const cp = customPaddocks.find(p => p.vertices[0].lat === layer.getLatLngs()[0][0].lat);
+                        if (cp) foundPaddock = cp.name;
                     }
-                    if (inside) {
+                });
+            }
+
+            if (foundPaddock) return foundPaddock;
+
+            // Check GeoJSON
+            if (geoLayer) {
+                geoLayer.eachLayer(layer => {
+                    if (foundPaddock) return;
+                    if (isPointInLayer(layer, ptX, ptY)) {
                         foundPaddock = layer.feature && layer.feature.properties ? layer.feature.properties.name : 'Unknown';
-                        break;
                     }
-                }
-            });
+                });
+            }
             return foundPaddock;
         }
 
@@ -2986,6 +3069,53 @@
             return best;
         }
 
+        function updateFarmStats() {
+            const data = getCurrentModeData();
+            let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
+            data.forEach(p => {
+                const areaNum = p.area || 0;
+                if (areaNum > 0 && !p.isOut) {
+                    tWCover += (p.latest.cover * areaNum); tAreaC += areaNum;
+                    if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * areaNum); tAreaG += areaNum; }
+                }
+            });
+
+            // --- SUBTRACT CROP BREAK AREAS ---
+            let totalCropBreakArea = 0;
+            const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
+            const daysAgoTs = Date.now() - filterDays * 24 * 60 * 60 * 1000;
+            savedBreaks.forEach(b => {
+                if (b.isCropBreak && b.createdAt && new Date(b.createdAt).getTime() >= daysAgoTs) {
+                    // Only subtract if it's not already in an 'OUT' paddock (to avoid double-counting)
+                    const pStatus = b.paddock ? excludedPaddocks.get(b.paddock.toLowerCase()) : null;
+                    if (!pStatus || pStatus === 'IN' || pStatus === 'PARTIAL') {
+                        totalCropBreakArea += (b.areaHa || 0);
+                    }
+                }
+            });
+            tAreaC = Math.max(0, tAreaC - totalCropBreakArea);
+
+            const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
+            const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
+
+            const elTotalAvg = document.getElementById('total-avg');
+            const elAvgGrowth = document.getElementById('avg-growth');
+            const elSyncTime = document.getElementById('sync-time');
+            const elFeedAreaTotal = document.getElementById('feed-area-total');
+            const elFeedAvgCover = document.getElementById('feed-avg-cover');
+            const elFeedAvgGrowth = document.getElementById('feed-avg-growth');
+
+            if (elTotalAvg) elTotalAvg.innerText = avgCoverVal.toLocaleString();
+            if (elAvgGrowth) elAvgGrowth.innerText = "+" + avgGrowthVal;
+            if (elSyncTime) elSyncTime.innerText = new Date().toLocaleTimeString();
+
+            if (elFeedAreaTotal) elFeedAreaTotal.innerText = tAreaC.toFixed(1);
+            if (elFeedAvgCover) elFeedAvgCover.innerText = avgCoverVal;
+            if (elFeedAvgGrowth) elFeedAvgGrowth.innerText = avgGrowthVal;
+            
+            return { tAreaC, avgCoverVal, avgGrowthVal };
+        }
+
         /* Rendering */
         function renderDashboard() {
             if (currentDashboardMode !== 'manual' && currentDashboardMode !== 'satellite') return;
@@ -2995,27 +3125,7 @@
                 return b.latest.cover - a.latest.cover;
             });
 
-            let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
-            sorted.forEach(p => {
-                const areaNum = p.area || 0;
-                if (areaNum > 0 && !p.isOut) {
-                    tWCover += (p.latest.cover * areaNum); tAreaC += areaNum;
-                    if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * areaNum); tAreaG += areaNum; }
-                }
-            });
-
-            // Update Side Stats
-            const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
-            const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
-
-            document.getElementById('total-avg').innerText = avgCoverVal.toLocaleString();
-            document.getElementById('avg-growth').innerText = "+" + avgGrowthVal;
-            document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
-
-            document.getElementById('feed-area-total').innerText = tAreaC.toFixed(1);
-            document.getElementById('feed-avg-cover').innerText = avgCoverVal;
-            document.getElementById('feed-avg-growth').innerText = avgGrowthVal;
-
+            updateFarmStats();
             calculateFeedLogic();
 
             const list = document.getElementById('list'); list.innerHTML = "";
@@ -3715,6 +3825,22 @@
 
             document.getElementById('crop-herd-outputs').innerHTML = cropHtml || '<div class="muted" style="font-size:11px; text-align:center;">No herds ticked for crops.</div>';
 
+            // Render Custom Paddocks List in Management
+            const cpList = document.getElementById('custom-paddock-list');
+            if (customPaddocks.length > 0) {
+                cpList.style.display = 'block';
+                let cpInner = `<div style="font-size:11px; font-weight:bold; color:#2980b9; margin-bottom:10px;">EXTERNAL PADDOCKS (CUSTOM)</div>`;
+                customPaddocks.forEach(p => {
+                    cpInner += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:12px; font-weight:600; color:#34495e;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
+                        <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:14px; padding:0 5px;" title="Remove Paddock">🗑️</button>
+                    </div>`;
+                });
+                cpList.innerHTML = cpInner;
+            } else {
+                cpList.style.display = 'none';
+            }
+
             renderFeedWedge(manualModeData, preGrazeTarget, residual);
         }
 
@@ -3937,6 +4063,7 @@
                     if (b.comment) cb.comment = b.comment;
                     if (b.lastEditedBy) cb.lastEditedBy = b.lastEditedBy;
                     if (b.lastEditedAt) cb.lastEditedAt = b.lastEditedAt;
+                    if (b.isCropBreak) cb.isCropBreak = b.isCropBreak;
                     return cb;
                 });
 
@@ -3948,6 +4075,107 @@
                 .then(res => console.log("Cloud save res:", res.status))
                 .catch(e => { console.log('Cloud breaks save failed', e); });
             }
+        }
+
+        /* ===================== CUSTOM PADDOCKS (EXTERNAL) ===================== */
+        function loadCustomPaddocks() {
+            try {
+                const stored = localStorage.getItem('custom_paddocks');
+                if (stored) {
+                    customPaddocks = JSON.parse(stored);
+                    renderCustomPaddocksOnMap();
+                }
+            } catch (e) {
+                console.error("Failed to load custom paddocks:", e);
+                customPaddocks = [];
+            }
+        }
+
+        function saveCustomPaddocks() {
+            localStorage.setItem('custom_paddocks', JSON.stringify(customPaddocks));
+            renderCustomPaddocksOnMap();
+            saveToCloud(true); // Sync to cloud
+        }
+
+        function renderCustomPaddocksOnMap() {
+            if (!map) return;
+            if (customPaddockLayer) map.removeLayer(customPaddockLayer);
+            if (customPaddockLabelLayer) map.removeLayer(customPaddockLabelLayer);
+
+            customPaddockLayer = L.layerGroup().addTo(map);
+            customPaddockLabelLayer = L.layerGroup().addTo(map);
+
+            customPaddocks.forEach(cp => {
+                const coords = cp.vertices.map(v => [v.lat, v.lng]);
+                const poly = L.polygon(coords, {
+                    color: '#8e44ad',
+                    weight: 2,
+                    dashArray: '5, 5',
+                    fillColor: '#8e44ad',
+                    fillOpacity: 0.1
+                }).addTo(customPaddockLayer);
+
+                // Add deletion button on click
+                poly.on('click', (e) => {
+                    if (isDrawingBreak) return;
+                    L.DomEvent.stopPropagation(e);
+                    if (confirm(`Delete external paddock "${cp.name}"?`)) {
+                        deleteCustomPaddock(cp.name);
+                    }
+                });
+
+                // Add label
+                const center = poly.getBounds().getCenter();
+                L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'custom-paddock-label',
+                        html: `<div style="color:#8e44ad; font-weight:bold; font-size:10px; text-shadow:0 0 3px white; text-align:center; background:rgba(255,255,255,0.7); padding:2px 4px; border-radius:4px; border:1px solid #8e44ad;">${cp.name.toUpperCase()}</div>`,
+                        iconSize: [80, 20],
+                        iconAnchor: [40, 10]
+                    })
+                }).addTo(customPaddockLabelLayer);
+                
+                // Add to areaLookup for math
+                areaLookup[cp.name] = cp.areaHa;
+                cropYields[cp.name] = cp.yield;
+            });
+        }
+
+        function deleteCustomPaddock(name) {
+            customPaddocks = customPaddocks.filter(p => p.name !== name);
+            saveCustomPaddocks();
+            if (currentDashboardMode === 'feed') setFeedInputs();
+        }
+
+        function showAddCustomPaddockModal() {
+            document.getElementById('custom-paddock-modal').style.display = 'flex';
+            document.getElementById('cp-modal-name').value = '';
+        }
+
+        function startAddCustomPaddock() {
+            const name = document.getElementById('cp-modal-name').value.trim();
+            const yieldVal = parseFloat(document.getElementById('cp-modal-yield').value) || 20000;
+            
+            if (!name) return alert("Please enter a paddock name");
+            if (customPaddocks.some(p => p.name.toLowerCase() === name.toLowerCase()) || paddockMap[name]) {
+                return alert("A paddock with this name already exists");
+            }
+
+            pendingCPData = { name, yield: yieldVal };
+            document.getElementById('custom-paddock-modal').style.display = 'none';
+            
+            // Enter drawing mode
+            currentDrawingMode = 'custom_paddock';
+            isDrawingBreak = true;
+            drawingVertices = [];
+            
+            setBreakFullscreen(true);
+            document.getElementById('break-toolbar').style.display = 'flex';
+            document.getElementById('vertex-count').textContent = 'Draw Paddock Boundaries';
+            map.getContainer().style.cursor = 'crosshair';
+            map.on('click', onMapClickForBreak);
+            
+            if (navigator.vibrate) navigator.vibrate(100);
         }
 
         function calculatePolygonArea(latlngs) {
@@ -4120,8 +4348,30 @@
         function finishBreak() {
             try {
                 const isLineMode = currentDrawingMode === 'line';
+                const isCropBreak = currentDrawingMode === 'crop_break';
+                const isCustomPaddock = currentDrawingMode === 'custom_paddock';
+                
                 console.log("Finishing break, mode:", currentDrawingMode, "vertices:", drawingVertices.length);
                 
+                if (isCustomPaddock) {
+                    if (drawingVertices.length < 3) return;
+                    const areaSqm = calculatePolygonArea(drawingVertices);
+                    const areaHa = areaSqm / 10000;
+                    
+                    const newPaddock = {
+                        name: pendingCPData.name,
+                        yield: pendingCPData.yield,
+                        vertices: [...drawingVertices],
+                        areaHa: areaHa
+                    };
+                    
+                    customPaddocks.push(newPaddock);
+                    saveCustomPaddocks();
+                    cleanupDrawing();
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    return;
+                }
+
                 if (!isLineMode && drawingVertices.length < 3) return;
                 if (isLineMode && drawingVertices.length < 2) return;
                 
@@ -4135,9 +4385,9 @@
                 centerLng /= drawingVertices.length;
                 let paddockName = getPaddockFromPoint({ lat: centerLat, lng: centerLng });
 
-                let baseName = paddockName ? paddockName : (isLineMode ? 'Crop Line' : 'Break');
+                let baseName = paddockName ? paddockName : (isLineMode ? 'Crop Line' : (isCropBreak ? 'Crop Break' : 'Break'));
                 let breaksInPaddock = savedBreaks.filter(b => b.name && b.name.startsWith(baseName)).length;
-                const breakName = paddockName ? `${baseName} ${isLineMode ? 'Line' : 'Break'} ${breaksInPaddock + 1}` : `${isLineMode ? 'Line' : 'Break'} ${savedBreaks.length + 1}`;
+                const breakName = paddockName ? `${baseName} ${isLineMode ? 'Line' : (isCropBreak ? 'Crop Break' : 'Break')} ${breaksInPaddock + 1}` : `${isLineMode ? 'Line' : (isCropBreak ? 'Crop Break' : 'Break')} ${savedBreaks.length + 1}`;
 
                 let cropWidthMeters = 0;
                 if (isLineMode) {
@@ -4167,7 +4417,8 @@
                         cropMode: 'line',
                         createdAt: new Date().toISOString(),
                         createdBy: localStorage.getItem('auth_name') || 'Unknown User',
-                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
+                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup,
+                        isCropBreak: isCropBreak
                     };
                     
                     console.log("New crop line created:", newBreak);
@@ -4215,7 +4466,8 @@
                         cropMode: isLineMode ? 'line' : 'polygon',
                         createdAt: new Date().toISOString(),
                         createdBy: localStorage.getItem('auth_name') || 'Unknown User',
-                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
+                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup,
+                        isCropBreak: isCropBreak
                     };
                     
                     console.log("New break created:", newBreak);
@@ -4893,7 +5145,7 @@
             // Calculate avg area/day globally (excluding crops)
             const now = new Date();
             const daysAgoTs = new Date(now.getTime() - filterDays * 24 * 60 * 60 * 1000);
-            const recentBreaksAll = savedBreaks.filter(b => b.group !== 'crops' && b.createdAt && new Date(b.createdAt) >= daysAgoTs);
+            const recentBreaksAll = savedBreaks.filter(b => b.group !== 'crops' && !b.isCropBreak && b.createdAt && new Date(b.createdAt) >= daysAgoTs);
             const recentAreaAll = recentBreaksAll.reduce((sum, b) => sum + b.areaHa, 0);
             const daysWithBreaks = new Set(recentBreaksAll.map(b => new Date(b.createdAt).toDateString())).size;
             const avgAreaPerDay = daysWithBreaks > 0 ? (recentAreaAll / daysWithBreaks) : 0;
@@ -4946,6 +5198,7 @@
             html += `<button class="btn-new-break" style="flex:1; margin-bottom:0;" onclick="startDrawingBreak('polygon')" ${isDrawingBreak ? 'disabled' : ''}>+ NEW BREAK</button>`;
             if (activeBreakGroup !== 'all') {
                 html += `<button class="btn-new-break" style="flex:1; margin-bottom:0; background:#d35400; border-color:#d35400;" onclick="startDrawingBreak('line')" ${isDrawingBreak ? 'disabled' : ''}>+ CROP LINE</button>`;
+                html += `<button class="btn-new-break" style="flex:1; margin-bottom:0; background:#27ae60; border-color:#27ae60;" onclick="startDrawingBreak('crop_break')" ${isDrawingBreak ? 'disabled' : ''}>+ CROP BREAK</button>`;
             }
             if (count > 0) {
                 html += `<button class="btn-select-breaks ${breakSelectMode ? 'active' : ''}" style="flex:0.6;" onclick="toggleBreakSelectMode()">${breakSelectMode ? '\u2715 CANCEL' : '\u2610 SELECT'}</button>`;
@@ -5182,8 +5435,8 @@
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
                         <div>
                             <span class="label">${isLineMode ? 'FACE LENGTH' : 'AREA'}</span>
-                            <span class="break-area-val">${measureStr}</span>
-                            ${isLineMode ? '' : (brk.areaHa >= 1 ? `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${Math.round(brk.areaSqm).toLocaleString()} m\u00b2</div>` : `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${brk.areaHa.toFixed(4)} ha</div>`)}
+                            <span class="break-area-val">${brk.isCropBreak ? Math.round(brk.areaSqm).toLocaleString() + ' m\u00b2' : measureStr}</span>
+                            ${isLineMode ? '' : (brk.areaHa >= 1 ? `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${brk.isCropBreak ? brk.areaHa.toFixed(2) + ' ha' : Math.round(brk.areaSqm).toLocaleString() + ' m\u00b2'}</div>` : `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${brk.areaHa.toFixed(4)} ha</div>`)}
                         </div>
                         <div>
                             ${secondaryMetricHtml}
