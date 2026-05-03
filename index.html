@@ -3353,10 +3353,10 @@
                 const currentVal = areaSqm;
 
                 if (target > 0 && currentVal > 0) {
-                    const diff = (currentVal / target) - 1;
-                    if (Math.abs(diff) > 0.2) { // 20% tolerance
-                        const warning = diff > 0 ? 'TOO BIG' : 'TOO SMALL';
-                        const color = diff > 0 ? '#ff7675' : '#74b9ff';
+                    const absDiff = Math.abs(currentVal - target);
+                    if (absDiff > 20) { // Stricter +/- 20m2 tolerance
+                        const warning = currentVal > target ? 'TOO BIG' : 'TOO SMALL';
+                        const color = currentVal > target ? '#ff7675' : '#74b9ff';
                         info += ` | <span style="color:${color}; font-weight:bold;">\u26a0\ufe0f ${warning}</span>`;
                     } else {
                         info += ` | <span style="color:#55efc4; font-weight:bold;">\u2705 GOOD SIZE</span>`;
