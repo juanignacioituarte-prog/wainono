@@ -4584,6 +4584,7 @@
                     console.log("New crop line created:", newBreak);
                     savedBreaks.unshift(newBreak);
                     saveBreaks();
+                    saveToCloud(true); // Immediate sync to feed file
                     cleanupDrawing();
                     if (currentDashboardMode === 'breaks') renderBreaksDashboard();
                     else renderBreaksOnMap();
@@ -4634,6 +4635,7 @@
                     console.log("New break created:", newBreak);
                     savedBreaks.unshift(newBreak); // Add to the TOP
                     saveBreaks();
+                    saveToCloud(true); // Immediate sync to feed file
                     cleanupDrawing();
                     renderBreaksDashboard();
                     renderBreaksOnMap();
@@ -5081,6 +5083,7 @@
                 brk.deletedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks();
+                saveToCloud(true); // Immediate sync to feed file
                 renderBreaksDashboard();
                 renderBreaksOnMap();
             }
@@ -5094,6 +5097,7 @@
                 brk.lastEditedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks();
+                saveToCloud(true); // Immediate sync to feed file
             }
         }
 
@@ -5105,6 +5109,7 @@
                 brk.lastEditedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks(); 
+                saveToCloud(true); // Immediate sync to feed file
             }
         }
 
@@ -5886,6 +5891,7 @@
             brk.lastEditedAt = new Date().toISOString();
             brk.synced = false;
             saveBreaks();
+            saveToCloud(true); // Immediate sync to feed file
             
             cleanupEdit();
             renderBreaksDashboard();
