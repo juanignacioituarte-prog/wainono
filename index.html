@@ -2640,6 +2640,10 @@
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
 
+            if (mode === 'breaks') {
+                loadBreaks();
+            }
+
             // Map vs Overlay Logic
             if (mode === 'feed') {
                 document.getElementById('map').style.display = 'none';
