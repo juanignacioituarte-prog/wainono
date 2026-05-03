@@ -1920,6 +1920,7 @@
         let breakSelectMode = false;
         let selectedBreakIds = new Set();
         let editingBreakId = null;
+        let editingCustomPaddockName = null; // Track if we are editing a custom paddock boundary
         let editVertices = [];
         let editMarkers = [];
         let editPolygon = null;
@@ -4095,6 +4096,11 @@
                                             // New local break, add it
                                             finalBreaks.push(lb);
                                         }
+                                    } else if (!cloudMap.has(idStr) && !lb.isDeleted) {
+                                        // STICKY SYNC: Keep local breaks that are missing from cloud (unless deleted locally)
+                                        // Mark them unsynced so they try to go back up
+                                        lb.synced = false;
+                                        finalBreaks.push(lb);
                                     }
                                 }
                             });
@@ -4224,13 +4230,19 @@
                     fillOpacity: 0.1
                 }).addTo(customPaddockLayer);
 
-                // Add deletion button on click
+                // Add options on click
                 poly.on('click', (e) => {
-                    if (isDrawingBreak) return;
+                    if (isDrawingBreak || editingBreakId || editingCustomPaddockName) return;
                     L.DomEvent.stopPropagation(e);
-                    if (confirm(`Delete external paddock "${cp.name}"?`)) {
-                        deleteCustomPaddock(cp.name);
-                    }
+                    
+                    const popupContent = `
+                        <div style="padding:10px; min-width:120px;">
+                            <div style="font-weight:bold; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; color:#8e44ad;">${cp.name.toUpperCase()}</div>
+                            <button onclick="startEditCustomPaddock('${cp.name}')" style="width:100%; padding:6px; background:#8e44ad; color:white; border:none; border-radius:4px; margin-bottom:6px; cursor:pointer; font-weight:bold; font-size:11px;">EDIT SHAPE</button>
+                            <button onclick="if(confirm('Delete external paddock ${cp.name}?')) deleteCustomPaddock('${cp.name}')" style="width:100%; padding:6px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">DELETE</button>
+                        </div>
+                    `;
+                    L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
                 });
 
                 // Add label
@@ -4253,7 +4265,37 @@
         function deleteCustomPaddock(name) {
             customPaddocks = customPaddocks.filter(p => p.name !== name);
             saveCustomPaddocks();
+            map.closePopup();
             if (currentDashboardMode === 'feed') setFeedInputs();
+        }
+
+        function startEditCustomPaddock(name) {
+            if (isDrawingBreak || editingBreakId) return;
+            const cp = customPaddocks.find(p => p.name === name);
+            if (!cp) return;
+            
+            editingCustomPaddockName = name;
+            editVertices = cp.vertices.map(v => ({ lat: v.lat, lng: v.lng }));
+            editSelectedIdx = -1;
+            
+            map.closePopup();
+            
+            // Hide the actual paddock layer while editing
+            renderCustomPaddocksOnMap(); // This will clear and re-render, we'll need to skip the one being edited
+            
+            // Show edit toolbar
+            setBreakFullscreen(true);
+            document.getElementById('edit-toolbar').style.display = 'flex';
+            document.getElementById('btn-delete-pt').disabled = true;
+            
+            // Hide group select as it's not applicable
+            const groupSelect = document.getElementById('edit-group-select');
+            if (groupSelect) groupSelect.style.display = 'none';
+            
+            map.getContainer().style.cursor = 'pointer';
+            renderEditPolygon();
+            renderEditMarkers();
+            updateEditInfo();
         }
 
         function showAddCustomPaddockModal() {
@@ -5788,6 +5830,17 @@
         }
 
         function finishEditBreak() {
+            if (editingCustomPaddockName) {
+                const cp = customPaddocks.find(p => p.name === editingCustomPaddockName);
+                if (cp) {
+                    cp.vertices = editVertices.map(v => ({ lat: v.lat, lng: v.lng }));
+                    cp.areaHa = calculatePolygonArea(cp.vertices) / 10000;
+                    saveCustomPaddocks();
+                }
+                cleanupEdit();
+                return;
+            }
+
             if (!editingBreakId) return;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
             if (!brk) return;
@@ -5846,7 +5899,12 @@
             editVertices = [];
             editSelectedIdx = -1;
             editingBreakId = null;
+            editingCustomPaddockName = null;
             document.getElementById('edit-toolbar').style.display = 'none';
+            
+            const groupSelect = document.getElementById('edit-group-select');
+            if (groupSelect) groupSelect.style.display = 'block';
+
             map.getContainer().style.cursor = '';
             setBreakFullscreen(false);
         }
