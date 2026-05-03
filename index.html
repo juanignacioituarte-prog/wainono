@@ -3320,14 +3320,19 @@
             const count = drawingVertices.length;
             let info = `${count} point${count !== 1 ? 's' : ''}`;
             const isLineMode = currentDrawingMode === 'line';
+            const isCropBreak = currentDrawingMode === 'crop_break';
+            const isCustomPaddock = currentDrawingMode === 'custom_paddock';
             
+            let areaSqm = 0;
+            let areaHa = 0;
+
             if (count >= 2 && isLineMode) {
                 const distMeters = calculateLineDistance(drawingVertices);
                 info += ` \u00b7 ${distMeters.toFixed(0)} meters`;
                 document.getElementById('btn-finish-break').disabled = false;
             } else if (count >= 3 && !isLineMode) {
-                const areaSqm = calculatePolygonArea(drawingVertices);
-                const areaHa = areaSqm / 10000;
+                areaSqm = calculatePolygonArea(drawingVertices);
+                areaHa = areaSqm / 10000;
                 info += ` \u00b7 ${areaHa < 1 ? areaSqm.toFixed(0) + ' m\u00b2' : areaHa.toFixed(2) + ' ha'}`;
                 document.getElementById('btn-follow-contour').style.display = 'block';
                 document.getElementById('btn-finish-break').disabled = false;
@@ -3335,7 +3340,34 @@
                 document.getElementById('btn-follow-contour').style.display = 'none';
                 document.getElementById('btn-finish-break').disabled = true;
             }
-            document.getElementById('vertex-count').textContent = info;
+
+            // Real-time area warnings
+            if (!isCustomPaddock && window.lastCalcTargets && (count >= 3 || (isLineMode && count >= 2))) {
+                let target = 0;
+                let currentVal = 0;
+                
+                if (isCropBreak) {
+                    target = window.lastCalcTargets.crop[activeBreakGroup] || 0;
+                    currentVal = areaSqm;
+                } else if (!isLineMode && activeBreakGroup !== 'all') {
+                    // Grass target (daily ha)
+                    target = (window.lastCalcTargets.grass && window.lastCalcTargets.grass[activeBreakGroup]) || 0;
+                    currentVal = areaHa;
+                }
+
+                if (target > 0 && currentVal > 0) {
+                    const diff = (currentVal / target) - 1;
+                    if (Math.abs(diff) > 0.2) { // 20% tolerance
+                        const warning = diff > 0 ? 'TOO BIG' : 'TOO SMALL';
+                        const color = diff > 0 ? '#ff7675' : '#74b9ff';
+                        info += ` | <span style="color:${color}; font-weight:bold;">\u26a0\ufe0f ${warning}</span>`;
+                    } else {
+                        info += ` | <span style="color:#55efc4; font-weight:bold;">\u2705 GOOD SIZE</span>`;
+                    }
+                }
+            }
+
+            document.getElementById('vertex-count').innerHTML = info;
         }
 
         document.getElementById('search').oninput = (e) => {
@@ -3550,6 +3582,18 @@
         function updateCropPaddockYield(pName, val) {
             cropYields[pName] = safeNum(val);
             saveAndRecalc();
+        }
+
+        function updateCustomPaddockYield(pName, val) {
+            const v = safeNum(val);
+            const p = customPaddocks.find(cp => cp.name === pName);
+            if (p) {
+                p.yield = v;
+                cropYields[pName] = v;
+                saveCustomPaddocks();
+                calculateFeedLogic();
+                triggerAutoSave();
+            }
         }
 
         function saveAndRecalc() {
@@ -3831,14 +3875,40 @@
                 cpList.style.display = 'block';
                 let cpInner = `<div style="font-size:11px; font-weight:bold; color:#2980b9; margin-bottom:10px;">EXTERNAL PADDOCKS (CUSTOM)</div>`;
                 customPaddocks.forEach(p => {
-                    cpInner += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-size:12px; font-weight:600; color:#34495e;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
-                        <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:14px; padding:0 5px;" title="Remove Paddock">🗑️</button>
+                    cpInner += `<div style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px; background:#fff; padding:8px; border-radius:6px; border:1px solid #d0e4ff;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:12px; font-weight:bold; color:#2c3e50;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
+                            <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:12px;" title="Remove Paddock">\ud83d\uddd1\ufe0f</button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="font-size:10px; color:#7f8c8d; font-weight:bold;">YIELD:</label>
+                            <input type="number" 
+                                style="width:70px; padding:2px 5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:right;"
+                                value="${p.yield}" 
+                                oninput="updateCustomPaddockYield('${p.name}', this.value)" />
+                            <span style="font-size:10px; color:#95a5a6;">kgDM/ha</span>
+                        </div>
                     </div>`;
                 });
                 cpList.innerHTML = cpInner;
             } else {
                 cpList.style.display = 'none';
+            }
+
+            // Store current targets for drawing warnings
+            window.lastCalcTargets = {
+                grass: grassHtml ? {} : null,
+                crop: herdCropM2Map
+            };
+            // Extract grass targets from the cache used during calculation
+            if (grassHtml) {
+                Object.keys(herdLockedCache).forEach(hid => {
+                    const cache = herdLockedCache[hid];
+                    const hCows = savedHerdCows[hid] || 0;
+                    if (hCows > 0) {
+                        window.lastCalcTargets.grass[hid] = cache.isLocked ? cache.lockedDailyArea : ((remainingAreaPerCow * hCows) / 10000);
+                    }
+                });
             }
 
             renderFeedWedge(manualModeData, preGrazeTarget, residual);
