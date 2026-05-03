@@ -4029,13 +4029,19 @@
                 breaks: getCompressedBreaks() // Also include breaks in feed settings for better sync coverage
             };
             console.log("Cloud: Sending feed_settings payload", payload);
-
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             })
                 .then(res => res.json())
                 .then(data => {
+                    // Mark ONLY the breaks that were included in this payload as synced
+                    const syncedIds = new Set(payload.breaks.map(b => String(b.id)));
+                    savedBreaks.forEach(b => {
+                        if (syncedIds.has(String(b.id))) b.synced = true;
+                    });
+                    localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+
                     if (!isAuto && btn) {
                         btn.disabled = false;
                         btn.innerText = "SAVE TO CLOUD";
@@ -4168,8 +4174,9 @@
                 isSyncingBreaks = true;
                 
                 const compressedBreaks = getCompressedBreaks();
+                const syncedIds = new Set(compressedBreaks.map(b => String(b.id)));
 
-                console.log("Syncing breaks to cloud...");
+                console.log("Syncing breaks to cloud...", syncedIds.size, "records");
                 fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify({ type: 'breaks', breaks: compressedBreaks })
@@ -4177,8 +4184,10 @@
                 .then(res => {
                     if (res.ok) {
                         console.log("Cloud sync successful");
-                        // Mark all as synced
-                        savedBreaks.forEach(b => b.synced = true);
+                        // Mark ONLY the IDs we actually sent as synced
+                        savedBreaks.forEach(b => {
+                            if (syncedIds.has(String(b.id))) b.synced = true;
+                        });
                         localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
                         if (currentDashboardMode === 'breaks') renderBreaksDashboard();
                     } else {
