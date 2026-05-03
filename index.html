@@ -4021,7 +4021,8 @@
                 customPaddocks: customPaddocks.map(cp => ({
                     ...cp,
                     vertices: cp.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) }))
-                }))
+                })),
+                breaks: getCompressedBreaks() // Also include breaks in feed settings for better sync coverage
             };
             console.log("Cloud: Sending feed_settings payload", payload);
 
@@ -4125,6 +4126,34 @@
             }
         }
 
+
+        function getCompressedBreaks() {
+            return savedBreaks.map(b => {
+                const cb = {
+                    id: b.id,
+                    name: b.name,
+                    paddock: b.paddock,
+                    vertices: b.vertices ? b.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) })) : [],
+                    areaSqm: Math.round(b.areaSqm || 0),
+                    areaHa: Number((b.areaHa || 0).toFixed(3)),
+                    distanceMeters: Math.round(b.distanceMeters || 0),
+                    cropWidthMeters: Number((b.cropWidthMeters || 0).toFixed(2)),
+                    cropMode: b.cropMode,
+                    createdAt: b.createdAt,
+                    createdBy: b.createdBy,
+                    group: b.group
+                };
+                if (b.comment) cb.comment = b.comment;
+                if (b.lastEditedBy) cb.lastEditedBy = b.lastEditedBy;
+                if (b.lastEditedAt) cb.lastEditedAt = b.lastEditedAt;
+                if (b.isCropBreak) cb.isCropBreak = b.isCropBreak;
+                if (b.isDeleted) cb.isDeleted = true;
+                if (b.deletedBy) cb.deletedBy = b.deletedBy;
+                if (b.deletedAt) cb.deletedAt = b.deletedAt;
+                return cb;
+            });
+        }
+
         function saveBreaks() {
             console.log("Saving breaks locally...", savedBreaks.length);
             // Save locally immediately
@@ -4134,31 +4163,7 @@
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5 && !isSyncingBreaks) {
                 isSyncingBreaks = true;
                 
-                // Compress payload
-                const compressedBreaks = savedBreaks.map(b => {
-                    const cb = {
-                        id: b.id,
-                        name: b.name,
-                        paddock: b.paddock,
-                        vertices: b.vertices ? b.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) })) : [],
-                        areaSqm: Math.round(b.areaSqm || 0),
-                        areaHa: Number((b.areaHa || 0).toFixed(3)),
-                        distanceMeters: Math.round(b.distanceMeters || 0),
-                        cropWidthMeters: Number((b.cropWidthMeters || 0).toFixed(2)),
-                        cropMode: b.cropMode,
-                        createdAt: b.createdAt,
-                        createdBy: b.createdBy,
-                        group: b.group
-                    };
-                    if (b.comment) cb.comment = b.comment;
-                    if (b.lastEditedBy) cb.lastEditedBy = b.lastEditedBy;
-                    if (b.lastEditedAt) cb.lastEditedAt = b.lastEditedAt;
-                    if (b.isCropBreak) cb.isCropBreak = b.isCropBreak;
-                    if (b.isDeleted) cb.isDeleted = true;
-                    if (b.deletedBy) cb.deletedBy = b.deletedBy;
-                    if (b.deletedAt) cb.deletedAt = b.deletedAt;
-                    return cb;
-                });
+                const compressedBreaks = getCompressedBreaks();
 
                 console.log("Syncing breaks to cloud...");
                 fetch(GOOGLE_SCRIPT_URL, {
