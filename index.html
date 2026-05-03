@@ -2425,6 +2425,11 @@
                 manualBreakOverrides = data.manualBreaks;
                 localStorage.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
             }
+            if (data.customPaddocks) {
+                customPaddocks = data.customPaddocks;
+                localStorage.setItem('custom_paddocks', JSON.stringify(customPaddocks));
+                renderCustomPaddocksOnMap();
+            }
             // Always reload the UI after settings are injected
             loadLocalFeedSettings();
         }
@@ -2549,6 +2554,7 @@
 
             // Load settings first
             await loadFeedSettings();
+            loadCustomPaddocks(); // Load external paddocks
 
             await Promise.all([loadStatusSheets(), loadManualSheet()]);
             await loadGeoJSON();
@@ -4009,7 +4015,8 @@
                 cropYields: cropYields,
                 cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
-                manualBreaks: manualBreakOverrides
+                manualBreaks: manualBreakOverrides,
+                customPaddocks: customPaddocks
             };
 
             fetch(GOOGLE_SCRIPT_URL, {
