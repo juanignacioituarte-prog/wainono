@@ -10,14 +10,14 @@
     <meta name="apple-mobile-web-app-title" content="RT Farm">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-512.png">
-    <title>RT Beta</title>
+    <title>RT v2</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <style>
         :root {
-            --accent: #8e44ad; /* Purple for beta */
+            --accent: #8e44ad; /* Purple for v2 */
             --bg: #f4f7f6;
             --text: #2c3e50;
             --prev: #7f8c8d;
@@ -1329,7 +1329,7 @@
 
     <div id="login-screen">
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
-        <h2>River Terrace Beta</h2>
+        <h2>River Terrace v2</h2>
         <div id="g_id_onload" data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
             data-callback="handleCredentialResponse" data-auto_prompt="false">
         </div>
@@ -1785,6 +1785,14 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
     <script>
+        /* === V2 STORAGE ISOLATION === */
+        const STORAGE_PREFIX = 'v2_';
+        const ls = {
+            getItem: (key) => localStorage.getItem(STORAGE_PREFIX + key),
+            setItem: (key, val) => localStorage.setItem(STORAGE_PREFIX + key, val),
+            removeItem: (key) => localStorage.removeItem(STORAGE_PREFIX + key)
+        };
+
         /* === CONFIGURATION === */
         // Paste your Google Apps Script Web App URL here to enable cloud saving
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWOs90lvflWJACWYOj--shAJcCweRVNs1u9P6CZHO0MUAX-ye8HDk-0PM60yh4g3aJ/exec";
@@ -1836,11 +1844,11 @@
             { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: null },
             { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: null }
         ];
-        let BREAK_GROUPS = JSON.parse(localStorage.getItem('custom_herds')) || default_BREAK_GROUPS;
-        let manualBreakOverrides = JSON.parse(localStorage.getItem('manual_break_overrides')) || {};
+        let BREAK_GROUPS = JSON.parse(ls.getItem('custom_herds')) || default_BREAK_GROUPS;
+        let manualBreakOverrides = JSON.parse(ls.getItem('manual_break_overrides')) || {};
 
         function saveHerdSettings() {
-            localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
+            ls.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
             saveAndRecalc();
             loadFeedSettings();
         }
@@ -1929,7 +1937,7 @@
             } else {
                 manualBreakOverrides[id][key] = value;
             }
-            localStorage.setItem('manual_break_overrides', JSON.stringify(manualBreakOverrides));
+            ls.setItem('manual_break_overrides', JSON.stringify(manualBreakOverrides));
             saveAndRecalc();
         }
         let activeBreakGroup = 'all';
@@ -2369,7 +2377,7 @@
                         header: true, skipEmptyLines: true,
                         complete: (results) => {
                             const data = results.data[0];
-                            if (data && !localStorage.getItem('feed_residual')) {
+                            if (data && !ls.getItem('feed_residual')) {
                                 // Only use CSV if local storage is empty
                                 document.getElementById('inp-residual').value = data.post_grazing_residual || 1500;
                                 const cVal = data.cow_numbers || 500;
@@ -2390,111 +2398,111 @@
         function setFeedInputs(data) {
             if (data.residual) {
                 document.getElementById('inp-residual').value = data.residual;
-                localStorage.setItem('feed_residual', data.residual);
+                ls.setItem('feed_residual', data.residual);
             }
             if (data.cows) {
                 document.getElementById('inp-cows').value = data.cows;
-                localStorage.setItem('feed_cows', data.cows);
+                ls.setItem('feed_cows', data.cows);
                 const cDisp = document.getElementById('inp-cows-display');
                 if (cDisp) cDisp.innerText = data.cows;
             }
             if (data.intake) {
                 document.getElementById('inp-intake').value = data.intake;
-                localStorage.setItem('feed_intake', data.intake);
+                ls.setItem('feed_intake', data.intake);
             }
             if (data.inshed !== undefined) {
                 document.getElementById('inp-inshed').value = data.inshed;
-                localStorage.setItem('feed_inshed', data.inshed);
+                ls.setItem('feed_inshed', data.inshed);
             }
             if (data.round) {
                 document.getElementById('inp-round').value = data.round;
-                localStorage.setItem('feed_round', data.round);
+                ls.setItem('feed_round', data.round);
             }
             if (data.pre) {
                 document.getElementById('inp-actual-pre').value = data.pre;
-                localStorage.setItem('feed_actual_pre', data.pre);
+                ls.setItem('feed_actual_pre', data.pre);
             }
             if (data.freq) {
                 document.querySelector(`input[name="milking_freq"][value="${data.freq}"]`).checked = true;
-                localStorage.setItem('feed_freq', data.freq);
+                ls.setItem('feed_freq', data.freq);
             }
             if (data.amPct) {
                 document.getElementById('inp-am-pct').value = data.amPct;
-                localStorage.setItem('feed_am_pct', data.amPct);
+                ls.setItem('feed_am_pct', data.amPct);
             }
             if (data.pmPct) {
                 document.getElementById('inp-pm-pct').value = data.pmPct;
-                localStorage.setItem('feed_pm_pct', data.pmPct);
+                ls.setItem('feed_pm_pct', data.pmPct);
             }
             if (data.longPct) {
                 document.getElementById('inp-long-pct').value = data.longPct;
-                localStorage.setItem('feed_long_pct', data.longPct);
+                ls.setItem('feed_long_pct', data.longPct);
             }
             if (data.shortPct) {
                 document.getElementById('inp-short-pct').value = data.shortPct;
-                localStorage.setItem('feed_short_pct', data.shortPct);
+                ls.setItem('feed_short_pct', data.shortPct);
             }
             if (data.cropYield) {
                 document.getElementById('inp-crop-yield').value = data.cropYield;
-                localStorage.setItem('feed_crop_yield', data.cropYield);
+                ls.setItem('feed_crop_yield', data.cropYield);
             }
             if (data.cropFeed) {
                 document.getElementById('inp-crop-feed').value = data.cropFeed;
-                localStorage.setItem('feed_crop_feed', data.cropFeed);
+                ls.setItem('feed_crop_feed', data.cropFeed);
             }
             if (data.cropYields) {
                 cropYields = data.cropYields;
-                localStorage.setItem('feed_crop_yields', JSON.stringify(cropYields));
+                ls.setItem('feed_crop_yields', JSON.stringify(cropYields));
             }
             if (data.herdCows) {
-                localStorage.setItem('herd_cow_numbers', JSON.stringify(data.herdCows));
+                ls.setItem('herd_cow_numbers', JSON.stringify(data.herdCows));
             }
             if (data.cropHerds) {
-                localStorage.setItem('herd_in_crops', JSON.stringify(data.cropHerds));
+                ls.setItem('herd_in_crops', JSON.stringify(data.cropHerds));
             }
             if (data.customHerds) {
                 BREAK_GROUPS = data.customHerds;
-                localStorage.setItem('custom_herds', JSON.stringify(data.customHerds));
+                ls.setItem('custom_herds', JSON.stringify(data.customHerds));
             }
             if (data.manualBreaks) {
                 manualBreakOverrides = data.manualBreaks;
-                localStorage.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
+                ls.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
             }
             // Always reload the UI after settings are injected
             loadLocalFeedSettings();
         }
 
         function loadLocalFeedSettings() {
-            if (localStorage.getItem('feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem('feed_residual');
-            if (localStorage.getItem('feed_cows')) {
-                const cVal = localStorage.getItem('feed_cows');
+            if (ls.getItem('feed_residual')) document.getElementById('inp-residual').value = ls.getItem('feed_residual');
+            if (ls.getItem('feed_cows')) {
+                const cVal = ls.getItem('feed_cows');
                 document.getElementById('inp-cows').value = cVal;
                 const cDisp = document.getElementById('inp-cows-display');
                 if (cDisp) cDisp.innerText = cVal;
             }
-            if (localStorage.getItem('feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem('feed_intake');
-            if (localStorage.getItem('feed_inshed')) document.getElementById('inp-inshed').value = localStorage.getItem('feed_inshed');
-            if (localStorage.getItem('feed_round')) document.getElementById('inp-round').value = localStorage.getItem('feed_round');
-            if (localStorage.getItem('feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem('feed_actual_pre');
+            if (ls.getItem('feed_intake')) document.getElementById('inp-intake').value = ls.getItem('feed_intake');
+            if (ls.getItem('feed_inshed')) document.getElementById('inp-inshed').value = ls.getItem('feed_inshed');
+            if (ls.getItem('feed_round')) document.getElementById('inp-round').value = ls.getItem('feed_round');
+            if (ls.getItem('feed_actual_pre')) document.getElementById('inp-actual-pre').value = ls.getItem('feed_actual_pre');
             
             // Grass Management Settings
-            const savedFreq = localStorage.getItem('feed_freq') || 'tad';
+            const savedFreq = ls.getItem('feed_freq') || 'tad';
             document.getElementById(savedFreq === '3in2' ? 'freq-3in2' : 'freq-tad').checked = true;
-            if (localStorage.getItem('feed_am_pct')) document.getElementById('inp-am-pct').value = localStorage.getItem('feed_am_pct');
-            if (localStorage.getItem('feed_pm_pct')) document.getElementById('inp-pm-pct').value = localStorage.getItem('feed_pm_pct');
-            if (localStorage.getItem('feed_long_pct')) document.getElementById('inp-long-pct').value = localStorage.getItem('feed_long_pct');
-            if (localStorage.getItem('feed_short_pct')) document.getElementById('inp-short-pct').value = localStorage.getItem('feed_short_pct');
+            if (ls.getItem('feed_am_pct')) document.getElementById('inp-am-pct').value = ls.getItem('feed_am_pct');
+            if (ls.getItem('feed_pm_pct')) document.getElementById('inp-pm-pct').value = ls.getItem('feed_pm_pct');
+            if (ls.getItem('feed_long_pct')) document.getElementById('inp-long-pct').value = ls.getItem('feed_long_pct');
+            if (ls.getItem('feed_short_pct')) document.getElementById('inp-short-pct').value = ls.getItem('feed_short_pct');
             
             // Crop Settings
-            if (localStorage.getItem('feed_crop_yield')) document.getElementById('inp-crop-yield').value = localStorage.getItem('feed_crop_yield');
-            if (localStorage.getItem('feed_crop_feed')) document.getElementById('inp-crop-feed').value = localStorage.getItem('feed_crop_feed');
-            if (localStorage.getItem('feed_crop_yields')) cropYields = JSON.parse(localStorage.getItem('feed_crop_yields'));
+            if (ls.getItem('feed_crop_yield')) document.getElementById('inp-crop-yield').value = ls.getItem('feed_crop_yield');
+            if (ls.getItem('feed_crop_feed')) document.getElementById('inp-crop-feed').value = ls.getItem('feed_crop_feed');
+            if (ls.getItem('feed_crop_yields')) cropYields = JSON.parse(ls.getItem('feed_crop_yields'));
 
             // Load Herd Inputs
             const herdGrid = document.getElementById('herd-inputs');
             if (herdGrid) {
                 herdGrid.innerHTML = '';
-                const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+                const savedHerdCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}');
                 
                 BREAK_GROUPS.forEach(g => {
                     if (g.id === 'all') return;
@@ -2875,7 +2883,7 @@
         }
 
         function buildCalibrationModel(historyLower) {
-            // --- COWGORITHM INJECTION (BETA ONLY) ---
+            // --- COWGORITHM INJECTION (v2) ---
             let sumIntake = 0; let countIntake = 0; let activeIntake = 18;
             savedBreaks.forEach(brk => {
                 if (brk.cropMode === 'line' || !brk.paddock) return;
@@ -2884,7 +2892,7 @@
                 const manualDaysDiff = Math.abs((new Date(brk.createdAt) - me.dateObj) / 86400000);
                 if (manualDaysDiff <= GAP_DAYS_MAX) {
                     const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : 1500;
-                    const cowNum = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                    const cowNum = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
                     if (cowNum > 0 && brk.timeStayHrs > 0) {
                         const trueI = ((me.cover - residual) * brk.areaHa) / (cowNum * (brk.timeStayHrs / 24));
                         if (trueI > 5 && trueI < 30) { sumIntake += trueI; countIntake++; }
@@ -2900,7 +2908,7 @@
                 if (hasManual) return; 
                 
                 const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : 1500;
-                const cowNum = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                const cowNum = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
                 if (cowNum > 0 && brk.timeStayHrs > 0) {
                     const harvestedYield = (cowNum * activeIntake * (brk.timeStayHrs / 24)) / brk.areaHa;
                     const impliedCover = residual + harvestedYield;
@@ -3579,24 +3587,24 @@
         }
 
         function saveAndRecalc() {
-            localStorage.setItem('feed_residual', document.getElementById('inp-residual').value);
-            localStorage.setItem('feed_cows', document.getElementById('inp-cows').value);
-            localStorage.setItem('feed_intake', document.getElementById('inp-intake').value);
-            localStorage.setItem('feed_inshed', document.getElementById('inp-inshed').value);
-            localStorage.setItem('feed_round', document.getElementById('inp-round').value);
-            localStorage.setItem('feed_actual_pre', document.getElementById('inp-actual-pre').value);
+            ls.setItem('feed_residual', document.getElementById('inp-residual').value);
+            ls.setItem('feed_cows', document.getElementById('inp-cows').value);
+            ls.setItem('feed_intake', document.getElementById('inp-intake').value);
+            ls.setItem('feed_inshed', document.getElementById('inp-inshed').value);
+            ls.setItem('feed_round', document.getElementById('inp-round').value);
+            ls.setItem('feed_actual_pre', document.getElementById('inp-actual-pre').value);
             
             // Grass
             const freq = document.querySelector('input[name="milking_freq"]:checked').value;
-            localStorage.setItem('feed_freq', freq);
-            localStorage.setItem('feed_am_pct', document.getElementById('inp-am-pct').value);
-            localStorage.setItem('feed_pm_pct', document.getElementById('inp-pm-pct').value);
-            localStorage.setItem('feed_long_pct', document.getElementById('inp-long-pct').value);
-            localStorage.setItem('feed_short_pct', document.getElementById('inp-short-pct').value);
+            ls.setItem('feed_freq', freq);
+            ls.setItem('feed_am_pct', document.getElementById('inp-am-pct').value);
+            ls.setItem('feed_pm_pct', document.getElementById('inp-pm-pct').value);
+            ls.setItem('feed_long_pct', document.getElementById('inp-long-pct').value);
+            ls.setItem('feed_short_pct', document.getElementById('inp-short-pct').value);
             
             // Crop
-            localStorage.setItem('feed_crop_yield', document.getElementById('inp-crop-yield').value);
-            localStorage.setItem('feed_crop_feed', document.getElementById('inp-crop-feed').value);
+            ls.setItem('feed_crop_yield', document.getElementById('inp-crop-yield').value);
+            ls.setItem('feed_crop_feed', document.getElementById('inp-crop-feed').value);
 
             let totalCows = 0;
             const herdCows = {};
@@ -3620,14 +3628,14 @@
             // Sync total cows to main input if using herd splits
             if (totalCows > 0) {
                 document.getElementById('inp-cows').value = totalCows;
-                localStorage.setItem('feed_cows', totalCows);
+                ls.setItem('feed_cows', totalCows);
                 const cDisp = document.getElementById('inp-cows-display');
                 if (cDisp) cDisp.innerText = totalCows;
             }
 
             if (hasHerdInputs) {
-                localStorage.setItem('herd_cow_numbers', JSON.stringify(herdCows));
-                localStorage.setItem('herd_in_crops', JSON.stringify(cropHerds));
+                ls.setItem('herd_cow_numbers', JSON.stringify(herdCows));
+                ls.setItem('herd_in_crops', JSON.stringify(cropHerds));
             }
             calculateFeedLogic();
             triggerAutoSave();
@@ -3681,7 +3689,7 @@
             document.getElementById('freq-inputs-3in2').style.display = freq === '3in2' ? 'grid' : 'none';
 
             let grassHtml = '';
-            const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+            const savedHerdCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}');
             
             // 1. Calculate manual pool
             let totalManualCows = 0;
@@ -3753,7 +3761,7 @@
             let totalGrassAssigned = 0;
             // ----- CROP MANAGEMENT HERD CALCULATIONS -----
             const cropYield = safeNum(document.getElementById('inp-crop-yield').value);
-            const cropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
+            const cropHerds = JSON.parse(ls.getItem('herd_in_crops') || '[]');
             let cropHtml = '';
             let herdCropM2Map = {};
 
@@ -3841,7 +3849,7 @@
                 }
             });
             
-            localStorage.setItem('feed_crop_m2_per_herd', JSON.stringify(herdCropM2Map));
+            ls.setItem('feed_crop_m2_per_herd', JSON.stringify(herdCropM2Map));
 
             document.getElementById('grass-herd-outputs').innerHTML = grassHtml || '<div class="muted" style="font-size:11px; text-align:center;">No cows allocated to herds.</div>';
             
@@ -4219,7 +4227,7 @@
                 inshed: document.getElementById('inp-inshed').value,
                 round: document.getElementById('inp-round').value,
                 pre: document.getElementById('inp-actual-pre').value,
-                herdCows: JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}'),
+                herdCows: JSON.parse(ls.getItem('herd_cow_numbers') || '{}'),
                 freq: document.querySelector('input[name="milking_freq"]:checked').value,
                 amPct: document.getElementById('inp-am-pct').value,
                 pmPct: document.getElementById('inp-pm-pct').value,
@@ -4228,7 +4236,7 @@
                 cropYield: document.getElementById('inp-crop-yield').value,
                 cropFeed: document.getElementById('inp-crop-feed').value,
                 cropYields: cropYields,
-                cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
+                cropHerds: JSON.parse(ls.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
                 manualBreaks: manualBreakOverrides
             };
@@ -4266,7 +4274,7 @@
         function loadBreaks() {
             // 1. Load from localStorage immediately
             try {
-                const stored = localStorage.getItem('farm_breaks');
+                const stored = ls.getItem('farm_breaks');
                 if (stored) {
                     const parsed = JSON.parse(stored);
                     if (Array.isArray(parsed)) savedBreaks = parsed;
@@ -4282,8 +4290,6 @@
                         if (data && Array.isArray(data.breaks)) {
                             console.log("Cloud breaks received:", data.breaks.length);
                             
-                            const cloudIds = new Set(data.breaks.map(b => String(b.id || "")));
-
                             const cloudMap = new Map(data.breaks.map(b => [String(b.id), b]));
                             
                             // 1. Mark all cloud breaks as synced
@@ -4318,7 +4324,7 @@
                             });
                             
                             savedBreaks = finalBreaks;
-                            localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+                            ls.setItem('farm_breaks', JSON.stringify(savedBreaks));
                             
                             if (currentDashboardMode === 'breaks') {
                                 renderBreaksDashboard();
@@ -4333,7 +4339,7 @@
         function saveBreaks() {
             console.log("Saving breaks locally...", savedBreaks.length);
             // Save locally immediately
-            localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+            ls.setItem('farm_breaks', JSON.stringify(savedBreaks));
 
             // Save to cloud in background
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5 && !isSyncingBreaks) {
@@ -4374,7 +4380,7 @@
                         console.log("Cloud sync successful");
                         // Mark all as synced
                         savedBreaks.forEach(b => b.synced = true);
-                        localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+                        ls.setItem('farm_breaks', JSON.stringify(savedBreaks));
                         if (currentDashboardMode === 'breaks') renderBreaksDashboard();
                     } else {
                         console.error("Cloud sync failed with status:", res.status);
@@ -4590,7 +4596,7 @@
                     const defaultYield = safeNum(document.getElementById('inp-crop-yield').value);
                     const paddockYield = (paddockName && cropYields[paddockName]) ? cropYields[paddockName] : defaultYield;
                     const cropFeed = safeNum(document.getElementById('inp-crop-feed').value);
-                    const hCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[activeBreakGroup] || 0;
+                    const hCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[activeBreakGroup] || 0;
                     
                     if (distanceMeters > 0 && hCows > 0 && paddockYield > 0) {
                         const hDemand = cropFeed * hCows;
@@ -4612,12 +4618,11 @@
                         cropWidthMeters: cropWidthMeters,
                         cropMode: 'line',
                         createdAt: new Date().toISOString(),
-                        createdBy: localStorage.getItem('auth_name') || 'Unknown User',
+                        createdBy: ls.getItem('auth_name') || 'Unknown User',
                         group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
                     };
                     
                     console.log("New crop line created:", newBreak);
-                    newBreak.synced = false;
                     savedBreaks.unshift(newBreak);
                     saveBreaks();
                     cleanupDrawing();
@@ -4661,12 +4666,11 @@
                         cropWidthMeters: cropWidthMeters,
                         cropMode: isLineMode ? 'line' : 'polygon',
                         createdAt: new Date().toISOString(),
-                        createdBy: localStorage.getItem('auth_name') || 'Unknown User',
+                        createdBy: ls.getItem('auth_name') || 'Unknown User',
                         group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
                     };
                     
                     console.log("New break created:", newBreak);
-                    newBreak.synced = false;
                     savedBreaks.unshift(newBreak); // Add to the TOP
                     saveBreaks();
                     cleanupDrawing();
@@ -4718,20 +4722,20 @@
 
         // === Audio Fence Alignment Aid ===
         function getBeepStartDistance() {
-            return parseFloat(localStorage.getItem('audio_beep_start_m')) || 10;
+            return parseFloat(ls.getItem('audio_beep_start_m')) || 10;
         }
         function getFenceIgnoreDistance() {
-            return parseFloat(localStorage.getItem('audio_fence_ignore_m')) || 2;
+            return parseFloat(ls.getItem('audio_fence_ignore_m')) || 2;
         }
         function getAudioVolume() {
-            return parseFloat(localStorage.getItem('audio_volume_pct')) || 100;
+            return parseFloat(ls.getItem('audio_volume_pct')) || 100;
         }
         function getContinuousToneDistance() {
-            const val = parseFloat(localStorage.getItem('audio_continuous_m'));
+            const val = parseFloat(ls.getItem('audio_continuous_m'));
             return isNaN(val) ? 1 : val;
         }
         function getBreakDisplayDays() {
-            const val = parseInt(localStorage.getItem('break_display_days'));
+            const val = parseInt(ls.getItem('break_display_days'));
             return isNaN(val) ? 7 : val;
         }
         function saveAudioSettings() {
@@ -4740,11 +4744,11 @@
             const volPct = parseFloat(document.getElementById('inp-audio-vol').value) || 100;
             const solidDist = parseFloat(document.getElementById('inp-audio-solid').value) || 1;
             const breakDays = parseInt(document.getElementById('inp-break-days').value) || 7;
-            localStorage.setItem('audio_beep_start_m', startDist);
-            localStorage.setItem('audio_fence_ignore_m', ignoreDist);
-            localStorage.setItem('audio_volume_pct', volPct);
-            localStorage.setItem('audio_continuous_m', solidDist);
-            localStorage.setItem('break_display_days', breakDays);
+            ls.setItem('audio_beep_start_m', startDist);
+            ls.setItem('audio_fence_ignore_m', ignoreDist);
+            ls.setItem('audio_volume_pct', volPct);
+            ls.setItem('audio_continuous_m', solidDist);
+            ls.setItem('break_display_days', breakDays);
             
             if (typeof currentDashboardMode !== 'undefined' && currentDashboardMode === 'breaks') {
                 renderBreaksDashboard();
@@ -5112,7 +5116,7 @@
             const brk = savedBreaks.find(b => b.id === breakId);
             if (brk) {
                 brk.isDeleted = true;
-                brk.deletedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.deletedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.deletedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks();
@@ -5125,7 +5129,7 @@
             const brk = savedBreaks.find(b => b.id === breakId);
             if (brk) {
                 brk.comment = comment;
-                brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks();
@@ -5136,7 +5140,7 @@
             const brk = savedBreaks.find(b => b.id === breakId);
             if (brk) { 
                 brk.name = newName; 
-                brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks(); 
@@ -5318,7 +5322,7 @@
             if (selectedBreakIds.size === 0) return;
             if (!confirm(`Delete ${selectedBreakIds.size} selected break${selectedBreakIds.size > 1 ? 's' : ''}?`)) return;
             
-            const deleter = localStorage.getItem('auth_name') || 'Unknown User';
+            const deleter = ls.getItem('auth_name') || 'Unknown User';
             const now = new Date().toISOString();
             
             savedBreaks.forEach(b => {
@@ -5329,7 +5333,7 @@
                     b.synced = false;
                 }
             });
-            
+
             selectedBreakIds.clear();
             breakSelectMode = false;
             saveBreaks();
@@ -5585,8 +5589,8 @@
                         const grower = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
                         const baseCover = parseFloat(p.latest.cover) || 0;
                         const estimatedCover = baseCover + (grower * daysSince);
-                        const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
-                        const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+                        const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(ls.getItem('feed_residual')) || 1500);
+                        const savedHerdCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}');
                         const cowNum = savedHerdCows[brk.group] || 0;
 
                         if (cowNum > 0) {
@@ -5681,7 +5685,7 @@
             const brk = savedBreaks.find(b => b.id === id);
             if (!brk) return;
             
-            let defaultRes = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
+            let defaultRes = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(ls.getItem('feed_residual')) || 1500);
             document.getElementById('modal-break-residual').value = defaultRes;
             if (brk.shiftType) document.getElementById('modal-break-shift').value = brk.shiftType;
             else document.getElementById('modal-break-shift').value = '24';
@@ -5704,12 +5708,12 @@
                 else if (shiftType === 'pm') hrsNum = 24 * (safeNum(document.getElementById('inp-pm-pct').value, 40) / 100);
                 
                 const manRes = parseFloat(document.getElementById('modal-break-residual').value);
-                const manualResidual = isFinite(manRes) && manRes > 0 ? manRes : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
+                const manualResidual = isFinite(manRes) && manRes > 0 ? manRes : (parseFloat(ls.getItem('feed_residual')) || 1500);
 
                 brk.timeStayHrs = hrsNum;
                 brk.shiftType = shiftType;
                 brk.manualResidual = manualResidual;
-                brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
                 
                 saveBreaks();
@@ -5898,7 +5902,7 @@
                 const defaultYield = safeNum(document.getElementById('inp-crop-yield').value);
                 const paddockYield = (brk.paddock && cropYields[brk.paddock]) ? cropYields[brk.paddock] : defaultYield;
                 const cropFeed = safeNum(document.getElementById('inp-crop-feed').value);
-                const hCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                const hCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
                 
                 if (brk.distanceMeters > 0 && hCows > 0 && paddockYield > 0) {
                     const hDemand = cropFeed * hCows;
@@ -5906,7 +5910,7 @@
                     brk.cropWidthMeters = reqM2 / brk.distanceMeters;
                 }
             }
-            brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+            brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
             brk.lastEditedAt = new Date().toISOString();
             brk.synced = false;
             saveBreaks();
@@ -5976,8 +5980,8 @@
                     if (userEmail === ADMIN_EMAIL.toLowerCase() || authorizedMap.hasOwnProperty(userEmail)) {
                         // Authorized! Keep email and name in local storage for next time
                         const userName = authorizedMap[userEmail] || "Admin"; // Fallback to Admin if admin email
-                        localStorage.setItem('auth_email', userEmail);
-                        localStorage.setItem('auth_name', userName);
+                        ls.setItem('auth_email', userEmail);
+                        ls.setItem('auth_name', userName);
                         
                         document.getElementById('login-screen').style.display = 'none';
                         
@@ -5991,7 +5995,7 @@
                         loadBreaks();
                     } else {
                         // If they failed authorization, make sure they are signed out locally
-                        localStorage.removeItem('auth_email');
+                        ls.removeItem('auth_email');
                         showUnauthorized(userEmail);
                     }
                 },
@@ -5999,16 +6003,16 @@
                     console.error("Auth fetch failed:", err);
                     if (userEmail === ADMIN_EMAIL.toLowerCase()) {
                          // Always fallback to allow admin even if CSV fails
-                        localStorage.setItem('auth_email', userEmail);
-                        localStorage.setItem('auth_name', "Admin");
+                        ls.setItem('auth_email', userEmail);
+                        ls.setItem('auth_name', "Admin");
                         document.getElementById('login-screen').style.display = 'none';
                         const adminMenu = document.getElementById('menu-item-admin');
                         if (adminMenu) adminMenu.style.display = 'block';
                         init();
                         loadBreaks();
                     } else {
-                        localStorage.removeItem('auth_email');
-                        localStorage.removeItem('auth_name');
+                        ls.removeItem('auth_email');
+                        ls.removeItem('auth_name');
                         showUnauthorized(userEmail);
                     }
                 }
@@ -6017,7 +6021,7 @@
 
         // Auto-Login Check on Boot
         window.addEventListener('DOMContentLoaded', () => {
-            const savedEmail = localStorage.getItem('auth_email');
+            const savedEmail = ls.getItem('auth_email');
             if (savedEmail) {
                 // Skips Google prompt, attempts authentication silently
                 handleCredentialResponse(savedEmail);

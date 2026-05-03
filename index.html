@@ -4052,6 +4052,8 @@
                 });
         }
 
+        let isSyncingBreaks = false;
+
         function loadBreaks() {
             // 1. Load from localStorage immediately
             try {
@@ -4071,21 +4073,28 @@
                         if (data && Array.isArray(data.breaks)) {
                             console.log("Cloud breaks received:", data.breaks.length);
                             
-                            const cloudIds = new Set(data.breaks.map(b => String(b.id || "")));
-                            const now = Date.now();
-                            const bufferMs = 60 * 60 * 1000; // 1 hour buffer for "newly created but not yet synced"
-
-                            // Start with cloud list as the primary truth
-                            let finalBreaks = [...data.breaks];
+                            const cloudMap = new Map(data.breaks.map(b => [String(b.id), b]));
                             
-                            // Merge in manual local breaks ONLY if they are very new (might be syncing soon)
+                            // 1. Mark all cloud breaks as synced
+                            data.breaks.forEach(b => b.synced = true);
+
+                            // 2. Start with cloud breaks
+                            let finalBreaks = [...data.breaks];
+
+                            // 3. Handle local overrides
                             savedBreaks.forEach(lb => {
-                                if (lb && lb.id && !cloudIds.has(String(lb.id))) {
-                                    const created = lb.createdAt ? new Date(lb.createdAt).getTime() : 0;
-                                    if (now - created < bufferMs) {
-                                        finalBreaks.push(lb);
-                                    } else {
-                                        console.log("Sync: Removing local break deleted in cloud:", lb.id);
+                                if (lb && lb.id) {
+                                    const idStr = String(lb.id);
+                                    if (lb.synced === false) {
+                                        // Local change has not been synced yet.
+                                        if (cloudMap.has(idStr)) {
+                                            // Replace cloud version with our local unsynced version
+                                            const idx = finalBreaks.findIndex(b => String(b.id) === idStr);
+                                            if (idx !== -1) finalBreaks[idx] = lb;
+                                        } else {
+                                            // New local break, add it
+                                            finalBreaks.push(lb);
+                                        }
                                     }
                                 }
                             });
@@ -4115,9 +4124,11 @@
             // Save locally immediately
             localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
 
-            // Save to cloud in background - Simple POST (avoid preflight)
-            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
-                // Compress payload before sending to avoid Google Sheets 50k char limit
+            // Save to cloud in background
+            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5 && !isSyncingBreaks) {
+                isSyncingBreaks = true;
+                
+                // Compress payload
                 const compressedBreaks = savedBreaks.map(b => {
                     const cb = {
                         id: b.id,
@@ -4137,18 +4148,43 @@
                     if (b.lastEditedBy) cb.lastEditedBy = b.lastEditedBy;
                     if (b.lastEditedAt) cb.lastEditedAt = b.lastEditedAt;
                     if (b.isCropBreak) cb.isCropBreak = b.isCropBreak;
+                    if (b.isDeleted) cb.isDeleted = true;
+                    if (b.deletedBy) cb.deletedBy = b.deletedBy;
+                    if (b.deletedAt) cb.deletedAt = b.deletedAt;
                     return cb;
                 });
 
-                console.log("Saving breaks to cloud...");
+                console.log("Syncing breaks to cloud...");
                 fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify({ type: 'breaks', breaks: compressedBreaks })
                 })
-                .then(res => console.log("Cloud save res:", res.status))
-                .catch(e => { console.log('Cloud breaks save failed', e); });
+                .then(res => {
+                    if (res.ok) {
+                        console.log("Cloud sync successful");
+                        // Mark all as synced
+                        savedBreaks.forEach(b => b.synced = true);
+                        localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+                        if (currentDashboardMode === 'breaks') renderBreaksDashboard();
+                    } else {
+                        console.error("Cloud sync failed with status:", res.status);
+                    }
+                })
+                .catch(e => { console.log('Cloud breaks save failed', e); })
+                .finally(() => {
+                    isSyncingBreaks = false;
+                });
             }
         }
+
+        // Background sync every 2 minutes
+        setInterval(() => {
+            if (savedBreaks.some(b => b.synced === false)) {
+                console.log("Unsynced breaks found, triggering background sync...");
+                saveBreaks();
+            }
+        }, 120000);
+
 
         /* ===================== CUSTOM PADDOCKS (EXTERNAL) ===================== */
         function loadCustomPaddocks() {
@@ -4494,7 +4530,8 @@
                         createdAt: new Date().toISOString(),
                         createdBy: localStorage.getItem('auth_name') || 'Unknown User',
                         group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup,
-                        isCropBreak: isCropBreak
+                        isCropBreak: isCropBreak,
+                        synced: false
                     };
                     
                     console.log("New crop line created:", newBreak);
@@ -4543,7 +4580,8 @@
                         createdAt: new Date().toISOString(),
                         createdBy: localStorage.getItem('auth_name') || 'Unknown User',
                         group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup,
-                        isCropBreak: isCropBreak
+                        isCropBreak: isCropBreak,
+                        synced: false
                     };
                     
                     console.log("New break created:", newBreak);
@@ -4989,10 +5027,16 @@
         }
 
         function deleteBreak(breakId) {
-            savedBreaks = savedBreaks.filter(b => b.id !== breakId);
-            saveBreaks();
-            renderBreaksDashboard();
-            renderBreaksOnMap();
+            const brk = savedBreaks.find(b => b.id === breakId);
+            if (brk) {
+                brk.isDeleted = true;
+                brk.deletedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.deletedAt = new Date().toISOString();
+                brk.synced = false;
+                saveBreaks();
+                renderBreaksDashboard();
+                renderBreaksOnMap();
+            }
         }
 
         function updateBreakComment(breakId, comment) {
@@ -5001,6 +5045,7 @@
                 brk.comment = comment;
                 brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
+                brk.synced = false;
                 saveBreaks();
             }
         }
@@ -5011,6 +5056,7 @@
                 brk.name = newName; 
                 brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
+                brk.synced = false;
                 saveBreaks(); 
             }
         }
@@ -5024,6 +5070,7 @@
             window.audioAidParallelLayers = [];
 
             savedBreaks.forEach(brk => {
+                if (brk.isDeleted) return;
                 if (brk.id === editingBreakId) {
                     breakLayers.push(null);
                     return;
@@ -5187,7 +5234,19 @@
         function deleteSelectedBreaks() {
             if (selectedBreakIds.size === 0) return;
             if (!confirm(`Delete ${selectedBreakIds.size} selected break${selectedBreakIds.size > 1 ? 's' : ''}?`)) return;
-            savedBreaks = savedBreaks.filter(b => !selectedBreakIds.has(b.id));
+            
+            const deleter = localStorage.getItem('auth_name') || 'Unknown User';
+            const now = new Date().toISOString();
+            
+            savedBreaks.forEach(b => {
+                if (selectedBreakIds.has(b.id)) {
+                    b.isDeleted = true;
+                    b.deletedBy = deleter;
+                    b.deletedAt = now;
+                    b.synced = false;
+                }
+            });
+
             selectedBreakIds.clear();
             breakSelectMode = false;
             saveBreaks();
@@ -5205,7 +5264,7 @@
 
             const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
             const visibleBreaks = savedBreaks.filter(b => {
-                if (!b.createdAt) return false;
+                if (!b.createdAt || b.isDeleted) return false;
                 const ts = new Date(b.createdAt).getTime();
                 if (weeklyFilterRange) {
                     return ts >= weeklyFilterRange.start && ts < weeklyFilterRange.end;
@@ -5221,7 +5280,7 @@
             // Calculate avg area/day globally (excluding crops)
             const now = new Date();
             const daysAgoTs = new Date(now.getTime() - filterDays * 24 * 60 * 60 * 1000);
-            const recentBreaksAll = savedBreaks.filter(b => b.group !== 'crops' && !b.isCropBreak && b.createdAt && new Date(b.createdAt) >= daysAgoTs);
+            const recentBreaksAll = savedBreaks.filter(b => !b.isDeleted && b.group !== 'crops' && !b.isCropBreak && b.createdAt && new Date(b.createdAt) >= daysAgoTs);
             const recentAreaAll = recentBreaksAll.reduce((sum, b) => sum + b.areaHa, 0);
             const daysWithBreaks = new Set(recentBreaksAll.map(b => new Date(b.createdAt).toDateString())).size;
             const avgAreaPerDay = daysWithBreaks > 0 ? (recentAreaAll / daysWithBreaks) : 0;
@@ -5527,7 +5586,8 @@
                                 const status = brk.lastEditedBy ? 'EDITED' : 'CREATED';
                                 const ts = brk.lastEditedAt ? new Date(brk.lastEditedAt) : (brk.createdAt ? new Date(brk.createdAt) : null);
                                 const dateStr = ts ? ts.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }).toUpperCase() : '';
-                                return `${firstName} ${status}${dateStr ? ' \u2022 ' + dateStr : ''}`;
+                                const syncIcon = brk.synced ? '<span style="color:#2ecc71; margin-left:4px;">\u2714\ufe0f</span>' : '<span style="color:#e67e22; margin-left:4px;" title="Sync Pending">\u23f3</span>';
+                                return `${firstName} ${status}${dateStr ? ' \u2022 ' + dateStr : ''}${syncIcon}`;
                             })()}
                         </div>
                     </div>
@@ -5766,6 +5826,7 @@
             }
             brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
             brk.lastEditedAt = new Date().toISOString();
+            brk.synced = false;
             saveBreaks();
             
             cleanupEdit();
