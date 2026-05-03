@@ -4584,6 +4584,14 @@ eEditGroupSelect();
 
         let ignoreNextMapClickTimeout = 0;
         function onMapClickForBreak(e) {
+            const latlng = e.latlng;
+            if (currentDrawingMode === 'custom_paddock') {
+                drawingVertices.push({ lat: latlng.lat, lng: latlng.lng });
+                if (navigator.vibrate) navigator.vibrate(50);
+                renderDrawingPoly();
+                document.getElementById('vertex-count').textContent = drawingVertices.length + ' points added';
+                return;
+            }
             if (!isDrawingBreak) return;
             if (useCrosshairMode) return; // Ignore taps when in crosshair mode, rely on btn
             if (Date.now() < ignoreNextMapClickTimeout) return;
@@ -4630,6 +4638,33 @@ eEditGroupSelect();
         }
 
         function finishBreak() {
+            if (currentDrawingMode === 'custom_paddock' && pendingCPData) {
+                const areaSqm = calculatePolygonArea(drawingVertices);
+                const areaHa = areaSqm / 10000;
+                
+                const newCP = {
+                    id: 'cp_' + Date.now(),
+                    name: pendingCPData.name,
+                    yield: pendingCPData.yield,
+                    vertices: [...drawingVertices],
+                    areaHa: areaHa
+                };
+                
+                customPaddocks.push(newCP);
+                saveCustomPaddocks();
+                
+                pendingCPData = null;
+                isDrawingBreak = false;
+                currentDrawingMode = 'polygon';
+                drawingVertices = [];
+                map.off('click', onMapClickForBreak);
+                map.getContainer().style.cursor = '';
+                document.getElementById('break-toolbar').style.display = 'none';
+                setBreakFullscreen(false);
+                
+                if (currentDashboardMode === 'feed') setFeedInputs();
+                return;
+            }
             try {
                 const isLineMode = currentDrawingMode === 'line';
                 console.log("Finishing break, mode:", currentDrawingMode, "vertices:", drawingVertices.length);
@@ -6160,6 +6195,144 @@ eEditGroupSelect();
                 });
                 loadAuthorizedEmails();
             } catch (e) { alert('Failed to remove email'); }
+        }
+
+        /* ===================== CUSTOM PADDOCKS (EXTERNAL) ===================== */
+        function loadCustomPaddocks() {
+            try {
+                const stored = localStorage.getItem('custom_paddocks');
+                if (stored) {
+                    customPaddocks = JSON.parse(stored);
+                    renderCustomPaddocksOnMap();
+                }
+            } catch (e) {
+                console.error("Failed to load custom paddocks:", e);
+                customPaddocks = [];
+            }
+        }
+
+        function saveCustomPaddocks() {
+            localStorage.setItem('custom_paddocks', JSON.stringify(customPaddocks));
+            renderCustomPaddocksOnMap();
+            saveToCloud(true); // Sync to cloud
+        }
+
+        function renderCustomPaddocksOnMap() {
+            if (!map) return;
+            if (customPaddockLayer) map.removeLayer(customPaddockLayer);
+            if (customPaddockLabelLayer) map.removeLayer(customPaddockLabelLayer);
+
+            customPaddockLayer = L.layerGroup().addTo(map);
+            customPaddockLabelLayer = L.layerGroup().addTo(map);
+
+            customPaddocks.forEach(cp => {
+                const coords = cp.vertices.map(v => [v.lat, v.lng]);
+                const poly = L.polygon(coords, {
+                    color: '#8e44ad',
+                    weight: 2,
+                    dashArray: '5, 5',
+                    fillColor: '#8e44ad',
+                    fillOpacity: 0.1,
+                    interactive: false // Disable interaction so clicks pass through to breaks
+                }).addTo(customPaddockLayer);
+
+                // Add label
+                const center = poly.getBounds().getCenter();
+                L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'custom-paddock-label',
+                        html: `<div style="color:#8e44ad; font-weight:bold; font-size:10px; text-shadow:0 0 3px white; text-align:center; background:rgba(255,255,255,0.7); padding:2px 4px; border-radius:4px; border:1px solid #8e44ad;">${cp.name.toUpperCase()}</div>`,
+                        iconSize: [80, 20],
+                        iconAnchor: [40, 10]
+                    })
+                }).addTo(customPaddockLabelLayer);
+                
+                // Add to areaLookup for math
+                areaLookup[cp.name] = cp.areaHa;
+                cropYields[cp.name] = cp.yield;
+            });
+        }
+
+        function deleteCustomPaddock(name) {
+            customPaddocks = customPaddocks.filter(p => p.name !== name);
+            saveCustomPaddocks();
+            map.closePopup();
+            if (currentDashboardMode === 'feed') setFeedInputs();
+        }
+
+        function startEditCustomPaddock(name) {
+            if (isDrawingBreak || editingBreakId) return;
+            const cp = customPaddocks.find(p => p.name === name);
+            if (!cp) return;
+            
+            editingCustomPaddockName = name;
+            editVertices = cp.vertices.map(v => ({ lat: v.lat, lng: v.lng }));
+            editSelectedIdx = -1;
+            
+            map.closePopup();
+            
+            // Hide the actual paddock layer while editing
+            renderCustomPaddocksOnMap();
+            
+            // Show edit toolbar
+            setBreakFullscreen(true);
+            document.getElementById('edit-toolbar').style.display = 'flex';
+            document.getElementById('btn-delete-pt').disabled = true;
+            
+            // Hide group select as it's not applicable
+            const groupSelect = document.getElementById('edit-group-select');
+            if (groupSelect) groupSelect.style.display = 'none';
+            
+            map.getContainer().style.cursor = 'pointer';
+            renderEditPolygon();
+            renderEditMarkers();
+            updateEditInfo();
+        }
+
+        function showAddCustomPaddockModal() {
+            document.getElementById('custom-paddock-modal').style.display = 'flex';
+            document.getElementById('cp-modal-name').value = '';
+        }
+
+        function startAddCustomPaddock() {
+            const name = document.getElementById('cp-modal-name').value.trim();
+            const yieldVal = parseFloat(document.getElementById('cp-modal-yield').value) || 20000;
+            
+            if (!name) return alert("Please enter a paddock name");
+            if (customPaddocks.some(p => p.name.toLowerCase() === name.toLowerCase()) || paddockMap[name]) {
+                return alert("A paddock with this name already exists");
+            }
+
+            pendingCPData = { name, yield: yieldVal };
+            document.getElementById('custom-paddock-modal').style.display = 'none';
+            
+            // Switch to map mode so user can draw
+            switchDashboardMode('satellite');
+            
+            // Enter drawing mode
+            currentDrawingMode = 'custom_paddock';
+            isDrawingBreak = true;
+            drawingVertices = [];
+            
+            setBreakFullscreen(true);
+            document.getElementById('break-toolbar').style.display = 'flex';
+            document.getElementById('vertex-count').textContent = 'Draw Paddock Boundaries';
+            map.getContainer().style.cursor = 'crosshair';
+            map.on('click', onMapClickForBreak);
+            
+            if (navigator.vibrate) navigator.vibrate(100);
+        }
+
+        function updateCustomPaddockYield(pName, val) {
+            const v = safeNum(val);
+            const p = customPaddocks.find(cp => cp.name === pName);
+            if (p) {
+                p.yield = v;
+                cropYields[pName] = v;
+                saveCustomPaddocks();
+                calculateFeedLogic();
+                triggerAutoSave();
+            }
         }
             // Register Service Worker for PWA
             if ('serviceWorker' in navigator) {
