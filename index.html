@@ -4164,6 +4164,9 @@
             pendingCPData = { name, yield: yieldVal };
             document.getElementById('custom-paddock-modal').style.display = 'none';
             
+            // Switch to map mode so user can draw
+            switchDashboardMode('satellite');
+            
             // Enter drawing mode
             currentDrawingMode = 'custom_paddock';
             isDrawingBreak = true;
