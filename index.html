@@ -2426,6 +2426,7 @@
                 localStorage.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
             }
             if (data.customPaddocks) {
+                console.log("Cloud: Received custom paddocks", data.customPaddocks.length);
                 customPaddocks = data.customPaddocks;
                 localStorage.setItem('custom_paddocks', JSON.stringify(customPaddocks));
                 renderCustomPaddocksOnMap();
@@ -4016,8 +4017,12 @@
                 cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
                 manualBreaks: manualBreakOverrides,
-                customPaddocks: customPaddocks
+                customPaddocks: customPaddocks.map(cp => ({
+                    ...cp,
+                    vertices: cp.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) }))
+                }))
             };
+            console.log("Cloud: Sending feed_settings payload", payload);
 
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
