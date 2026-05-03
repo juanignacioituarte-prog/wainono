@@ -3341,19 +3341,10 @@
                 document.getElementById('btn-finish-break').disabled = true;
             }
 
-            // Real-time area warnings
-            if (!isCustomPaddock && window.lastCalcTargets && (count >= 3 || (isLineMode && count >= 2))) {
-                let target = 0;
-                let currentVal = 0;
-                
-                if (isCropBreak) {
-                    target = window.lastCalcTargets.crop[activeBreakGroup] || 0;
-                    currentVal = areaSqm;
-                } else if (!isLineMode && activeBreakGroup !== 'all') {
-                    // Grass target (daily ha)
-                    target = (window.lastCalcTargets.grass && window.lastCalcTargets.grass[activeBreakGroup]) || 0;
-                    currentVal = areaHa;
-                }
+            // Real-time area warnings (Crop Breaks only)
+            if (isCropBreak && window.lastCalcTargets && count >= 3) {
+                const target = window.lastCalcTargets.crop[activeBreakGroup] || 0;
+                const currentVal = areaSqm;
 
                 if (target > 0 && currentVal > 0) {
                     const diff = (currentVal / target) - 1;
