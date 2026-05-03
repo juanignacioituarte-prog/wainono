@@ -1463,6 +1463,14 @@
             </div>
 
             <div class="feed-card">
+                <div class="feed-title-row">
+                    <div class="feed-title">External Paddocks</div>
+                    <button class="btn-save" onclick="showAddCustomPaddockModal()">+ ADD NEW</button>
+                </div>
+                <div id="custom-paddock-list" style="margin-top:10px;"></div>
+            </div>
+
+            <div class="feed-card">
                 <div class="feed-title">Feed Wedge & Demand</div>
                 <div class="chart-box">
                     <canvas id="wedgeChart"></canvas>
@@ -1827,6 +1835,11 @@
         let predictedWedgeChartInstance = null;
         let usePartialCalibration = false;
         let manualFarmGrowthRate = 0;
+        let customPaddocks = []; // Array of { id, name, yield, vertices, areaHa }
+        let customPaddockLayer = null;
+        let customPaddockLabelLayer = null;
+        let pendingCPData = null; // For new paddock creation
+        let editingCustomPaddockName = null; // Track if we are editing a custom paddock boundary
 
         /* Break Management State */
         let default_BREAK_GROUPS = [
@@ -2489,9 +2502,7 @@
             // Crop Settings
             if (localStorage.getItem('feed_crop_yield')) document.getElementById('inp-crop-yield').value = localStorage.getItem('feed_crop_yield');
             if (localStorage.getItem('feed_crop_feed')) document.getElementById('inp-crop-feed').value = localStorage.getItem('feed_crop_feed');
-            if (localStorage.getItem('feed_crop_yields')) cropYields = JSON.parse(localStorage.getItem('feed_crop_yields'));
-
-            // Load Herd Inputs
+            if (localStorage.getItem('feed_crop_yields')) cropYields = JSON            // Load Herd Inputs
             const herdGrid = document.getElementById('herd-inputs');
             if (herdGrid) {
                 herdGrid.innerHTML = '';
@@ -2517,7 +2528,7 @@
                                     <label style="font-size:9px; color:#95a5a6; font-weight:bold; text-transform:uppercase;">Cows</label>
                                     <input type="number" id="herd-cows-${g.id}" value="${val}" style="width:50px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-weight:bold;" oninput="saveAndRecalc()">
                                 </div>
-                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">├ù</button>
+                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">×</button>
                             </div>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; align-items:center; background:#f9f9f9; padding:8px; border-radius:6px;">
@@ -2552,7 +2563,37 @@
                     herdGrid.appendChild(div);
                 });
             }
+
+            // External Paddocks List
+            const cpList = document.getElementById('custom-paddock-list');
+            if (cpList && customPaddocks.length > 0) {
+                cpList.style.display = 'block';
+                let cpInner = '';
+                customPaddocks.forEach(p => {
+                    cpInner += `<div style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px; background:#fff; padding:8px; border-radius:6px; border:1px solid #d0e4ff;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:12px; font-weight:bold; color:#2c3e50;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
+                            <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:12px;" title="Remove Paddock">🗑️</button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+                            <label style="font-size:10px; color:#7f8c8d; font-weight:bold;">YIELD:</label>
+                            <input type="number" 
+                                style="width:60px; padding:2px 5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:right;"
+                                value="${p.yield}" 
+                                oninput="updateCustomPaddockYield('${p.name}', this.value)" />
+                            <span style="font-size:10px; color:#95a5a6; flex:1;">kgDM/ha</span>
+                            <button onclick="startEditCustomPaddock('${p.name}')" style="background:#8e44ad; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">EDIT SHAPE</button>
+                        </div>
+                    </div>`;
+                });
+                cpList.innerHTML = cpInner;
+            } else if (cpList) {
+                cpList.style.display = 'none';
+            }
+
             updateEditGroupSelect();
+            calculateFeedLogic();
+eEditGroupSelect();
             calculateFeedLogic();
         }
 
@@ -2594,6 +2635,7 @@
 
             await Promise.all([loadStatusSheets(), loadManualSheet()]);
             await loadGeoJSON();
+            loadCustomPaddocks();
 
             const calibHoverArea = document.getElementById('calib-hover-area');
             const calibText = document.getElementById('calib-text');
@@ -3606,6 +3648,7 @@
             localStorage.setItem('feed_crop_feed', document.getElementById('inp-crop-feed').value);
 
             let totalCows = 0;
+            let totalCowsOnGrass = 0;
             const herdCows = {};
             const cropHerds = [];
             let hasHerdInputs = false;
@@ -3617,6 +3660,7 @@
                     const val = parseFloat(el.value) || 0;
                     herdCows[g.id] = val;
                     totalCows += val;
+                    if (g.on_grass) totalCowsOnGrass += val;
                 }
                 const tg = document.getElementById(`crop-toggle-${g.id}`);
                 if (tg && tg.checked) {
@@ -3625,11 +3669,12 @@
             });
             
             // Sync total cows to main input if using herd splits
-            if (totalCows > 0) {
-                document.getElementById('inp-cows').value = totalCows;
-                localStorage.setItem('feed_cows', totalCows);
+            if (totalCowsOnGrass > 0 || totalCows > 0) {
+                // We use on-grass cows for rotation parameters as requested
+                document.getElementById('inp-cows').value = totalCowsOnGrass;
+                localStorage.setItem('feed_cows', totalCowsOnGrass);
                 const cDisp = document.getElementById('inp-cows-display');
-                if (cDisp) cDisp.innerText = totalCows;
+                if (cDisp) cDisp.innerText = totalCowsOnGrass;
             }
 
             if (hasHerdInputs) {
@@ -3654,27 +3699,22 @@
             // Pre-grazing Target
             let preGrazeTarget = 0;
             if (totalArea > 0) {
-                // Calculate total demand across all herds correctly
-                let totalCows = 0;
-                let totalCropDemandKg = 0;
+                // Calculate total pasture demand across all herds on grass
+                let totalPastureDemandKg = 0;
                 const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
                 
                 BREAK_GROUPS.forEach(g => {
                     if (g.id === 'all') return;
                     const hCows = savedHerdCows[g.id] || 0;
-                    totalCows += hCows;
                     
-                    if (g.on_crop) {
-                        const hCropFeed = (g.custom_crop_feed !== null && g.custom_crop_feed !== undefined) ? g.custom_crop_feed : cropFeed;
-                        totalCropDemandKg += (hCows * hCropFeed);
+                    if (g.on_grass) {
+                        const hCropFeed = (g.on_crop) ? ((g.custom_crop_feed !== null && g.custom_crop_feed !== undefined) ? g.custom_crop_feed : cropFeed) : 0;
+                        const hPastureDemand = Math.max(0, intake - inshed - hCropFeed);
+                        totalPastureDemandKg += (hCows * hPastureDemand);
                     }
                 });
 
-                const effectiveIntake = intake - inshed;
-                const totalPastureDemandKg = (totalCows * effectiveIntake) - totalCropDemandKg;
-                const avgPastureDemandPerCow = totalCows > 0 ? (totalPastureDemandKg / totalCows) : 0;
-                
-                preGrazeTarget = ((totalCows * Math.max(0, avgPastureDemandPerCow) * round) / totalArea) + residual;
+                preGrazeTarget = ((totalPastureDemandKg * round) / totalArea) + residual;
             }
             document.getElementById('res-target-pre').innerText = Math.round(preGrazeTarget);
             document.getElementById('feed-target-copy').innerText = Math.round(preGrazeTarget);

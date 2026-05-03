@@ -3628,6 +3628,7 @@
             localStorage.setItem('feed_crop_feed', document.getElementById('inp-crop-feed').value);
 
             let totalCows = 0;
+            let totalCowsOnGrass = 0;
             const herdCows = {};
             const cropHerds = [];
             let hasHerdInputs = false;
@@ -3639,6 +3640,7 @@
                     const val = parseFloat(el.value) || 0;
                     herdCows[g.id] = val;
                     totalCows += val;
+                    if (g.on_grass) totalCowsOnGrass += val;
                 }
                 const tg = document.getElementById(`crop-toggle-${g.id}`);
                 if (tg && tg.checked) {
@@ -3647,11 +3649,12 @@
             });
             
             // Sync total cows to main input if using herd splits
-            if (totalCows > 0) {
-                document.getElementById('inp-cows').value = totalCows;
-                localStorage.setItem('feed_cows', totalCows);
+            if (totalCowsOnGrass > 0 || totalCows > 0) {
+                // We use on-grass cows for rotation parameters as requested
+                document.getElementById('inp-cows').value = totalCowsOnGrass;
+                localStorage.setItem('feed_cows', totalCowsOnGrass);
                 const cDisp = document.getElementById('inp-cows-display');
-                if (cDisp) cDisp.innerText = totalCows;
+                if (cDisp) cDisp.innerText = totalCowsOnGrass;
             }
 
             if (hasHerdInputs) {
@@ -3676,27 +3679,22 @@
             // Pre-grazing Target
             let preGrazeTarget = 0;
             if (totalArea > 0) {
-                // Calculate total demand across all herds correctly
-                let totalCows = 0;
-                let totalCropDemandKg = 0;
+                // Calculate total pasture demand across all herds on grass
+                let totalPastureDemandKg = 0;
                 const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
                 
                 BREAK_GROUPS.forEach(g => {
                     if (g.id === 'all') return;
                     const hCows = savedHerdCows[g.id] || 0;
-                    totalCows += hCows;
                     
-                    if (g.on_crop) {
-                        const hCropFeed = (g.custom_crop_feed !== null && g.custom_crop_feed !== undefined) ? g.custom_crop_feed : cropFeed;
-                        totalCropDemandKg += (hCows * hCropFeed);
+                    if (g.on_grass) {
+                        const hCropFeed = (g.on_crop) ? ((g.custom_crop_feed !== null && g.custom_crop_feed !== undefined) ? g.custom_crop_feed : cropFeed) : 0;
+                        const hPastureDemand = Math.max(0, intake - inshed - hCropFeed);
+                        totalPastureDemandKg += (hCows * hPastureDemand);
                     }
                 });
 
-                const effectiveIntake = intake - inshed;
-                const totalPastureDemandKg = (totalCows * effectiveIntake) - totalCropDemandKg;
-                const avgPastureDemandPerCow = totalCows > 0 ? (totalPastureDemandKg / totalCows) : 0;
-                
-                preGrazeTarget = ((totalCows * Math.max(0, avgPastureDemandPerCow) * round) / totalArea) + residual;
+                preGrazeTarget = ((totalPastureDemandKg * round) / totalArea) + residual;
             }
             document.getElementById('res-target-pre').innerText = Math.round(preGrazeTarget);
             document.getElementById('feed-target-copy').innerText = Math.round(preGrazeTarget);
@@ -3910,13 +3908,14 @@
                             <span style="font-size:12px; font-weight:bold; color:#2c3e50;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
                             <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:12px;" title="Remove Paddock">\ud83d\uddd1\ufe0f</button>
                         </div>
-                        <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
                             <label style="font-size:10px; color:#7f8c8d; font-weight:bold;">YIELD:</label>
                             <input type="number" 
-                                style="width:70px; padding:2px 5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:right;"
+                                style="width:60px; padding:2px 5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:right;"
                                 value="${p.yield}" 
                                 oninput="updateCustomPaddockYield('${p.name}', this.value)" />
-                            <span style="font-size:10px; color:#95a5a6;">kgDM/ha</span>
+                            <span style="font-size:10px; color:#95a5a6; flex:1;">kgDM/ha</span>
+                            <button onclick="startEditCustomPaddock('${p.name}')" style="background:#8e44ad; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">EDIT SHAPE</button>
                         </div>
                     </div>`;
                 });
@@ -4272,23 +4271,11 @@
                     weight: 2,
                     dashArray: '5, 5',
                     fillColor: '#8e44ad',
-                    fillOpacity: 0.1
+                    fillOpacity: 0.1,
+                    interactive: false // Disable interaction so clicks pass through to breaks
                 }).addTo(customPaddockLayer);
 
-                // Add options on click
-                poly.on('click', (e) => {
-                    if (isDrawingBreak || editingBreakId || editingCustomPaddockName) return;
-                    L.DomEvent.stopPropagation(e);
-                    
-                    const popupContent = `
-                        <div style="padding:10px; min-width:120px;">
-                            <div style="font-weight:bold; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px; color:#8e44ad;">${cp.name.toUpperCase()}</div>
-                            <button onclick="startEditCustomPaddock('${cp.name}')" style="width:100%; padding:6px; background:#8e44ad; color:white; border:none; border-radius:4px; margin-bottom:6px; cursor:pointer; font-weight:bold; font-size:11px;">EDIT SHAPE</button>
-                            <button onclick="if(confirm('Delete external paddock ${cp.name}?')) deleteCustomPaddock('${cp.name}')" style="width:100%; padding:6px; background:#e74c3c; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">DELETE</button>
-                        </div>
-                    `;
-                    L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(map);
-                });
+                // Map options removed as requested: edit shape now in sidebar
 
                 // Add label
                 const center = poly.getBounds().getCenter();
