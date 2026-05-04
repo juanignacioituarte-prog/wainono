@@ -2676,7 +2676,7 @@
                                     setTimeout(() => msg.style.display = 'none', 2000);
                                 }
                             }
-                            calculateFeedLogic();
+                            saveAndRecalc();
                         })
                         .catch(e => {
                             console.log("Cloud load failed on tab switch, using local");
@@ -2684,10 +2684,10 @@
                                 msg.innerText = "Sync failed (Offline)";
                                 setTimeout(() => msg.style.display = 'none', 3000);
                             }
-                            calculateFeedLogic();
+                            saveAndRecalc();
                         });
                 } else {
-                    calculateFeedLogic();
+                    saveAndRecalc();
                 }
                 return;
             } else {
@@ -3649,7 +3649,7 @@
             });
             
             // Sync total cows to main input if using herd splits
-            if (totalCowsOnGrass > 0 || totalCows > 0) {
+            if (hasHerdInputs) {
                 // We use on-grass cows for rotation parameters as requested
                 document.getElementById('inp-cows').value = totalCowsOnGrass;
                 localStorage.setItem('feed_cows', totalCowsOnGrass);
