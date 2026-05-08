@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rt-farm-v1.0.21';
+const CACHE_NAME = 'rt-farm-v2.0.0';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

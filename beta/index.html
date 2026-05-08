@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#2ecc71">
+    <meta name="theme-color" content="#8e44ad">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RT Farm">
@@ -442,8 +442,6 @@
             color: #95a5a6;
             font-weight: 600;
         }
-
-
 
         /* Feed Calculations View */
         #feed-view {
@@ -1297,6 +1295,25 @@
         </div>
     </div>
 
+    <!-- Custom Paddock Modal -->
+    <div id="custom-paddock-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:10000; align-items:center; justify-content:center;">
+        <div class="modal-content" style="background:white; padding:20px; border-radius:12px; width:80%; max-width:300px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+            <h3 style="margin-top:0;">Add Paddock Outside Map</h3>
+            <div style="margin-bottom:15px;">
+                <label style="display:block; font-size:12px; margin-bottom:5px;">Paddock Name</label>
+                <input type="text" id="cp-modal-name" placeholder="e.g. Runoff 1" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:12px; margin-bottom:5px;">Estimated Yield (kgDM/ha)</label>
+                <input type="number" id="cp-modal-yield" value="20000" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="document.getElementById('custom-paddock-modal').style.display='none'" style="flex:1; padding:10px; border:1px solid #ccc; border-radius:4px; background:white; cursor:pointer;">CANCEL</button>
+                <button onclick="startAddCustomPaddock()" style="flex:1; padding:10px; border:none; border-radius:4px; background:var(--accent); color:white; cursor:pointer; font-weight:bold;">START DRAWING</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Finish Break Details Modal -->
     <div id="finish-break-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:10000; align-items:center; justify-content:center;">
         <div style="background:white; padding:20px; border-radius:12px; width:80%; max-width:320px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
@@ -1329,7 +1346,7 @@
 
     <div id="login-screen">
         <img src="icon-512.png" alt="Logo" style="width: 120px; border-radius: 20px; margin-bottom: 20px;">
-        <h2>River Terrace Beta</h2>
+        <h2>River Terrace Farm App</h2>
         <div id="g_id_onload" data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
             data-callback="handleCredentialResponse" data-auto_prompt="false">
         </div>
@@ -1355,7 +1372,7 @@
                 <line x1="65" y1="50" x2="100" y2="50" />
             </svg>
         </div>
-        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">📍</button>
+        <button id="btn-gps" class="btn-gps" onclick="toggleGPS()" title="Show my location">ðŸ“</button>
         <div class="map-controls">
             <div id="latest-date" class="date-label">LATEST DATA: --</div>
             <div id="sat-layer-controls" class="layer-group">
@@ -1366,7 +1383,7 @@
             <div id="legend" class="legend-box">
                 <div class="legend-header" onclick="toggleLegend()">
                     <span>COVER SCALE (kgDM/ha)</span>
-                    <span id="legend-toggle-icon">▼</span>
+                    <span id="legend-toggle-icon">â–¼</span>
                 </div>
                 <div id="legend-content" class="legend-content">
                     <div class="legend-item">
@@ -1451,23 +1468,17 @@
                         <input type="number" id="inp-crop-feed" value="4" oninput="saveAndRecalc()">
                     </div>
                 </div>
-                <div id="crop-paddock-yields-list" style="margin-top:15px; background:#f9f9f9; padding:10px; border-radius:6px; border:1px solid #eee;">
+                <button class="btn-save" style="margin-top:10px; width:100%; background:#8e44ad; border-color:#8e44ad; margin-bottom:15px;" onclick="showAddCustomPaddockModal()">+ ADD EXTERNAL PADDOCK</button>
+                <div id="crop-paddock-yields-list" style="background:#f9f9f9; padding:10px; border-radius:6px; border:1px solid #eee;">
                     <div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:10px; display:flex; justify-content:space-between;">
                         <span>CROP PADDOCK</span>
                         <span>EST. YIELD (kgDM/ha)</span>
                     </div>
                 </div>
+                <div id="custom-paddock-list" style="margin-top:10px; background:#f0f7ff; padding:10px; border-radius:8px; border:1px solid #d0e4ff; display:none;"></div>
                 <div style="font-size:12px; font-weight:bold; color:#7f8c8d; margin-top:10px; margin-bottom:5px; display:none;">Herds in Crops:</div>
                 <div id="crop-herd-toggles" style="display:none; flex-wrap:wrap; gap:10px; margin-bottom:15px; font-size:12px;"></div>
                 <div id="crop-herd-outputs"></div>
-            </div>
-
-            <div class="feed-card">
-                <div class="feed-title-row">
-                    <div class="feed-title">External Paddocks</div>
-                    <button class="btn-save" onclick="showAddCustomPaddockModal()">+ ADD NEW</button>
-                </div>
-                <div id="custom-paddock-list" style="margin-top:10px;"></div>
             </div>
 
             <div class="feed-card">
@@ -1476,7 +1487,6 @@
                     <canvas id="wedgeChart"></canvas>
                 </div>
             </div>
-
 
             <div class="feed-card">
                 <div class="feed-title">Rotation Parameters</div>
@@ -1532,7 +1542,7 @@
                     </div>
                     <div class="result-highlight">
                         <h3 id="res-area-cow">0</h3>
-                        <small>Area per Cow (m┬▓/day)</small>
+                        <small>Area per Cow (mÂ²/day)</small>
                     </div>
                 </div>
             </div>
@@ -1554,22 +1564,22 @@
                     </div>
                 </div>
             </div>
+        </div>
 
+        <div id="predict-view" style="display:none; flex-direction:column; gap:15px; padding:15px; background:#f5f7fa; flex-grow:1; overflow-y:auto;">
             <div class="feed-card">
-                <div class="feed-title-row">
-                    <div class="feed-title">Predicted Feed Wedge Planner</div>
-                    <div style="flex:1;"></div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">Expected APC: <span id="predict-apc">0</span> kg</div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--warning); margin-left:15px;">Expected Supp: <span id="predict-supp">0.0</span> kg/cow</div>
-                    <button class="btn-save" style="margin-left:15px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE FROM WEATHER</button>
+                <div class="feed-title-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div class="feed-title" style="margin-bottom:0;">Predicted Feed Wedge Planner</div>
+                    <button class="btn-save" style="font-size:10px; padding:4px 8px;" onclick="fetchWeatherAndOptimizeGrowth(event)">🌤️ OPTIMIZE GROWTH</button>
                 </div>
-                <div class="calc-grid" style="margin-bottom:15px;">
+                
+                <div class="calc-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
                     <div class="input-group">
                         <label>Days Ahead</label>
                         <input type="number" id="inp-predict-days" value="14" oninput="updatePredictedWedge()">
                     </div>
                     <div class="input-group">
-                        <label>Expected Growth (kgDM/ha/day)</label>
+                        <label>Est. Growth (kgDM/day)</label>
                         <input type="number" id="inp-predict-growth" value="35" oninput="updatePredictedWedge()">
                     </div>
                     <div class="input-group">
@@ -1577,52 +1587,44 @@
                         <input type="number" id="inp-predict-rotation" value="30" oninput="updatePredictedWedge()">
                     </div>
                     <div class="input-group">
-                        <label>Simulated Cows</label>
-                        <input type="number" id="inp-predict-cows" placeholder="Auto" oninput="updatePredictedWedge()">
-                    </div>
-                    <div class="input-group">
-                        <label>Simulated Intake (kgDM)</label>
-                        <input type="number" id="inp-predict-intake" placeholder="Auto" oninput="updatePredictedWedge()">
-                    </div>
-                    <div class="input-group">
-                        <label>Max Supp Allowed (kg/cow)</label>
+                        <label>Max Supp (kg/cow)</label>
                         <input type="number" id="inp-predict-max-supp" value="20" oninput="updatePredictedWedge()">
                     </div>
                 </div>
-                
-                <div style="margin-bottom: 15px; padding: 15px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                            <input type="checkbox" id="inp-dryoff-toggle" style="width: 20px; height: 20px;" onclick="document.getElementById('dryoff-container').style.display = this.checked ? 'flex' : 'none'; updatePredictedWedge();">
-                            Dry Off Mode (Zero Pasture)
-                        </label>
-                    </div>
-                    <div id="dryoff-container" style="display:none; flex-direction:column; gap:10px; margin-top:15px;">
-                        <div id="dryoff-list"></div>
-                        <button class="btn-save" onclick="addDryOffEntry()" style="background:var(--secondary); align-self:flex-start; font-size:0.9rem;">+ ADD DRY OFF EVENT</button>
-                    </div>
-                </div>
 
-                <div class="chart-box">
-                    <canvas id="predictedWedgeChart"></canvas>
+                <div class="calc-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div class="result-highlight" style="background:#fff; border:1px solid #ddd; padding:10px; border-radius:8px; text-align:center;">
+                        <h3 id="predict-apc" style="margin:0; font-size:18px; color:#8e44ad;">0</h3>
+                        <small style="font-size:10px; color:#7f8c8d;">PREDICTED APC</small>
+                    </div>
+                    <div class="result-highlight" style="background:#fff; border:1px solid #ddd; padding:10px; border-radius:8px; text-align:center;">
+                        <h3 id="predict-supp" style="margin:0; font-size:18px; color:#f39c12;">0.0</h3>
+                        <small style="font-size:10px; color:#7f8c8d;">PREDICTED SUPP</small>
+                    </div>
                 </div>
             </div>
 
+            <div class="feed-card" style="flex-grow:1; min-height:300px; display:flex; flex-direction:column;">
+                <div class="feed-title">Predicted Feed Wedge</div>
+                <div style="flex-grow:1; position:relative; min-height:250px;">
+                    <canvas id="predictedWedgeChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="sidebar">
-        <button class="minimize-btn" onclick="toggleSidebar()">≡</button>
+        <button class="minimize-btn" onclick="toggleSidebar()">â—€</button>
         <div id="sidebar-content" style="display:flex; flex-direction:column; height:100%; width:100%;">
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
-                <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
+                <button class="btn-dots" onclick="toggleSettingsMenu()">â‹®</button>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
-                    <div class="dropdown-item" onclick="switchDashboardMode('herd_management'); toggleSettingsMenu();">Manage Herds</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.21</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1630,14 +1632,17 @@
                     <button id="btn-mode-man" class="mode-btn active"
                         onclick="switchDashboardMode('manual')">FARMWALK</button>
                     <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED</button>
+                    <button id="btn-mode-predict" class="mode-btn" onclick="switchDashboardMode('predict')">PREDICT</button>
                     <button id="btn-mode-breaks" class="mode-btn"
                         onclick="switchDashboardMode('breaks')">BREAKS</button>
                 </div>
-                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">▼</button>
+                <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">â–¼</button>
             </div>
 
             <div id="header-details" class="header-collapsible">
-                <div id="fallback-warning" class="fallback-alert" style="display:none;">⚠️ RECENT DATA LOW (UNDER 0.3) - SHOWING PREVIOUS DATE</div>
+                <div id="fallback-warning" class="fallback-alert" style="display:none;">âš ï¸ RECENT DATA LOW (UNDER
+                    0.3) -
+                    SHOWING PREVIOUS DATE</div>
 
                 <div id="calibration-box" class="calib-box" style="display:none;">
                     <div class="calib-row" id="calib-hover-area">
@@ -1669,8 +1674,6 @@
 
             <input type="text" id="search" placeholder="Search paddocks..." style="margin-top:8px;">
         </div>
-
-
         <div id="list">Loading data...</div>
 
         <div id="admin-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
@@ -1773,26 +1776,62 @@
             <p style="font-size:10px; color:#95a5a6; margin-top:0; margin-bottom:10px;">Tap any week to isolate its breaks on the map.</p>
             <div id="weekly-report-content"></div>
         </div>
+    </div>
+</div>
 
-        <div id="herd-management-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                <h3 style="margin-top:0; margin-bottom:0;">Manage Herds</h3>
-                <button onclick="switchDashboardMode('feed')" style="background:#2ecc71; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">Done</button>
+    <!-- Modals -->
+    <div id="custom-paddock-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:20000; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
+        <div style="background:white; padding:25px; border-radius:12px; width:100%; max-width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.2);">
+            <h3 style="margin-top:0; color:#8e44ad; display:flex; align-items:center; gap:10px;">
+                <span>+ ADD EXTERNAL PADDOCK</span>
+            </h3>
+            <p style="font-size:13px; color:#666; margin-bottom:20px;">Register an off-platform paddock by giving it a name and yield, then drawing its boundaries on the map.</p>
+            
+            <div class="input-group" style="margin-bottom:15px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">PADDOCK NAME</label>
+                <input type="text" id="cp-modal-name" placeholder="e.g. Back Block 1" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-weight:bold;">
             </div>
-            <p style="font-size:12px; color:#666; margin-bottom:15px;">Configure your herds, change colors, and manage the rotation groups.</p>
             
-            <button onclick="addCustomHerd()" style="width:100%; padding:10px; background:white; border:2px dashed #8e44ad; color:#8e44ad; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:20px;">+ CREATE NEW HERD</button>
+            <div class="input-group" style="margin-bottom:20px;">
+                <label style="display:block; font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">ESTIMATED YIELD (kgDM/ha)</label>
+                <input type="number" id="cp-modal-yield" value="20000" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-weight:bold;">
+            </div>
             
-            <div id="herd-management-list" style="display:flex; flex-direction:column; gap:12px;">
-                <!-- Herds listed here -->
+            <div style="display:flex; gap:10px;">
+                <button onclick="document.getElementById('custom-paddock-modal').style.display='none'" style="flex:1; padding:12px; border:1px solid #ddd; background:#f9f9f9; border-radius:8px; font-weight:bold; cursor:pointer;">CANCEL</button>
+                <button onclick="startAddCustomPaddock()" style="flex:2; padding:12px; border:none; background:#8e44ad; color:white; border-radius:8px; font-weight:bold; cursor:pointer;">DRAW ON MAP</button>
             </div>
         </div>
     </div>
-</div>
+
+    <div id="confirm-paddock-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100001; align-items:center; justify-content:center;">
+        <div style="background:white; padding:25px; border-radius:12px; width:320px; text-align:center; box-shadow:0 10px-40px rgba(0,0,0,0.2);">
+            <div style="font-size:40px; margin-bottom:15px;">ðŸ—ºï¸</div>
+            <h3 style="margin-top:0;">Select Whole Paddock?</h3>
+            <p style="font-size:14px; color:#666; margin-bottom:25px;">Do you want to use the entire area of <b id="confirm-paddock-name"></b> for this break?</p>
+            <div style="display:flex; gap:10px;">
+                <button id="btn-cancel-paddock" style="flex:1; padding:12px; border:1px solid #ddd; background:#f9f9f9; border-radius:8px; font-weight:bold; cursor:pointer;">NO</button>
+                <button id="btn-confirm-paddock" style="flex:1; padding:12px; border:none; background:var(--accent); color:white; border-radius:8px; font-weight:bold; cursor:pointer;">YES</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
     <script>
+        /* === BETA STORAGE ISOLATION === */
+        const STORAGE_PREFIX = 'beta_';
+        const ls = {
+            getItem: (key) => window.localStorage.getItem(STORAGE_PREFIX + key),
+            setItem: (key, val) => window.localStorage.setItem(STORAGE_PREFIX + key, val),
+            removeItem: (key) => window.localStorage.removeItem(STORAGE_PREFIX + key)
+        };
+
         /* === CONFIGURATION === */
         // Paste your Google Apps Script Web App URL here to enable cloud saving
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRkkZ9pxJnFYiBpbLdgy_WXoG_itdfnjL199NvOLLxCGrPfh2drA1lcCVditsKxbe2/exec";
@@ -1835,11 +1874,6 @@
         let predictedWedgeChartInstance = null;
         let usePartialCalibration = false;
         let manualFarmGrowthRate = 0;
-        let customPaddocks = []; // Array of { id, name, yield, vertices, areaHa }
-        let customPaddockLayer = null;
-        let customPaddockLabelLayer = null;
-        let pendingCPData = null; // For new paddock creation
-        let editingCustomPaddockName = null; // Track if we are editing a custom paddock boundary
 
         /* Break Management State */
         let default_BREAK_GROUPS = [
@@ -1849,11 +1883,11 @@
             { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_yield: null },
             { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_yield: null }
         ];
-        let BREAK_GROUPS = JSON.parse(localStorage.getItem('custom_herds')) || default_BREAK_GROUPS;
-        let manualBreakOverrides = JSON.parse(localStorage.getItem('manual_break_overrides')) || {};
+        let BREAK_GROUPS = JSON.parse(ls.getItem('custom_herds')) || default_BREAK_GROUPS;
+        let manualBreakOverrides = JSON.parse(ls.getItem('manual_break_overrides')) || {};
 
         function saveHerdSettings() {
-            localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
+            ls.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
             saveAndRecalc();
             loadFeedSettings();
         }
@@ -1890,50 +1924,7 @@
             if(confirm("Are you sure you want to remove this herd?")) {
                 BREAK_GROUPS = BREAK_GROUPS.filter(g => g.id !== id);
                 saveHerdSettings();
-                if (currentDashboardMode === 'herd_management') renderHerdManagement();
             }
-        }
-
-        function renderHerdManagement() {
-            const container = document.getElementById('herd-management-list');
-            if (!container) return;
-            
-            container.innerHTML = BREAK_GROUPS.map(g => {
-                if (g.id === 'all') return ''; // Don't allow editing the 'All' group directly
-                return `
-                    <div style="background:white; border-radius:10px; padding:15px; border:1px solid #eee; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                        <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
-                            <input type="color" value="${g.color || '#8e44ad'}" 
-                                onchange="updateCustomHerd('${g.id}', 'color', this.value); renderHerdManagement();"
-                                style="width:30px; height:30px; border:none; border-radius:4px; cursor:pointer; background:none;">
-                            <input type="text" value="${g.name}" 
-                                onchange="updateCustomHerd('${g.id}', 'name', this.value); renderHerdManagement();"
-                                style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px; font-weight:bold; font-size:14px; color:var(--text);">
-                            <button onclick="deleteCustomHerd('${g.id}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:18px;">🗑️</button>
-                        </div>
-                        
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                            <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#666; cursor:pointer;">
-                                <input type="checkbox" ${g.on_grass ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_grass', this.checked)"> On Grass
-                            </label>
-                            <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#666; cursor:pointer;">
-                                <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crops
-                            </label>
-                        </div>
-
-                        <div style="margin-top:12px; padding-top:12px; border-top:1px solid #eee; display:flex; gap:8px; align-items:center;">
-                            <div style="flex:1;">
-                                <label style="font-size:9px; color:#999; display:block;">MOVE HERD TO</label>
-                                <select onchange="moveHerdToBreak('${g.id}', this.value)" style="width:100%; font-size:10px; padding:2px;">
-                                    <option value="">(None)</option>
-                                    ${savedBreaks.map(b => `<option value="${b.id}">${b.name || b.paddock}</option>`).join('')}
-                                </select>
-                            </div>
-                            <button onclick="teleportHerdToBreak('${g.id}')" style="background:#8e44ad; color:white; border:none; padding:6px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer; align-self:flex-end;">TELEPORT</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
         }
 
         function saveManualBreak(id, key, value) {
@@ -1943,12 +1934,16 @@
             } else {
                 manualBreakOverrides[id][key] = value;
             }
-            localStorage.setItem('manual_break_overrides', JSON.stringify(manualBreakOverrides));
+            ls.setItem('manual_break_overrides', JSON.stringify(manualBreakOverrides));
             saveAndRecalc();
         }
         let activeBreakGroup = 'all';
         let cropYields = {}; // { paddockName: yield }
         let allCropPaddocks = []; // List of paddock names with 'CROP' status
+        let customPaddocks = []; // Array of { id, name, yield, vertices, areaHa }
+        let pendingCPData = null; // Temporary storage for modal data during drawing
+        let customPaddockLayer = null;
+        let customPaddockLabelLayer = null;
 
         let activeSoundBreakId = null; 
         let audioCtx = null;
@@ -1979,10 +1974,11 @@
         let drawingMarkers = [];
         let drawingPolyline = null;
         let drawingPolygon = null;
-        let breakLayers = [];
+        let breakLayers = {};
         let breakSelectMode = false;
         let selectedBreakIds = new Set();
         let editingBreakId = null;
+        let editingCustomPaddockName = null; // Track if we are editing a custom paddock boundary
         let editVertices = [];
         let editMarkers = [];
         let editPolygon = null;
@@ -1996,41 +1992,57 @@
         /* Helpers */
         function normName(s) { return (s || "").trim().toLowerCase(); }
 
+        function isPointInLayer(layer, x, y) {
+            const ptL = L.latLng(y, x);
+            if (layer.getBounds && !layer.getBounds().contains(ptL)) return false;
+            let polys = layer.getLatLngs();
+            let rings = [];
+            function extractRings(arr) {
+                if (!arr || arr.length === 0) return;
+                if (arr[0] && typeof arr[0].lat === 'number') rings.push(arr);
+                else arr.forEach(extractRings);
+            }
+            extractRings(polys);
+            for (let poly of rings) {
+                let inside = false;
+                for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                    let xi = poly[i].lng, yi = poly[i].lat;
+                    let xj = poly[j].lng, yj = poly[j].lat;
+                    let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+                if (inside) return true;
+            }
+            return false;
+        }
+
         function getPaddockFromPoint(latlngRaw) {
             if (!latlngRaw) return null;
             let foundPaddock = null;
-            if (!geoLayer) return null;
             const ptX = latlngRaw.lng, ptY = latlngRaw.lat;
-            const ptL = L.latLng(ptY, ptX);
 
-            geoLayer.eachLayer(layer => {
-                if (foundPaddock) return;
-                if (!layer.getLatLngs) return; // Skip if not a polygon
-                if (layer.getBounds && !layer.getBounds().contains(ptL)) return;
-
-                let polys = layer.getLatLngs();
-                let rings = [];
-                function extractRings(arr) {
-                    if (!arr || arr.length === 0) return;
-                    if (arr[0] && typeof arr[0].lat === 'number') rings.push(arr);
-                    else arr.forEach(extractRings);
-                }
-                extractRings(polys);
-
-                for (let poly of rings) {
-                    let inside = false;
-                    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-                        let xi = poly[i].lng, yi = poly[i].lat;
-                        let xj = poly[j].lng, yj = poly[j].lat;
-                        let intersect = ((yi > ptY) != (yj > ptY)) && (ptX < (xj - xi) * (ptY - yi) / (yj - yi) + xi);
-                        if (intersect) inside = !inside;
+            // Check Custom first
+            if (customPaddockLayer) {
+                customPaddockLayer.eachLayer(layer => {
+                    if (foundPaddock) return;
+                    if (isPointInLayer(layer, ptX, ptY)) {
+                        const cp = customPaddocks.find(p => p.vertices[0].lat === layer.getLatLngs()[0][0].lat);
+                        if (cp) foundPaddock = cp.name;
                     }
-                    if (inside) {
+                });
+            }
+
+            if (foundPaddock) return foundPaddock;
+
+            // Check GeoJSON
+            if (geoLayer) {
+                geoLayer.eachLayer(layer => {
+                    if (foundPaddock) return;
+                    if (isPointInLayer(layer, ptX, ptY)) {
                         foundPaddock = layer.feature && layer.feature.properties ? layer.feature.properties.name : 'Unknown';
-                        break;
                     }
-                }
-            });
+                });
+            }
             return foundPaddock;
         }
 
@@ -2073,8 +2085,6 @@
             }
         }
 
-
-
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const btn = document.querySelector('.minimize-btn');
@@ -2082,11 +2092,11 @@
             const isMinimized = sidebar.classList.contains('minimized');
             
             if (window.innerWidth > 768) {
-                btn.innerHTML = isMinimized ? 'ÔûÂ' : 'ÔùÇ';
+                btn.innerHTML = isMinimized ? 'â–¶' : 'â—€';
                 sidebar.style.width = isMinimized ? '40px' : '380px';
                 sidebar.style.height = '100%';
             } else {
-                btn.innerHTML = isMinimized ? 'Ôû▓' : 'Ôû╝';
+                btn.innerHTML = isMinimized ? 'â–²' : 'â–¼';
                 const sideH = isMinimized ? '0px' : '55vh';
                 sidebar.style.height = sideH;
                 document.documentElement.style.setProperty('--sidebar-h', sideH);
@@ -2104,7 +2114,7 @@
             const content = document.getElementById('legend-content');
             const icon = document.getElementById('legend-toggle-icon');
             const isCollapsed = content.classList.toggle('collapsed');
-            icon.textContent = isCollapsed ? 'ÔûÂ' : 'Ôû╝';
+            icon.textContent = isCollapsed ? 'â–¶' : 'â–¼';
         }
 
         // Auto-collapse header and legend on mobile
@@ -2119,7 +2129,7 @@
                 const legendContent = document.getElementById('legend-content');
                 const legendIcon = document.getElementById('legend-toggle-icon');
                 if (legendContent) legendContent.classList.add('collapsed');
-                if (legendIcon) legendIcon.textContent = 'ÔûÂ';
+                if (legendIcon) legendIcon.textContent = 'â–¶';
             }, 500);
         }
 
@@ -2296,6 +2306,9 @@
                             renderDashboard();
                             updateGeoStyles();
                         }
+                        if (currentDashboardMode === 'predict') {
+                            updatePredictedWedge();
+                        }
                     }
                 });
             } catch (e) { }
@@ -2383,7 +2396,7 @@
                         header: true, skipEmptyLines: true,
                         complete: (results) => {
                             const data = results.data[0];
-                            if (data && !localStorage.getItem('feed_residual')) {
+                            if (data && !ls.getItem('feed_residual')) {
                                 // Only use CSV if local storage is empty
                                 document.getElementById('inp-residual').value = data.post_grazing_residual || 1500;
                                 const cVal = data.cow_numbers || 500;
@@ -2404,109 +2417,117 @@
         function setFeedInputs(data) {
             if (data.residual) {
                 document.getElementById('inp-residual').value = data.residual;
-                localStorage.setItem('feed_residual', data.residual);
+                ls.setItem('feed_residual', data.residual);
             }
             if (data.cows) {
                 document.getElementById('inp-cows').value = data.cows;
-                localStorage.setItem('feed_cows', data.cows);
+                ls.setItem('feed_cows', data.cows);
                 const cDisp = document.getElementById('inp-cows-display');
                 if (cDisp) cDisp.innerText = data.cows;
             }
             if (data.intake) {
                 document.getElementById('inp-intake').value = data.intake;
-                localStorage.setItem('feed_intake', data.intake);
+                ls.setItem('feed_intake', data.intake);
             }
             if (data.inshed !== undefined) {
                 document.getElementById('inp-inshed').value = data.inshed;
-                localStorage.setItem('feed_inshed', data.inshed);
+                ls.setItem('feed_inshed', data.inshed);
             }
             if (data.round) {
                 document.getElementById('inp-round').value = data.round;
-                localStorage.setItem('feed_round', data.round);
+                ls.setItem('feed_round', data.round);
             }
             if (data.pre) {
                 document.getElementById('inp-actual-pre').value = data.pre;
-                localStorage.setItem('feed_actual_pre', data.pre);
+                ls.setItem('feed_actual_pre', data.pre);
             }
             if (data.freq) {
                 document.querySelector(`input[name="milking_freq"][value="${data.freq}"]`).checked = true;
-                localStorage.setItem('feed_freq', data.freq);
+                ls.setItem('feed_freq', data.freq);
             }
             if (data.amPct) {
                 document.getElementById('inp-am-pct').value = data.amPct;
-                localStorage.setItem('feed_am_pct', data.amPct);
+                ls.setItem('feed_am_pct', data.amPct);
             }
             if (data.pmPct) {
                 document.getElementById('inp-pm-pct').value = data.pmPct;
-                localStorage.setItem('feed_pm_pct', data.pmPct);
+                ls.setItem('feed_pm_pct', data.pmPct);
             }
             if (data.longPct) {
                 document.getElementById('inp-long-pct').value = data.longPct;
-                localStorage.setItem('feed_long_pct', data.longPct);
+                ls.setItem('feed_long_pct', data.longPct);
             }
             if (data.shortPct) {
                 document.getElementById('inp-short-pct').value = data.shortPct;
-                localStorage.setItem('feed_short_pct', data.shortPct);
+                ls.setItem('feed_short_pct', data.shortPct);
             }
             if (data.cropYield) {
                 document.getElementById('inp-crop-yield').value = data.cropYield;
-                localStorage.setItem('feed_crop_yield', data.cropYield);
+                ls.setItem('feed_crop_yield', data.cropYield);
             }
             if (data.cropFeed) {
                 document.getElementById('inp-crop-feed').value = data.cropFeed;
-                localStorage.setItem('feed_crop_feed', data.cropFeed);
+                ls.setItem('feed_crop_feed', data.cropFeed);
             }
             if (data.cropYields) {
                 cropYields = data.cropYields;
-                localStorage.setItem('feed_crop_yields', JSON.stringify(cropYields));
+                ls.setItem('feed_crop_yields', JSON.stringify(cropYields));
             }
             if (data.herdCows) {
-                localStorage.setItem('herd_cow_numbers', JSON.stringify(data.herdCows));
+                ls.setItem('herd_cow_numbers', JSON.stringify(data.herdCows));
             }
             if (data.cropHerds) {
-                localStorage.setItem('herd_in_crops', JSON.stringify(data.cropHerds));
+                ls.setItem('herd_in_crops', JSON.stringify(data.cropHerds));
             }
             if (data.customHerds) {
                 BREAK_GROUPS = data.customHerds;
-                localStorage.setItem('custom_herds', JSON.stringify(data.customHerds));
+                ls.setItem('custom_herds', JSON.stringify(data.customHerds));
             }
             if (data.manualBreaks) {
                 manualBreakOverrides = data.manualBreaks;
-                localStorage.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
+                ls.setItem('manual_break_overrides', JSON.stringify(data.manualBreaks));
+            }
+            if (data.customPaddocks) {
+                console.log("Cloud: Received custom paddocks", data.customPaddocks.length);
+                customPaddocks = data.customPaddocks;
+                ls.setItem('custom_paddocks', JSON.stringify(customPaddocks));
+                renderCustomPaddocksOnMap();
             }
             // Always reload the UI after settings are injected
             loadLocalFeedSettings();
         }
 
         function loadLocalFeedSettings() {
-            if (localStorage.getItem('feed_residual')) document.getElementById('inp-residual').value = localStorage.getItem('feed_residual');
-            if (localStorage.getItem('feed_cows')) {
-                const cVal = localStorage.getItem('feed_cows');
+            if (ls.getItem('feed_residual')) document.getElementById('inp-residual').value = ls.getItem('feed_residual');
+            if (ls.getItem('feed_cows')) {
+                const cVal = ls.getItem('feed_cows');
                 document.getElementById('inp-cows').value = cVal;
                 const cDisp = document.getElementById('inp-cows-display');
                 if (cDisp) cDisp.innerText = cVal;
             }
-            if (localStorage.getItem('feed_intake')) document.getElementById('inp-intake').value = localStorage.getItem('feed_intake');
-            if (localStorage.getItem('feed_inshed')) document.getElementById('inp-inshed').value = localStorage.getItem('feed_inshed');
-            if (localStorage.getItem('feed_round')) document.getElementById('inp-round').value = localStorage.getItem('feed_round');
-            if (localStorage.getItem('feed_actual_pre')) document.getElementById('inp-actual-pre').value = localStorage.getItem('feed_actual_pre');
+            if (ls.getItem('feed_intake')) document.getElementById('inp-intake').value = ls.getItem('feed_intake');
+            if (ls.getItem('feed_inshed')) document.getElementById('inp-inshed').value = ls.getItem('feed_inshed');
+            if (ls.getItem('feed_round')) document.getElementById('inp-round').value = ls.getItem('feed_round');
+            if (ls.getItem('feed_actual_pre')) document.getElementById('inp-actual-pre').value = ls.getItem('feed_actual_pre');
             
             // Grass Management Settings
-            const savedFreq = localStorage.getItem('feed_freq') || 'tad';
+            const savedFreq = ls.getItem('feed_freq') || 'tad';
             document.getElementById(savedFreq === '3in2' ? 'freq-3in2' : 'freq-tad').checked = true;
-            if (localStorage.getItem('feed_am_pct')) document.getElementById('inp-am-pct').value = localStorage.getItem('feed_am_pct');
-            if (localStorage.getItem('feed_pm_pct')) document.getElementById('inp-pm-pct').value = localStorage.getItem('feed_pm_pct');
-            if (localStorage.getItem('feed_long_pct')) document.getElementById('inp-long-pct').value = localStorage.getItem('feed_long_pct');
-            if (localStorage.getItem('feed_short_pct')) document.getElementById('inp-short-pct').value = localStorage.getItem('feed_short_pct');
+            if (ls.getItem('feed_am_pct')) document.getElementById('inp-am-pct').value = ls.getItem('feed_am_pct');
+            if (ls.getItem('feed_pm_pct')) document.getElementById('inp-pm-pct').value = ls.getItem('feed_pm_pct');
+            if (ls.getItem('feed_long_pct')) document.getElementById('inp-long-pct').value = ls.getItem('feed_long_pct');
+            if (ls.getItem('feed_short_pct')) document.getElementById('inp-short-pct').value = ls.getItem('feed_short_pct');
             
             // Crop Settings
-            if (localStorage.getItem('feed_crop_yield')) document.getElementById('inp-crop-yield').value = localStorage.getItem('feed_crop_yield');
-            if (localStorage.getItem('feed_crop_feed')) document.getElementById('inp-crop-feed').value = localStorage.getItem('feed_crop_feed');
-            if (localStorage.getItem('feed_crop_yields')) cropYields = JSON            // Load Herd Inputs
+            if (ls.getItem('feed_crop_yield')) document.getElementById('inp-crop-yield').value = ls.getItem('feed_crop_yield');
+            if (ls.getItem('feed_crop_feed')) document.getElementById('inp-crop-feed').value = ls.getItem('feed_crop_feed');
+            if (ls.getItem('feed_crop_yields')) cropYields = JSON.parse(ls.getItem('feed_crop_yields'));
+
+            // Load Herd Inputs
             const herdGrid = document.getElementById('herd-inputs');
             if (herdGrid) {
                 herdGrid.innerHTML = '';
-                const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+                const savedHerdCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}');
                 
                 BREAK_GROUPS.forEach(g => {
                     if (g.id === 'all') return;
@@ -2528,7 +2549,7 @@
                                     <label style="font-size:9px; color:#95a5a6; font-weight:bold; text-transform:uppercase;">Cows</label>
                                     <input type="number" id="herd-cows-${g.id}" value="${val}" style="width:50px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-weight:bold;" oninput="saveAndRecalc()">
                                 </div>
-                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">×</button>
+                                <button onclick="deleteCustomHerd('${g.id}')" style="background:#ffeaea; border:none; color:#e74c3c; cursor:pointer; font-size:16px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;" title="Delete Herd">Ã—</button>
                             </div>
                         </div>
                         <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:11px; align-items:center; background:#f9f9f9; padding:8px; border-radius:6px;">
@@ -2563,37 +2584,7 @@
                     herdGrid.appendChild(div);
                 });
             }
-
-            // External Paddocks List
-            const cpList = document.getElementById('custom-paddock-list');
-            if (cpList && customPaddocks.length > 0) {
-                cpList.style.display = 'block';
-                let cpInner = '';
-                customPaddocks.forEach(p => {
-                    cpInner += `<div style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px; background:#fff; padding:8px; border-radius:6px; border:1px solid #d0e4ff;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:12px; font-weight:bold; color:#2c3e50;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
-                            <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:12px;" title="Remove Paddock">🗑️</button>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
-                            <label style="font-size:10px; color:#7f8c8d; font-weight:bold;">YIELD:</label>
-                            <input type="number" 
-                                style="width:60px; padding:2px 5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:right;"
-                                value="${p.yield}" 
-                                oninput="updateCustomPaddockYield('${p.name}', this.value)" />
-                            <span style="font-size:10px; color:#95a5a6; flex:1;">kgDM/ha</span>
-                            <button onclick="startEditCustomPaddock('${p.name}')" style="background:#8e44ad; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">EDIT SHAPE</button>
-                        </div>
-                    </div>`;
-                });
-                cpList.innerHTML = cpInner;
-            } else if (cpList) {
-                cpList.style.display = 'none';
-            }
-
             updateEditGroupSelect();
-            calculateFeedLogic();
-eEditGroupSelect();
             calculateFeedLogic();
         }
 
@@ -2632,10 +2623,10 @@ eEditGroupSelect();
 
             // Load settings first
             await loadFeedSettings();
+            loadCustomPaddocks(); // Load external paddocks
 
             await Promise.all([loadStatusSheets(), loadManualSheet()]);
             await loadGeoJSON();
-            loadCustomPaddocks();
 
             const calibHoverArea = document.getElementById('calib-hover-area');
             const calibText = document.getElementById('calib-text');
@@ -2688,16 +2679,15 @@ eEditGroupSelect();
             } catch (e) { }
         }
 
-        /* Dashboard Mode Switching */
         function switchDashboardMode(mode) {
             if (isDrawingBreak) cancelBreak();
             breakSelectMode = false;
             selectedBreakIds.clear();
             currentDashboardMode = mode;
-            document.getElementById('btn-mode-sat').classList.toggle('active', mode === 'satellite');
-            document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual');
-            document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
-            document.getElementById('btn-mode-breaks').classList.toggle('active', mode === 'breaks');
+            document.getElementById('btn-mode-sat')?.classList.toggle('active', mode === 'satellite');
+            document.getElementById('btn-mode-man')?.classList.toggle('active', mode === 'manual');
+            document.getElementById('btn-mode-feed')?.classList.toggle('active', mode === 'feed');
+            document.getElementById('btn-mode-breaks')?.classList.toggle('active', mode === 'breaks');
 
             if (mode !== 'breaks') {
                 const avgLabel = document.querySelector('.avg-box .avg-row .avg-item:first-child small:first-child');
@@ -2715,57 +2705,52 @@ eEditGroupSelect();
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks') ? 'flex' : 'none';
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
-            
-            // Toggle Cow Emulator Visibility
-            const cowPanel = document.getElementById('cow-emulator-panel');
-            if (cowPanel) {
-                const showCow = (mode === 'satellite' || mode === 'manual' || mode === 'breaks');
-                cowPanel.style.display = showCow ? 'block' : 'none';
+            document.getElementById('predict-view').style.display = (mode === 'predict') ? 'flex' : 'none';
+
+            if (mode === 'breaks') {
+                loadBreaks();
             }
 
-            // Map vs Overlay Logic
-            if (mode === 'feed') {
+            if (mode === 'feed' || mode === 'predict') {
                 document.getElementById('map').style.display = 'none';
                 document.getElementById('list').style.display = 'none';
-                if (window.innerWidth <= 768) {
-                    document.getElementById('sidebar').style.height = 'auto'; // Shrink sidebar to header only
-                }
+                document.getElementById('admin-view').style.display = 'none';
+                if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
+                if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
 
-                const msg = document.getElementById('save-msg');
-                if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
-                    if (msg) {
-                        msg.innerText = "Syncing from Cloud...";
-                        msg.style.display = 'inline-block';
+                if (window.innerWidth <= 768) {
+                    document.getElementById('sidebar').style.height = 'auto';
+                }
+                
+                if (mode === 'feed') {
+                    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                        const msg = document.getElementById('save-msg');
+                        if (msg) { msg.innerText = "Syncing from Cloud..."; msg.style.display = 'inline-block'; }
+                        fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now(), { cache: 'no-store' })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data) setFeedInputs(data);
+                                if (msg) { msg.innerText = "Synced!"; setTimeout(() => msg.style.display = 'none', 2000); }
+                                saveAndRecalc();
+                            })
+                            .catch(e => {
+                                console.log("Cloud load failed, using local");
+                                if (msg) { msg.innerText = "Sync failed"; setTimeout(() => msg.style.display = 'none', 3000); }
+                                saveAndRecalc();
+                            });
+                    } else {
+                        saveAndRecalc();
                     }
-                    fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now(), { cache: 'no-store' })
-                        .then(res => res.json())
-                        .then(data => {
-                            if (data) {
-                                setFeedInputs(data);
-                                if (msg) {
-                                    setTimeout(() => msg.style.display = 'none', 2000);
-                                }
-                            }
-                            saveAndRecalc();
-                        })
-                        .catch(e => {
-                            console.log("Cloud load failed on tab switch, using local");
-                            if (msg) {
-                                msg.innerText = "Sync failed (Offline)";
-                                setTimeout(() => msg.style.display = 'none', 3000);
-                            }
-                            saveAndRecalc();
-                        });
-                } else {
-                    saveAndRecalc();
+                } else if (mode === 'predict') {
+                    updatePredictedWedge();
                 }
                 return;
             } else {
                 document.getElementById('map').style.display = 'block';
                 document.getElementById('list').style.display = 'block';
-                document.getElementById('admin-view').style.display = 'none';
-                if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
-                if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
+                document.getElementById('admin-view').style.display = (mode === 'admin') ? 'block' : 'none';
+                if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = (mode === 'audio_settings') ? 'block' : 'none';
+                if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = (mode === 'weekly_report') ? 'block' : 'none';
                 
                 const sidebar = document.getElementById('sidebar');
                 const isMinimized = sidebar.classList.contains('minimized');
@@ -2794,84 +2779,33 @@ eEditGroupSelect();
                     updateGeoStyles();
                     renderBreaksDashboard();
                     renderBreaksOnMap();
-
-                    // Force a fresh sync every time we enter breaks mode
-                    if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
-                        loadBreaks();
-                    }
                     return;
                 } else if (mode === 'admin') {
-                    document.getElementById('map').style.display = 'none';
-                    document.getElementById('list').style.display = 'none';
-                    document.getElementById('admin-view').style.display = 'block';
                     loadAuthorizedEmails();
-                    
-                    // Highlight the dots menu temporarily or just deactivate other buttons
                     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     return;
                 } else if (mode === 'audio_settings') {
-                    document.getElementById('map').style.display = 'none';
-                    document.getElementById('list').style.display = 'none';
-                    document.getElementById('admin-view').style.display = 'none';
-                    document.getElementById('audio-settings-view').style.display = 'block';
-                    
                     document.getElementById('inp-audio-start').value = getBeepStartDistance();
                     document.getElementById('inp-audio-ignore').value = getFenceIgnoreDistance();
                     document.getElementById('inp-audio-vol').value = getAudioVolume();
                     document.getElementById('inp-audio-solid').value = getContinuousToneDistance();
                     document.getElementById('inp-break-days').value = getBreakDisplayDays();
-                    
                     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     return;
                 } else if (mode === 'weekly_report') {
-                    document.getElementById('map').style.display = 'block';
-                    document.getElementById('list').style.display = 'none';
-                    document.getElementById('admin-view').style.display = 'none';
-                    if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
-                    document.getElementById('weekly-report-view').style.display = 'block';
-                    
-                    const sidebar = document.getElementById('sidebar');
-                    const isMinimized = sidebar.classList.contains('minimized');
-                    
-                    if (window.innerWidth <= 768) {
-                        const sideH = isMinimized ? '0px' : '55vh';
-                        sidebar.style.height = sideH;
-                        sidebar.style.width = '100%';
-                        document.documentElement.style.setProperty('--sidebar-h', sideH);
-                    } else {
-                        sidebar.style.width = isMinimized ? '40px' : '380px';
-                        sidebar.style.height = '100%';
-                    }
-                    setTimeout(() => map.invalidateSize(), 50);
-                    
                     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     setLayerMode(currentViewMode);
                     document.getElementById('legend').style.display = 'none';
                     updateGeoStyles();
-                    
                     weeklyFilterRange = null;
                     renderWeeklyReport();
                     renderBreaksOnMap();
-                    return;
-                } else if (mode === 'herd_management') {
-                    document.getElementById('map').style.display = 'none';
-                    document.getElementById('list').style.display = 'none';
-                    document.getElementById('admin-view').style.display = 'none';
-                    if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
-                    if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
-                    document.getElementById('herd-management-view').style.display = 'block';
-                    
-                    renderHerdManagement();
-                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     return;
                 } else {
                     setLayerMode(currentViewMode);
                 }
             }
 
-            document.getElementById('admin-view').style.display = 'none';
-            if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
-            if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
             renderDashboard();
             updateGeoStyles();
         }
@@ -2932,7 +2866,7 @@ eEditGroupSelect();
                 const manualDaysDiff = Math.abs((new Date(brk.createdAt) - me.dateObj) / 86400000);
                 if (manualDaysDiff <= GAP_DAYS_MAX) {
                     const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : 1500;
-                    const cowNum = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                    const cowNum = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
                     if (cowNum > 0 && brk.timeStayHrs > 0) {
                         const trueI = ((me.cover - residual) * brk.areaHa) / (cowNum * (brk.timeStayHrs / 24));
                         if (trueI > 5 && trueI < 30) { sumIntake += trueI; countIntake++; }
@@ -2948,7 +2882,7 @@ eEditGroupSelect();
                 if (hasManual) return; 
                 
                 const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : 1500;
-                const cowNum = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                const cowNum = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
                 if (cowNum > 0 && brk.timeStayHrs > 0) {
                     const harvestedYield = (cowNum * activeIntake * (brk.timeStayHrs / 24)) / brk.areaHa;
                     const impliedCover = residual + harvestedYield;
@@ -3049,10 +2983,10 @@ eEditGroupSelect();
             pill.className = `calib-pill ${cls}`; pill.textContent = `${label}`;
             
             const equationHtml = calibrationModel.type === 'exponential' 
-                ? `cover = ${Math.round(calibrationModel.A)}├ùexp(${calibrationModel.B.toFixed(2)}├ùndvi)` 
-                : `cover = ${calibrationModel.a.toFixed(2)}├ùraw + ${Math.round(calibrationModel.b)}`;
+                ? `cover = ${Math.round(calibrationModel.A)}Ã—exp(${calibrationModel.B.toFixed(2)}Ã—ndvi)` 
+                : `cover = ${calibrationModel.a.toFixed(2)}Ã—raw + ${Math.round(calibrationModel.b)}`;
                 
-            text.innerHTML = `<div><b style="color:#2c3e50;">R┬▓</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
+            text.innerHTML = `<div><b style="color:#2c3e50;">RÂ²</b> ${calibrationModel.r2.toFixed(2)} | <b style="color:#2c3e50;">Calibrators</b> ${calibrationModel.count}</div><div style="margin-top:3px;"><b style="color:#2c3e50;">Model</b> ${equationHtml}</div>`;
         }
 
         function toggleCalibrationModel() {
@@ -3170,6 +3104,53 @@ eEditGroupSelect();
             return best;
         }
 
+        function updateFarmStats() {
+            const data = getCurrentModeData();
+            let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
+            data.forEach(p => {
+                const areaNum = p.area || 0;
+                if (areaNum > 0 && !p.isOut) {
+                    tWCover += (p.latest.cover * areaNum); tAreaC += areaNum;
+                    if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * areaNum); tAreaG += areaNum; }
+                }
+            });
+
+            // --- SUBTRACT CROP BREAK AREAS ---
+            let totalCropBreakArea = 0;
+            const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
+            const daysAgoTs = Date.now() - filterDays * 24 * 60 * 60 * 1000;
+            savedBreaks.forEach(b => {
+                if (b.isCropBreak && b.createdAt && new Date(b.createdAt).getTime() >= daysAgoTs) {
+                    // Only subtract if it's not already in an 'OUT' paddock (to avoid double-counting)
+                    const pStatus = b.paddock ? excludedPaddocks.get(b.paddock.toLowerCase()) : null;
+                    if (!pStatus || pStatus === 'IN' || pStatus === 'PARTIAL') {
+                        totalCropBreakArea += (b.areaHa || 0);
+                    }
+                }
+            });
+            tAreaC = Math.max(0, tAreaC - totalCropBreakArea);
+
+            const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
+            const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
+
+            const elTotalAvg = document.getElementById('total-avg');
+            const elAvgGrowth = document.getElementById('avg-growth');
+            const elSyncTime = document.getElementById('sync-time');
+            const elFeedAreaTotal = document.getElementById('feed-area-total');
+            const elFeedAvgCover = document.getElementById('feed-avg-cover');
+            const elFeedAvgGrowth = document.getElementById('feed-avg-growth');
+
+            if (elTotalAvg) elTotalAvg.innerText = avgCoverVal.toLocaleString();
+            if (elAvgGrowth) elAvgGrowth.innerText = "+" + avgGrowthVal;
+            if (elSyncTime) elSyncTime.innerText = new Date().toLocaleTimeString();
+
+            if (elFeedAreaTotal) elFeedAreaTotal.innerText = tAreaC.toFixed(1);
+            if (elFeedAvgCover) elFeedAvgCover.innerText = avgCoverVal;
+            if (elFeedAvgGrowth) elFeedAvgGrowth.innerText = avgGrowthVal;
+            
+            return { tAreaC, avgCoverVal, avgGrowthVal };
+        }
+
         /* Rendering */
         function renderDashboard() {
             if (currentDashboardMode !== 'manual' && currentDashboardMode !== 'satellite') return;
@@ -3179,27 +3160,7 @@ eEditGroupSelect();
                 return b.latest.cover - a.latest.cover;
             });
 
-            let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
-            sorted.forEach(p => {
-                const areaNum = p.area || 0;
-                if (areaNum > 0 && !p.isOut) {
-                    tWCover += (p.latest.cover * areaNum); tAreaC += areaNum;
-                    if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * areaNum); tAreaG += areaNum; }
-                }
-            });
-
-            // Update Side Stats
-            const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
-            const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
-
-            document.getElementById('total-avg').innerText = avgCoverVal.toLocaleString();
-            document.getElementById('avg-growth').innerText = "+" + avgGrowthVal;
-            document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
-
-            document.getElementById('feed-area-total').innerText = tAreaC.toFixed(1);
-            document.getElementById('feed-avg-cover').innerText = avgCoverVal;
-            document.getElementById('feed-avg-growth').innerText = avgGrowthVal;
-
+            updateFarmStats();
             calculateFeedLogic();
 
             const list = document.getElementById('list'); list.innerHTML = "";
@@ -3216,7 +3177,7 @@ eEditGroupSelect();
                     badges += `<span class="badge" style="background:var(--prev)">M</span>`;
                 }
 
-                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> ÔÇó </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
+                const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> â€¢ </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
 
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
@@ -3394,14 +3355,19 @@ eEditGroupSelect();
             const count = drawingVertices.length;
             let info = `${count} point${count !== 1 ? 's' : ''}`;
             const isLineMode = currentDrawingMode === 'line';
+            const isCropBreak = currentDrawingMode === 'crop_break';
+            const isCustomPaddock = currentDrawingMode === 'custom_paddock';
             
+            let areaSqm = 0;
+            let areaHa = 0;
+
             if (count >= 2 && isLineMode) {
                 const distMeters = calculateLineDistance(drawingVertices);
                 info += ` \u00b7 ${distMeters.toFixed(0)} meters`;
                 document.getElementById('btn-finish-break').disabled = false;
             } else if (count >= 3 && !isLineMode) {
-                const areaSqm = calculatePolygonArea(drawingVertices);
-                const areaHa = areaSqm / 10000;
+                areaSqm = calculatePolygonArea(drawingVertices);
+                areaHa = areaSqm / 10000;
                 info += ` \u00b7 ${areaHa < 1 ? areaSqm.toFixed(0) + ' m\u00b2' : areaHa.toFixed(2) + ' ha'}`;
                 document.getElementById('btn-follow-contour').style.display = 'block';
                 document.getElementById('btn-finish-break').disabled = false;
@@ -3409,7 +3375,25 @@ eEditGroupSelect();
                 document.getElementById('btn-follow-contour').style.display = 'none';
                 document.getElementById('btn-finish-break').disabled = true;
             }
-            document.getElementById('vertex-count').textContent = info;
+
+            // Real-time area warnings (Crop Breaks only)
+            if (isCropBreak && window.lastCalcTargets && count >= 3) {
+                const target = window.lastCalcTargets.crop[activeBreakGroup] || 0;
+                const currentVal = areaSqm;
+
+                if (target > 0 && currentVal > 0) {
+                    const absDiff = Math.abs(currentVal - target);
+                    if (absDiff > 20) { // Stricter +/- 20m2 tolerance
+                        const warning = currentVal > target ? 'TOO BIG' : 'TOO SMALL';
+                        const color = currentVal > target ? '#ff7675' : '#74b9ff';
+                        info += ` | <span style="color:${color}; font-weight:bold;">\u26a0\ufe0f ${warning}</span>`;
+                    } else {
+                        info += ` | <span style="color:#55efc4; font-weight:bold;">\u2705 GOOD SIZE</span>`;
+                    }
+                }
+            }
+
+            document.getElementById('vertex-count').innerHTML = info;
         }
 
         document.getElementById('search').oninput = (e) => {
@@ -3626,25 +3610,37 @@ eEditGroupSelect();
             saveAndRecalc();
         }
 
+        function updateCustomPaddockYield(pName, val) {
+            const v = safeNum(val);
+            const p = customPaddocks.find(cp => cp.name === pName);
+            if (p) {
+                p.yield = v;
+                cropYields[pName] = v;
+                saveCustomPaddocks();
+                calculateFeedLogic();
+                triggerAutoSave();
+            }
+        }
+
         function saveAndRecalc() {
-            localStorage.setItem('feed_residual', document.getElementById('inp-residual').value);
-            localStorage.setItem('feed_cows', document.getElementById('inp-cows').value);
-            localStorage.setItem('feed_intake', document.getElementById('inp-intake').value);
-            localStorage.setItem('feed_inshed', document.getElementById('inp-inshed').value);
-            localStorage.setItem('feed_round', document.getElementById('inp-round').value);
-            localStorage.setItem('feed_actual_pre', document.getElementById('inp-actual-pre').value);
+            ls.setItem('feed_residual', document.getElementById('inp-residual').value);
+            ls.setItem('feed_cows', document.getElementById('inp-cows').value);
+            ls.setItem('feed_intake', document.getElementById('inp-intake').value);
+            ls.setItem('feed_inshed', document.getElementById('inp-inshed').value);
+            ls.setItem('feed_round', document.getElementById('inp-round').value);
+            ls.setItem('feed_actual_pre', document.getElementById('inp-actual-pre').value);
             
             // Grass
             const freq = document.querySelector('input[name="milking_freq"]:checked').value;
-            localStorage.setItem('feed_freq', freq);
-            localStorage.setItem('feed_am_pct', document.getElementById('inp-am-pct').value);
-            localStorage.setItem('feed_pm_pct', document.getElementById('inp-pm-pct').value);
-            localStorage.setItem('feed_long_pct', document.getElementById('inp-long-pct').value);
-            localStorage.setItem('feed_short_pct', document.getElementById('inp-short-pct').value);
+            ls.setItem('feed_freq', freq);
+            ls.setItem('feed_am_pct', document.getElementById('inp-am-pct').value);
+            ls.setItem('feed_pm_pct', document.getElementById('inp-pm-pct').value);
+            ls.setItem('feed_long_pct', document.getElementById('inp-long-pct').value);
+            ls.setItem('feed_short_pct', document.getElementById('inp-short-pct').value);
             
             // Crop
-            localStorage.setItem('feed_crop_yield', document.getElementById('inp-crop-yield').value);
-            localStorage.setItem('feed_crop_feed', document.getElementById('inp-crop-feed').value);
+            ls.setItem('feed_crop_yield', document.getElementById('inp-crop-yield').value);
+            ls.setItem('feed_crop_feed', document.getElementById('inp-crop-feed').value);
 
             let totalCows = 0;
             let totalCowsOnGrass = 0;
@@ -3671,14 +3667,14 @@ eEditGroupSelect();
             if (hasHerdInputs) {
                 // We use on-grass cows for rotation parameters as requested
                 document.getElementById('inp-cows').value = totalCowsOnGrass;
-                localStorage.setItem('feed_cows', totalCowsOnGrass);
+                ls.setItem('feed_cows', totalCowsOnGrass);
                 const cDisp = document.getElementById('inp-cows-display');
                 if (cDisp) cDisp.innerText = totalCowsOnGrass;
             }
 
             if (hasHerdInputs) {
-                localStorage.setItem('herd_cow_numbers', JSON.stringify(herdCows));
-                localStorage.setItem('herd_in_crops', JSON.stringify(cropHerds));
+                ls.setItem('herd_cow_numbers', JSON.stringify(herdCows));
+                ls.setItem('herd_in_crops', JSON.stringify(cropHerds));
             }
             calculateFeedLogic();
             triggerAutoSave();
@@ -3700,7 +3696,7 @@ eEditGroupSelect();
             if (totalArea > 0) {
                 // Calculate total pasture demand across all herds on grass
                 let totalPastureDemandKg = 0;
-                const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+                const savedHerdCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}');
                 
                 BREAK_GROUPS.forEach(g => {
                     if (g.id === 'all') return;
@@ -3746,7 +3742,7 @@ eEditGroupSelect();
             document.getElementById('freq-inputs-3in2').style.display = freq === '3in2' ? 'grid' : 'none';
 
             let grassHtml = '';
-            const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+            const savedHerdCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}');
             
             // 1. Calculate manual pool
             let totalManualCows = 0;
@@ -3818,7 +3814,7 @@ eEditGroupSelect();
             let totalGrassAssigned = 0;
             // ----- CROP MANAGEMENT HERD CALCULATIONS -----
             const cropYield = safeNum(document.getElementById('inp-crop-yield').value);
-            const cropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
+            const cropHerds = JSON.parse(ls.getItem('herd_in_crops') || '[]');
             let cropHtml = '';
             let herdCropM2Map = {};
 
@@ -3901,12 +3897,12 @@ eEditGroupSelect();
                     herdCropM2Map[g.id] = cAreaM2;
                     cropHtml += `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #eee;">
                         <span style="font-weight:bold; color:${g.color}; font-size:12px;">${g.name}</span>
-                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m┬▓/day</span></span>
+                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">mÂ²/day</span></span>
                     </div>`;
                 }
             });
             
-            localStorage.setItem('feed_crop_m2_per_herd', JSON.stringify(herdCropM2Map));
+            ls.setItem('feed_crop_m2_per_herd', JSON.stringify(herdCropM2Map));
 
             document.getElementById('grass-herd-outputs').innerHTML = grassHtml || '<div class="muted" style="font-size:11px; text-align:center;">No cows allocated to herds.</div>';
             
@@ -3916,52 +3912,189 @@ eEditGroupSelect();
 
             document.getElementById('crop-herd-outputs').innerHTML = cropHtml || '<div class="muted" style="font-size:11px; text-align:center;">No herds ticked for crops.</div>';
 
+            // Render Custom Paddocks List in Management
+            const cpList = document.getElementById('custom-paddock-list');
+            if (customPaddocks.length > 0) {
+                cpList.style.display = 'block';
+                let cpInner = `<div style="font-size:11px; font-weight:bold; color:#2980b9; margin-bottom:10px;">EXTERNAL PADDOCKS (CUSTOM)</div>`;
+                customPaddocks.forEach(p => {
+                    cpInner += `<div style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px; background:#fff; padding:8px; border-radius:6px; border:1px solid #d0e4ff;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:12px; font-weight:bold; color:#2c3e50;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
+                            <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:12px;" title="Remove Paddock">\ud83d\uddd1\ufe0f</button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+                            <label style="font-size:10px; color:#7f8c8d; font-weight:bold;">YIELD:</label>
+                            <input type="number" 
+                                style="width:60px; padding:2px 5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:right;"
+                                value="${p.yield}" 
+                                oninput="updateCustomPaddockYield('${p.name}', this.value)" />
+                            <span style="font-size:10px; color:#95a5a6; flex:1;">kgDM/ha</span>
+                            <button onclick="startEditCustomPaddock('${p.name}')" style="background:#8e44ad; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">EDIT SHAPE</button>
+                        </div>
+                    </div>`;
+                });
+                cpList.innerHTML = cpInner;
+            } else {
+                cpList.style.display = 'none';
+            }
+
+            // Store current targets for drawing warnings
+            window.lastCalcTargets = {
+                grass: grassHtml ? {} : null,
+                crop: herdCropM2Map
+            };
+            // Extract grass targets from the cache used during calculation
+            if (grassHtml) {
+                Object.keys(herdLockedCache).forEach(hid => {
+                    const cache = herdLockedCache[hid];
+                    const hCows = savedHerdCows[hid] || 0;
+                    if (hCows > 0) {
+                        window.lastCalcTargets.grass[hid] = cache.isLocked ? cache.lockedDailyArea : ((remainingAreaPerCow * hCows) / 10000);
+                    }
+                });
+            }
+
             renderFeedWedge(manualModeData, preGrazeTarget, residual);
-            updatePredictedWedge();
         }
 
         function renderFeedWedge(paddockData, targetPre, targetRes) {
             const ctx = document.getElementById('wedgeChart').getContext('2d');
-
-            // Filter out 'out' paddocks and sort by cover high to low
             const activePaddocks = paddockData.filter(p => !p.isOut).sort((a, b) => b.latest.cover - a.latest.cover);
-
             const labels = activePaddocks.map(p => p.name);
             const dataCover = activePaddocks.map(p => p.latest.cover);
-
-            // Create Demand Line Data
             const demandLine = [];
             const count = activePaddocks.length;
             if (count > 0) {
                 const slope = (targetRes - targetPre) / (count - 1 || 1);
-                for (let i = 0; i < count; i++) {
-                    demandLine.push(targetPre + (slope * i));
-                }
+                for (let i = 0; i < count; i++) demandLine.push(targetPre + (slope * i));
             }
-
             if (wedgeChartInstance) wedgeChartInstance.destroy();
-
             wedgeChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [
-                        {
-                            type: 'line',
-                            label: 'Demand Line',
-                            data: demandLine,
-                            borderColor: '#e74c3c',
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            borderDash: [5, 5],
-                            fill: false,
-                            tension: 0
-                        },
+                        { type: 'line', label: 'Demand Line', data: demandLine, borderColor: '#e74c3c', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], fill: false, tension: 0 },
+                        { type: 'bar', label: 'Cover (kgDM/ha)', data: dataCover, backgroundColor: '#2ecc71', borderRadius: 3, barPercentage: 0.95, categoryPercentage: 0.95 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: true, position: 'top', align: 'end' }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } } },
+                    scales: { y: { beginAtZero: true, title: { display: true, text: 'kgDM/ha', font: { size: 10, weight: 'bold' } } }, x: { ticks: { maxRotation: 90, minRotation: 90, font: { size: 9 } } } }
+                }
+            });
+        }
+
+        function fetchWeatherAndOptimizeGrowth(event) {
+            const lat = -42.679;
+            const lon = 172.879;
+            const btn = event ? event.target : null;
+            if (btn) btn.innerText = "FETCHING...";
+
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&timezone=Pacific%2FAuckland&forecast_days=14`)
+                .then(res => res.json())
+                .then(data => {
+                    const maxTemps = data.daily.temperature_2m_max;
+                    const minTemps = data.daily.temperature_2m_min;
+                    let avgTemp = 0;
+                    for(let i=0; i<maxTemps.length; i++) {
+                        avgTemp += (maxTemps[i] + minTemps[i]) / 2;
+                    }
+                    avgTemp = avgTemp / maxTemps.length;
+                    
+                    let estimatedGrowth = 10 + Math.max(0, (avgTemp - 5) * 2.5);
+                    estimatedGrowth = Math.min(100, Math.max(5, Math.round(estimatedGrowth)));
+                    
+                    document.getElementById('inp-predict-growth').value = estimatedGrowth;
+                    if (btn) btn.innerText = "🌤️ OPTIMIZE GROWTH";
+                    updatePredictedWedge();
+                })
+                .catch(err => {
+                    console.error("Weather fetch failed:", err);
+                    alert("Failed to fetch weather data.");
+                    if (btn) btn.innerText = "🌤️ OPTIMIZE GROWTH";
+                });
+        }
+
+        function updatePredictedWedge() {
+            if (!manualModeData || manualModeData.length === 0) return;
+            
+            const daysAhead = parseInt(document.getElementById('inp-predict-days').value) || 14;
+            const growthRate = parseFloat(document.getElementById('inp-predict-growth').value) || 0;
+            const rotationDays = parseInt(document.getElementById('inp-predict-rotation').value) || 30;
+            const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
+            const maxSuppPerCow = parseFloat(document.getElementById('inp-predict-max-supp').value) || 20;
+
+            const nowTime = Date.now();
+            
+            // 1. Calculate time frame
+            const fwDate = manualModeData[0]?.latest?.ts ? new Date(manualModeData[0].latest.ts) : new Date();
+            const daysSinceFW = Math.max(0, (nowTime - fwDate.getTime()) / 86400000);
+            const totalSimDays = daysSinceFW + daysAhead;
+
+            let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
+            if (simPaddocks.length === 0) return;
+
+            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
+            const areaPerDayHa = (rotationDays > 0 && totalAreaHa > 0) ? (totalAreaHa / rotationDays) : 0;
+
+            // 2. Sort by farmwalk cover (descending) to establish the grazing sequence
+            simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
+
+            // 3. Estimate cover at totalSimDays
+            let cumulativeArea = 0;
+            simPaddocks.forEach(p => {
+                // How many days into the rotation cycle is this paddock grazed?
+                const simGrazingDay = areaPerDayHa > 0 ? (cumulativeArea / areaPerDayHa) : 999;
+                
+                if (totalSimDays >= simGrazingDay) {
+                    // It has been grazed at least once in the simulation period
+                    // Calculate days since it was grazed in the rotation cycle
+                    const daysSinceGrazing = (totalSimDays - simGrazingDay) % (rotationDays || 1);
+                    p.currentCover = targetRes + (daysSinceGrazing * growthRate);
+                } else {
+                    // Not grazed yet by the end of prediction period
+                    p.currentCover = p.latest.cover + (totalSimDays * growthRate);
+                }
+                cumulativeArea += p.area;
+            });
+
+            // 4. Calculate Final Metrics
+            const expectedApc = simPaddocks.reduce((sum, p) => sum + (p.currentCover * p.area), 0) / (totalAreaHa || 1);
+            document.getElementById('predict-apc').innerText = Math.round(expectedApc).toLocaleString();
+
+            // Expected Supplement (Very basic estimation)
+            const cows = parseFloat(document.getElementById('inp-cows').value) || 0;
+            const intake = parseFloat(document.getElementById('inp-intake').value) || 18;
+            const dailyDemandKg = cows * intake;
+            const pastureOffered = areaPerDayHa * (expectedApc - targetRes);
+            const suppRequired = cows > 0 ? Math.max(0, (dailyDemandKg - Math.max(0, pastureOffered)) / cows) : 0;
+            document.getElementById('predict-supp').innerText = Math.min(maxSuppPerCow, suppRequired).toFixed(1);
+
+            // 5. Render
+            simPaddocks.sort((a, b) => b.currentCover - a.currentCover);
+            renderPredictedWedge(simPaddocks, targetRes);
+        }
+
+        function renderPredictedWedge(simPaddocks, targetRes) {
+            const ctx = document.getElementById('predictedWedgeChart').getContext('2d');
+            const labels = simPaddocks.map(p => p.name);
+            const dataCover = simPaddocks.map(p => p.currentCover);
+
+            if (predictedWedgeChartInstance) predictedWedgeChartInstance.destroy();
+
+            predictedWedgeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
                         {
                             type: 'bar',
-                            label: 'Cover (kgDM/ha)',
+                            label: 'Predicted Cover (kgDM/ha)',
                             data: dataCover,
-                            backgroundColor: '#2ecc71',
+                            backgroundColor: '#9b59b6',
                             borderRadius: 3,
                             barPercentage: 0.95,
                             categoryPercentage: 0.95
@@ -3985,277 +4118,6 @@ eEditGroupSelect();
                             ticks: { maxRotation: 90, minRotation: 90, font: { size: 9 } }
                         }
                     }
-                }
-            });
-        }
-
-        function fetchWeatherAndOptimizeGrowth(event) {
-            const lat = -37.8;
-            const lon = 175.3;
-            const btn = event ? event.target : null;
-            if (btn) btn.innerText = "FETCHING...";
-
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&timezone=Pacific%2FAuckland&forecast_days=14`)
-                .then(res => res.json())
-                .then(data => {
-                    const maxTemps = data.daily.temperature_2m_max;
-                    const minTemps = data.daily.temperature_2m_min;
-                    let avgTemp = 0;
-                    for(let i=0; i<maxTemps.length; i++) {
-                        avgTemp += (maxTemps[i] + minTemps[i]) / 2;
-                    }
-                    avgTemp = avgTemp / maxTemps.length;
-                    
-                    let estimatedGrowth = 10 + Math.max(0, (avgTemp - 5) * 2.5);
-                    estimatedGrowth = Math.min(100, Math.max(5, Math.round(estimatedGrowth)));
-                    
-                    document.getElementById('inp-predict-growth').value = estimatedGrowth;
-                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
-                    updatePredictedWedge();
-                })
-                .catch(err => {
-                    console.error("Weather fetch failed:", err);
-                    alert("Failed to fetch weather data.");
-                    if (btn) btn.innerText = "­ƒîñ´©Å OPTIMIZE FROM WEATHER";
-                });
-        }
-
-        function toggleDryOffMode() {
-            const isChecked = document.getElementById('inp-dryoff-toggle').checked;
-            document.getElementById('dryoff-container').style.display = isChecked ? 'flex' : 'none';
-        }
-        
-        function addDryOffEntry() {
-            const list = document.getElementById('dryoff-list');
-            const row = document.createElement('div');
-            row.className = 'dryoff-row';
-            row.style.display = 'flex';
-            row.style.gap = '10px';
-            row.style.marginBottom = '5px';
-            row.style.alignItems = 'center';
-            row.innerHTML = `
-                <input type="date" class="dryoff-date" style="flex:1; padding:5px; border-radius:4px; border:1px solid #ccc;" onchange="updatePredictedWedge()">
-                <input type="number" class="dryoff-cows" placeholder="Cows dried off" style="flex:1; padding:5px; border-radius:4px; border:1px solid #ccc;" onchange="updatePredictedWedge()">
-                <button onclick="this.parentElement.remove(); updatePredictedWedge();" style="background:#ff4444; color:white; border:none; border-radius:4px; padding:5px 10px; cursor:pointer;">X</button>
-            `;
-            list.appendChild(row);
-        }
-
-        function updatePredictedWedge() {
-            if (currentDashboardMode !== 'feed' || !manualModeData) return;
-            const nowTime = Date.now();
-
-            const daysAhead = parseInt(document.getElementById('inp-predict-days').value) || 14;
-            const dailyGrowth = parseFloat(document.getElementById('inp-predict-growth').value) || 0;
-            
-            const simRotInput = document.getElementById('inp-predict-rotation');
-            const rotationDays = (simRotInput && simRotInput.value !== "") ? parseInt(simRotInput.value) : (parseInt(document.getElementById('inp-rotation').value) || 30);
-            
-            const targetRes = parseFloat(document.getElementById('inp-residual').value) || 1500;
-            
-            const simCowsInput = document.getElementById('inp-predict-cows');
-            const cows = (simCowsInput && simCowsInput.value !== "") ? parseInt(simCowsInput.value) : (parseInt(document.getElementById('inp-cows').value) || 0);
-            
-            const simIntakeInput = document.getElementById('inp-predict-intake');
-            const intake = (simIntakeInput && simIntakeInput.value !== "") ? parseFloat(simIntakeInput.value) : (parseFloat(document.getElementById('inp-intake').value) || 18);
-            
-            const dailyDemandKg = cows * intake;
-            
-            const isDryOffMode = document.getElementById('inp-dryoff-toggle').checked;
-            const dryOffEvents = [];
-            if (isDryOffMode) {
-                document.querySelectorAll('.dryoff-row').forEach(row => {
-                    const dStr = row.querySelector('.dryoff-date').value;
-                    const cNum = parseInt(row.querySelector('.dryoff-cows').value) || 0;
-                    if (dStr && cNum > 0) {
-                        const ts = new Date(dStr).getTime();
-                        if (!isNaN(ts)) dryOffEvents.push({ ts, cows: cNum });
-                    }
-                });
-                dryOffEvents.sort((a, b) => a.ts - b.ts);
-            }
-
-            let simPaddocks = JSON.parse(JSON.stringify(manualModeData)).filter(p => !p.isOut);
-            
-            const totalAreaHa = simPaddocks.reduce((sum, p) => sum + p.area, 0);
-            const areaPerDayHa = totalAreaHa / (rotationDays || 1);
-            const targetPre = (dailyDemandKg / areaPerDayHa) + targetRes;
-            const maxSuppPerCow = parseFloat(document.getElementById('inp-predict-max-supp').value) || 20;
-            
-            // 1. Initial State: Starting from Farmwalk Cover + Catch-up growth
-            const fwDate = manualModeData[0]?.latest?.ts ? new Date(manualModeData[0].latest.ts) : null;
-            const daysSinceFW = fwDate ? Math.max(0, (nowTime - fwDate.getTime()) / 86400000) : 0;
-            
-            simPaddocks.forEach(p => {
-                p.currentCover = p.latest.cover;
-                if (fwDate) {
-                    p.currentCover += (dailyGrowth * Math.round(daysSinceFW));
-                }
-            });
-
-            // 2. Sort by current cover (highest first) - this is our fixed grazing sequence
-            simPaddocks.sort((a, b) => b.currentCover - a.currentCover);
-
-            // 3. Sequential Simulation
-            let totalAreaPassed = daysSinceFW * areaPerDayHa; 
-            let finalCows = cows;
-            let finalDailyDemandKg = dailyDemandKg;
-
-            for (let day = 0; day < daysAhead; day++) {
-                let currentDayTs = nowTime + (day * 86400000);
-                let currentCows = cows;
-                if (isDryOffMode) {
-                    dryOffEvents.forEach(ev => {
-                        if (ev.ts <= currentDayTs) currentCows = Math.max(0, currentCows - ev.cows);
-                    });
-                }
-                let currentDailyDemandKg = currentCows * intake;
-                
-                const areaToGrazeToday = areaPerDayHa;
-                const maxSuppTotalKg = currentCows * maxSuppPerCow;
-                const minPastureReqKg = Math.max(0, currentDailyDemandKg - maxSuppTotalKg);
-
-                // Everyone grows
-                simPaddocks.forEach(p => p.currentCover += dailyGrowth);
-
-                // Where is our cursor in the farm?
-                // We assume we are grazing sequentially from the top of the wedge.
-                // totalAreaPassed is how much area we have grazed since the farmwalk.
-                let cursorStart = totalAreaPassed % totalAreaHa;
-                let cursorEnd = (totalAreaPassed + areaToGrazeToday) % totalAreaHa;
-                
-                // Graze the paddocks in the [cursorStart, cursorEnd] range
-                let areaInFarm = 0;
-                let dayGrazedCoverSum = 0;
-                let dayGrazedAreaSum = 0;
-
-                simPaddocks.forEach(p => {
-                    let paddockStart = areaInFarm;
-                    let paddockEnd = areaInFarm + p.area;
-                    
-                    // Does our daily grazing range [cursorStart, cursorStart + areaToGraze] overlap this paddock?
-                    let start = Math.max(paddockStart, cursorStart);
-                    let end = Math.min(paddockEnd, cursorStart + areaToGrazeToday);
-                    
-                    if (start < end) {
-                        let take = end - start;
-                        dayGrazedAreaSum += take;
-                        dayGrazedCoverSum += (p.currentCover * take);
-                    }
-                    areaInFarm = paddockEnd;
-                });
-
-                // Wrap around logic if cursor crosses the end of the farm
-                if (cursorStart + areaToGrazeToday > totalAreaHa) {
-                    let overflow = (cursorStart + areaToGrazeToday) - totalAreaHa;
-                    let areaInFarm2 = 0;
-                    simPaddocks.forEach(p => {
-                        let paddockStart = areaInFarm2;
-                        let paddockEnd = areaInFarm2 + p.area;
-                        let start = Math.max(paddockStart, 0);
-                        let end = Math.min(paddockEnd, overflow);
-                        if (start < end) {
-                            let take = end - start;
-                            dayGrazedAreaSum += take;
-                            dayGrazedCoverSum += (p.currentCover * take);
-                        }
-                        areaInFarm2 = paddockEnd;
-                    });
-                }
-
-                // Adjust residual based on supplement cap
-                const dayAvgPre = dayGrazedAreaSum > 0 ? (dayGrazedCoverSum / dayGrazedAreaSum) : targetRes;
-                const pastureNeededToHitTarget = (dayAvgPre - targetRes) * areaToGrazeToday;
-                const actualPastureTaken = Math.max(minPastureReqKg, pastureNeededToHitTarget);
-                const dayResidual = areaToGrazeToday > 0 ? (dayAvgPre - (actualPastureTaken / areaToGrazeToday)) : targetRes;
-
-                // Apply the grazing to the paddocks in the range
-                let areaInFarm3 = 0;
-                simPaddocks.forEach(p => {
-                    let pStart = areaInFarm3;
-                    let pEnd = areaInFarm3 + p.area;
-                    let start = Math.max(pStart, cursorStart);
-                    let end = Math.min(pEnd, cursorStart + areaToGrazeToday);
-                    if (start < end) {
-                        let fraction = (end - start) / p.area;
-                        p.currentCover = (p.currentCover * (1 - fraction)) + (dayResidual * fraction);
-                    }
-                    // Handle wrap
-                    if (cursorStart + areaToGrazeToday > totalAreaHa) {
-                        let overflow = (cursorStart + areaToGrazeToday) - totalAreaHa;
-                        let start2 = Math.max(pStart, 0);
-                        let end2 = Math.min(pEnd, overflow);
-                        if (start2 < end2) {
-                            let fraction2 = (end2 - start2) / p.area;
-                            p.currentCover = (p.currentCover * (1 - fraction2)) + (dayResidual * fraction2);
-                        }
-                    }
-                    areaInFarm3 = pEnd;
-                });
-
-                totalAreaPassed += areaToGrazeToday;
-
-                if (day === daysAhead - 1) {
-                    finalCows = currentCows;
-                    finalDailyDemandKg = currentDailyDemandKg;
-                }
-            }
-
-            // Map currentCover back to latest.cover for rendering
-            simPaddocks.forEach(p => p.latest.cover = p.currentCover);
-            const finalTargetPre = (finalDailyDemandKg / areaPerDayHa) + targetRes;
-            
-            const finalTotalCover = simPaddocks.reduce((sum, p) => sum + (p.latest.cover * p.area), 0);
-            const expectedApc = totalAreaHa > 0 ? (finalTotalCover / totalAreaHa) : 0;
-            const apcEl = document.getElementById('predict-apc');
-            if (apcEl) apcEl.innerText = Math.round(expectedApc).toLocaleString();
-            
-            let finalAreaSum = 0;
-            let finalCoverSum = 0;
-            simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
-            for (let p of simPaddocks) {
-                if (finalAreaSum >= areaPerDayHa) break;
-                let take = Math.min(p.area, areaPerDayHa - finalAreaSum);
-                finalAreaSum += take;
-                finalCoverSum += (p.latest.cover * take);
-            }
-            const expectedAvgAvailablePreGraze = (finalAreaSum > 0) ? (finalCoverSum / finalAreaSum) : 0;
-            const expectedPastureOfferedPerDay = (expectedAvgAvailablePreGraze - targetRes) * areaPerDayHa;
-            let expectedSupplementKgDay = finalDailyDemandKg - expectedPastureOfferedPerDay;
-            if (expectedSupplementKgDay < 0) expectedSupplementKgDay = 0;
-            const expectedSuppPerCow = finalCows > 0 ? (expectedSupplementKgDay / finalCows) : 0;
-            
-            const suppEl = document.getElementById('predict-supp');
-            if (suppEl) suppEl.innerText = expectedSuppPerCow.toFixed(1);
-
-            renderPredictedWedge(simPaddocks, finalTargetPre, targetRes);
-        }
-
-        function renderPredictedWedge(simPaddocks, targetPre, targetRes) {
-            const ctx = document.getElementById('predictedWedgeChart').getContext('2d');
-            simPaddocks.sort((a, b) => b.latest.cover - a.latest.cover);
-            const labels = simPaddocks.map(p => p.name);
-            const dataCover = simPaddocks.map(p => p.latest.cover);
-            const demandLine = [];
-            const count = simPaddocks.length;
-            if (count > 0) {
-                const slope = (targetRes - targetPre) / (count - 1 || 1);
-                for (let i = 0; i < count; i++) demandLine.push(targetPre + (slope * i));
-            }
-            if (predictedWedgeChartInstance) predictedWedgeChartInstance.destroy();
-            predictedWedgeChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { type: 'line', label: 'Predicted Demand Line', data: demandLine, borderColor: '#3498db', borderWidth: 2, pointRadius: 0, borderDash: [5, 5], fill: false, tension: 0 },
-                        { type: 'bar', label: 'Predicted Cover (kgDM/ha)', data: dataCover, backgroundColor: '#9b59b6', borderRadius: 3, barPercentage: 0.95, categoryPercentage: 0.95 }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { display: true, position: 'top', align: 'end' }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y.toFixed(0)} kgDM/ha` } } },
-                    scales: { y: { beginAtZero: true, title: { display: true, text: 'kgDM/ha', font: { size: 10, weight: 'bold' } } }, x: { ticks: { maxRotation: 90, minRotation: 90, font: { size: 9 } } } }
                 }
             });
         }
@@ -4284,7 +4146,7 @@ eEditGroupSelect();
                 inshed: document.getElementById('inp-inshed').value,
                 round: document.getElementById('inp-round').value,
                 pre: document.getElementById('inp-actual-pre').value,
-                herdCows: JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}'),
+                herdCows: JSON.parse(ls.getItem('herd_cow_numbers') || '{}'),
                 freq: document.querySelector('input[name="milking_freq"]:checked').value,
                 amPct: document.getElementById('inp-am-pct').value,
                 pmPct: document.getElementById('inp-pm-pct').value,
@@ -4293,17 +4155,29 @@ eEditGroupSelect();
                 cropYield: document.getElementById('inp-crop-yield').value,
                 cropFeed: document.getElementById('inp-crop-feed').value,
                 cropYields: cropYields,
-                cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
+                cropHerds: JSON.parse(ls.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
-                manualBreaks: manualBreakOverrides
+                manualBreaks: manualBreakOverrides,
+                customPaddocks: customPaddocks.map(cp => ({
+                    ...cp,
+                    vertices: cp.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) }))
+                })),
+                breaks: getCompressedBreaks() // Also include breaks in feed settings for better sync coverage
             };
-
+            console.log("Cloud: Sending feed_settings payload", payload);
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             })
                 .then(res => res.json())
                 .then(data => {
+                    // Mark ONLY the breaks that were included in this payload as synced
+                    const syncedIds = new Set(payload.breaks.map(b => String(b.id)));
+                    savedBreaks.forEach(b => {
+                        if (syncedIds.has(String(b.id))) b.synced = true;
+                    });
+                    ls.setItem('farm_breaks', JSON.stringify(savedBreaks));
+
                     if (!isAuto && btn) {
                         btn.disabled = false;
                         btn.innerText = "SAVE TO CLOUD";
@@ -4329,9 +4203,9 @@ eEditGroupSelect();
         let isSyncingBreaks = false;
 
         function loadBreaks() {
-            // 1. Load from localStorage immediately
+            // 1. Load from ls immediately
             try {
-                const stored = localStorage.getItem('farm_breaks');
+                const stored = ls.getItem('farm_breaks');
                 if (stored) {
                     const parsed = JSON.parse(stored);
                     if (Array.isArray(parsed)) savedBreaks = parsed;
@@ -4347,8 +4221,6 @@ eEditGroupSelect();
                         if (data && Array.isArray(data.breaks)) {
                             console.log("Cloud breaks received:", data.breaks.length);
                             
-                            const cloudIds = new Set(data.breaks.map(b => String(b.id || "")));
-
                             const cloudMap = new Map(data.breaks.map(b => [String(b.id), b]));
                             
                             // 1. Mark all cloud breaks as synced
@@ -4371,6 +4243,11 @@ eEditGroupSelect();
                                             // New local break, add it
                                             finalBreaks.push(lb);
                                         }
+                                    } else if (!cloudMap.has(idStr) && !lb.isDeleted) {
+                                        // STICKY SYNC: Keep local breaks that are missing from cloud (unless deleted locally)
+                                        // Mark them unsynced so they try to go back up
+                                        lb.synced = false;
+                                        finalBreaks.push(lb);
                                     }
                                 }
                             });
@@ -4383,7 +4260,7 @@ eEditGroupSelect();
                             });
                             
                             savedBreaks = finalBreaks;
-                            localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+                            ls.setItem('farm_breaks', JSON.stringify(savedBreaks));
                             
                             if (currentDashboardMode === 'breaks') {
                                 renderBreaksDashboard();
@@ -4395,41 +4272,47 @@ eEditGroupSelect();
             }
         }
 
+
+        function getCompressedBreaks() {
+            return savedBreaks.map(b => {
+                const cb = {
+                    id: b.id,
+                    name: b.name,
+                    paddock: b.paddock,
+                    vertices: b.vertices ? b.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) })) : [],
+                    areaSqm: Math.round(b.areaSqm || 0),
+                    areaHa: Number((b.areaHa || 0).toFixed(3)),
+                    distanceMeters: Math.round(b.distanceMeters || 0),
+                    cropWidthMeters: Number((b.cropWidthMeters || 0).toFixed(2)),
+                    cropMode: b.cropMode,
+                    createdAt: b.createdAt,
+                    createdBy: b.createdBy,
+                    group: b.group
+                };
+                if (b.comment) cb.comment = b.comment;
+                if (b.lastEditedBy) cb.lastEditedBy = b.lastEditedBy;
+                if (b.lastEditedAt) cb.lastEditedAt = b.lastEditedAt;
+                if (b.isCropBreak) cb.isCropBreak = b.isCropBreak;
+                if (b.isDeleted) cb.isDeleted = true;
+                if (b.deletedBy) cb.deletedBy = b.deletedBy;
+                if (b.deletedAt) cb.deletedAt = b.deletedAt;
+                return cb;
+            });
+        }
+
         function saveBreaks() {
             console.log("Saving breaks locally...", savedBreaks.length);
             // Save locally immediately
-            localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+            ls.setItem('farm_breaks', JSON.stringify(savedBreaks));
 
             // Save to cloud in background
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5 && !isSyncingBreaks) {
                 isSyncingBreaks = true;
                 
-                // Compress payload
-                const compressedBreaks = savedBreaks.map(b => {
-                    const cb = {
-                        id: b.id,
-                        name: b.name,
-                        paddock: b.paddock,
-                        vertices: b.vertices ? b.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) })) : [],
-                        areaSqm: Math.round(b.areaSqm || 0),
-                        areaHa: Number((b.areaHa || 0).toFixed(3)),
-                        distanceMeters: Math.round(b.distanceMeters || 0),
-                        cropWidthMeters: Number((b.cropWidthMeters || 0).toFixed(2)),
-                        cropMode: b.cropMode,
-                        createdAt: b.createdAt,
-                        createdBy: b.createdBy,
-                        group: b.group
-                    };
-                    if (b.comment) cb.comment = b.comment;
-                    if (b.lastEditedBy) cb.lastEditedBy = b.lastEditedBy;
-                    if (b.lastEditedAt) cb.lastEditedAt = b.lastEditedAt;
-                    if (b.isDeleted) cb.isDeleted = true;
-                    if (b.deletedBy) cb.deletedBy = b.deletedBy;
-                    if (b.deletedAt) cb.deletedAt = b.deletedAt;
-                    return cb;
-                });
+                const compressedBreaks = getCompressedBreaks();
+                const syncedIds = new Set(compressedBreaks.map(b => String(b.id)));
 
-                console.log("Syncing breaks to cloud...");
+                console.log("Syncing breaks to cloud...", syncedIds.size, "records");
                 fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify({ type: 'breaks', breaks: compressedBreaks })
@@ -4437,9 +4320,11 @@ eEditGroupSelect();
                 .then(res => {
                     if (res.ok) {
                         console.log("Cloud sync successful");
-                        // Mark all as synced
-                        savedBreaks.forEach(b => b.synced = true);
-                        localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+                        // Mark ONLY the IDs we actually sent as synced
+                        savedBreaks.forEach(b => {
+                            if (syncedIds.has(String(b.id))) b.synced = true;
+                        });
+                        ls.setItem('farm_breaks', JSON.stringify(savedBreaks));
                         if (currentDashboardMode === 'breaks') renderBreaksDashboard();
                     } else {
                         console.error("Cloud sync failed with status:", res.status);
@@ -4460,6 +4345,134 @@ eEditGroupSelect();
             }
         }, 120000);
 
+
+        /* ===================== CUSTOM PADDOCKS (EXTERNAL) ===================== */
+        function loadCustomPaddocks() {
+            try {
+                const stored = ls.getItem('custom_paddocks');
+                if (stored) {
+                    customPaddocks = JSON.parse(stored);
+                    renderCustomPaddocksOnMap();
+                }
+            } catch (e) {
+                console.error("Failed to load custom paddocks:", e);
+                customPaddocks = [];
+            }
+        }
+
+        function saveCustomPaddocks() {
+            ls.setItem('custom_paddocks', JSON.stringify(customPaddocks));
+            renderCustomPaddocksOnMap();
+            saveToCloud(true); // Sync to cloud
+        }
+
+        function renderCustomPaddocksOnMap() {
+            if (!map) return;
+            if (customPaddockLayer) map.removeLayer(customPaddockLayer);
+            if (customPaddockLabelLayer) map.removeLayer(customPaddockLabelLayer);
+
+            customPaddockLayer = L.layerGroup().addTo(map);
+            customPaddockLabelLayer = L.layerGroup().addTo(map);
+
+            customPaddocks.forEach(cp => {
+                const coords = cp.vertices.map(v => [v.lat, v.lng]);
+                const poly = L.polygon(coords, {
+                    color: '#8e44ad',
+                    weight: 2,
+                    dashArray: '5, 5',
+                    fillColor: '#8e44ad',
+                    fillOpacity: 0.1,
+                    interactive: false // Disable interaction so clicks pass through to breaks
+                }).addTo(customPaddockLayer);
+
+                // Map options removed as requested: edit shape now in sidebar
+
+                // Add label
+                const center = poly.getBounds().getCenter();
+                L.marker(center, {
+                    icon: L.divIcon({
+                        className: 'custom-paddock-label',
+                        html: `<div style="color:#8e44ad; font-weight:bold; font-size:10px; text-shadow:0 0 3px white; text-align:center; background:rgba(255,255,255,0.7); padding:2px 4px; border-radius:4px; border:1px solid #8e44ad;">${cp.name.toUpperCase()}</div>`,
+                        iconSize: [80, 20],
+                        iconAnchor: [40, 10]
+                    })
+                }).addTo(customPaddockLabelLayer);
+                
+                // Add to areaLookup for math
+                areaLookup[cp.name] = cp.areaHa;
+                cropYields[cp.name] = cp.yield;
+            });
+        }
+
+        function deleteCustomPaddock(name) {
+            customPaddocks = customPaddocks.filter(p => p.name !== name);
+            saveCustomPaddocks();
+            map.closePopup();
+            if (currentDashboardMode === 'feed') setFeedInputs();
+        }
+
+        function startEditCustomPaddock(name) {
+            if (isDrawingBreak || editingBreakId) return;
+            const cp = customPaddocks.find(p => p.name === name);
+            if (!cp) return;
+            
+            editingCustomPaddockName = name;
+            editVertices = cp.vertices.map(v => ({ lat: v.lat, lng: v.lng }));
+            editSelectedIdx = -1;
+            
+            map.closePopup();
+            
+            // Hide the actual paddock layer while editing
+            renderCustomPaddocksOnMap(); // This will clear and re-render, we'll need to skip the one being edited
+            
+            // Show edit toolbar
+            setBreakFullscreen(true);
+            document.getElementById('edit-toolbar').style.display = 'flex';
+            document.getElementById('btn-delete-pt').disabled = true;
+            
+            // Hide group select as it's not applicable
+            const groupSelect = document.getElementById('edit-group-select');
+            if (groupSelect) groupSelect.style.display = 'none';
+            
+            map.getContainer().style.cursor = 'pointer';
+            renderEditPolygon();
+            renderEditMarkers();
+            updateEditInfo();
+        }
+
+        function showAddCustomPaddockModal() {
+            document.getElementById('custom-paddock-modal').style.display = 'flex';
+            document.getElementById('cp-modal-name').value = '';
+        }
+
+        function startAddCustomPaddock() {
+            const name = document.getElementById('cp-modal-name').value.trim();
+            const yieldVal = parseFloat(document.getElementById('cp-modal-yield').value) || 20000;
+            
+            if (!name) return alert("Please enter a paddock name");
+            if (customPaddocks.some(p => p.name.toLowerCase() === name.toLowerCase()) || paddockMap[name]) {
+                return alert("A paddock with this name already exists");
+            }
+
+            pendingCPData = { name, yield: yieldVal };
+            document.getElementById('custom-paddock-modal').style.display = 'none';
+            
+            // Switch to map mode so user can draw
+            switchDashboardMode('satellite');
+            
+            // Enter drawing mode
+            currentDrawingMode = 'custom_paddock';
+            isDrawingBreak = true;
+            drawingVertices = [];
+            
+            setBreakFullscreen(true);
+            document.getElementById('break-toolbar').style.display = 'flex';
+            document.getElementById('vertex-count').textContent = 'Draw Paddock Boundaries';
+            map.getContainer().style.cursor = 'crosshair';
+            map.on('click', onMapClickForBreak);
+            
+            if (navigator.vibrate) navigator.vibrate(100);
+        }
 
         function calculatePolygonArea(latlngs) {
             if (latlngs.length < 3) return 0;
@@ -4583,14 +4596,6 @@ eEditGroupSelect();
 
         let ignoreNextMapClickTimeout = 0;
         function onMapClickForBreak(e) {
-            const latlng = e.latlng;
-            if (currentDrawingMode === 'custom_paddock') {
-                drawingVertices.push({ lat: latlng.lat, lng: latlng.lng });
-                if (navigator.vibrate) navigator.vibrate(50);
-                renderDrawingPoly();
-                document.getElementById('vertex-count').textContent = drawingVertices.length + ' points added';
-                return;
-            }
             if (!isDrawingBreak) return;
             if (useCrosshairMode) return; // Ignore taps when in crosshair mode, rely on btn
             if (Date.now() < ignoreNextMapClickTimeout) return;
@@ -4637,37 +4642,32 @@ eEditGroupSelect();
         }
 
         function finishBreak() {
-            if (currentDrawingMode === 'custom_paddock' && pendingCPData) {
-                const areaSqm = calculatePolygonArea(drawingVertices);
-                const areaHa = areaSqm / 10000;
-                
-                const newCP = {
-                    id: 'cp_' + Date.now(),
-                    name: pendingCPData.name,
-                    yield: pendingCPData.yield,
-                    vertices: [...drawingVertices],
-                    areaHa: areaHa
-                };
-                
-                customPaddocks.push(newCP);
-                saveCustomPaddocks();
-                
-                pendingCPData = null;
-                isDrawingBreak = false;
-                currentDrawingMode = 'polygon';
-                drawingVertices = [];
-                map.off('click', onMapClickForBreak);
-                map.getContainer().style.cursor = '';
-                document.getElementById('break-toolbar').style.display = 'none';
-                setBreakFullscreen(false);
-                
-                if (currentDashboardMode === 'feed') setFeedInputs();
-                return;
-            }
             try {
                 const isLineMode = currentDrawingMode === 'line';
+                const isCropBreak = currentDrawingMode === 'crop_break';
+                const isCustomPaddock = currentDrawingMode === 'custom_paddock';
+                
                 console.log("Finishing break, mode:", currentDrawingMode, "vertices:", drawingVertices.length);
                 
+                if (isCustomPaddock) {
+                    if (drawingVertices.length < 3) return;
+                    const areaSqm = calculatePolygonArea(drawingVertices);
+                    const areaHa = areaSqm / 10000;
+                    
+                    const newPaddock = {
+                        name: pendingCPData.name,
+                        yield: pendingCPData.yield,
+                        vertices: [...drawingVertices],
+                        areaHa: areaHa
+                    };
+                    
+                    customPaddocks.push(newPaddock);
+                    saveCustomPaddocks();
+                    cleanupDrawing();
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                    return;
+                }
+
                 if (!isLineMode && drawingVertices.length < 3) return;
                 if (isLineMode && drawingVertices.length < 2) return;
                 
@@ -4681,9 +4681,9 @@ eEditGroupSelect();
                 centerLng /= drawingVertices.length;
                 let paddockName = getPaddockFromPoint({ lat: centerLat, lng: centerLng });
 
-                let baseName = paddockName ? paddockName : (isLineMode ? 'Crop Line' : 'Break');
+                let baseName = paddockName ? paddockName : (isLineMode ? 'Crop Line' : (isCropBreak ? 'Crop Break' : 'Break'));
                 let breaksInPaddock = savedBreaks.filter(b => b.name && b.name.startsWith(baseName)).length;
-                const breakName = paddockName ? `${baseName} ${isLineMode ? 'Line' : 'Break'} ${breaksInPaddock + 1}` : `${isLineMode ? 'Line' : 'Break'} ${savedBreaks.length + 1}`;
+                const breakName = paddockName ? `${baseName} ${isLineMode ? 'Line' : (isCropBreak ? 'Crop Break' : 'Break')} ${breaksInPaddock + 1}` : `${isLineMode ? 'Line' : (isCropBreak ? 'Crop Break' : 'Break')} ${savedBreaks.length + 1}`;
 
                 let cropWidthMeters = 0;
                 if (isLineMode) {
@@ -4695,7 +4695,7 @@ eEditGroupSelect();
                     const hCropYield = (hGroup && hGroup.custom_crop_yield !== null && hGroup.custom_crop_yield !== undefined) ? hGroup.custom_crop_yield : defaultYield;
                     
                     const paddockYield = (paddockName && cropYields[paddockName]) ? cropYields[paddockName] : hCropYield;
-                    const hCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[activeBreakGroup] || 0;
+                    const hCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[activeBreakGroup] || 0;
                     
                     if (distanceMeters > 0 && hCows > 0 && paddockYield > 0) {
                         const hDemand = hCropFeed * hCows;
@@ -4717,14 +4717,16 @@ eEditGroupSelect();
                         cropWidthMeters: cropWidthMeters,
                         cropMode: 'line',
                         createdAt: new Date().toISOString(),
-                        createdBy: localStorage.getItem('auth_name') || 'Unknown User',
-                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
+                        createdBy: ls.getItem('auth_name') || 'Unknown User',
+                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup,
+                        isCropBreak: isCropBreak,
+                        synced: false
                     };
                     
                     console.log("New crop line created:", newBreak);
-                    newBreak.synced = false;
                     savedBreaks.unshift(newBreak);
                     saveBreaks();
+                    saveToCloud(true); // Immediate sync to feed file
                     cleanupDrawing();
                     if (currentDashboardMode === 'breaks') renderBreaksDashboard();
                     else renderBreaksOnMap();
@@ -4766,14 +4768,16 @@ eEditGroupSelect();
                         cropWidthMeters: cropWidthMeters,
                         cropMode: isLineMode ? 'line' : 'polygon',
                         createdAt: new Date().toISOString(),
-                        createdBy: localStorage.getItem('auth_name') || 'Unknown User',
-                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup
+                        createdBy: ls.getItem('auth_name') || 'Unknown User',
+                        group: activeBreakGroup === 'all' ? '1st' : activeBreakGroup,
+                        isCropBreak: isCropBreak,
+                        synced: false
                     };
                     
                     console.log("New break created:", newBreak);
-                    newBreak.synced = false;
                     savedBreaks.unshift(newBreak); // Add to the TOP
                     saveBreaks();
+                    saveToCloud(true); // Immediate sync to feed file
                     cleanupDrawing();
                     renderBreaksDashboard();
                     renderBreaksOnMap();
@@ -4823,20 +4827,20 @@ eEditGroupSelect();
 
         // === Audio Fence Alignment Aid ===
         function getBeepStartDistance() {
-            return parseFloat(localStorage.getItem('audio_beep_start_m')) || 10;
+            return parseFloat(ls.getItem('audio_beep_start_m')) || 10;
         }
         function getFenceIgnoreDistance() {
-            return parseFloat(localStorage.getItem('audio_fence_ignore_m')) || 2;
+            return parseFloat(ls.getItem('audio_fence_ignore_m')) || 2;
         }
         function getAudioVolume() {
-            return parseFloat(localStorage.getItem('audio_volume_pct')) || 100;
+            return parseFloat(ls.getItem('audio_volume_pct')) || 100;
         }
         function getContinuousToneDistance() {
-            const val = parseFloat(localStorage.getItem('audio_continuous_m'));
+            const val = parseFloat(ls.getItem('audio_continuous_m'));
             return isNaN(val) ? 1 : val;
         }
         function getBreakDisplayDays() {
-            const val = parseInt(localStorage.getItem('break_display_days'));
+            const val = parseInt(ls.getItem('break_display_days'));
             return isNaN(val) ? 7 : val;
         }
         function saveAudioSettings() {
@@ -4845,11 +4849,11 @@ eEditGroupSelect();
             const volPct = parseFloat(document.getElementById('inp-audio-vol').value) || 100;
             const solidDist = parseFloat(document.getElementById('inp-audio-solid').value) || 1;
             const breakDays = parseInt(document.getElementById('inp-break-days').value) || 7;
-            localStorage.setItem('audio_beep_start_m', startDist);
-            localStorage.setItem('audio_fence_ignore_m', ignoreDist);
-            localStorage.setItem('audio_volume_pct', volPct);
-            localStorage.setItem('audio_continuous_m', solidDist);
-            localStorage.setItem('break_display_days', breakDays);
+            ls.setItem('audio_beep_start_m', startDist);
+            ls.setItem('audio_fence_ignore_m', ignoreDist);
+            ls.setItem('audio_volume_pct', volPct);
+            ls.setItem('audio_continuous_m', solidDist);
+            ls.setItem('break_display_days', breakDays);
             
             if (typeof currentDashboardMode !== 'undefined' && currentDashboardMode === 'breaks') {
                 renderBreaksDashboard();
@@ -5217,10 +5221,11 @@ eEditGroupSelect();
             const brk = savedBreaks.find(b => b.id === breakId);
             if (brk) {
                 brk.isDeleted = true;
-                brk.deletedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.deletedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.deletedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks();
+                saveToCloud(true); // Immediate sync to feed file
                 renderBreaksDashboard();
                 renderBreaksOnMap();
             }
@@ -5230,10 +5235,11 @@ eEditGroupSelect();
             const brk = savedBreaks.find(b => b.id === breakId);
             if (brk) {
                 brk.comment = comment;
-                brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks();
+                saveToCloud(true); // Immediate sync to feed file
             }
         }
 
@@ -5241,16 +5247,17 @@ eEditGroupSelect();
             const brk = savedBreaks.find(b => b.id === breakId);
             if (brk) { 
                 brk.name = newName; 
-                brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
                 brk.synced = false;
                 saveBreaks(); 
+                saveToCloud(true); // Immediate sync to feed file
             }
         }
 
         function renderBreaksOnMap() {
-            breakLayers.forEach(l => { if (l) map.removeLayer(l); });
-            breakLayers = [];
+            Object.values(breakLayers).forEach(l => { if (l) map.removeLayer(l); });
+            breakLayers = {};
             
             if (!window.audioAidParallelLayers) window.audioAidParallelLayers = [];
             window.audioAidParallelLayers.forEach(l => { if (l) map.removeLayer(l); });
@@ -5258,34 +5265,23 @@ eEditGroupSelect();
 
             savedBreaks.forEach(brk => {
                 if (brk.isDeleted) return;
-                if (brk.id === editingBreakId) {
-                    breakLayers.push(null);
-                    return;
-                }
+                if (brk.id === editingBreakId) return;
+
                 if (weeklyFilterRange) {
-                    if (!brk.createdAt) { breakLayers.push(null); return; }
+                    if (!brk.createdAt) return;
                     const ts = new Date(brk.createdAt).getTime();
-                    if (ts < weeklyFilterRange.start || ts >= weeklyFilterRange.end) {
-                        breakLayers.push(null); 
-                        return; 
-                    }
+                    if (ts < weeklyFilterRange.start || ts >= weeklyFilterRange.end) return;
                 } else {
-                    if (!brk.createdAt) { breakLayers.push(null); return; }
+                    if (!brk.createdAt) return;
                     const ts = new Date(brk.createdAt).getTime();
                     const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
                     const daysAgo = Date.now() - filterDays * 24 * 60 * 60 * 1000;
-                    if (ts < daysAgo) {
-                        breakLayers.push(null); 
-                        return; 
-                    }
+                    if (ts < daysAgo) return;
                 }
                 
                 const coords = brk.vertices.map(v => [v.lat, v.lng]);
                 const gColor = getGroupColor(brk.group);
-                const isCrop = brk.group === 'crops';
-                // If it's a crop, check if it was explicitly saved as a line.
-                // For backwards compatibility before this feature, default old crops to 'line'
-                const isLineMode = isCrop && (brk.cropMode === 'line' || brk.cropMode == null);
+                const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
                 
                 let renderLayer;
                 let measureStr;
@@ -5325,12 +5321,12 @@ eEditGroupSelect();
                 });
                 
                 renderLayer.on('click', function(e) {
-                    if (breakSelectMode || isDrawingBreak) return; // Don't interrupt drawing or selecting, let the event naturally bubble up or ignore it 
+                    if (breakSelectMode || isDrawingBreak) return; 
                     L.DomEvent.stopPropagation(e);
                     scrollToBreakCard(brk.id);
                 });
 
-                breakLayers.push(renderLayer);
+                breakLayers[brk.id] = renderLayer;
             });
         }
 
@@ -5370,29 +5366,33 @@ eEditGroupSelect();
         }
 
         function focusBreakOnMap(breakId) {
-            const idx = savedBreaks.findIndex(b => b.id === breakId);
-            if (idx < 0 || !breakLayers[idx]) return;
-            const layer = breakLayers[idx];
+            const layer = breakLayers[breakId];
+            if (!layer) return;
             try {
                 const bounds = layer.getBounds();
                 if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
             } catch (e) { }
-            breakLayers.forEach((l, i) => {
-                if (!l) return;
-                const brk = savedBreaks[i];
-                const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
+
+            Object.keys(breakLayers).forEach(id => {
+                const l = breakLayers[id];
+                const brk = savedBreaks.find(b => String(b.id) === String(id));
+                if (!l || !brk) return;
+                const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
                 if (isLineMode) {
                     l.setStyle({ weight: 4, opacity: 0.9, color: getGroupColor(brk.group) });
                 } else {
                     l.setStyle({ weight: 2.5, fillOpacity: 0.2, color: getGroupColor(brk.group) });
                 }
             });
-            const targetBrk = savedBreaks[idx];
-            const isTargetLineMode = targetBrk.group === 'crops' && (targetBrk.cropMode === 'line' || targetBrk.cropMode == null);
-            if (isTargetLineMode) {
-                layer.setStyle({ weight: 6, opacity: 1, color: getGroupColor(targetBrk.group) });
-            } else {
-                layer.setStyle({ weight: 4, fillOpacity: 0.45, color: getGroupColor(targetBrk.group) });
+
+            const targetBrk = savedBreaks.find(b => String(b.id) === String(breakId));
+            if (targetBrk) {
+                const isTargetLineMode = targetBrk.cropMode === 'line' || (targetBrk.group === 'crops' && targetBrk.cropMode == null);
+                if (isTargetLineMode) {
+                    layer.setStyle({ weight: 6, opacity: 1, color: getGroupColor(targetBrk.group) });
+                } else {
+                    layer.setStyle({ weight: 4, fillOpacity: 0.45, color: getGroupColor(targetBrk.group) });
+                }
             }
             if (layer.bringToFront) layer.bringToFront();
         }
@@ -5423,7 +5423,7 @@ eEditGroupSelect();
             if (selectedBreakIds.size === 0) return;
             if (!confirm(`Delete ${selectedBreakIds.size} selected break${selectedBreakIds.size > 1 ? 's' : ''}?`)) return;
             
-            const deleter = localStorage.getItem('auth_name') || 'Unknown User';
+            const deleter = ls.getItem('auth_name') || 'Unknown User';
             const now = new Date().toISOString();
             
             savedBreaks.forEach(b => {
@@ -5434,7 +5434,7 @@ eEditGroupSelect();
                     b.synced = false;
                 }
             });
-            
+
             selectedBreakIds.clear();
             breakSelectMode = false;
             saveBreaks();
@@ -5468,7 +5468,7 @@ eEditGroupSelect();
             // Calculate avg area/day globally (excluding crops)
             const now = new Date();
             const daysAgoTs = new Date(now.getTime() - filterDays * 24 * 60 * 60 * 1000);
-            const recentBreaksAll = savedBreaks.filter(b => !b.isDeleted && b.group !== 'crops' && b.createdAt && new Date(b.createdAt) >= daysAgoTs);
+            const recentBreaksAll = savedBreaks.filter(b => !b.isDeleted && b.group !== 'crops' && !b.isCropBreak && b.createdAt && new Date(b.createdAt) >= daysAgoTs);
             const recentAreaAll = recentBreaksAll.reduce((sum, b) => sum + b.areaHa, 0);
             const daysWithBreaks = new Set(recentBreaksAll.map(b => new Date(b.createdAt).toDateString())).size;
             const avgAreaPerDay = daysWithBreaks > 0 ? (recentAreaAll / daysWithBreaks) : 0;
@@ -5521,6 +5521,7 @@ eEditGroupSelect();
             html += `<button class="btn-new-break" style="flex:1; margin-bottom:0;" onclick="startDrawingBreak('polygon')" ${isDrawingBreak ? 'disabled' : ''}>+ NEW BREAK</button>`;
             if (activeBreakGroup !== 'all') {
                 html += `<button class="btn-new-break" style="flex:1; margin-bottom:0; background:#d35400; border-color:#d35400;" onclick="startDrawingBreak('line')" ${isDrawingBreak ? 'disabled' : ''}>+ CROP LINE</button>`;
+                html += `<button class="btn-new-break" style="flex:1; margin-bottom:0; background:#27ae60; border-color:#27ae60;" onclick="startDrawingBreak('crop_break')" ${isDrawingBreak ? 'disabled' : ''}>+ CROP BREAK</button>`;
             }
             if (count > 0) {
                 html += `<button class="btn-select-breaks ${breakSelectMode ? 'active' : ''}" style="flex:0.6;" onclick="toggleBreakSelectMode()">${breakSelectMode ? '\u2715 CANCEL' : '\u2610 SELECT'}</button>`;
@@ -5573,7 +5574,7 @@ eEditGroupSelect();
             const weeks = {};
             
             savedBreaks.forEach(b => {
-                if (b.isDeleted || b.group === 'crops' || !b.createdAt) return;
+                if (b.group === 'crops' || !b.createdAt) return;
                 
                 const d = new Date(b.createdAt);
                 
@@ -5629,7 +5630,7 @@ eEditGroupSelect();
                         </div>
                         <div style="text-align:right;">
                             <div style="font-weight:bold; color:var(--accent); font-size:18px;">${w.totalArea.toFixed(2)} <span style="font-size:11px; font-weight:normal; color:#7f8c8d;">ha</span></div>
-                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map Ô×ö'}</div>
+                            <div style="font-size:10px; color:${isActive ? '#e67e22' : '#3498db'}; margin-top:2px;">${isActive ? 'Viewing \u2714' : 'Tap to map âž”'}</div>
                         </div>
                     </div>`;
                 });
@@ -5639,7 +5640,7 @@ eEditGroupSelect();
         }
 
         function renderBreakCardHtml(brk) {
-            const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
+            const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
             const measureStr = isLineMode 
                 ? (brk.distanceMeters ? brk.distanceMeters.toFixed(0) + ' meters' : '0 meters')
                 : (brk.areaHa >= 1 ? brk.areaHa.toFixed(2) + ' ha' : Math.round(brk.areaSqm) + ' m\u00b2');
@@ -5690,8 +5691,8 @@ eEditGroupSelect();
                         const grower = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
                         const baseCover = parseFloat(p.latest.cover) || 0;
                         const estimatedCover = baseCover + (grower * daysSince);
-                        const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
-                        const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+                        const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(ls.getItem('feed_residual')) || 1500);
+                        const savedHerdCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}');
                         const cowNum = savedHerdCows[brk.group] || 0;
 
                         if (cowNum > 0) {
@@ -5746,7 +5747,7 @@ eEditGroupSelect();
                                  title="${isAudioActive ? 'Stop Audio Aid' : 'Start Audio Aid'}">
                              ${isAudioActive ? '\u23f9\ufe0f' : '\u25b6\ufe0f'}
                          </button>
-                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">ÔÜÖ´©Å</button>`}
+                         ${isLineMode ? '' : `<button class="btn-edit-break" style="position:static; background:#3498db;" onclick="event.stopPropagation(); editBreakDetails('${brk.id}')" title="Edit Duration & Residual">âš™ï¸</button>`}
                          <button class="btn-edit-break" style="position:static;" onclick="event.stopPropagation(); startEditBreak('${brk.id}')" title="Edit vertices">\u270e</button>
                          <button class="btn-delete-break" style="position:static;" onclick="promptDeleteBreak('${brk.id}', event)" title="Delete break">\ud83d\uddd1\ufe0f</button>
                        </div>`
@@ -5757,8 +5758,8 @@ eEditGroupSelect();
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
                         <div>
                             <span class="label">${isLineMode ? 'FACE LENGTH' : 'AREA'}</span>
-                            <span class="break-area-val">${measureStr}</span>
-                            ${isLineMode ? '' : (brk.areaHa >= 1 ? `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${Math.round(brk.areaSqm).toLocaleString()} m\u00b2</div>` : `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${brk.areaHa.toFixed(4)} ha</div>`)}
+                            <span class="break-area-val">${brk.isCropBreak ? Math.round(brk.areaSqm).toLocaleString() + ' m\u00b2' : measureStr}</span>
+                            ${isLineMode ? '' : (brk.areaHa >= 1 ? `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${brk.isCropBreak ? brk.areaHa.toFixed(2) + ' ha' : Math.round(brk.areaSqm).toLocaleString() + ' m\u00b2'}</div>` : `<div style="font-size:10px; color:#95a5a6; margin-top:2px;">${brk.areaHa.toFixed(4)} ha</div>`)}
                         </div>
                         <div>
                             ${secondaryMetricHtml}
@@ -5786,7 +5787,7 @@ eEditGroupSelect();
             const brk = savedBreaks.find(b => b.id === id);
             if (!brk) return;
             
-            let defaultRes = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
+            let defaultRes = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(ls.getItem('feed_residual')) || 1500);
             document.getElementById('modal-break-residual').value = defaultRes;
             if (brk.shiftType) document.getElementById('modal-break-shift').value = brk.shiftType;
             else document.getElementById('modal-break-shift').value = '24';
@@ -5809,12 +5810,12 @@ eEditGroupSelect();
                 else if (shiftType === 'pm') hrsNum = 24 * (safeNum(document.getElementById('inp-pm-pct').value, 40) / 100);
                 
                 const manRes = parseFloat(document.getElementById('modal-break-residual').value);
-                const manualResidual = isFinite(manRes) && manRes > 0 ? manRes : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
+                const manualResidual = isFinite(manRes) && manRes > 0 ? manRes : (parseFloat(ls.getItem('feed_residual')) || 1500);
 
                 brk.timeStayHrs = hrsNum;
                 brk.shiftType = shiftType;
                 brk.manualResidual = manualResidual;
-                brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+                brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
                 brk.lastEditedAt = new Date().toISOString();
                 
                 saveBreaks();
@@ -5837,9 +5838,8 @@ eEditGroupSelect();
             focusBreakOnMap(breakId);
 
             // Hide the saved polygon for this break
-            const idx = savedBreaks.findIndex(b => b.id === breakId);
-            if (idx >= 0 && breakLayers[idx]) {
-                map.removeLayer(breakLayers[idx]);
+            if (breakLayers[breakId]) {
+                map.removeLayer(breakLayers[breakId]);
             }
 
             // Show edit toolbar and maximize map
@@ -5862,7 +5862,7 @@ eEditGroupSelect();
             if (editPolygon) map.removeLayer(editPolygon);
             const brk = savedBreaks.find(b => b.id === editingBreakId);
             const gColor = brk ? getGroupColor(brk.group) : '#e67e22';
-            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
+            const isLineMode = brk ? (brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null)) : false;
 
             if (editVertices.length >= 3 && !isLineMode) {
                 const coords = editVertices.map(v => [v.lat, v.lng]);
@@ -5939,7 +5939,7 @@ eEditGroupSelect();
         function updateEditInfo() {
             let info = `${editVertices.length} points`;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
-            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
+            const isLineMode = brk ? (brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null)) : false;
 
             if (isLineMode && editVertices.length >= 2) {
                 const distMeters = calculateLineDistance(editVertices);
@@ -5955,7 +5955,7 @@ eEditGroupSelect();
         function deleteEditVertex() {
             if (editSelectedIdx < 0 || editSelectedIdx >= editVertices.length) return;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
-            const isLineMode = brk ? (brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null)) : false;
+            const isLineMode = brk ? (brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null)) : false;
             
             if (!isLineMode && editVertices.length <= 3) {
                 alert('A break must have at least 3 points.');
@@ -5975,11 +5975,22 @@ eEditGroupSelect();
         }
 
         function finishEditBreak() {
+            if (editingCustomPaddockName) {
+                const cp = customPaddocks.find(p => p.name === editingCustomPaddockName);
+                if (cp) {
+                    cp.vertices = editVertices.map(v => ({ lat: v.lat, lng: v.lng }));
+                    cp.areaHa = calculatePolygonArea(cp.vertices) / 10000;
+                    saveCustomPaddocks();
+                }
+                cleanupEdit();
+                return;
+            }
+
             if (!editingBreakId) return;
             const brk = savedBreaks.find(b => b.id === editingBreakId);
             if (!brk) return;
             
-            const isLineMode = brk.group === 'crops' && (brk.cropMode === 'line' || brk.cropMode == null);
+            const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
             
             if (!isLineMode && editVertices.length < 3) return;
             if (isLineMode && editVertices.length < 2) return;
@@ -6008,7 +6019,7 @@ eEditGroupSelect();
                 const hCropYield = (hGroup && hGroup.custom_crop_yield !== null && hGroup.custom_crop_yield !== undefined) ? hGroup.custom_crop_yield : defaultYield;
 
                 const paddockYield = (brk.paddock && cropYields[brk.paddock]) ? cropYields[brk.paddock] : hCropYield;
-                const hCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
+                const hCows = JSON.parse(ls.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
                 
                 if (brk.distanceMeters > 0 && hCows > 0 && paddockYield > 0) {
                     const hDemand = hCropFeed * hCows;
@@ -6016,10 +6027,11 @@ eEditGroupSelect();
                     brk.cropWidthMeters = reqM2 / brk.distanceMeters;
                 }
             }
-            brk.lastEditedBy = localStorage.getItem('auth_name') || 'Unknown User';
+            brk.lastEditedBy = ls.getItem('auth_name') || 'Unknown User';
             brk.lastEditedAt = new Date().toISOString();
             brk.synced = false;
             saveBreaks();
+            saveToCloud(true); // Immediate sync to feed file
             
             cleanupEdit();
             renderBreaksDashboard();
@@ -6038,7 +6050,12 @@ eEditGroupSelect();
             editVertices = [];
             editSelectedIdx = -1;
             editingBreakId = null;
+            editingCustomPaddockName = null;
             document.getElementById('edit-toolbar').style.display = 'none';
+            
+            const groupSelect = document.getElementById('edit-group-select');
+            if (groupSelect) groupSelect.style.display = 'block';
+
             map.getContainer().style.cursor = '';
             setBreakFullscreen(false);
         }
@@ -6063,7 +6080,7 @@ eEditGroupSelect();
                 const responsePayload = parseJwt(response.credential);
                 userEmail = responsePayload.email.toLowerCase();
             } else {
-                // If checking from localStorage auto-login
+                // If checking from ls auto-login
                 userEmail = response;
             }
 
@@ -6086,8 +6103,8 @@ eEditGroupSelect();
                     if (userEmail === ADMIN_EMAIL.toLowerCase() || authorizedMap.hasOwnProperty(userEmail)) {
                         // Authorized! Keep email and name in local storage for next time
                         const userName = authorizedMap[userEmail] || "Admin"; // Fallback to Admin if admin email
-                        localStorage.setItem('auth_email', userEmail);
-                        localStorage.setItem('auth_name', userName);
+                        ls.setItem('auth_email', userEmail);
+                        ls.setItem('auth_name', userName);
                         
                         document.getElementById('login-screen').style.display = 'none';
                         
@@ -6101,7 +6118,7 @@ eEditGroupSelect();
                         loadBreaks();
                     } else {
                         // If they failed authorization, make sure they are signed out locally
-                        localStorage.removeItem('auth_email');
+                        ls.removeItem('auth_email');
                         showUnauthorized(userEmail);
                     }
                 },
@@ -6109,16 +6126,16 @@ eEditGroupSelect();
                     console.error("Auth fetch failed:", err);
                     if (userEmail === ADMIN_EMAIL.toLowerCase()) {
                          // Always fallback to allow admin even if CSV fails
-                        localStorage.setItem('auth_email', userEmail);
-                        localStorage.setItem('auth_name', "Admin");
+                        ls.setItem('auth_email', userEmail);
+                        ls.setItem('auth_name', "Admin");
                         document.getElementById('login-screen').style.display = 'none';
                         const adminMenu = document.getElementById('menu-item-admin');
                         if (adminMenu) adminMenu.style.display = 'block';
                         init();
                         loadBreaks();
                     } else {
-                        localStorage.removeItem('auth_email');
-                        localStorage.removeItem('auth_name');
+                        ls.removeItem('auth_email');
+                        ls.removeItem('auth_name');
                         showUnauthorized(userEmail);
                     }
                 }
@@ -6127,7 +6144,7 @@ eEditGroupSelect();
 
         // Auto-Login Check on Boot
         window.addEventListener('DOMContentLoaded', () => {
-            const savedEmail = localStorage.getItem('auth_email');
+            const savedEmail = ls.getItem('auth_email');
             if (savedEmail) {
                 // Skips Google prompt, attempts authentication silently
                 handleCredentialResponse(savedEmail);
@@ -6161,7 +6178,7 @@ eEditGroupSelect();
                     row.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:10px; border-radius:6px; border:1px solid #eee; font-size:13px;";
                     row.innerHTML = `
                             <span>${email}</span>
-                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">Ô£ò</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
+                            ${email !== ADMIN_EMAIL ? `<button onclick="removeAuthorizedEmail('${email}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-weight:bold;">âœ•</button>` : '<span style="font-size:10px; color:#999;">ADMIN</span>'}
                         `;
                     listDiv.appendChild(row);
                 });
@@ -6195,144 +6212,6 @@ eEditGroupSelect();
                 loadAuthorizedEmails();
             } catch (e) { alert('Failed to remove email'); }
         }
-
-        /* ===================== CUSTOM PADDOCKS (EXTERNAL) ===================== */
-        function loadCustomPaddocks() {
-            try {
-                const stored = localStorage.getItem('custom_paddocks');
-                if (stored) {
-                    customPaddocks = JSON.parse(stored);
-                    renderCustomPaddocksOnMap();
-                }
-            } catch (e) {
-                console.error("Failed to load custom paddocks:", e);
-                customPaddocks = [];
-            }
-        }
-
-        function saveCustomPaddocks() {
-            localStorage.setItem('custom_paddocks', JSON.stringify(customPaddocks));
-            renderCustomPaddocksOnMap();
-            saveToCloud(true); // Sync to cloud
-        }
-
-        function renderCustomPaddocksOnMap() {
-            if (!map) return;
-            if (customPaddockLayer) map.removeLayer(customPaddockLayer);
-            if (customPaddockLabelLayer) map.removeLayer(customPaddockLabelLayer);
-
-            customPaddockLayer = L.layerGroup().addTo(map);
-            customPaddockLabelLayer = L.layerGroup().addTo(map);
-
-            customPaddocks.forEach(cp => {
-                const coords = cp.vertices.map(v => [v.lat, v.lng]);
-                const poly = L.polygon(coords, {
-                    color: '#8e44ad',
-                    weight: 2,
-                    dashArray: '5, 5',
-                    fillColor: '#8e44ad',
-                    fillOpacity: 0.1,
-                    interactive: false // Disable interaction so clicks pass through to breaks
-                }).addTo(customPaddockLayer);
-
-                // Add label
-                const center = poly.getBounds().getCenter();
-                L.marker(center, {
-                    icon: L.divIcon({
-                        className: 'custom-paddock-label',
-                        html: `<div style="color:#8e44ad; font-weight:bold; font-size:10px; text-shadow:0 0 3px white; text-align:center; background:rgba(255,255,255,0.7); padding:2px 4px; border-radius:4px; border:1px solid #8e44ad;">${cp.name.toUpperCase()}</div>`,
-                        iconSize: [80, 20],
-                        iconAnchor: [40, 10]
-                    })
-                }).addTo(customPaddockLabelLayer);
-                
-                // Add to areaLookup for math
-                areaLookup[cp.name] = cp.areaHa;
-                cropYields[cp.name] = cp.yield;
-            });
-        }
-
-        function deleteCustomPaddock(name) {
-            customPaddocks = customPaddocks.filter(p => p.name !== name);
-            saveCustomPaddocks();
-            map.closePopup();
-            if (currentDashboardMode === 'feed') setFeedInputs();
-        }
-
-        function startEditCustomPaddock(name) {
-            if (isDrawingBreak || editingBreakId) return;
-            const cp = customPaddocks.find(p => p.name === name);
-            if (!cp) return;
-            
-            editingCustomPaddockName = name;
-            editVertices = cp.vertices.map(v => ({ lat: v.lat, lng: v.lng }));
-            editSelectedIdx = -1;
-            
-            map.closePopup();
-            
-            // Hide the actual paddock layer while editing
-            renderCustomPaddocksOnMap();
-            
-            // Show edit toolbar
-            setBreakFullscreen(true);
-            document.getElementById('edit-toolbar').style.display = 'flex';
-            document.getElementById('btn-delete-pt').disabled = true;
-            
-            // Hide group select as it's not applicable
-            const groupSelect = document.getElementById('edit-group-select');
-            if (groupSelect) groupSelect.style.display = 'none';
-            
-            map.getContainer().style.cursor = 'pointer';
-            renderEditPolygon();
-            renderEditMarkers();
-            updateEditInfo();
-        }
-
-        function showAddCustomPaddockModal() {
-            document.getElementById('custom-paddock-modal').style.display = 'flex';
-            document.getElementById('cp-modal-name').value = '';
-        }
-
-        function startAddCustomPaddock() {
-            const name = document.getElementById('cp-modal-name').value.trim();
-            const yieldVal = parseFloat(document.getElementById('cp-modal-yield').value) || 20000;
-            
-            if (!name) return alert("Please enter a paddock name");
-            if (customPaddocks.some(p => p.name.toLowerCase() === name.toLowerCase()) || paddockMap[name]) {
-                return alert("A paddock with this name already exists");
-            }
-
-            pendingCPData = { name, yield: yieldVal };
-            document.getElementById('custom-paddock-modal').style.display = 'none';
-            
-            // Switch to map mode so user can draw
-            switchDashboardMode('satellite');
-            
-            // Enter drawing mode
-            currentDrawingMode = 'custom_paddock';
-            isDrawingBreak = true;
-            drawingVertices = [];
-            
-            setBreakFullscreen(true);
-            document.getElementById('break-toolbar').style.display = 'flex';
-            document.getElementById('vertex-count').textContent = 'Draw Paddock Boundaries';
-            map.getContainer().style.cursor = 'crosshair';
-            map.on('click', onMapClickForBreak);
-            
-            if (navigator.vibrate) navigator.vibrate(100);
-        }
-
-        function updateCustomPaddockYield(pName, val) {
-            const v = safeNum(val);
-            const p = customPaddocks.find(cp => cp.name === pName);
-            if (p) {
-                p.yield = v;
-                cropYields[pName] = v;
-                saveCustomPaddocks();
-                calculateFeedLogic();
-                triggerAutoSave();
-            }
-        }
             // Register Service Worker for PWA
             if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
@@ -6342,15 +6221,15 @@ eEditGroupSelect();
     <!-- Break Drawing Toolbar (Moved Outside Map for Z-Index Stability) -->
     <div id="break-toolbar" class="break-toolbar" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
         <div class="toolbar-toggles">
-            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> ­ƒÄ» Use Crosshair</label>
-            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> ­ƒöÆ Lock Points</label>
+            <label><input type="checkbox" id="toggle-crosshair" onchange="toggleCrosshairMode(this.checked)"> ðŸŽ¯ Use Crosshair</label>
+            <label><input type="checkbox" id="toggle-lock-pts" onchange="toggleLockPoints(this.checked)"> ðŸ”’ Lock Points</label>
         </div>
         <button class="btn-drop" id="btn-drop-point" onclick="event.stopPropagation(); addPointFromCrosshair()">DROP POINT</button>
         <span class="vertex-count" id="vertex-count">0 points</span>
-        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">Ôå® Undo</button>
-        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">Ô¼í Follow Contour</button>
-        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>Ô£ô Finish</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">Ô£ò Cancel</button>
+        <button class="btn-undo" onclick="event.stopPropagation(); undoLastVertex()">â†© Undo</button>
+        <button class="btn-done" id="btn-follow-contour" style="background:#2ecc71; color:white; display:none;" onclick="followPaddockContour()">â¬¡ Follow Contour</button>
+        <button class="btn-finish" id="btn-finish-break" onclick="event.stopPropagation(); finishBreak()" disabled>âœ“ Finish</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelBreak()">âœ• Cancel</button>
     </div>
 
     <!-- Break Edit Toolbar -->
@@ -6363,10 +6242,11 @@ eEditGroupSelect();
             <option value="pennos">Pennos</option>
             <option value="crops">Crops</option>
         </select>
-        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>Ô£ò Delete Point</button>
-        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">Ô£ô Done</button>
-        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">Ô£ò Cancel</button>
+        <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>âœ• Delete Point</button>
+        <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">âœ“ Done</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">âœ• Cancel</button>
     </div>
 
 </body>
 </html>
+

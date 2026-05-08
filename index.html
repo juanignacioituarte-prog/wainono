@@ -1918,7 +1918,7 @@
         let drawingMarkers = [];
         let drawingPolyline = null;
         let drawingPolygon = null;
-        let breakLayers = [];
+        let breakLayers = new Map();
         let breakSelectMode = false;
         let selectedBreakIds = new Set();
         let editingBreakId = null;
@@ -4098,7 +4098,20 @@
                 const stored = localStorage.getItem('farm_breaks');
                 if (stored) {
                     const parsed = JSON.parse(stored);
-                    if (Array.isArray(parsed)) savedBreaks = parsed;
+                    if (Array.isArray(parsed)) {
+                        // Deduplicate local storage on load just in case
+                        const localMap = new Map();
+                        parsed.forEach(b => { 
+                            if(b && b.id) {
+                                // Keep the newest version if IDs collide in local storage
+                                const idStr = String(b.id);
+                                if (!localMap.has(idStr) || new Date(b.createdAt || 0) > new Date(localMap.get(idStr).createdAt || 0)) {
+                                    localMap.set(idStr, b);
+                                }
+                            }
+                        });
+                        savedBreaks = Array.from(localMap.values());
+                    }
                 }
             } catch (e) { savedBreaks = []; }
 
@@ -4111,42 +4124,41 @@
                         if (data && Array.isArray(data.breaks)) {
                             console.log("Cloud breaks received:", data.breaks.length);
                             
-                            const cloudMap = new Map(data.breaks.map(b => [String(b.id), b]));
+                            // 1. Deduplicate cloud data itself and mark as synced
+                            const cloudMap = new Map();
+                            data.breaks.forEach(b => {
+                                if (b && b.id) {
+                                    b.synced = true;
+                                    cloudMap.set(String(b.id), b);
+                                }
+                            });
                             
-                            // 1. Mark all cloud breaks as synced
-                            data.breaks.forEach(b => b.synced = true);
-
-                            // 2. Start with cloud breaks
-                            let finalBreaks = [...data.breaks];
+                            // 2. Start with deduplicated cloud breaks
+                            let finalMap = new Map();
+                            cloudMap.forEach((v, k) => finalMap.set(k, v));
 
                             // 3. Handle local overrides
                             savedBreaks.forEach(lb => {
                                 if (lb && lb.id) {
                                     const idStr = String(lb.id);
                                     if (lb.synced === false) {
-                                        // Local change has not been synced yet.
-                                        if (cloudMap.has(idStr)) {
-                                            // Replace cloud version with our local unsynced version
-                                            const idx = finalBreaks.findIndex(b => String(b.id) === idStr);
-                                            if (idx !== -1) finalBreaks[idx] = lb;
-                                        } else {
-                                            // New local break, add it
-                                            finalBreaks.push(lb);
-                                        }
-                                    } else if (!cloudMap.has(idStr) && !lb.isDeleted) {
+                                        // Local change has not been synced yet - overwrite cloud version
+                                        finalMap.set(idStr, lb);
+                                    } else if (!finalMap.has(idStr) && !lb.isDeleted) {
                                         // STICKY SYNC: Keep local breaks that are missing from cloud (unless deleted locally)
-                                        // Mark them unsynced so they try to go back up
                                         lb.synced = false;
-                                        finalBreaks.push(lb);
+                                        finalMap.set(idStr, lb);
                                     }
                                 }
                             });
+                            
+                            let finalBreaks = Array.from(finalMap.values());
                             
                             // Authoritative Sort
                             finalBreaks.sort((a, b) => {
                                 const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
                                 const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                                return db - da; 
+                                return (db || 0) - (da || 0); 
                             });
                             
                             savedBreaks = finalBreaks;
@@ -4200,12 +4212,16 @@
                 isSyncingBreaks = true;
                 
                 const compressedBreaks = getCompressedBreaks();
-                const syncedIds = new Set(compressedBreaks.map(b => String(b.id)));
+                // De-duplicate by ID before sending to cloud
+                const dedupMap = new Map();
+                compressedBreaks.forEach(b => dedupMap.set(String(b.id), b));
+                const uniqueBreaks = Array.from(dedupMap.values());
+                const syncedIds = new Set(uniqueBreaks.map(b => String(b.id)));
 
                 console.log("Syncing breaks to cloud...", syncedIds.size, "records");
                 fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
-                    body: JSON.stringify({ type: 'breaks', breaks: compressedBreaks })
+                    body: JSON.stringify({ type: 'breaks', breaks: uniqueBreaks })
                 })
                 .then(res => {
                     if (res.ok) {
@@ -5147,7 +5163,7 @@
 
         function renderBreaksOnMap() {
             breakLayers.forEach(l => { if (l) map.removeLayer(l); });
-            breakLayers = [];
+            breakLayers.clear();
             
             if (!window.audioAidParallelLayers) window.audioAidParallelLayers = [];
             window.audioAidParallelLayers.forEach(l => { if (l) map.removeLayer(l); });
@@ -5155,33 +5171,24 @@
 
             savedBreaks.forEach(brk => {
                 if (brk.isDeleted) return;
-                if (brk.id === editingBreakId) {
-                    breakLayers.push(null);
-                    return;
-                }
+                if (brk.id === editingBreakId) return;
+
                 if (weeklyFilterRange) {
-                    if (!brk.createdAt) { breakLayers.push(null); return; }
+                    if (!brk.createdAt) return;
                     const ts = new Date(brk.createdAt).getTime();
-                    if (ts < weeklyFilterRange.start || ts >= weeklyFilterRange.end) {
-                        breakLayers.push(null); 
-                        return; 
-                    }
+                    if (ts < weeklyFilterRange.start || ts >= weeklyFilterRange.end) return;
                 } else {
-                    if (!brk.createdAt) { breakLayers.push(null); return; }
+                    if (!brk.createdAt) return;
                     const ts = new Date(brk.createdAt).getTime();
                     const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
                     const daysAgo = Date.now() - filterDays * 24 * 60 * 60 * 1000;
-                    if (ts < daysAgo) {
-                        breakLayers.push(null); 
-                        return; 
-                    }
+                    if (ts < daysAgo) return;
                 }
                 
                 const coords = brk.vertices.map(v => [v.lat, v.lng]);
-                const gColor = getGroupColor(brk.group);
-                // If it's a crop, check if it was explicitly saved as a line.
-                // For backwards compatibility before this feature, default old crops to 'line'
-                const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
+                const group = brk.group || '1st';
+                const gColor = getGroupColor(group);
+                const isLineMode = brk.cropMode === 'line' || (group === 'crops' && brk.cropMode == null);
                 
                 let renderLayer;
                 let measureStr;
@@ -5221,12 +5228,12 @@
                 });
                 
                 renderLayer.on('click', function(e) {
-                    if (breakSelectMode || isDrawingBreak) return; // Don't interrupt drawing or selecting, let the event naturally bubble up or ignore it 
+                    if (breakSelectMode || isDrawingBreak) return; 
                     L.DomEvent.stopPropagation(e);
                     scrollToBreakCard(brk.id);
                 });
 
-                breakLayers.push(renderLayer);
+                breakLayers.set(String(brk.id), renderLayer);
             });
         }
 
@@ -5237,7 +5244,7 @@
             }
             
             // Check if the break is hidden by the current group filter
-            const brk = savedBreaks.find(b => b.id === breakId);
+            const brk = savedBreaks.find(b => String(b.id) === String(breakId));
             if (brk && activeBreakGroup !== 'all' && activeBreakGroup !== (brk.group || '1st')) {
                 setActiveBreakGroup(brk.group || '1st');
             }
@@ -5266,31 +5273,43 @@
         }
 
         function focusBreakOnMap(breakId) {
-            const idx = savedBreaks.findIndex(b => b.id === breakId);
-            if (idx < 0 || !breakLayers[idx]) return;
-            const layer = breakLayers[idx];
+            const bIdStr = String(breakId);
+            const layer = breakLayers.get(bIdStr);
+            if (!layer) return;
+
             try {
                 const bounds = layer.getBounds();
                 if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
             } catch (e) { }
-            breakLayers.forEach((l, i) => {
-                if (!l) return;
-                const brk = savedBreaks[i];
-                const isLineMode = brk.cropMode === 'line' || (brk.group === 'crops' && brk.cropMode == null);
-                if (isLineMode) {
-                    l.setStyle({ weight: 4, opacity: 0.9, color: getGroupColor(brk.group) });
+
+            // Optimized highlighting using a lookup map
+            const savedBreaksMap = new Map();
+            savedBreaks.forEach(b => savedBreaksMap.set(String(b.id), b));
+
+            breakLayers.forEach((l, id) => {
+                const brk = savedBreaksMap.get(String(id));
+                if (!l || !brk) return;
+                
+                const isSelected = String(id) === bIdStr;
+                const group = brk.group || '1st';
+                const isLineMode = brk.cropMode === 'line' || (group === 'crops' && brk.cropMode == null);
+                const gColor = getGroupColor(group);
+
+                if (isSelected) {
+                    if (isLineMode) {
+                        l.setStyle({ weight: 6, opacity: 1, color: gColor });
+                    } else {
+                        l.setStyle({ weight: 4, fillOpacity: 0.45, color: gColor });
+                    }
+                    if (l.bringToFront) l.bringToFront();
                 } else {
-                    l.setStyle({ weight: 2.5, fillOpacity: 0.2, color: getGroupColor(brk.group) });
+                    if (isLineMode) {
+                        l.setStyle({ weight: 4, opacity: 0.9, color: gColor });
+                    } else {
+                        l.setStyle({ weight: 2.5, fillOpacity: 0.2, color: gColor });
+                    }
                 }
             });
-            const targetBrk = savedBreaks[idx];
-            const isTargetLineMode = targetBrk.cropMode === 'line' || (targetBrk.group === 'crops' && targetBrk.cropMode == null);
-            if (isTargetLineMode) {
-                layer.setStyle({ weight: 6, opacity: 1, color: getGroupColor(targetBrk.group) });
-            } else {
-                layer.setStyle({ weight: 4, fillOpacity: 0.45, color: getGroupColor(targetBrk.group) });
-            }
-            if (layer.bringToFront) layer.bringToFront();
         }
 
         function toggleBreakSelectMode() {
@@ -5341,10 +5360,12 @@
         function renderBreaksDashboard() {
             if (currentDashboardMode !== 'breaks') return;
             const list = document.getElementById('list');
-            // Ensure newest is at the top before rendering
-            savedBreaks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-            savedBreaks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            // Ensure newest is at the top before rendering (Stable sort)
+            savedBreaks.sort((a, b) => {
+                const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return (db || 0) - (da || 0);
+            });
 
             const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
             const visibleBreaks = savedBreaks.filter(b => {
@@ -5632,7 +5653,8 @@
                 }
             }
             
-            const gColor = getGroupColor(brk.group);
+            const group = brk.group || '1st';
+            const gColor = getGroupColor(group);
             
             return `<div class="break-card ${isSelected ? 'selected' : ''} ${isAudioActive ? 'audio-active' : ''}" id="break-${brk.id}" onclick="${cardClick}" style="border-left: 4px solid ${gColor};">
                     ${breakSelectMode
@@ -5734,9 +5756,9 @@
             focusBreakOnMap(breakId);
 
             // Hide the saved polygon for this break
-            const idx = savedBreaks.findIndex(b => b.id === breakId);
-            if (idx >= 0 && breakLayers[idx]) {
-                map.removeLayer(breakLayers[idx]);
+            if (breakLayers.has(breakId)) {
+                map.removeLayer(breakLayers.get(breakId));
+                breakLayers.delete(breakId);
             }
 
             // Show edit toolbar and maximize map
