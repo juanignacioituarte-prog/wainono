@@ -1822,10 +1822,10 @@
         /* Break Management State */
         let default_BREAK_GROUPS = [
             { id: 'all', name: 'All Herds', color: '#7f8c8d', on_grass: false, on_crop: false, custom_crop_feed: null },
-            { id: '1st', name: '1st Herd', color: '#3498db', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_yield: null },
-            { id: '2nd', name: '2nd Herd', color: '#2ecc71', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_yield: null },
-            { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_yield: null },
-            { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_yield: null }
+            { id: '1st', name: '1st Herd', color: '#3498db', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null },
+            { id: '2nd', name: '2nd Herd', color: '#2ecc71', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null },
+            { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null },
+            { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null }
         ];
         let BREAK_GROUPS = JSON.parse(localStorage.getItem('custom_herds')) || default_BREAK_GROUPS;
         let manualBreakOverrides = JSON.parse(localStorage.getItem('manual_break_overrides')) || {};
@@ -1833,7 +1833,7 @@
         function saveHerdSettings() {
             localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
             saveAndRecalc();
-            loadFeedSettings();
+            loadLocalFeedSettings();
         }
 
         function addCustomHerd() {
@@ -1850,7 +1850,7 @@
                 on_grass: true,
                 on_crop: false,
                 custom_crop_feed: null,
-                custom_crop_yield: null,
+                custom_crop_paddock: null,
                 is_oad: false
             });
             saveHerdSettings();
@@ -2514,8 +2514,12 @@
                                     <input type="number" step="0.1" style="width:60px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:11px;" value="${g.custom_crop_feed !== null && g.custom_crop_feed !== undefined ? g.custom_crop_feed : ''}" placeholder="Global" onchange="updateCustomHerd('${g.id}', 'custom_crop_feed', this.value !== '' ? parseFloat(this.value) : null)">
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:space-between;">
-                                    <label style="font-weight:600; color:#555; font-size:10px;">CROP YIELD (KGDM/HA):</label>
-                                    <input type="number" step="100" style="width:60px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:11px;" value="${g.custom_crop_yield !== null && g.custom_crop_yield !== undefined ? g.custom_crop_yield : ''}" placeholder="Global" onchange="updateCustomHerd('${g.id}', 'custom_crop_yield', this.value !== '' ? parseFloat(this.value) : null)">
+                                    <label style="font-weight:600; color:#555; font-size:10px;">TARGET CROP PADDOCK:</label>
+                                    <select style="width:80px; padding:2px; border:1px solid #ccc; border-radius:4px; font-size:11px;" onchange="updateCustomHerd('${g.id}', 'custom_crop_paddock', this.value !== '' ? this.value : null)">
+                                        <option value="">Global</option>
+                                        ${allCropPaddocks.map(p => `<option value="${p}" ${g.custom_crop_paddock === p ? 'selected' : ''}>${p}</option>`).join('')}
+                                        ${customPaddocks.map(p => `<option value="${p.name}" ${g.custom_crop_paddock === p.name ? 'selected' : ''}>${p.name}</option>`).join('')}
+                                    </select>
                                 </div>
                             </div>
                         `;
@@ -3874,15 +3878,27 @@
                 // Crop Math
                 if (hCows > 0 && g.on_crop) {
                     let cAreaM2 = 0;
-                    if (cropYield > 0) {
+                    
+                    let herdCropYield = cropYield; // default global
+                    if (g.custom_crop_paddock) {
+                        const pName = g.custom_crop_paddock;
+                        if (cropYields[pName]) {
+                            herdCropYield = cropYields[pName];
+                        } else {
+                            const cp = customPaddocks.find(p => p.name === pName);
+                            if (cp && cp.yield) herdCropYield = cp.yield;
+                        }
+                    }
+                    
+                    if (herdCropYield > 0) {
                         const effectiveCropFeed = (g.custom_crop_feed !== null && g.custom_crop_feed !== undefined && String(g.custom_crop_feed).trim() !== '') ? parseFloat(g.custom_crop_feed) : cropFeed;
                         const hDemand = effectiveCropFeed * hCows;
-                        cAreaM2 = (hDemand / cropYield) * 10000;
+                        cAreaM2 = (hDemand / herdCropYield) * 10000;
                     }
                     herdCropM2Map[g.id] = cAreaM2;
                     cropHtml += `<div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #eee;">
                         <span style="font-weight:bold; color:${g.color}; font-size:12px;">${g.name}</span>
-                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m²/day</span></span>
+                        <span style="font-size:14px; font-weight:bold;">${Math.round(cAreaM2)} <span style="font-size:11px; font-weight:normal; color:#95a5a6;">m\u00b2/day</span></span>
                     </div>`;
                 }
             });
@@ -4322,6 +4338,11 @@
             const cp = customPaddocks.find(p => p.name === name);
             if (!cp) return;
             
+            // Switch to map mode so user can see what they are editing
+            if (currentDashboardMode === 'feed' || currentDashboardMode === 'predict') {
+                switchDashboardMode('satellite');
+            }
+            
             editingCustomPaddockName = name;
             editVertices = cp.vertices.map(v => ({ lat: v.lat, lng: v.lng }));
             editSelectedIdx = -1;
@@ -4598,7 +4619,16 @@
                     const globalCropFeed = safeNum(document.getElementById('inp-crop-feed').value);
                     
                     const hCropFeed = (hGroup && hGroup.custom_crop_feed !== null && hGroup.custom_crop_feed !== undefined) ? hGroup.custom_crop_feed : globalCropFeed;
-                    const hCropYield = (hGroup && hGroup.custom_crop_yield !== null && hGroup.custom_crop_yield !== undefined) ? hGroup.custom_crop_yield : defaultYield;
+                    
+                    let hCropYield = defaultYield;
+                    if (hGroup && hGroup.custom_crop_paddock) {
+                        const pName = hGroup.custom_crop_paddock;
+                        if (cropYields[pName]) hCropYield = cropYields[pName];
+                        else {
+                            const cp = customPaddocks.find(p => p.name === pName);
+                            if (cp && cp.yield) hCropYield = cp.yield;
+                        }
+                    }
                     
                     const paddockYield = (paddockName && cropYields[paddockName]) ? cropYields[paddockName] : hCropYield;
                     const hCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[activeBreakGroup] || 0;
