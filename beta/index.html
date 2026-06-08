@@ -1864,7 +1864,7 @@
         let excludedPaddocks = new Map();
         let partialPaddocks = new Set();
         let currentViewMode = 'ndvi';
-        let currentDashboardMode = 'manual';
+        let currentDashboardMode = 'breaks';
         let manualEntries = [];
         let farmGrowthRate = 0;
         let calibrationModel = null;
@@ -2638,7 +2638,7 @@
                 calibHoverArea.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
             }
 
-            switchDashboardMode('manual');
+            switchDashboardMode('breaks');
             
             // Auto-start GPS tracking
             setTimeout(() => {
