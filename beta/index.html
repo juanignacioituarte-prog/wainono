@@ -3933,7 +3933,10 @@
                     cpInner += `<div style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px; background:#fff; padding:8px; border-radius:6px; border:1px solid #d0e4ff;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span style="font-size:12px; font-weight:bold; color:#2c3e50;">${p.name} (${p.areaHa.toFixed(2)} ha)</span>
-                            <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:12px;" title="Remove Paddock">\ud83d\uddd1\ufe0f</button>
+                            <div style="display:flex; gap:4px; align-items:center;">
+                                <button onclick="renameCustomPaddock('${p.name}')" style="background:none; border:none; color:#8e44ad; cursor:pointer; font-size:12px;" title="Rename Paddock">✏️</button>
+                                <button onclick="deleteCustomPaddock('${p.name}')" style="background:none; border:none; color:#e74c3c; cursor:pointer; font-size:12px;" title="Remove Paddock">\ud83d\uddd1\ufe0f</button>
+                            </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
                             <label style="font-size:10px; color:#7f8c8d; font-weight:bold;">YIELD:</label>
@@ -4414,6 +4417,55 @@
                 areaLookup[cp.name] = cp.areaHa;
                 cropYields[cp.name] = cp.yield;
             });
+        }
+
+        function renameCustomPaddock(oldName) {
+            const newName = prompt("Enter new name for external paddock:", oldName);
+            if (!newName) return;
+            const trimmed = newName.trim();
+            if (!trimmed || trimmed === oldName) return;
+
+            // Check duplicate name
+            if (customPaddocks.some(p => p.name.toLowerCase() === trimmed.toLowerCase()) || paddockMap[trimmed]) {
+                return alert("A paddock with this name already exists");
+            }
+
+            // 1. Update name in customPaddocks
+            const cp = customPaddocks.find(p => p.name === oldName);
+            if (cp) cp.name = trimmed;
+
+            // 2. Update cropYields
+            if (cropYields[oldName] !== undefined) {
+                cropYields[trimmed] = cropYields[oldName];
+                delete cropYields[oldName];
+            }
+
+            // 3. Update areaLookup
+            if (areaLookup[oldName] !== undefined) {
+                areaLookup[trimmed] = areaLookup[oldName];
+                delete areaLookup[oldName];
+            }
+
+            // 4. Update BREAK_GROUPS references
+            BREAK_GROUPS.forEach(g => {
+                if (g.custom_crop_paddock === oldName) {
+                    g.custom_crop_paddock = trimmed;
+                }
+            });
+
+            // 5. Update savedBreaks references
+            savedBreaks.forEach(b => {
+                if (b.paddock === oldName) {
+                    b.paddock = trimmed;
+                    if (b.name && b.name.includes(oldName)) {
+                        b.name = b.name.replace(oldName, trimmed);
+                    }
+                }
+            });
+
+            saveCustomPaddocks();
+            saveHerdSettings();
+            saveBreaks();
         }
 
         function deleteCustomPaddock(name) {
