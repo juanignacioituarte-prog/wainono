@@ -1458,16 +1458,7 @@
 
             <div class="feed-card">
                 <div class="feed-title">Crop Management</div>
-                <div class="calc-grid">
-                    <div class="input-group">
-                        <label>Default Crop Yield (kgDM/ha)</label>
-                        <input type="number" id="inp-crop-yield" value="20000" oninput="saveAndRecalc()">
-                    </div>
-                    <div class="input-group">
-                        <label>Default Target Feed (kgDM/cow)</label>
-                        <input type="number" id="inp-crop-feed" value="4" oninput="saveAndRecalc()">
-                    </div>
-                </div>
+
                 <button class="btn-save" style="margin-top:10px; width:100%; background:#8e44ad; border-color:#8e44ad; margin-bottom:15px;" onclick="showAddCustomPaddockModal()">+ ADD EXTERNAL PADDOCK</button>
                 <div id="crop-paddock-yields-list" style="background:#f9f9f9; padding:10px; border-radius:6px; border:1px solid #eee;">
                     <div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:10px; display:flex; justify-content:space-between;">
@@ -1822,10 +1813,10 @@
         /* Break Management State */
         let default_BREAK_GROUPS = [
             { id: 'all', name: 'All Herds', color: '#7f8c8d', on_grass: false, on_crop: false, custom_crop_feed: null },
-            { id: '1st', name: '1st Herd', color: '#3498db', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null },
-            { id: '2nd', name: '2nd Herd', color: '#2ecc71', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null },
-            { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null },
-            { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: null, custom_crop_paddock: null }
+            { id: '1st', name: '1st Herd', color: '#3498db', on_grass: true, on_crop: false, custom_crop_feed: 4, custom_crop_paddock: null },
+            { id: '2nd', name: '2nd Herd', color: '#2ecc71', on_grass: true, on_crop: false, custom_crop_feed: 4, custom_crop_paddock: null },
+            { id: '3rd', name: '3rd Herd', color: '#f39c12', on_grass: true, on_crop: false, custom_crop_feed: 4, custom_crop_paddock: null },
+            { id: 'pennos', name: 'Pennos', color: '#e74c3c', on_grass: true, on_crop: false, custom_crop_feed: 4, custom_crop_paddock: null }
         ];
         let BREAK_GROUPS = JSON.parse(localStorage.getItem('custom_herds')) || default_BREAK_GROUPS;
         let manualBreakOverrides = JSON.parse(localStorage.getItem('manual_break_overrides')) || {};
@@ -1849,7 +1840,7 @@
                 color: color,
                 on_grass: true,
                 on_crop: false,
-                custom_crop_feed: null,
+                custom_crop_feed: 4,
                 custom_crop_paddock: null,
                 is_oad: false
             });
@@ -2402,14 +2393,7 @@
                 document.getElementById('inp-short-pct').value = data.shortPct;
                 localStorage.setItem('feed_short_pct', data.shortPct);
             }
-            if (data.cropYield) {
-                document.getElementById('inp-crop-yield').value = data.cropYield;
-                localStorage.setItem('feed_crop_yield', data.cropYield);
-            }
-            if (data.cropFeed) {
-                document.getElementById('inp-crop-feed').value = data.cropFeed;
-                localStorage.setItem('feed_crop_feed', data.cropFeed);
-            }
+
             if (data.cropYields) {
                 cropYields = data.cropYields;
                 localStorage.setItem('feed_crop_yields', JSON.stringify(cropYields));
@@ -2460,8 +2444,6 @@
             if (localStorage.getItem('feed_short_pct')) document.getElementById('inp-short-pct').value = localStorage.getItem('feed_short_pct');
             
             // Crop Settings
-            if (localStorage.getItem('feed_crop_yield')) document.getElementById('inp-crop-yield').value = localStorage.getItem('feed_crop_yield');
-            if (localStorage.getItem('feed_crop_feed')) document.getElementById('inp-crop-feed').value = localStorage.getItem('feed_crop_feed');
             if (localStorage.getItem('feed_crop_yields')) cropYields = JSON.parse(localStorage.getItem('feed_crop_yields'));
 
             // Load Herd Inputs
@@ -2511,12 +2493,12 @@
                             <div style="display:flex; flex-direction:column; gap:4px; margin-top:8px; border-top:1px solid #eee; padding-top:8px; width:100%;">
                                 <div style="display:flex; align-items:center; justify-content:space-between;">
                                     <label style="font-weight:600; color:#555; font-size:10px;">TARGET CROP FEED (KG):</label>
-                                    <input type="number" step="0.1" style="width:60px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:11px;" value="${g.custom_crop_feed !== null && g.custom_crop_feed !== undefined ? g.custom_crop_feed : ''}" placeholder="Global" onchange="updateCustomHerd('${g.id}', 'custom_crop_feed', this.value !== '' ? parseFloat(this.value) : null)">
+                                    <input type="number" step="0.1" style="width:60px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:11px;" value="${g.custom_crop_feed !== null && g.custom_crop_feed !== undefined ? g.custom_crop_feed : '4'}" placeholder="4" onchange="updateCustomHerd('${g.id}', 'custom_crop_feed', this.value !== '' ? parseFloat(this.value) : 4)">
                                 </div>
                                 <div style="display:flex; align-items:center; justify-content:space-between;">
                                     <label style="font-weight:600; color:#555; font-size:10px;">TARGET CROP PADDOCK:</label>
                                     <select style="width:80px; padding:2px; border:1px solid #ccc; border-radius:4px; font-size:11px;" onchange="updateCustomHerd('${g.id}', 'custom_crop_paddock', this.value !== '' ? this.value : null)">
-                                        <option value="">Global</option>
+                                        <option value="">None</option>
                                         ${allCropPaddocks.map(p => `<option value="${p}" ${g.custom_crop_paddock === p ? 'selected' : ''}>${p}</option>`).join('')}
                                         ${customPaddocks.map(p => `<option value="${p.name}" ${g.custom_crop_paddock === p.name ? 'selected' : ''}>${p.name}</option>`).join('')}
                                     </select>
@@ -3628,8 +3610,7 @@
             localStorage.setItem('feed_short_pct', document.getElementById('inp-short-pct').value);
             
             // Crop
-            localStorage.setItem('feed_crop_yield', document.getElementById('inp-crop-yield').value);
-            localStorage.setItem('feed_crop_feed', document.getElementById('inp-crop-feed').value);
+
 
             let totalCows = 0;
             let totalCowsOnGrass = 0;
@@ -3675,7 +3656,6 @@
             const cows = safeNum(document.getElementById('inp-cows').value);
             const intake = safeNum(document.getElementById('inp-intake').value);
             const inshed = safeNum(document.getElementById('inp-inshed').value);
-            const cropFeed = safeNum(document.getElementById('inp-crop-feed').value);
             const round = safeNum(document.getElementById('inp-round').value);
             const totalArea = safeNum(document.getElementById('feed-area-total').innerText);
             const actualPre = safeNum(document.getElementById('inp-actual-pre').value);
@@ -3692,7 +3672,7 @@
                     const hCows = savedHerdCows[g.id] || 0;
                     
                     if (g.on_grass) {
-                        const hCropFeed = (g.on_crop) ? ((g.custom_crop_feed !== null && g.custom_crop_feed !== undefined) ? g.custom_crop_feed : cropFeed) : 0;
+                        const hCropFeed = (g.on_crop) ? ((g.custom_crop_feed !== null && g.custom_crop_feed !== undefined) ? g.custom_crop_feed : 4) : 0;
                         const hPastureDemand = Math.max(0, intake - inshed - hCropFeed);
                         totalPastureDemandKg += (hCows * hPastureDemand);
                     }
@@ -3802,7 +3782,6 @@
             
             let totalGrassAssigned = 0;
             // ----- CROP MANAGEMENT HERD CALCULATIONS -----
-            const cropYield = safeNum(document.getElementById('inp-crop-yield').value);
             const cropHerds = JSON.parse(localStorage.getItem('herd_in_crops') || '[]');
             let cropHtml = '';
             let herdCropM2Map = {};
@@ -3816,7 +3795,7 @@
                     <span>EST. YIELD (kgDM/ha)</span>
                 </div>`;
                 allCropPaddocks.forEach(pName => {
-                    const y = cropYields[pName] || cropYield; // fallback to global
+                    const y = cropYields[pName] || 20000; // fallback to global
                     listHtml += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                         <span style="font-size:12px; font-weight:600;">${pName}</span>
                         <input type="number" 
@@ -3879,7 +3858,7 @@
                 if (hCows > 0 && g.on_crop) {
                     let cAreaM2 = 0;
                     
-                    let herdCropYield = cropYield; // default global
+                    let herdCropYield = 0;
                     if (g.custom_crop_paddock) {
                         const pName = g.custom_crop_paddock;
                         if (cropYields[pName]) {
@@ -3891,7 +3870,7 @@
                     }
                     
                     if (herdCropYield > 0) {
-                        const effectiveCropFeed = (g.custom_crop_feed !== null && g.custom_crop_feed !== undefined && String(g.custom_crop_feed).trim() !== '') ? parseFloat(g.custom_crop_feed) : cropFeed;
+                        const effectiveCropFeed = (g.custom_crop_feed !== null && g.custom_crop_feed !== undefined && String(g.custom_crop_feed).trim() !== '') ? parseFloat(g.custom_crop_feed) : 4;
                         const hDemand = effectiveCropFeed * hCows;
                         cAreaM2 = (hDemand / herdCropYield) * 10000;
                     }
@@ -4058,8 +4037,8 @@
                 pmPct: document.getElementById('inp-pm-pct').value,
                 longPct: document.getElementById('inp-long-pct').value,
                 shortPct: document.getElementById('inp-short-pct').value,
-                cropYield: document.getElementById('inp-crop-yield').value,
-                cropFeed: document.getElementById('inp-crop-feed').value,
+                cropYield: 20000,
+                cropFeed: 4,
                 cropYields: cropYields,
                 cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
@@ -4615,12 +4594,9 @@
                 let cropWidthMeters = 0;
                 if (isLineMode) {
                     const hGroup = BREAK_GROUPS.find(g => g.id === activeBreakGroup);
-                    const defaultYield = safeNum(document.getElementById('inp-crop-yield').value);
-                    const globalCropFeed = safeNum(document.getElementById('inp-crop-feed').value);
+                    const hCropFeed = (hGroup && hGroup.custom_crop_feed !== null && hGroup.custom_crop_feed !== undefined) ? hGroup.custom_crop_feed : 4;
                     
-                    const hCropFeed = (hGroup && hGroup.custom_crop_feed !== null && hGroup.custom_crop_feed !== undefined) ? hGroup.custom_crop_feed : globalCropFeed;
-                    
-                    let hCropYield = defaultYield;
+                    let hCropYield = 0;
                     if (hGroup && hGroup.custom_crop_paddock) {
                         const pName = hGroup.custom_crop_paddock;
                         if (cropYields[pName]) hCropYield = cropYields[pName];
@@ -5961,11 +5937,17 @@
 
             if (isLineMode) {
                 const hGroup = BREAK_GROUPS.find(g => g.id === brk.group);
-                const defaultYield = safeNum(document.getElementById('inp-crop-yield').value);
-                const globalCropFeed = safeNum(document.getElementById('inp-crop-feed').value);
+                const hCropFeed = (hGroup && hGroup.custom_crop_feed !== null && hGroup.custom_crop_feed !== undefined) ? hGroup.custom_crop_feed : 4;
                 
-                const hCropFeed = (hGroup && hGroup.custom_crop_feed !== null && hGroup.custom_crop_feed !== undefined) ? hGroup.custom_crop_feed : globalCropFeed;
-                const hCropYield = (hGroup && hGroup.custom_crop_yield !== null && hGroup.custom_crop_yield !== undefined) ? hGroup.custom_crop_yield : defaultYield;
+                let hCropYield = 0;
+                if (hGroup && hGroup.custom_crop_paddock) {
+                    const pName = hGroup.custom_crop_paddock;
+                    if (cropYields[pName]) hCropYield = cropYields[pName];
+                    else {
+                        const cp = customPaddocks.find(p => p.name === pName);
+                        if (cp && cp.yield) hCropYield = cp.yield;
+                    }
+                }
 
                 const paddockYield = (brk.paddock && cropYields[brk.paddock]) ? cropYields[brk.paddock] : hCropYield;
                 const hCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}')[brk.group] || 0;
