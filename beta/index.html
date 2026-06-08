@@ -3338,7 +3338,7 @@
             if (coords.length > 1) {
                 drawingPolyline = L.polyline(coords, { color: gColor, weight: 3, dashArray: '5, 5' }).addTo(map);
             }
-            if (coords.length >= 3 && currentDrawingMode === 'polygon') {
+            if (coords.length >= 3 && currentDrawingMode !== 'line') {
                 drawingPolygon = L.polygon(coords, { color: gColor, weight: 1, fillColor: gColor, fillOpacity: 0.15 }).addTo(map);
             }
         }
