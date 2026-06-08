@@ -1782,12 +1782,12 @@
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRkkZ9pxJnFYiBpbLdgy_WXoG_itdfnjL199NvOLLxCGrPfh2drA1lcCVditsKxbe2/exec";
 
         /* URLs */
-        const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/paddocks.geojson";
-        const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=0&single=true&output=csv";
-        const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=494849216&single=true&output=csv";
+        const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
+        const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
+        const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
         const PARTIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=369172552&single=true&output=csv";
-        const MANUAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=564540457&single=true&output=csv";
-        const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=800992969&single=true&output=csv";
+        const CAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv";
+        const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv";
         const FEED_SETTINGS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1218249029&single=true&output=csv";
         const AUTH_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=581275033&single=true&output=csv";
 
@@ -2258,7 +2258,7 @@
         async function loadManualSheet() {
             manualEntries = [];
             try {
-                const res = await fetch(MANUAL_CSV_URL + "&t=" + Date.now());
+                const res = await fetch(CAL_CSV_URL + "&t=" + Date.now());
                 const txt = await res.text();
                 Papa.parse(txt, {
                     header: true, skipEmptyLines: true,
