@@ -2158,6 +2158,12 @@
             if (layer.bringToFront) layer.bringToFront();
         }
 
+        function hideAllPaddockLabels() {
+            document.querySelectorAll('.paddock-label.show-label').forEach(el => {
+                el.classList.remove('show-label');
+            });
+        }
+
         /* Loaders */
         async function loadManualRankCSV() {
             try {
@@ -2547,6 +2553,10 @@
             }).setView([-44.118829, 170.8550364], 14);
             L.control.zoom({ position: 'topleft' }).addTo(map);
             baseLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+            
+            map.on('click', function (e) {
+                if (typeof hideAllPaddockLabels === 'function') hideAllPaddockLabels();
+            });
 
             // Load settings first
             await loadFeedSettings();
@@ -2587,8 +2597,16 @@
                         layer.on('click', (e) => {
                             if (isDrawingBreak) return; // bubble up for drawing
                             L.DomEvent.stopPropagation(e);
-                            if (isDrawingBreak) return; // bubble up for drawing
-                            L.DomEvent.stopPropagation(e);
+                            
+                            const tip = layer.getTooltip();
+                            if (tip && tip.getElement()) {
+                                const isShown = tip.getElement().classList.contains('show-label');
+                                hideAllPaddockLabels();
+                                if (!isShown) {
+                                    tip.getElement().classList.add('show-label');
+                                }
+                            }
+                            
                             const p = getCurrentModeData().find(d => d.name === pName);
                             const isOut = p ? p.isOut : true;
                             const isPartial = p ? p.isPartial : false;
