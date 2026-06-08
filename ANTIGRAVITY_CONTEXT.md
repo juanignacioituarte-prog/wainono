@@ -1,4 +1,4 @@
-# Antigravity Context: RiverTerrace Farm Dashboard
+# Antigravity Context: Wainono Farm Dashboard
 
 This document is intended to provide immediate context for any future Antigravity AI instances picking up this project on a new machine. 
 

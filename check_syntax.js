@@ -1,6 +1,6 @@
 
 const fs = require('fs');
-const content = fs.readFileSync('c:/Users/juani/OneDrive/Desktop/ndvi/riverterrace-main/riverterrace-main/index.html', 'utf8');
+const content = fs.readFileSync('c:/Users/juani/OneDrive/Desktop/ndvi/wainono-main/wainono-main/index.html', 'utf8');
 const scriptMatch = content.match(/<script>([\s\S]*?)<\/script>/);
 if (scriptMatch) {
     try {
