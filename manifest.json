@@ -1,6 +1,6 @@
 {
   "name": "Wainono Farm Monitor",
-  "short_name": "RT Farm",
+  "short_name": "WN Farm",
   "description": "Farm monitoring dashboard with satellite NDVI, farmwalk data, feed wedge, and break management.",
   "start_url": "./index.html",
   "display": "standalone",
