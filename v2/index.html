@@ -4510,7 +4510,7 @@
             if (currentDrawingMode === 'custom_paddock') {
                 drawingVertices.push({ lat: latlng.lat, lng: latlng.lng });
                 if (navigator.vibrate) navigator.vibrate(50);
-                renderDrawingPoly();
+                redrawDrawingLayers();
                 document.getElementById('vertex-count').textContent = drawingVertices.length + ' points added';
                 return;
             }
