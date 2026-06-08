@@ -4159,8 +4159,12 @@
                                         finalMap.set(idStr, lb);
                                     } else if (!finalMap.has(idStr) && !lb.isDeleted) {
                                         // STICKY SYNC: Keep local breaks that are missing from cloud (unless deleted locally)
-                                        lb.synced = false;
-                                        finalMap.set(idStr, lb);
+                                        // Only keep them if they were created offline and never synced (synced !== true).
+                                        // If they were synced before, it means they were deleted on the cloud.
+                                        if (lb.synced !== true) {
+                                            lb.synced = false;
+                                            finalMap.set(idStr, lb);
+                                        }
                                     }
                                 }
                             });
