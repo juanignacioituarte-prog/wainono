@@ -3831,7 +3831,7 @@
                         <input type="number" 
                             style="width:80px; padding:4px; border:1px solid #ddd; border-radius:4px; font-size:12px; text-align:right;"
                             value="${y}" 
-                            oninput="updateCropPaddockYield('${pName}', this.value)" />
+                            onchange="updateCropPaddockYield('${pName}', this.value)" />
                     </div>`;
                 });
                 cropPaddockList.innerHTML = listHtml;
@@ -3941,7 +3941,7 @@
                             <input type="number" 
                                 style="width:60px; padding:2px 5px; border:1px solid #ddd; border-radius:4px; font-size:11px; text-align:right;"
                                 value="${p.yield}" 
-                                oninput="updateCustomPaddockYield('${p.name}', this.value)" />
+                                onchange="updateCustomPaddockYield('${p.name}', this.value)" />
                             <span style="font-size:10px; color:#95a5a6; flex:1;">kgDM/ha</span>
                             <button onclick="startEditCustomPaddock('${p.name}')" style="background:#8e44ad; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">EDIT SHAPE</button>
                         </div>
