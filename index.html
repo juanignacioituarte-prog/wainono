@@ -3608,6 +3608,7 @@
 
         function updateCropPaddockYield(pName, val) {
             cropYields[pName] = safeNum(val);
+            localStorage.setItem('feed_crop_yields', JSON.stringify(cropYields));
             saveAndRecalc();
         }
 
@@ -3617,6 +3618,7 @@
             if (p) {
                 p.yield = v;
                 cropYields[pName] = v;
+                localStorage.setItem('feed_crop_yields', JSON.stringify(cropYields));
                 saveCustomPaddocks();
                 calculateFeedLogic();
                 triggerAutoSave();
@@ -3888,7 +3890,7 @@
                 if (hCows > 0 && g.on_crop) {
                     let cAreaM2 = 0;
                     
-                    let herdCropYield = 0;
+                    let herdCropYield = 20000;
                     if (g.custom_crop_paddock) {
                         const pName = g.custom_crop_paddock;
                         if (cropYields[pName]) {
@@ -3896,6 +3898,7 @@
                         } else {
                             const cp = customPaddocks.find(p => p.name === pName);
                             if (cp && cp.yield) herdCropYield = cp.yield;
+                            else herdCropYield = 20000;
                         }
                     }
                     
@@ -4705,13 +4708,14 @@
                     const hGroup = BREAK_GROUPS.find(g => g.id === activeBreakGroup);
                     const hCropFeed = (hGroup && hGroup.custom_crop_feed !== null && hGroup.custom_crop_feed !== undefined) ? hGroup.custom_crop_feed : 4;
                     
-                    let hCropYield = 0;
+                    let hCropYield = 20000;
                     if (hGroup && hGroup.custom_crop_paddock) {
                         const pName = hGroup.custom_crop_paddock;
                         if (cropYields[pName]) hCropYield = cropYields[pName];
                         else {
                             const cp = customPaddocks.find(p => p.name === pName);
                             if (cp && cp.yield) hCropYield = cp.yield;
+                            else hCropYield = 20000;
                         }
                     }
                     
@@ -6090,13 +6094,14 @@
                 const hGroup = BREAK_GROUPS.find(g => g.id === brk.group);
                 const hCropFeed = (hGroup && hGroup.custom_crop_feed !== null && hGroup.custom_crop_feed !== undefined) ? hGroup.custom_crop_feed : 4;
                 
-                let hCropYield = 0;
+                let hCropYield = 20000;
                 if (hGroup && hGroup.custom_crop_paddock) {
                     const pName = hGroup.custom_crop_paddock;
                     if (cropYields[pName]) hCropYield = cropYields[pName];
                     else {
                         const cp = customPaddocks.find(p => p.name === pName);
                         if (cp && cp.yield) hCropYield = cp.yield;
+                        else hCropYield = 20000;
                     }
                 }
 
