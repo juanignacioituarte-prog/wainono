@@ -4633,6 +4633,28 @@
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Distinct vib for drop point
         }
 
+        function toggleModalBreakInputs(isCropBreak) {
+            const shiftContainer = document.getElementById('modal-shift-container');
+            const residualContainer = document.getElementById('modal-residual-container');
+            const customHrsContainer = document.getElementById('custom-hrs-container');
+            const cropStatusContainer = document.getElementById('modal-crop-status-container');
+            
+            if (isCropBreak) {
+                if (shiftContainer) shiftContainer.style.display = 'none';
+                if (residualContainer) residualContainer.style.display = 'none';
+                if (customHrsContainer) customHrsContainer.style.display = 'none';
+                if (cropStatusContainer) cropStatusContainer.style.display = 'block';
+            } else {
+                if (shiftContainer) shiftContainer.style.display = 'block';
+                if (residualContainer) residualContainer.style.display = 'block';
+                if (customHrsContainer) {
+                    const shiftVal = document.getElementById('modal-break-shift').value;
+                    customHrsContainer.style.display = shiftVal === 'custom' ? 'block' : 'none';
+                }
+                if (cropStatusContainer) cropStatusContainer.style.display = 'none';
+            }
+        }
+
         function finishBreak() {
             try {
                 const isLineMode = currentDrawingMode === 'line';
@@ -4731,28 +4753,6 @@
                     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                     return;
                 }
-
-        function toggleModalBreakInputs(isCropBreak) {
-            const shiftContainer = document.getElementById('modal-shift-container');
-            const residualContainer = document.getElementById('modal-residual-container');
-            const customHrsContainer = document.getElementById('custom-hrs-container');
-            const cropStatusContainer = document.getElementById('modal-crop-status-container');
-            
-            if (isCropBreak) {
-                if (shiftContainer) shiftContainer.style.display = 'none';
-                if (residualContainer) residualContainer.style.display = 'none';
-                if (customHrsContainer) customHrsContainer.style.display = 'none';
-                if (cropStatusContainer) cropStatusContainer.style.display = 'block';
-            } else {
-                if (shiftContainer) shiftContainer.style.display = 'block';
-                if (residualContainer) residualContainer.style.display = 'block';
-                if (customHrsContainer) {
-                    const shiftVal = document.getElementById('modal-break-shift').value;
-                    customHrsContainer.style.display = shiftVal === 'custom' ? 'block' : 'none';
-                }
-                if (cropStatusContainer) cropStatusContainer.style.display = 'none';
-            }
-        }
 
                 let defaultRes = safeNum(document.getElementById('inp-residual')?.value, 1500);
                 document.getElementById('modal-break-residual').value = defaultRes;
