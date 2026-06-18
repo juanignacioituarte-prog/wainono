@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wn-farm-v1.0.23';
+const CACHE_NAME = 'rt-farm-v1.0.16';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -36,31 +36,29 @@ self.addEventListener('fetch', event => {
 
     // Always fetch live data from Google Sheets and GCS (never cache)
     if (url.hostname.includes('google') || url.hostname.includes('googleapis') || url.hostname.includes('storage.googleapis')) {
-        event.respondWith(fetch(event.request));
+        event.respondWith(
+            fetch(event.request).catch(() => caches.match(event.request))
+        );
         return;
     }
 
-    // Network First strategy (ensures latest version is loaded if online)
+    // Cache-first for static assets
     event.respondWith(
-        fetch(event.request)
-            .then(networkResponse => {
-                // If valid response, update cache
-                if (networkResponse && networkResponse.ok) {
+        caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) return cachedResponse;
+            return fetch(event.request).then(networkResponse => {
+                // Cache new static assets
+                if (networkResponse.ok) {
                     const clone = networkResponse.clone();
                     caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                 }
                 return networkResponse;
-            })
-            .catch(() => {
-                // If offline, check cache
-                return caches.match(event.request).then(cachedResponse => {
-                    if (cachedResponse) return cachedResponse;
-                    
-                    // Offline fallback for index.html
-                    if (event.request.mode === 'navigate') {
-                        return caches.match('./index.html');
-                    }
-                });
-            })
+            });
+        }).catch(() => {
+            // Offline fallback
+            if (event.request.destination === 'document') {
+                return caches.match('./index.html');
+            }
+        })
     );
 });

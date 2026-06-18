@@ -4082,8 +4082,7 @@
                 customPaddocks: customPaddocks.map(cp => ({
                     ...cp,
                     vertices: cp.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) }))
-                })),
-                breaks: getCompressedBreaks() // Also include breaks in feed settings for better sync coverage
+                }))
             };
             console.log("Cloud: Sending feed_settings payload", payload);
             fetch(GOOGLE_SCRIPT_URL, {
@@ -4092,21 +4091,18 @@
             })
                 .then(res => res.json())
                 .then(data => {
-                    // Mark ONLY the breaks that were included in this payload as synced
-                    const syncedIds = new Set(payload.breaks.map(b => String(b.id)));
-                    savedBreaks.forEach(b => {
-                        if (syncedIds.has(String(b.id))) b.synced = true;
-                    });
-                    localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
-
-                    if (!isAuto && btn) {
-                        btn.disabled = false;
-                        btn.innerText = "SAVE TO CLOUD";
-                    }
-                    if (msg) {
-                        msg.innerText = "SAVED TO CLOUD!";
-                        msg.style.display = 'inline-block';
-                        setTimeout(() => msg.style.display = 'none', 3000);
+                    if (data && (data.status === 'success' || data.success === true)) {
+                        if (!isAuto && btn) {
+                            btn.disabled = false;
+                            btn.innerText = "SAVE TO CLOUD";
+                        }
+                        if (msg) {
+                            msg.innerText = "SAVED TO CLOUD!";
+                            msg.style.display = 'inline-block';
+                            setTimeout(() => msg.style.display = 'none', 3000);
+                        }
+                    } else {
+                        throw new Error(data ? data.message || "Failed status from cloud" : "Empty cloud response");
                     }
                 })
                 .catch(err => {
@@ -4177,9 +4173,11 @@
                                         finalMap.set(idStr, lb);
                                     } else if (!finalMap.has(idStr) && !lb.isDeleted) {
                                         // STICKY SYNC: Keep local breaks that are missing from cloud (unless deleted locally)
-                                        // Only keep them if they were created offline and never synced (synced !== true).
-                                        // If they were synced before, it means they were deleted on the cloud.
-                                        if (lb.synced !== true) {
+                                        // If they were synced before but are missing from cloud now, it could be a failed cloud save
+                                        // or temporary sheet read issue. If created recently (e.g. last 14 days), keep them and
+                                        // trigger a re-sync. Otherwise, assume they were deleted.
+                                        const ageDays = lb.createdAt ? (Date.now() - new Date(lb.createdAt).getTime()) / 86400000 : 999;
+                                        if (lb.synced !== true || ageDays < 14) {
                                             lb.synced = false;
                                             finalMap.set(idStr, lb);
                                         }
@@ -4247,30 +4245,110 @@
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5 && !isSyncingBreaks) {
                 isSyncingBreaks = true;
                 
-                const compressedBreaks = getCompressedBreaks();
-                // De-duplicate by ID before sending to cloud
-                const dedupMap = new Map();
-                compressedBreaks.forEach(b => dedupMap.set(String(b.id), b));
-                const uniqueBreaks = Array.from(dedupMap.values());
-                const syncedIds = new Set(uniqueBreaks.map(b => String(b.id)));
-
-                console.log("Syncing breaks to cloud...", syncedIds.size, "records");
-                fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ type: 'breaks', breaks: uniqueBreaks })
-                })
+                // Fetch the latest breaks from the cloud first to merge and prevent overwriting other users' data
+                console.log("Fetching latest cloud breaks for merging before write...");
+                fetch(GOOGLE_SCRIPT_URL + '?type=breaks&_t=' + Date.now(), { cache: 'no-store' })
                 .then(res => {
-                    if (res.ok) {
-                        console.log("Cloud sync successful");
-                        // Mark ONLY the IDs we actually sent as synced
-                        savedBreaks.forEach(b => {
-                            if (syncedIds.has(String(b.id))) b.synced = true;
+                    if (res.ok) return res.json().catch(() => null);
+                    throw new Error("Failed to fetch cloud breaks for pre-write merge");
+                })
+                .then(data => {
+                    let cloudMap = new Map();
+                    if (data && Array.isArray(data.breaks)) {
+                        data.breaks.forEach(b => {
+                            if (b && b.id) cloudMap.set(String(b.id), b);
                         });
-                        localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
-                        if (currentDashboardMode === 'breaks') renderBreaksDashboard();
-                    } else {
-                        console.error("Cloud sync failed with status:", res.status);
                     }
+                    
+                    // Merge local breaks into the fetched cloud breaks list
+                    savedBreaks.forEach(lb => {
+                        if (lb && lb.id) {
+                            const idStr = String(lb.id);
+                            // If local break is unsynced, marked as deleted, or missing from cloud, overwrite/insert
+                            if (lb.synced === false || lb.isDeleted || !cloudMap.has(idStr)) {
+                                cloudMap.set(idStr, lb);
+                            }
+                        }
+                    });
+
+                    const mergedBreaks = Array.from(cloudMap.values());
+                    const compressedBreaks = mergedBreaks.map(b => {
+                        const cb = {
+                            id: b.id,
+                            name: b.name,
+                            paddock: b.paddock,
+                            vertices: b.vertices ? b.vertices.map(v => ({ lat: Number(v.lat.toFixed(6)), lng: Number(v.lng.toFixed(6)) })) : [],
+                            areaSqm: Math.round(b.areaSqm || 0),
+                            areaHa: Number((b.areaHa || 0).toFixed(3)),
+                            distanceMeters: Math.round(b.distanceMeters || 0),
+                            cropWidthMeters: Number((b.cropWidthMeters || 0).toFixed(2)),
+                            cropMode: b.cropMode,
+                            createdAt: b.createdAt,
+                            createdBy: b.createdBy,
+                            group: b.group
+                        };
+                        if (b.comment) cb.comment = b.comment;
+                        if (b.lastEditedBy) cb.lastEditedBy = b.lastEditedBy;
+                        if (b.lastEditedAt) cb.lastEditedAt = b.lastEditedAt;
+                        if (b.isCropBreak) cb.isCropBreak = b.isCropBreak;
+                        if (b.cropStatus) cb.cropStatus = b.cropStatus;
+                        if (b.isDeleted) cb.isDeleted = true;
+                        if (b.deletedBy) cb.deletedBy = b.deletedBy;
+                        if (b.deletedAt) cb.deletedAt = b.deletedAt;
+                        return cb;
+                    });
+
+                    const dedupMap = new Map();
+                    compressedBreaks.forEach(b => dedupMap.set(String(b.id), b));
+                    const uniqueBreaks = Array.from(dedupMap.values());
+                    const syncedIds = new Set(savedBreaks.map(b => String(b.id)));
+
+                    console.log("Syncing merged breaks to cloud...", uniqueBreaks.length, "records");
+                    return fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ type: 'breaks', breaks: uniqueBreaks })
+                    })
+                    .then(res => {
+                        if (res.ok) {
+                            return res.json().catch(() => ({ status: 'error', message: 'Invalid JSON response from server' }));
+                        }
+                        throw new Error("HTTP error " + res.status);
+                    })
+                    .then(postData => {
+                        if (postData && (postData.status === 'success' || postData.success === true)) {
+                            console.log("Cloud sync successful");
+                            // Mark our local instances as synced
+                            savedBreaks.forEach(b => {
+                                if (syncedIds.has(String(b.id))) b.synced = true;
+                            });
+
+                            // Re-merge local breaks into the final list retaining proper states
+                            const localMap = new Map();
+                            mergedBreaks.forEach(mb => {
+                                localMap.set(String(mb.id), { ...mb, synced: true });
+                            });
+                            savedBreaks.forEach(sb => {
+                                if (sb.synced === false || sb.isDeleted) {
+                                    localMap.set(String(sb.id), sb);
+                                }
+                            });
+
+                            savedBreaks = Array.from(localMap.values());
+                            savedBreaks.sort((a, b) => {
+                                const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                                const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                                return (db || 0) - (da || 0);
+                            });
+
+                            localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+                            if (currentDashboardMode === 'breaks') {
+                                renderBreaksDashboard();
+                                renderBreaksOnMap();
+                            }
+                        } else {
+                            console.error("Cloud sync failed or returned error status:", postData);
+                        }
+                    });
                 })
                 .catch(e => { console.log('Cloud breaks save failed', e); })
                 .finally(() => {
