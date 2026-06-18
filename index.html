@@ -1576,13 +1576,13 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.28</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.29</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.28</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.29</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4166,18 +4166,22 @@
                             let finalMap = new Map();
                             cloudMap.forEach((v, k) => finalMap.set(k, v));
 
-                            // 3. Handle local overrides
+                            // 3. Handle local overrides using timestamp comparison
                             savedBreaks.forEach(lb => {
                                 if (lb && lb.id) {
                                     const idStr = String(lb.id);
-                                    if (lb.synced === false) {
-                                        // Local change has not been synced yet - overwrite cloud version
-                                        finalMap.set(idStr, lb);
-                                    } else if (!finalMap.has(idStr) && !lb.isDeleted) {
-                                        // STICKY SYNC: Keep local breaks that are missing from cloud (unless deleted locally)
-                                        // If they were synced before but are missing from cloud now, it could be a failed cloud save
-                                        // or temporary sheet read issue. If created recently, keep them and
-                                        // trigger a re-sync. Otherwise, assume they were deleted.
+                                    const cloudVersion = finalMap.get(idStr);
+                                    
+                                    if (cloudVersion) {
+                                        // Exists in both - check timestamps to see which one is newer
+                                        const localTime = new Date(lb.lastEditedAt || lb.createdAt || 0).getTime();
+                                        const cloudTime = new Date(cloudVersion.lastEditedAt || cloudVersion.createdAt || 0).getTime();
+                                        
+                                        if (lb.synced === false || localTime > cloudTime) {
+                                            finalMap.set(idStr, lb);
+                                        }
+                                    } else {
+                                        // Missing from cloud - respect deletion unless it has never been synced
                                         if (lb.synced !== true) {
                                             lb.synced = false;
                                             finalMap.set(idStr, lb);
@@ -4266,13 +4270,25 @@
                         });
                     }
                     
-                    // Merge local breaks into the fetched cloud breaks list
+                    // Merge local breaks into the fetched cloud breaks list using timestamp comparison
                     savedBreaks.forEach(lb => {
                         if (lb && lb.id) {
                             const idStr = String(lb.id);
-                            // If local break is unsynced, marked as deleted, or missing from cloud, overwrite/insert
-                            if (lb.synced === false || lb.isDeleted || !cloudMap.has(idStr)) {
-                                cloudMap.set(idStr, lb);
+                            const cloudVersion = cloudMap.get(idStr);
+                            
+                            if (!cloudVersion) {
+                                // Missing from cloud - only upload if unsynced or deleted locally (respects cloud deletions)
+                                if (lb.synced === false || lb.isDeleted) {
+                                    cloudMap.set(idStr, lb);
+                                }
+                            } else {
+                                // Exists in both - check timestamps to see which one is newer
+                                const localTime = new Date(lb.lastEditedAt || lb.createdAt || 0).getTime();
+                                const cloudTime = new Date(cloudVersion.lastEditedAt || cloudVersion.createdAt || 0).getTime();
+                                
+                                if (lb.synced === false || lb.isDeleted || localTime > cloudTime) {
+                                    cloudMap.set(idStr, lb);
+                                }
                             }
                         }
                     });
