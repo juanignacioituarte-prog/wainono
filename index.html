@@ -1576,13 +1576,13 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.29</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.30</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.29</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.30</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4181,8 +4181,9 @@
                                             finalMap.set(idStr, lb);
                                         }
                                     } else {
-                                        // Missing from cloud - respect deletion unless it has never been synced
-                                        if (lb.synced !== true) {
+                                        // Missing from cloud - respect local deletion, otherwise assume it was lost
+                                        // due to a spreadsheet overwrite error. Keep it and re-sync to heal database.
+                                        if (!lb.isDeleted) {
                                             lb.synced = false;
                                             finalMap.set(idStr, lb);
                                         }
@@ -4277,8 +4278,10 @@
                             const cloudVersion = cloudMap.get(idStr);
                             
                             if (!cloudVersion) {
-                                // Missing from cloud - only upload if unsynced or deleted locally (respects cloud deletions)
-                                if (lb.synced === false || lb.isDeleted) {
+                                // Missing from cloud entirely - respect local deletion, otherwise assume it was lost
+                                // and re-upload it to heal the database.
+                                if (!lb.isDeleted) {
+                                    lb.synced = false;
                                     cloudMap.set(idStr, lb);
                                 }
                             } else {
