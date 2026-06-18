@@ -1576,13 +1576,13 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.33</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.34</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.33</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.34</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -5484,14 +5484,54 @@
                     permanent: false, direction: 'center', className: 'paddock-label show-label'
                 });
                 
+                let pressTimer;
+                let isLongPress = false;
+                
+                const handlePressStart = (e) => {
+                    isLongPress = false;
+                    pressTimer = setTimeout(() => {
+                        isLongPress = true;
+                        if (navigator.vibrate) navigator.vibrate(80);
+                        
+                        if (!breakSelectMode) {
+                            breakSelectMode = true;
+                            selectedBreakIds.clear();
+                        }
+                        const found = savedBreaks.find(b => String(b.id) === String(brk.id));
+                        if (found) {
+                            selectedBreakIds.add(found.id);
+                        }
+                        renderBreaksDashboard();
+                        highlightSelectedBreaksOnMap();
+                    }, 600);
+                };
+                
+                const handlePressEnd = () => {
+                    clearTimeout(pressTimer);
+                };
+
+                renderLayer.on('mousedown touchstart', handlePressStart);
+                renderLayer.on('mouseup touchend', handlePressEnd);
+                renderLayer.on('touchmove mousemove', handlePressEnd);
+                
                 renderLayer.on('click', function(e) {
-                    if (breakSelectMode || isDrawingBreak) return; 
                     L.DomEvent.stopPropagation(e);
-                    scrollToBreakCard(brk.id);
+                    if (isLongPress) {
+                        isLongPress = false;
+                        return;
+                    }
+                    if (isDrawingBreak) return; 
+                    
+                    if (breakSelectMode) {
+                        toggleBreakSelection(brk.id);
+                    } else {
+                        scrollToBreakCard(brk.id);
+                    }
                 });
 
                 breakLayers.set(String(brk.id), renderLayer);
             });
+            highlightSelectedBreaksOnMap();
         }
 
         function scrollToBreakCard(breakId) {
@@ -5573,6 +5613,7 @@
             breakSelectMode = !breakSelectMode;
             selectedBreakIds.clear();
             renderBreaksDashboard();
+            highlightSelectedBreaksOnMap();
         }
 
         function setCropMeasurementMode(mode) {
@@ -5582,13 +5623,115 @@
         }
 
         function toggleBreakSelection(breakId, event) {
-            event.stopPropagation();
-            if (selectedBreakIds.has(breakId)) {
-                selectedBreakIds.delete(breakId);
+            if (event) event.stopPropagation();
+            const found = savedBreaks.find(b => String(b.id) === String(breakId));
+            if (!found) return;
+            const id = found.id;
+            if (selectedBreakIds.has(id)) {
+                selectedBreakIds.delete(id);
             } else {
-                selectedBreakIds.add(breakId);
+                selectedBreakIds.add(id);
             }
             renderBreaksDashboard();
+            highlightSelectedBreaksOnMap();
+        }
+
+        function highlightSelectedBreaksOnMap() {
+            if (!map) return;
+            const savedBreaksMap = new Map();
+            savedBreaks.forEach(b => savedBreaksMap.set(String(b.id), b));
+
+            breakLayers.forEach((l, id) => {
+                const brk = savedBreaksMap.get(String(id));
+                if (!l || !brk) return;
+
+                const isSelected = selectedBreakIds.has(brk.id);
+                const group = brk.group || '1st';
+                const isLineMode = brk.cropMode === 'line' || (group === 'crops' && brk.cropMode == null);
+                const gColor = getGroupColor(group);
+
+                if (isSelected) {
+                    if (isLineMode) {
+                        l.setStyle({ weight: 7, opacity: 1, color: '#e74c3c' });
+                    } else {
+                        l.setStyle({ weight: 4.5, fillOpacity: 0.5, color: '#e74c3c', fillColor: '#e74c3c' });
+                    }
+                    if (l.bringToFront) l.bringToFront();
+                } else {
+                    if (isLineMode) {
+                        l.setStyle({ weight: 4, opacity: 0.9, color: gColor });
+                    } else {
+                        l.setStyle({ weight: 2.5, fillOpacity: 0.2, color: gColor, fillColor: gColor });
+                    }
+                }
+            });
+        }
+
+        let cardPressTimer = null;
+        let cardLongPressed = false;
+        
+        function handleCardPressStart(breakId) {
+            cardLongPressed = false;
+            cardPressTimer = setTimeout(() => {
+                cardLongPressed = true;
+                if (navigator.vibrate) navigator.vibrate(80);
+                
+                if (!breakSelectMode) {
+                    breakSelectMode = true;
+                    selectedBreakIds.clear();
+                }
+                const found = savedBreaks.find(b => String(b.id) === String(breakId));
+                if (found) {
+                    selectedBreakIds.add(found.id);
+                }
+                renderBreaksDashboard();
+                highlightSelectedBreaksOnMap();
+            }, 600);
+        }
+        
+        function handleCardPressEnd() {
+            clearTimeout(cardPressTimer);
+        }
+
+        function handleCardClick(breakId, event) {
+            if (cardLongPressed) {
+                cardLongPressed = false;
+                return;
+            }
+            if (breakSelectMode) {
+                toggleBreakSelection(breakId, event);
+            } else {
+                focusBreakOnMap(breakId);
+                document.querySelectorAll('.break-card').forEach(c => c.classList.remove('active'));
+                const card = document.getElementById('break-' + breakId);
+                if (card) card.classList.add('active');
+            }
+        }
+
+        function setMultiStatus(status) {
+            if (selectedBreakIds.size === 0) return;
+            const editor = localStorage.getItem('auth_name') || 'Unknown User';
+            const now = new Date().toISOString();
+            
+            savedBreaks.forEach(b => {
+                if (selectedBreakIds.has(b.id) && b.isCropBreak) {
+                    b.cropStatus = status;
+                    b.lastEditedBy = editor;
+                    b.lastEditedAt = now;
+                    b.synced = false;
+                    
+                    delete b.timeStayHrs;
+                    delete b.shiftType;
+                    delete b.manualResidual;
+                }
+            });
+            
+            selectedBreakIds.clear();
+            breakSelectMode = false;
+            saveBreaks();
+            renderBreaksDashboard();
+            renderBreaksOnMap();
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         }
 
         function deleteSelectedBreaks() {
@@ -5702,9 +5845,21 @@
             }
             html += `</div>`;
 
-            // Delete selected button
+            // Delete / Status multi-select actions
             if (breakSelectMode && selectedBreakIds.size > 0) {
-                html += `<button class="btn-delete-selected" onclick="deleteSelectedBreaks()">\u2715 DELETE SELECTED (${selectedBreakIds.size})</button>`;
+                const selectedBreaksList = savedBreaks.filter(b => selectedBreakIds.has(b.id));
+                const hasCrops = selectedBreaksList.some(b => b.isCropBreak);
+                
+                html += `<div class="multi-select-actions" style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px; background:#f1f2f6; padding:10px; border-radius:8px; border:1px solid #ced6e0;">`;
+                html += `<div style="font-size:11px; font-weight:bold; color:#2f3542; margin-bottom:4px; text-align:center;">${selectedBreakIds.size} BREAKS SELECTED</div>`;
+                html += `<div style="display:flex; gap:6px; width:100%;">`;
+                if (hasCrops) {
+                    html += `<button onclick="setMultiStatus('grazed')" style="flex:1; background:#2ecc71; border:none; color:white; padding:8px 4px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">GRAZED</button>`;
+                    html += `<button onclick="setMultiStatus('marked')" style="flex:1; background:#f1c40f; border:none; color:white; padding:8px 4px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">MARKED</button>`;
+                }
+                html += `<button onclick="deleteSelectedBreaks()" style="flex:1; background:#e74c3c; border:none; color:white; padding:8px 4px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">DELETE</button>`;
+                html += `</div>`;
+                html += `</div>`;
             }
 
             if (groupBreaks.length === 0) {
@@ -5824,9 +5979,7 @@
             const isSelected = selectedBreakIds.has(brk.id);
             const isAudioActive = activeSoundBreakId === brk.id;
             
-            const cardClick = breakSelectMode
-                ? `toggleBreakSelection('${brk.id}', event)`
-                : `focusBreakOnMap('${brk.id}'); document.querySelectorAll('.break-card').forEach(c=>c.classList.remove('active')); this.classList.add('active');`;
+            const cardClick = `handleCardClick('${brk.id}', event)`;
 
             let secondaryMetricHtml = '';
             if (brk.isCropBreak) {
@@ -5920,7 +6073,18 @@
             const group = brk.group || '1st';
             const gColor = getGroupColor(group);
             
-            return `<div class="break-card ${isSelected ? 'selected' : ''} ${isAudioActive ? 'audio-active' : ''}" id="break-${brk.id}" onclick="${cardClick}" style="border-left: 4px solid ${gColor};">
+            const pressStart = `handleCardPressStart('${brk.id}')`;
+            const pressEnd = `handleCardPressEnd()`;
+            
+            return `<div class="break-card ${isSelected ? 'selected' : ''} ${isAudioActive ? 'audio-active' : ''}" id="break-${brk.id}" 
+                onclick="${cardClick}" 
+                onmousedown="${pressStart}" 
+                onmouseup="${pressEnd}" 
+                onmouseleave="${pressEnd}" 
+                ontouchstart="${pressStart}" 
+                ontouchend="${pressEnd}" 
+                ontouchmove="${pressEnd}"
+                style="border-left: 4px solid ${gColor}; position: relative; user-select: none; -webkit-user-select: none;">
                     ${breakSelectMode
                     ? `<input type="checkbox" class="break-checkbox" ${isSelected ? 'checked' : ''} onclick="toggleBreakSelection('${brk.id}', event)" style="position:absolute; top:14px; right:10px;" />`
                     : `<div style="position:absolute; top:10px; right:10px; display:flex; gap:6px;">
