@@ -1576,13 +1576,13 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.34</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.35</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.34</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.35</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4181,12 +4181,10 @@
                                             finalMap.set(idStr, lb);
                                         }
                                     } else {
-                                        // Missing from cloud - respect local deletion, otherwise assume it was lost
-                                        // due to a spreadsheet overwrite error. Keep it and re-sync to heal database.
-                                        if (!lb.isDeleted) {
-                                            lb.synced = false;
-                                            finalMap.set(idStr, lb);
-                                        }
+                                        // Missing from cloud - assume it was lost
+                                        // Keep it and re-sync to heal database.
+                                        lb.synced = false;
+                                        finalMap.set(idStr, lb);
                                     }
                                 }
                             });
@@ -4287,12 +4285,10 @@
                             const cloudVersion = cloudMap.get(idStr);
                             
                             if (!cloudVersion) {
-                                // Missing from cloud entirely - respect local deletion, otherwise assume it was lost
-                                // and re-upload it to heal the database.
-                                if (!lb.isDeleted) {
-                                    lb.synced = false;
-                                    cloudMap.set(idStr, lb);
-                                }
+                                // Missing from cloud entirely - assume it was lost
+                                // Keep it and re-sync to heal database.
+                                lb.synced = false;
+                                cloudMap.set(idStr, lb);
                             } else {
                                 // Exists in both - check timestamps to see which one is newer
                                 const localTime = new Date(lb.lastEditedAt || lb.createdAt || 0).getTime();
@@ -5379,9 +5375,13 @@
         function deleteBreak(breakId) {
             const brk = savedBreaks.find(b => b.id === breakId);
             if (brk) {
+                const deleter = localStorage.getItem('auth_name') || 'Unknown User';
+                const now = new Date().toISOString();
                 brk.isDeleted = true;
-                brk.deletedBy = localStorage.getItem('auth_name') || 'Unknown User';
-                brk.deletedAt = new Date().toISOString();
+                brk.deletedBy = deleter;
+                brk.deletedAt = now;
+                brk.lastEditedBy = deleter;
+                brk.lastEditedAt = now;
                 brk.synced = false;
                 saveBreaks();
                 saveToCloud(true); // Immediate sync to feed file
@@ -5746,6 +5746,8 @@
                     b.isDeleted = true;
                     b.deletedBy = deleter;
                     b.deletedAt = now;
+                    b.lastEditedBy = deleter;
+                    b.lastEditedAt = now;
                     b.synced = false;
                 }
             });
@@ -5903,7 +5905,7 @@
             const weeks = {};
             
             savedBreaks.forEach(b => {
-                if (b.group === 'crops' || !b.createdAt) return;
+                if (b.group === 'crops' || !b.createdAt || b.isDeleted) return;
                 
                 const d = new Date(b.createdAt);
                 
