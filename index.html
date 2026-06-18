@@ -1576,13 +1576,13 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.31</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.32</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.31</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.32</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4249,11 +4249,21 @@
             // Save locally immediately
             localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
 
-            // Debounce cloud sync by 1.5 seconds to handle rapid successive edits
+            // Show blocking overlay to prevent other edits during sync
+            const overlay = document.getElementById('sync-blocking-overlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                const txt = document.getElementById('sync-overlay-text');
+                if (txt) txt.innerText = "Saving local changes (3s)...";
+            }
+
+            // Debounce cloud sync by 3.0 seconds
             if (syncTimeoutId) clearTimeout(syncTimeoutId);
             syncTimeoutId = setTimeout(() => {
+                const txt = document.getElementById('sync-overlay-text');
+                if (txt) txt.innerText = "Syncing changes to cloud...";
                 syncBreaksToCloud();
-            }, 1500);
+            }, 3000);
         }
 
         function syncBreaksToCloud() {
@@ -4265,6 +4275,14 @@
                 }
                 isSyncingBreaks = true;
                 
+                // Show blocking overlay (if not already shown)
+                const overlay = document.getElementById('sync-blocking-overlay');
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                    const txt = document.getElementById('sync-overlay-text');
+                    if (txt) txt.innerText = "Syncing changes to cloud...";
+                }
+
                 // Fetch the latest breaks from the cloud first to merge and prevent overwriting other users' data
                 console.log("Fetching latest cloud breaks for merging before write...");
                 fetch(GOOGLE_SCRIPT_URL + '?type=breaks&_t=' + Date.now(), { cache: 'no-store' })
@@ -4391,6 +4409,10 @@
                         syncNeedsReRun = false;
                         console.log("Executing queued saveBreaks re-run...");
                         syncBreaksToCloud();
+                    } else {
+                        // Hide blocking overlay when sync completely finishes
+                        const overlay = document.getElementById('sync-blocking-overlay');
+                        if (overlay) overlay.style.display = 'none';
                     }
                 });
             }
@@ -6472,6 +6494,29 @@
         <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>✕ Delete Point</button>
         <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">✓ Done</button>
         <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">✕ Cancel</button>
+    </div>
+
+    <!-- Sync Blocking Overlay -->
+    <style>
+    @keyframes sync-spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .sync-spinner {
+        border: 3px solid rgba(255,255,255,0.2);
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        animation: sync-spin 1s linear infinite;
+        margin: 0 auto 12px auto;
+    }
+    </style>
+    <div id="sync-blocking-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:99999; justify-content:center; align-items:center; color:white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; backdrop-filter:blur(3px);">
+        <div style="background:#1e272e; padding:25px; border-radius:12px; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.5); border: 1px solid #2f3640; width: 220px;">
+            <div class="sync-spinner"></div>
+            <div id="sync-overlay-text" style="font-weight:600; font-size:13px; color: #f5f6fa; letter-spacing: 0.5px;">Waiting 3s before sync...</div>
+        </div>
     </div>
 
 </body>
