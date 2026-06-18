@@ -1576,13 +1576,13 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.35</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.36</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.35</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.36</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1679,7 +1679,7 @@
             <div class="input-group" style="margin-bottom:15px;">
                 <label style="font-weight:bold; font-size:12px;">Break Display Days</label>
                 <div style="font-size:11px; color:#777; margin-bottom:4px;">How many days to show breaks for on the map and dashboard.</div>
-                <input type="number" id="inp-break-days" value="7" min="1" max="365" onchange="saveAudioSettings()">
+                <input type="number" id="inp-break-days" value="21" min="1" max="365" onchange="saveAudioSettings()">
             </div>
             
             <button onclick="switchDashboardMode('breaks')" style="background:#2ecc71; color:white; border:none; padding:10px 15px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">Done</button>
@@ -2612,11 +2612,19 @@
                             L.DomEvent.stopPropagation(e);
                             
                             const tip = layer.getTooltip();
-                            if (tip && tip.getElement()) {
-                                const isShown = tip.getElement().classList.contains('show-label');
-                                hideAllPaddockLabels();
-                                if (!isShown) {
-                                    tip.getElement().classList.add('show-label');
+                            if (tip) {
+                                if (!layer.isTooltipOpen()) {
+                                    layer.openTooltip();
+                                }
+                                const el = tip.getElement();
+                                if (el) {
+                                    hideAllPaddockLabels();
+                                    el.classList.add('show-label');
+                                    
+                                    if (layer._labelTimer) clearTimeout(layer._labelTimer);
+                                    layer._labelTimer = setTimeout(() => {
+                                        el.classList.remove('show-label');
+                                    }, 3000);
                                 }
                             }
                             
@@ -3119,7 +3127,7 @@
 
             // --- SUBTRACT CROP BREAK AREAS ---
             let totalCropBreakArea = 0;
-            const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
+            const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 21;
             const daysAgoTs = Date.now() - filterDays * 24 * 60 * 60 * 1000;
             savedBreaks.forEach(b => {
                 if (b.isCropBreak && b.createdAt && new Date(b.createdAt).getTime() >= daysAgoTs) {
@@ -4996,14 +5004,14 @@
         }
         function getBreakDisplayDays() {
             const val = parseInt(localStorage.getItem('break_display_days'));
-            return isNaN(val) ? 7 : val;
+            return isNaN(val) ? 21 : val;
         }
         function saveAudioSettings() {
             const startDist = parseFloat(document.getElementById('inp-audio-start').value) || 10;
             const ignoreDist = parseFloat(document.getElementById('inp-audio-ignore').value) || 2;
             const volPct = parseFloat(document.getElementById('inp-audio-vol').value) || 100;
             const solidDist = parseFloat(document.getElementById('inp-audio-solid').value) || 1;
-            const breakDays = parseInt(document.getElementById('inp-break-days').value) || 7;
+            const breakDays = parseInt(document.getElementById('inp-break-days').value) || 21;
             localStorage.setItem('audio_beep_start_m', startDist);
             localStorage.setItem('audio_fence_ignore_m', ignoreDist);
             localStorage.setItem('audio_volume_pct', volPct);
@@ -5433,7 +5441,7 @@
                 } else {
                     if (!brk.createdAt) return;
                     const ts = new Date(brk.createdAt).getTime();
-                    const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
+                    const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 21;
                     const daysAgo = Date.now() - filterDays * 24 * 60 * 60 * 1000;
                     if (ts < daysAgo) return;
                 }
@@ -5769,7 +5777,7 @@
                 return (db || 0) - (da || 0);
             });
 
-            const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 7;
+            const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 21;
             const visibleBreaks = savedBreaks.filter(b => {
                 if (!b.createdAt || b.isDeleted) return false;
                 const ts = new Date(b.createdAt).getTime();
