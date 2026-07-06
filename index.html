@@ -3097,22 +3097,8 @@
             document.getElementById('vehicle-maintenance-view').style.display = (mode === 'vehicle_maintenance') ? 'block' : 'none';
             document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
 
-            if (mode === 'breaks') {
-                loadBreaks();
-            }
-            if (mode === 'health_safety') {
-                loadHSTables();
-            } else {
-                if (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) cancelHazardDrawing();
-            }
-            if (mode === 'roster') {
-                fetchRoster(currentRosterSheet);
-            }
-            if (mode === 'vehicle_maintenance') {
-                loadVehicleMaintenance();
-            }
-            if (typeof renderHazardsOnMap === 'function') {
-                renderHazardsOnMap();
+            if (mode !== 'health_safety' && typeof isDrawingHazard !== 'undefined' && isDrawingHazard) {
+                cancelHazardDrawing();
             }
 
             // Map vs Overlay Logic
@@ -3192,7 +3178,28 @@
                         sidebar.style.height = '100%';
                     }
                 }
-                setTimeout(() => map.invalidateSize(), 50);
+                setTimeout(() => {
+                    map.invalidateSize();
+                    
+                    if (geoLayer) {
+                        map.removeLayer(geoLayer);
+                        geoLayer.addTo(map);
+                    }
+                    if (typeof customPaddockLayer !== 'undefined' && customPaddockLayer && map.hasLayer(customPaddockLayer)) {
+                        map.removeLayer(customPaddockLayer);
+                        customPaddockLayer.addTo(map);
+                    }
+                    if (typeof customPaddockLabelLayer !== 'undefined' && customPaddockLabelLayer && map.hasLayer(customPaddockLabelLayer)) {
+                        map.removeLayer(customPaddockLabelLayer);
+                        customPaddockLabelLayer.addTo(map);
+                    }
+
+                    if (mode === 'breaks') loadBreaks();
+                    if (mode === 'health_safety') loadHSTables();
+                    if (mode === 'roster') fetchRoster(currentRosterSheet);
+                    if (mode === 'vehicle_maintenance') loadVehicleMaintenance();
+                    if (typeof renderHazardsOnMap === 'function') renderHazardsOnMap();
+                }, 50);
 
                 if (mode === 'manual') {
                     if (ndviLayer) map.removeLayer(ndviLayer);
