@@ -1576,7 +1576,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.49</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.50</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1584,7 +1584,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.49</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.50</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2967,13 +2967,22 @@
                 }
                 return;
             } else {
-                document.getElementById('map').style.display = 'block';
+                document.getElementById('map').style.display = (mode === 'roster') ? 'none' : 'block';
                 document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
                 
                 const sidebar = document.getElementById('sidebar');
+                if (mode === 'roster') {
+                    if (window.innerWidth > 768) {
+                        sidebar.style.setProperty('width', '100vw', 'important');
+                    }
+                } else {
+                    if (window.innerWidth > 768) {
+                        sidebar.style.removeProperty('width');
+                    }
+                }
                 const isMinimized = sidebar.classList.contains('minimized');
                 
                 if (window.innerWidth <= 768) {

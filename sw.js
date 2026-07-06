@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wn-farm-v1.0.49';
+const CACHE_NAME = 'wn-farm-v1.0.50';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
