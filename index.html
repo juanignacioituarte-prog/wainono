@@ -1580,6 +1580,7 @@
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('roster'); toggleSettingsMenu();" style="font-weight: bold; color: #3498db;">📅 Roster</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
@@ -1930,6 +1931,31 @@
                 2. Copy code from <code>health_safety_apps_script.js</code> into Extensions > Apps Script.<br>
                 3. Deploy as a web app for "Anyone".<br>
                 4. Set the script URL in <code>index.html</code>.
+            </div>
+        </div>
+
+        <!-- Roster Panel -->
+        <div id="roster-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto; flex-direction:column; box-sizing:border-box;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">
+                <h3 style="margin-top:0; margin-bottom:0; color:#2980b9; display:flex; align-items:center; gap:6px;">
+                    <span>📅 Roster Schedule</span>
+                </h3>
+                <button onclick="fetchRoster()" style="background:#3498db; border:none; padding:4px 8px; border-radius:4px; color:white; font-size:10px; font-weight:bold; cursor:pointer;">Refresh</button>
+            </div>
+            
+            <div id="roster-msg" style="font-size:11px; color:#7f8c8d; font-weight:bold; margin-bottom:10px; text-align:center;">Loading roster...</div>
+            
+            <!-- Setup Guide Fallback for Roster -->
+            <div id="roster-setup-guide" style="display:none; padding:12px; background:#fcf3cf; border:1px solid #f9e79f; border-radius:8px; font-size:11px; color:#7e5109; line-height:1.4; margin-bottom:15px;">
+                <b>Roster Setup Required:</b><br>
+                1. Make sure your H&S script has the <code>get_roster</code> endpoint code.<br>
+                2. Verify that the Roster spreadsheet ID (<code>13WH2T-3uzAcOw4hajLUaGQSNr2MWY1Ocwq2BiAe0dZQ</code>) is shared/accessible to your Google account.<br>
+                3. If the script cannot read the sheet, it will show this guide.
+            </div>
+
+            <!-- Scrollable container for the roster grid table -->
+            <div id="roster-table-container" style="width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #eee; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:20px;">
+                <!-- Roster table will be generated dynamically -->
             </div>
         </div>
     </div>
@@ -2883,6 +2909,7 @@
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
             document.getElementById('health-safety-view').style.display = (mode === 'health_safety') ? 'block' : 'none';
+            document.getElementById('roster-view').style.display = (mode === 'roster') ? 'block' : 'none';
             document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
 
             if (mode === 'breaks') {
@@ -2892,6 +2919,9 @@
                 loadHSTables();
             } else {
                 if (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) cancelHazardDrawing();
+            }
+            if (mode === 'roster') {
+                fetchRoster();
             }
             if (typeof renderHazardsOnMap === 'function') {
                 renderHazardsOnMap();
@@ -2937,7 +2967,7 @@
                 return;
             } else {
                 document.getElementById('map').style.display = 'block';
-                document.getElementById('list').style.display = (mode === 'health_safety') ? 'none' : 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
@@ -8027,8 +8057,91 @@
                 loadAuthorizedEmails();
             } catch (e) { alert('Failed to remove email'); }
         }
-            // Register Service Worker for PWA with auto-update on launch and resume
-            if ('serviceWorker' in navigator) {
+
+        /* --- ROSTER MODULE --- */
+        function fetchRoster() {
+            if (!HS_GOOGLE_SCRIPT_URL || HS_GOOGLE_SCRIPT_URL.length < 5) {
+                document.getElementById('roster-msg').innerText = "Roster URL not configured.";
+                document.getElementById('roster-setup-guide').style.display = 'block';
+                return;
+            }
+            
+            document.getElementById('roster-msg').innerText = "Loading roster from Google Sheets...";
+            document.getElementById('roster-setup-guide').style.display = 'none';
+            
+            fetch(HS_GOOGLE_SCRIPT_URL + '?type=get_roster&_t=' + Date.now(), { cache: 'no-store' })
+            .then(res => {
+                if (res.ok) return res.json().catch(() => null);
+                throw new Error("Network response error");
+            })
+            .then(data => {
+                if (data && data.success) {
+                    document.getElementById('roster-msg').innerText = "Updated just now";
+                    renderRosterGrid(data.values, data.backgrounds);
+                } else {
+                    document.getElementById('roster-msg').innerText = "Error loading roster data.";
+                    document.getElementById('roster-setup-guide').style.display = 'block';
+                    console.error("Roster error:", data ? data.error : "empty response");
+                }
+            })
+            .catch(err => {
+                console.error("Failed to load roster:", err);
+                document.getElementById('roster-msg').innerText = "Connection failed: showing offline instructions";
+                document.getElementById('roster-setup-guide').style.display = 'block';
+            });
+        }
+
+        function renderRosterGrid(values, backgrounds) {
+            const container = document.getElementById('roster-table-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            if (!values || values.length === 0) {
+                container.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:15px;">Roster spreadsheet is empty.</div>';
+                return;
+            }
+            
+            const table = document.createElement('table');
+            table.style.cssText = "width:100%; border-collapse:collapse; font-size:12px; text-align:left; background:white; min-width:600px;";
+            
+            values.forEach((row, rIdx) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = "1px solid #eee";
+                
+                // Add alternating row backgrounds
+                if (rIdx > 0) {
+                    tr.style.backgroundColor = rIdx % 2 === 0 ? "#fcfcfc" : "#ffffff";
+                }
+                
+                row.forEach((cellVal, cIdx) => {
+                    const cell = document.createElement(rIdx === 0 ? 'th' : 'td');
+                    
+                    // Style cell contents
+                    cell.innerText = cellVal || '';
+                    cell.style.cssText = "padding:8px 10px; border-right:1px solid #f0f0f0; white-space:nowrap;";
+                    
+                    if (rIdx === 0) {
+                        cell.style.cssText += "background:#f4f7f6; font-weight:bold; color:#2c3e50; border-bottom:2px solid #ddd; position:sticky; top:0; z-index:10;";
+                    } else {
+                        // Apply background color from backgrounds matrix if exists
+                        if (backgrounds && backgrounds[rIdx] && backgrounds[rIdx][cIdx]) {
+                            const bgCol = backgrounds[rIdx][cIdx];
+                            // Only apply color if it's not default white/transparent
+                            if (bgCol && bgCol !== '#ffffff' && bgCol !== '#fff' && bgCol !== 'transparent') {
+                                cell.style.backgroundColor = bgCol;
+                                cell.style.boxShadow = "inset 0 0 0 1px rgba(0,0,0,0.05)";
+                            }
+                        }
+                    }
+                    tr.appendChild(cell);
+                });
+                table.appendChild(tr);
+            });
+            container.appendChild(table);
+        }
+
+        // Register Service Worker for PWA with auto-update on launch and resume
+        if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('sw.js')
                     .then(reg => {
                         // Check for updates on load
