@@ -1576,7 +1576,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.57</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.58</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1585,7 +1585,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.57</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.58</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -8682,7 +8682,7 @@
                                 <button onclick="openVMServiceModal('${v.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#e67e22; color:white; cursor:pointer;">🔧 Check/Service</button>
                                 ${isOOS
                                     ? `<button onclick="restoreVehicle('${v.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#2ecc71; color:white; cursor:pointer;">✅ Restore</button>`
-                                    : `<button onclick="openVMOOSModal('${v.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#f5f5f5; color:#e74c3c; cursor:pointer;">🚫 Out of Service</button>`
+                                    : `<button onclick="openVMOOSModal('${v.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#f5f5f5; color:#e74c3c; cursor:pointer;">🚫 Put Out of Service</button>`
                                 }
                                 <button onclick="deleteVehicle('${v.id}')" style="padding:4px 8px; font-size:10px; border-radius:4px; border:none; background:#f5f5f5; color:#999; cursor:pointer;">Delete</button>
                             </div>
