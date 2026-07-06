@@ -1745,11 +1745,12 @@
             </div>
 
             <!-- Tab Navigation -->
-            <div style="display:flex; background:#eaeaea; border-radius:8px; padding:3px; margin-bottom:15px; gap:2px;">
-                <button id="tab-hs-staff" onclick="setHSTab('staff')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:white; color:#333; transition: all 0.2s;">Staff</button>
-                <button id="tab-hs-hazards" onclick="setHSTab('hazards')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s;">Hazards</button>
-                <button id="tab-hs-meetings" onclick="setHSTab('meetings')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s;">Meetings</button>
-                <button id="tab-hs-interactions" onclick="setHSTab('interactions')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s;">Observations</button>
+            <div style="display:flex; background:#eaeaea; border-radius:8px; padding:3px; margin-bottom:15px; gap:2px; overflow-x:auto;">
+                <button id="tab-hs-staff" onclick="setHSTab('staff')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:white; color:#333; transition: all 0.2s; white-space:nowrap;">Staff</button>
+                <button id="tab-hs-hazards" onclick="setHSTab('hazards')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s; white-space:nowrap;">Hazards</button>
+                <button id="tab-hs-meetings" onclick="setHSTab('meetings')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s; white-space:nowrap;">Meetings</button>
+                <button id="tab-hs-interactions" onclick="setHSTab('interactions')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s; white-space:nowrap;">Observations</button>
+                <button id="tab-hs-incidents" onclick="setHSTab('incidents')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s; white-space:nowrap;">Incidents</button>
             </div>
 
             <!-- Staff Tab Contents -->
@@ -1923,6 +1924,75 @@
                     <!-- Observations logs -->
                 </div>
             </div>
+
+            <!-- Incidents Tab Contents -->
+            <div id="hs-tab-content-incidents" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:bold; font-size:13px; color:#2c3e50;">Incident Reports</span>
+                    <button onclick="toggleAddIncidentForm()" style="background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">+ Log Incident</button>
+                </div>
+
+                <!-- Add Incident Form -->
+                <div id="hs-add-incident-form" style="display:none; background:white; padding:12px; border-radius:8px; border:1px solid #ddd; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Date of Incident</label>
+                        <input type="date" id="hs-incident-date" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Time of Incident</label>
+                        <input type="time" id="hs-incident-time" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Person Involved / Reporter</label>
+                        <select id="hs-incident-reporter" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <!-- Populated with staff -->
+                        </select>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Type of Incident</label>
+                        <select id="hs-incident-type" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <option value="Injury / Illness">Injury / Illness</option>
+                            <option value="Property / Equipment Damage">Property / Equipment Damage</option>
+                            <option value="Environmental Incident">Environmental Incident</option>
+                            <option value="Vehicle / ATV Accident">Vehicle / ATV Accident</option>
+                            <option value="Near Miss">Near Miss</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Severity</label>
+                        <select id="hs-incident-severity" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <textarea id="hs-incident-description" placeholder="Description of what happened..." style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box; height:50px;"></textarea>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Treatment Administered</label>
+                        <select id="hs-incident-treatment" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <option value="None">None</option>
+                            <option value="First Aid on Site">First Aid on Site</option>
+                            <option value="Doctor / Medical Centre">Doctor / Medical Centre</option>
+                            <option value="Hospitalization">Hospitalization</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <textarea id="hs-incident-action" placeholder="Preventative action taken or recommended..." style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box; height:50px;"></textarea>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="toggleAddIncidentForm(false)" style="flex:1; padding:6px; background:#eee; border:none; border-radius:4px; font-size:11px; cursor:pointer;">Cancel</button>
+                        <button onclick="saveSafetyIncident()" style="flex:2; padding:6px; background:#e74c3c; color:white; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Save Report</button>
+                    </div>
+                </div>
+
+                <div id="hs-incidents-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Incidents logs -->
+                </div>
+            </div>
             
             <!-- Setup Guide (collapsible/visible only if sync url missing) -->
             <div id="hs-setup-guide" style="display:none; margin-top:20px; padding:10px; background:#fcf3cf; border:1px solid #f9e79f; border-radius:6px; font-size:11px; color:#7e5109; line-height:1.4;">
@@ -2017,6 +2087,7 @@
         let hsHazards = JSON.parse(localStorage.getItem('hs_hazards')) || [];
         let hsMeetings = JSON.parse(localStorage.getItem('hs_meetings')) || [];
         let hsInteractions = JSON.parse(localStorage.getItem('hs_interactions')) || [];
+        let hsIncidents = JSON.parse(localStorage.getItem('hs_incidents')) || [];
         let currentHSTab = 'staff';
         let isDrawingHazard = false;
         let hazardDrawingType = 'point'; // 'point' or 'area'
@@ -6858,7 +6929,7 @@
             currentHSTab = tab;
             
             // Toggle Tab Buttons
-            ['staff', 'hazards', 'meetings', 'interactions'].forEach(t => {
+            ['staff', 'hazards', 'meetings', 'interactions', 'incidents'].forEach(t => {
                 const btn = document.getElementById(`tab-hs-${t}`);
                 const panel = document.getElementById(`hs-tab-content-${t}`);
                 if (btn && panel) {
@@ -6868,6 +6939,10 @@
                     panel.style.display = isActive ? 'block' : 'none';
                 }
             });
+
+            if (tab === 'incidents') {
+                populateIncidentStaffSelect();
+            }
 
             // Clean up drawing if changing tabs
             if (tab !== 'hazards' && isDrawingHazard) {
@@ -6880,6 +6955,7 @@
             renderHazardList();
             renderMeetingsList();
             renderInteractionsList();
+            renderIncidentsList();
             syncHSFromCloud();
         }
 
@@ -7976,6 +8052,136 @@
             });
         }
 
+        /* --- INCIDENT REPORTS LOG --- */
+        function toggleAddIncidentForm(show) {
+            const form = document.getElementById('hs-add-incident-form');
+            if (!form) return;
+            if (show === undefined) {
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            } else {
+                form.style.display = show ? 'block' : 'none';
+            }
+            
+            if (form.style.display === 'block') {
+                document.getElementById('hs-incident-date').value = new Date().toISOString().split('T')[0];
+                const now = new Date();
+                const timeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                document.getElementById('hs-incident-time').value = timeString;
+                document.getElementById('hs-incident-description').value = '';
+                document.getElementById('hs-incident-action').value = '';
+                
+                populateIncidentStaffSelect();
+            }
+        }
+
+        function populateIncidentStaffSelect() {
+            const reporterSel = document.getElementById('hs-incident-reporter');
+            if (!reporterSel) return;
+            
+            reporterSel.innerHTML = '<option value="">-- Select Person --</option>';
+            
+            const activeStaff = hsStaff.filter(s => s.status === 'active');
+            const loggedInName = localStorage.getItem('auth_name') || '';
+            
+            if (loggedInName) {
+                const opt = document.createElement('option');
+                opt.value = loggedInName;
+                opt.innerText = `${loggedInName} (Current User)`;
+                opt.selected = true;
+                reporterSel.appendChild(opt);
+            }
+            
+            activeStaff.forEach(s => {
+                if (s.name !== loggedInName) {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.innerText = s.name;
+                    reporterSel.appendChild(opt);
+                }
+            });
+        }
+
+        function saveSafetyIncident() {
+            const date = document.getElementById('hs-incident-date').value;
+            const time = document.getElementById('hs-incident-time').value;
+            const reporter = document.getElementById('hs-incident-reporter').value;
+            const type = document.getElementById('hs-incident-type').value;
+            const severity = document.getElementById('hs-incident-severity').value;
+            const description = document.getElementById('hs-incident-description').value.trim();
+            const treatment = document.getElementById('hs-incident-treatment').value;
+            const action = document.getElementById('hs-incident-action').value.trim();
+            
+            if (!reporter) return alert('Please select the reporter / person involved.');
+            if (!description) return alert('Please enter incident details/description.');
+            
+            const newIncident = {
+                id: 'inc_' + Date.now(),
+                date: date || new Date().toISOString().split('T')[0],
+                time: time || '00:00',
+                reporter: reporter,
+                type: type,
+                severity: severity,
+                description: description,
+                treatment: treatment,
+                actionTaken: action || ''
+            };
+            
+            hsIncidents.push(newIncident);
+            localStorage.setItem('hs_incidents', JSON.stringify(hsIncidents));
+            
+            toggleAddIncidentForm(false);
+            renderIncidentsList();
+            saveHSToCloud();
+        }
+
+        function deleteIncident(id) {
+            if (!confirm('Are you sure you want to delete this incident report?')) return;
+            hsIncidents = hsIncidents.filter(item => item.id !== id);
+            localStorage.setItem('hs_incidents', JSON.stringify(hsIncidents));
+            renderIncidentsList();
+            saveHSToCloud();
+        }
+
+        function renderIncidentsList() {
+            const listDiv = document.getElementById('hs-incidents-list');
+            if (!listDiv) return;
+            listDiv.innerHTML = '';
+            
+            if (hsIncidents.length === 0) {
+                listDiv.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:15px; background:white; border-radius:6px; border:1px solid #eee;">No logged incident reports.</div>';
+                return;
+            }
+            
+            const sorted = [...hsIncidents].sort((a,b) => new Date(b.date + 'T' + b.time) - new Date(a.date + 'T' + a.time));
+            
+            sorted.forEach(item => {
+                const card = document.createElement('div');
+                let borderCol = '#2ecc71'; // Low severity (green)
+                if (item.severity === 'Medium') borderCol = '#f1c40f'; // Yellow
+                else if (item.severity === 'High') borderCol = '#e67e22'; // Orange
+                else if (item.severity === 'Critical') borderCol = '#e74c3c'; // Red
+                
+                card.style.cssText = `background:white; padding:12px; border-radius:8px; border:1px solid #eee; border-left:4px solid ${borderCol}; box-shadow:0 1px 3px rgba(0,0,0,0.05); position:relative;`;
+                
+                const formattedDate = new Date(item.date).toLocaleDateString('en-NZ');
+                
+                card.innerHTML = `
+                    <div style="font-size:10px; color:#7f8c8d; font-weight:bold; margin-bottom:4px;">INCIDENT REPORT • ${formattedDate} ${item.time}</div>
+                    <div style="font-weight:bold; color:#2c3e50; font-size:13px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>${item.type.toUpperCase()}</span>
+                        <span style="font-size:10px; padding:2px 6px; border-radius:10px; background:${borderCol}; color:${item.severity === 'Medium' ? '#333' : 'white'}; font-weight:bold;">${item.severity}</span>
+                    </div>
+                    <div style="font-size:11px; color:#555; margin-bottom:4px;"><b>Reporter/Involved:</b> ${item.reporter} • <b>Treatment:</b> ${item.treatment}</div>
+                    <div style="font-size:11px; color:#666; margin-bottom:6px; line-height:1.35; white-space:pre-wrap;">${item.description}</div>
+                    ${item.actionTaken ? `<div style="font-size:11px; background:#faf0ee; border-left:2px solid #e74c3c; padding:4px 8px; color:#c0392b; margin-top:4px;">👉 <b>Preventative Action:</b> ${item.actionTaken}</div>` : ''}
+                    <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                        <button onclick="deleteIncident('${item.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#f5f5f5; color:#e74c3c; cursor:pointer;">Delete</button>
+                    </div>
+                `;
+                listDiv.appendChild(card);
+            });
+        }
+
         /* --- SYNC & CLOUD SPREADSHEET SYNC LOGIC --- */
         let hsSyncTimeoutId = null;
 
@@ -7997,7 +8203,8 @@
                     staff: hsStaff,
                     hazards: hsHazards,
                     meetings: hsMeetings,
-                    interactions: hsInteractions
+                    interactions: hsInteractions,
+                    incidents: hsIncidents
                 };
                 
                 fetch(HS_GOOGLE_SCRIPT_URL, {
@@ -8051,6 +8258,10 @@
                     if (data.interactions && Array.isArray(data.interactions)) {
                         hsInteractions = data.interactions;
                         localStorage.setItem('hs_interactions', JSON.stringify(hsInteractions));
+                    }
+                    if (data.incidents && Array.isArray(data.incidents)) {
+                        hsIncidents = data.incidents;
+                        localStorage.setItem('hs_incidents', JSON.stringify(hsIncidents));
                     }
                     
                     document.getElementById('hs-sync-msg').innerText = "Updated from Cloud!";
