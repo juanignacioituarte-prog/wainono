@@ -7854,6 +7854,28 @@
             });
         }
 
+        function zoomToHazard(id) {
+            const h = hsHazards.find(haz => haz.id === id);
+            if (!h) return;
+            
+            switchDashboardMode('manual');
+            
+            if (h.type === 'point') {
+                map.setView([h.coordinates.lat, h.coordinates.lng], 17);
+            } else if (h.type === 'area' && h.coordinates.length > 0) {
+                const bounds = L.latLngBounds(h.coordinates.map(c => [c.lat, c.lng]));
+                map.fitBounds(bounds);
+            }
+            
+            if (hazardLayers.has(id)) {
+                const layer = hazardLayers.get(id);
+                if (layer.openPopup) layer.openPopup();
+                else if (layer.getBounds) {
+                    layer.openPopup(layer.getBounds().getCenter());
+                }
+            }
+        }
+
         function renderHazardList() {
             const listDiv = document.getElementById('hs-hazard-list');
             listDiv.innerHTML = '';
@@ -7885,6 +7907,7 @@
                     <div style="display:flex; gap:6px;">
                         <button onclick="resolveHazard('${h.id}')" style="flex:2; padding:5px; background:#2ecc71; border:none; color:white; font-weight:bold; border-radius:4px; font-size:11px; cursor:pointer;">✓ Resolve</button>
                         <button onclick="startEditHazard('${h.id}')" style="flex:2; padding:5px; background:#3498db; border:none; color:white; font-weight:bold; border-radius:4px; font-size:11px; cursor:pointer;">✏️ Edit</button>
+                        <button onclick="zoomToHazard('${h.id}')" style="flex:2; padding:5px; background:#9b59b6; border:none; color:white; font-weight:bold; border-radius:4px; font-size:11px; cursor:pointer;">📍 Map</button>
                         <button onclick="deleteHazard('${h.id}')" style="flex:1; padding:5px; background:#f5f5f5; border:1px solid #ddd; color:#e74c3c; font-weight:bold; border-radius:4px; font-size:11px; cursor:pointer;">Delete</button>
                     </div>
                 `;
