@@ -1576,7 +1576,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.52</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.53</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1584,7 +1584,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.52</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.53</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -8299,7 +8299,7 @@
 
         /* --- ROSTER MODULE --- */
         let rosterSheets = [];
-        let currentRosterSheet = "";
+        let currentRosterSheet = localStorage.getItem('roster_selected_sheet') || "";
 
         function onRosterSheetChange() {
             const select = document.getElementById('roster-sheet-select');
@@ -8318,9 +8318,10 @@
             document.getElementById('roster-msg').innerText = "Loading roster from Google Sheets...";
             document.getElementById('roster-setup-guide').style.display = 'none';
             
+            const targetSheet = sheetName || currentRosterSheet;
             let url = ROSTER_GOOGLE_SCRIPT_URL + '?type=get_roster&_t=' + Date.now();
-            if (sheetName) {
-                url += '&sheetName=' + encodeURIComponent(sheetName);
+            if (targetSheet) {
+                url += '&sheetName=' + encodeURIComponent(targetSheet);
             }
             
             fetch(url, { cache: 'no-store' })
@@ -8335,7 +8336,10 @@
                     // Update sheet selector dropdown
                     if (data.sheets && Array.isArray(data.sheets)) {
                         rosterSheets = data.sheets;
-                        currentRosterSheet = data.currentSheet || sheetName || "";
+                        currentRosterSheet = data.currentSheet || targetSheet || "";
+                        if (currentRosterSheet) {
+                            localStorage.setItem('roster_selected_sheet', currentRosterSheet);
+                        }
                         
                         const select = document.getElementById('roster-sheet-select');
                         if (select) {
