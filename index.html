@@ -6780,8 +6780,6 @@
             } catch (e) { alert('Failed to add email'); }
         }
 
-        }
-
         /* ===================== HEALTH & SAFETY FUNCTIONS ===================== */
         function setHSTab(tab) {
             currentHSTab = tab;
@@ -6975,7 +6973,7 @@
         }
 
         /* --- HAZARD MANAGEMENT & DRAWING --- */
-        let drawingVertices = [];
+        let hazardDrawingVertices = [];
         let tempMarkers = [];
         let tempPolyline = null;
         let tempPolygon = null;
@@ -6986,7 +6984,7 @@
             
             isDrawingHazard = true;
             hazardDrawingType = type;
-            drawingVertices = [];
+            hazardDrawingVertices = [];
             
             document.getElementById('hazard-toolbar').style.display = 'flex';
             document.getElementById('hazard-vertex-count').innerText = type === 'point' ? 'Click on map to drop hazard pin' : 'Click on map to draw hazard area (0 points)';
@@ -7003,7 +7001,7 @@
 
         function addHazardVertex(latlng) {
             if (hazardDrawingType === 'point') {
-                drawingVertices = [latlng];
+                hazardDrawingVertices = [latlng];
                 
                 // Clear any previous point
                 tempMarkers.forEach(m => map.removeLayer(m));
@@ -7021,7 +7019,7 @@
                 
                 finishHazard();
             } else {
-                drawingVertices.push(latlng);
+                hazardDrawingVertices.push(latlng);
                 
                 // Draw vertex marker
                 const m = L.circleMarker(latlng, { radius: 5, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1 }).addTo(map);
@@ -7029,8 +7027,8 @@
                 
                 updateHazardDrawingOnMap();
                 
-                document.getElementById('hazard-vertex-count').innerText = `Drawing area (${drawingVertices.length} points)`;
-                document.getElementById('btn-finish-hazard').disabled = drawingVertices.length < 3;
+                document.getElementById('hazard-vertex-count').innerText = `Drawing area (${hazardDrawingVertices.length} points)`;
+                document.getElementById('btn-finish-hazard').disabled = hazardDrawingVertices.length < 3;
             }
         }
 
@@ -7038,24 +7036,24 @@
             if (tempPolyline) map.removeLayer(tempPolyline);
             if (tempPolygon) map.removeLayer(tempPolygon);
             
-            if (drawingVertices.length >= 3) {
-                tempPolygon = L.polygon(drawingVertices, { color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 0.2, weight: 2 }).addTo(map);
-            } else if (drawingVertices.length >= 2) {
-                tempPolyline = L.polyline(drawingVertices, { color: '#e74c3c', weight: 2 }).addTo(map);
+            if (hazardDrawingVertices.length >= 3) {
+                tempPolygon = L.polygon(hazardDrawingVertices, { color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 0.2, weight: 2 }).addTo(map);
+            } else if (hazardDrawingVertices.length >= 2) {
+                tempPolyline = L.polyline(hazardDrawingVertices, { color: '#e74c3c', weight: 2 }).addTo(map);
             }
         }
 
         function undoLastHazardVertex() {
-            if (drawingVertices.length === 0) return;
-            drawingVertices.pop();
+            if (hazardDrawingVertices.length === 0) return;
+            hazardDrawingVertices.pop();
             
             const lastMarker = tempMarkers.pop();
             if (lastMarker) map.removeLayer(lastMarker);
             
             updateHazardDrawingOnMap();
             
-            document.getElementById('hazard-vertex-count').innerText = `Drawing area (${drawingVertices.length} points)`;
-            document.getElementById('btn-finish-hazard').disabled = drawingVertices.length < 3;
+            document.getElementById('hazard-vertex-count').innerText = `Drawing area (${hazardDrawingVertices.length} points)`;
+            document.getElementById('btn-finish-hazard').disabled = hazardDrawingVertices.length < 3;
         }
 
         function cancelHazardDrawing() {
@@ -7071,7 +7069,7 @@
             if (tempPolygon) map.removeLayer(tempPolygon);
             tempPolyline = null;
             tempPolygon = null;
-            drawingVertices = [];
+            hazardDrawingVertices = [];
             
             renderHazardsOnMap();
         }
@@ -7080,7 +7078,7 @@
             map.off('click', handleHazardMapClick);
             map.getContainer().style.cursor = '';
             
-            if (hazardDrawingType === 'area' && drawingVertices.length < 3) {
+            if (hazardDrawingType === 'area' && hazardDrawingVertices.length < 3) {
                 return alert('Please draw at least 3 points to complete a hazard area.');
             }
             openFinishHazardModal();
@@ -7183,7 +7181,7 @@
                     severity: severity,
                     status: 'active',
                     type: hazardDrawingType,
-                    coordinates: hazardDrawingType === 'point' ? drawingVertices[0] : [...drawingVertices],
+                    coordinates: hazardDrawingType === 'point' ? hazardDrawingVertices[0] : [...hazardDrawingVertices],
                     reportedBy: reporter,
                     reportedAt: new Date().toISOString()
                 };
