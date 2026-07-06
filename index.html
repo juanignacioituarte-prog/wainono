@@ -1576,7 +1576,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.51</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.52</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1584,7 +1584,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.51</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.52</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2010,7 +2010,14 @@
                 <h3 style="margin-top:0; margin-bottom:0; color:#2980b9; display:flex; align-items:center; gap:6px;">
                     <span>📅 Roster Schedule</span>
                 </h3>
-                <button onclick="fetchRoster()" style="background:#3498db; border:none; padding:4px 8px; border-radius:4px; color:white; font-size:10px; font-weight:bold; cursor:pointer;">Refresh</button>
+                <button onclick="fetchRoster(currentRosterSheet)" style="background:#3498db; border:none; padding:4px 8px; border-radius:4px; color:white; font-size:10px; font-weight:bold; cursor:pointer;">Refresh</button>
+            </div>
+            
+            <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;" id="roster-sheet-selector-container">
+                <label style="font-size:11px; font-weight:bold; color:#555; white-space:nowrap;">Select Month:</label>
+                <select id="roster-sheet-select" onchange="onRosterSheetChange()" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:white;">
+                    <option value="">-- Active Sheet --</option>
+                </select>
             </div>
             
             <div id="roster-msg" style="font-size:11px; color:#7f8c8d; font-weight:bold; margin-bottom:10px; text-align:center;">Loading roster...</div>
@@ -2993,7 +3000,7 @@
                 if (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) cancelHazardDrawing();
             }
             if (mode === 'roster') {
-                fetchRoster();
+                fetchRoster(currentRosterSheet);
             }
             if (typeof renderHazardsOnMap === 'function') {
                 renderHazardsOnMap();
@@ -8291,7 +8298,17 @@
         }
 
         /* --- ROSTER MODULE --- */
-        function fetchRoster() {
+        let rosterSheets = [];
+        let currentRosterSheet = "";
+
+        function onRosterSheetChange() {
+            const select = document.getElementById('roster-sheet-select');
+            if (select && select.value) {
+                fetchRoster(select.value);
+            }
+        }
+
+        function fetchRoster(sheetName) {
             if (!ROSTER_GOOGLE_SCRIPT_URL || ROSTER_GOOGLE_SCRIPT_URL.length < 5) {
                 document.getElementById('roster-msg').innerText = "Roster URL not configured.";
                 document.getElementById('roster-setup-guide').style.display = 'block';
@@ -8301,7 +8318,12 @@
             document.getElementById('roster-msg').innerText = "Loading roster from Google Sheets...";
             document.getElementById('roster-setup-guide').style.display = 'none';
             
-            fetch(ROSTER_GOOGLE_SCRIPT_URL + '?type=get_roster&_t=' + Date.now(), { cache: 'no-store' })
+            let url = ROSTER_GOOGLE_SCRIPT_URL + '?type=get_roster&_t=' + Date.now();
+            if (sheetName) {
+                url += '&sheetName=' + encodeURIComponent(sheetName);
+            }
+            
+            fetch(url, { cache: 'no-store' })
             .then(res => {
                 if (res.ok) return res.json().catch(() => null);
                 throw new Error("Network response error");
@@ -8309,6 +8331,27 @@
             .then(data => {
                 if (data && data.success) {
                     document.getElementById('roster-msg').innerText = "Updated just now";
+                    
+                    // Update sheet selector dropdown
+                    if (data.sheets && Array.isArray(data.sheets)) {
+                        rosterSheets = data.sheets;
+                        currentRosterSheet = data.currentSheet || sheetName || "";
+                        
+                        const select = document.getElementById('roster-sheet-select');
+                        if (select) {
+                            select.innerHTML = '';
+                            rosterSheets.forEach(s => {
+                                const opt = document.createElement('option');
+                                opt.value = s;
+                                opt.innerText = s;
+                                if (s === currentRosterSheet) {
+                                    opt.selected = true;
+                                }
+                                select.appendChild(opt);
+                            });
+                        }
+                    }
+                    
                     renderRosterGrid(data.values, data.backgrounds);
                 } else {
                     document.getElementById('roster-msg').innerText = "Error loading roster data.";
