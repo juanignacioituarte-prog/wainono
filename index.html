@@ -1579,7 +1579,7 @@
                 <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.36</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
-                    <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">❤️ Health & Safety</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
@@ -2862,6 +2862,7 @@
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
             document.getElementById('health-safety-view').style.display = (mode === 'health_safety') ? 'block' : 'none';
+            document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
 
             if (mode === 'breaks') {
                 loadBreaks();
@@ -2915,7 +2916,7 @@
                 return;
             } else {
                 document.getElementById('map').style.display = 'block';
-                document.getElementById('list').style.display = 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
