@@ -7658,7 +7658,13 @@
             saveHSToCloud();
         }
 
+        function canEditHS() {
+            const n = (localStorage.getItem('auth_name') || "").toLowerCase();
+            return n.includes('juan') || n.includes('adrian') || n === 'admin';
+        }
+
         function resolveHazard(id) {
+            if (!canEditHS()) return alert("Only Juan or Adrian can resolve hazards.");
             const h = hsHazards.find(haz => haz.id === id);
             if (h) {
                 h.status = 'resolved';
@@ -7671,6 +7677,7 @@
         }
 
         function deleteHazard(id) {
+            if (!canEditHS()) return alert("Only Juan or Adrian can delete hazards.");
             if (!confirm('Are you sure you want to delete this hazard from the log?')) return;
             hsHazards = hsHazards.filter(haz => haz.id !== id);
             localStorage.setItem('hs_hazards', JSON.stringify(hsHazards));
@@ -7680,6 +7687,7 @@
         }
 
         function startEditHazard(hazardId) {
+            if (!canEditHS()) return alert("Only Juan or Adrian can edit hazards.");
             if (isDrawingHazard || editingHazardId) return;
             const h = hsHazards.find(haz => haz.id === hazardId);
             if (!h) return;
@@ -7999,6 +8007,7 @@
         }
 
         function deleteMeeting(id) {
+            if (!canEditHS()) return alert("Only Juan or Adrian can delete meetings.");
             if (!confirm('Are you sure you want to delete this meeting log?')) return;
             hsMeetings = hsMeetings.filter(m => m.id !== id);
             localStorage.setItem('hs_meetings', JSON.stringify(hsMeetings));
@@ -8118,6 +8127,7 @@
         }
 
         function deleteInteraction(id) {
+            if (!canEditHS()) return alert("Only Juan or Adrian can delete observations.");
             if (!confirm('Are you sure you want to delete this observation log?')) return;
             hsInteractions = hsInteractions.filter(item => item.id !== id);
             localStorage.setItem('hs_interactions', JSON.stringify(hsInteractions));
@@ -8244,6 +8254,7 @@
         }
 
         function deleteIncident(id) {
+            if (!canEditHS()) return alert("Only Juan or Adrian can delete incidents.");
             if (!confirm('Are you sure you want to delete this incident report?')) return;
             hsIncidents = hsIncidents.filter(item => item.id !== id);
             localStorage.setItem('hs_incidents', JSON.stringify(hsIncidents));
