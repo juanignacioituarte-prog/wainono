@@ -1782,8 +1782,27 @@
                     <div style="margin-bottom:8px;">
                         <input type="text" id="hs-staff-allergies" placeholder="Allergies (e.g. Bees, Penicillin, None)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
                     </div>
-                    <div style="margin-bottom:8px;">
-                        <input type="text" id="hs-staff-training" placeholder="Training/Certifications (e.g. First Aid, ATV)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    <!-- Structured Training Records Selector -->
+                    <div style="margin-bottom:8px; border: 1px dashed #2ecc71; padding: 10px; border-radius: 6px; background: #fafafa;">
+                        <label style="font-size:11px; font-weight:bold; color:#27ae60; display:block; margin-bottom:4px;">Add Completed Training</label>
+                        <div style="display:flex; gap:4px; margin-bottom:6px;">
+                            <select id="hs-staff-training-select" onchange="toggleCustomTrainingInput()" style="flex:2; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:white;">
+                                <option value="First Aid Certificate">First Aid Certificate</option>
+                                <option value="ATV / Quad Bike Safety">ATV / Quad Bike Safety</option>
+                                <option value="Tractor & Machinery Operation">Tractor & Machinery Operation</option>
+                                <option value="Agrichemical Handling (Growsafe)">Agrichemical Handling (Growsafe)</option>
+                                <option value="Chainsaw Safety">Chainsaw Safety</option>
+                                <option value="Dairy Shed & Robot Safety">Dairy Shed & Robot Safety</option>
+                                <option value="Custom">Custom / Write-in...</option>
+                            </select>
+                            <input type="date" id="hs-staff-training-date" style="flex:1.5; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:white;">
+                            <button type="button" onclick="addTrainingToTempList()" style="flex:1; padding:6px; background:#3498db; color:white; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">+ Add</button>
+                        </div>
+                        <input type="text" id="hs-staff-training-custom" placeholder="Enter custom training name..." style="display:none; width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; margin-bottom:6px; box-sizing:border-box; background:white;">
+                        
+                        <div id="hs-staff-temp-trainings" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+                            <!-- Training badges appear here -->
+                        </div>
                     </div>
                     <div style="margin-bottom:10px;">
                         <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Safety Induction Date</label>
@@ -6863,6 +6882,68 @@
             document.getElementById('hs-staff-email').value = email;
         }
 
+        let tempStaffTrainings = [];
+
+        function toggleCustomTrainingInput() {
+            const selectEl = document.getElementById('hs-staff-training-select');
+            const customInput = document.getElementById('hs-staff-training-custom');
+            if (selectEl && selectEl.value === 'Custom') {
+                customInput.style.display = 'block';
+            } else {
+                if (customInput) customInput.style.display = 'none';
+            }
+        }
+
+        function addTrainingToTempList() {
+            const selectVal = document.getElementById('hs-staff-training-select').value;
+            const dateVal = document.getElementById('hs-staff-training-date').value;
+            let courseName = selectVal;
+            
+            if (selectVal === 'Custom') {
+                courseName = document.getElementById('hs-staff-training-custom').value.trim();
+                if (!courseName) return alert('Please enter a custom training name.');
+            }
+            
+            if (!dateVal) return alert('Please select a completion date.');
+            
+            // Check for duplicates
+            const isDup = tempStaffTrainings.some(t => t.course.toLowerCase() === courseName.toLowerCase());
+            if (isDup) return alert('This training has already been added.');
+            
+            tempStaffTrainings.push({
+                course: courseName,
+                date: dateVal
+            });
+            
+            // Clear custom input if used
+            if (selectVal === 'Custom') {
+                document.getElementById('hs-staff-training-custom').value = '';
+            }
+            
+            renderTempTrainings();
+        }
+
+        function removeTempTraining(index) {
+            tempStaffTrainings.splice(index, 1);
+            renderTempTrainings();
+        }
+
+        function renderTempTrainings() {
+            const container = document.getElementById('hs-staff-temp-trainings');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            tempStaffTrainings.forEach((t, idx) => {
+                const badge = document.createElement('span');
+                badge.style.cssText = "background:#d4edda; color:#155724; border:1px solid #c3e6cb; padding:3px 8px; border-radius:12px; font-size:11px; display:inline-flex; align-items:center; gap:5px; font-weight:bold; margin-right:4px; margin-bottom:4px;";
+                badge.innerHTML = `
+                    <span>🎓 ${t.course} (${t.date})</span>
+                    <span onclick="removeTempTraining(${idx})" style="cursor:pointer; font-weight:bold; color:#721c24; margin-left:2px; font-size:12px;">✕</span>
+                `;
+                container.appendChild(badge);
+            });
+        }
+
         function toggleAddStaffForm(show) {
             const form = document.getElementById('hs-add-staff-form');
             if (!form) return;
@@ -6879,7 +6960,15 @@
                 document.getElementById('hs-staff-phone').value = '';
                 document.getElementById('hs-staff-emergency').value = '';
                 document.getElementById('hs-staff-allergies').value = '';
-                document.getElementById('hs-staff-training').value = '';
+                
+                // Clear training inputs and temp list
+                tempStaffTrainings = [];
+                renderTempTrainings();
+                document.getElementById('hs-staff-training-select').value = 'First Aid Certificate';
+                document.getElementById('hs-staff-training-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('hs-staff-training-custom').value = '';
+                document.getElementById('hs-staff-training-custom').style.display = 'none';
+
                 document.getElementById('hs-staff-induction').value = new Date().toISOString().split('T')[0];
                 loadAppUsersForStaffSelect();
             }
@@ -6892,10 +6981,12 @@
             const phone = document.getElementById('hs-staff-phone').value.trim();
             const emergency = document.getElementById('hs-staff-emergency').value.trim();
             const allergies = document.getElementById('hs-staff-allergies').value.trim();
-            const training = document.getElementById('hs-staff-training').value.trim();
             const induction = document.getElementById('hs-staff-induction').value;
             
             if (!name) return alert('Staff member name is required.');
+            
+            // Build the training string summary from the temp list (e.g. "First Aid (2026-05-12), ATV (2026-06-15)")
+            const trainingSummary = tempStaffTrainings.map(t => `${t.course} (${t.date})`).join(', ');
             
             const staffId = 'staff_' + Date.now();
             const newStaff = {
@@ -6906,7 +6997,7 @@
                 phone: phone || '',
                 emergencyContact: emergency || '',
                 allergies: allergies || '',
-                training: training || '',
+                training: trainingSummary,
                 inductionDate: induction || new Date().toISOString().split('T')[0],
                 status: 'active'
             };
