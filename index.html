@@ -1582,6 +1582,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('roster'); toggleSettingsMenu();" style="font-weight: bold; color: #3498db;">📅 Roster</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weather'); toggleSettingsMenu();" style="font-weight: bold; color: #f1c40f;">☁️ Weather</div>
+                    <div class="dropdown-item" onclick="window.open('https://cwu.co.nz/forecast/fairlie/', '_blank'); toggleSettingsMenu();" style="font-weight: bold; color: #9b59b6;">📅 10 Day Forecast</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('vehicle_maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #e67e22;">🚜 Vehicle Maintenance</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
@@ -2008,7 +2009,7 @@
 
         <!-- Weather Panel -->
         <div id="weather-view" style="display:none; flex-grow:1; width:100%; height:100%; background:#f9f9f9; box-sizing:border-box;">
-            <iframe src="https://cwu.co.nz/forecast/fairlie/" style="width:100%; height:100%; border:none;"></iframe>
+            <iframe src="https://www.weather-pro.com/reports/index.php?SN=N914557" style="width:100%; height:100%; border:none;"></iframe>
         </div>
 
         <!-- Roster Panel -->
