@@ -3021,7 +3021,7 @@
                         layer.on('mouseout', function () { if (isDrawingBreak) return; const tip = layer.getTooltip(); if (tip && tip.getElement()) tip.getElement().classList.remove('show-label'); });
                         
                         layer.on('click', (e) => {
-                            if (isDrawingBreak) return; // bubble up for drawing
+                            if (isDrawingBreak || (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) || (typeof editingHazardId !== 'undefined' && editingHazardId)) return; // bubble up for drawing
                             L.DomEvent.stopPropagation(e);
                             
                             const tip = layer.getTooltip();
