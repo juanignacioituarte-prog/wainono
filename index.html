@@ -1579,6 +1579,7 @@
                 <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.36</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">❤️ Health & Safety</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
@@ -1733,6 +1734,183 @@
             <p style="font-size:10px; color:#95a5a6; margin-top:0; margin-bottom:10px;">Tap any week to isolate its breaks on the map.</p>
             <div id="weekly-report-content"></div>
         </div>
+        <!-- Health & Safety Panel -->
+        <div id="health-safety-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="margin-top:0; margin-bottom:0; color:#c0392b; display:flex; align-items:center; gap:6px;">
+                    <span>🛡️ Health & Safety</span>
+                </h3>
+                <span id="hs-sync-msg" style="font-size:10px; color:#7f8c8d; font-weight:bold;">Local Mode</span>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div style="display:flex; background:#eaeaea; border-radius:8px; padding:3px; margin-bottom:15px; gap:2px;">
+                <button id="tab-hs-staff" onclick="setHSTab('staff')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:white; color:#333; transition: all 0.2s;">Staff</button>
+                <button id="tab-hs-hazards" onclick="setHSTab('hazards')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s;">Hazards</button>
+                <button id="tab-hs-meetings" onclick="setHSTab('meetings')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s;">Meetings</button>
+                <button id="tab-hs-interactions" onclick="setHSTab('interactions')" style="flex:1; border:none; padding:6px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; background:transparent; color:#666; transition: all 0.2s;">Observations</button>
+            </div>
+
+            <!-- Staff Tab Contents -->
+            <div id="hs-tab-content-staff" style="display:block;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:bold; font-size:13px; color:#2c3e50;">Staff Registry</span>
+                    <button onclick="toggleAddStaffForm()" style="background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">+ Add Staff</button>
+                </div>
+                
+                <!-- Add Staff Inline Form -->
+                <div id="hs-add-staff-form" style="display:none; background:white; padding:12px; border-radius:8px; border:1px solid #ddd; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Select App User to Pre-fill</label>
+                        <select id="hs-staff-user-select" onchange="onStaffUserSelectChange()" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <option value="">-- Choose App User --</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <input type="text" id="hs-staff-name" placeholder="Full Name" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <input type="text" id="hs-staff-role" placeholder="Role (e.g. Manager, Shepherd)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px; display:flex; gap:6px;">
+                        <input type="email" id="hs-staff-email" placeholder="Email" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                        <input type="text" id="hs-staff-phone" placeholder="Phone" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <input type="text" id="hs-staff-emergency" placeholder="Emergency Contact Name & Phone" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <input type="text" id="hs-staff-allergies" placeholder="Allergies (e.g. Bees, Penicillin, None)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <input type="text" id="hs-staff-training" placeholder="Training/Certifications (e.g. First Aid, ATV)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Safety Induction Date</label>
+                        <input type="date" id="hs-staff-induction" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="toggleAddStaffForm(false)" style="flex:1; padding:6px; background:#eee; border:none; border-radius:4px; font-size:11px; cursor:pointer;">Cancel</button>
+                        <button onclick="saveStaffMember()" style="flex:2; padding:6px; background:#2ecc71; color:white; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Save Staff</button>
+                    </div>
+                </div>
+
+                <div id="hs-staff-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Staff list rendered dynamically -->
+                </div>
+            </div>
+
+            <!-- Hazards Tab Contents -->
+            <div id="hs-tab-content-hazards" style="display:none;">
+                <div style="background:white; padding:12px; border-radius:8px; border:1px solid #eee; margin-bottom:12px; text-align:center;">
+                    <div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:8px; text-transform:uppercase;">REPORT NEW HAZARD</div>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="startDrawingHazard('point')" style="flex:1; background:#e74c3c; border:none; padding:8px; border-radius:6px; color:white; font-size:11px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">📍 Drop Pin</button>
+                        <button onclick="startDrawingHazard('area')" style="flex:1; background:#c0392b; border:none; padding:8px; border-radius:6px; color:white; font-size:11px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">⬡ Draw Area</button>
+                    </div>
+                </div>
+
+                <div id="hs-hazard-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Hazards list rendered dynamically -->
+                </div>
+            </div>
+
+            <!-- Meetings Tab Contents -->
+            <div id="hs-tab-content-meetings" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:bold; font-size:13px; color:#2c3e50;">Safety Meetings</span>
+                    <button onclick="toggleAddMeetingForm()" style="background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">+ Log Meeting</button>
+                </div>
+
+                <!-- Add Meeting Inline Form -->
+                <div id="hs-add-meeting-form" style="display:none; background:white; padding:12px; border-radius:8px; border:1px solid #ddd; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Meeting Date</label>
+                        <input type="date" id="hs-meeting-date" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <input type="text" id="hs-meeting-topic" placeholder="Topic / Key Theme" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:11px; font-weight:bold; color:#555; display:block; margin-bottom:4px;">Attendees</label>
+                        <div id="hs-meeting-attendees-checkboxes" style="max-height:90px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; padding:6px; background:#fafafa;">
+                            <!-- Populated dynamically with active staff -->
+                        </div>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <textarea id="hs-meeting-notes" placeholder="Key notes, issues raised, actions decided..." style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box; height:60px;"></textarea>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="toggleAddMeetingForm(false)" style="flex:1; padding:6px; background:#eee; border:none; border-radius:4px; font-size:11px; cursor:pointer;">Cancel</button>
+                        <button onclick="saveSafetyMeeting()" style="flex:2; padding:6px; background:#2ecc71; color:white; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Save Log</button>
+                    </div>
+                </div>
+
+                <div id="hs-meetings-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Safety meetings logs -->
+                </div>
+            </div>
+
+            <!-- Interactions Tab Contents -->
+            <div id="hs-tab-content-interactions" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:bold; font-size:13px; color:#2c3e50;">Safety Observations</span>
+                    <button onclick="toggleAddInteractionForm()" style="background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">+ Log Observation</button>
+                </div>
+
+                <!-- Add Interaction Form -->
+                <div id="hs-add-interaction-form" style="display:none; background:white; padding:12px; border-radius:8px; border:1px solid #ddd; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Date</label>
+                        <input type="date" id="hs-interaction-date" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Observer</label>
+                        <select id="hs-interaction-observer" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <!-- Populated with staff -->
+                        </select>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Person Observed (Optional)</label>
+                        <select id="hs-interaction-observed" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <!-- Populated with staff -->
+                        </select>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Type of Observation</label>
+                        <select id="hs-interaction-type" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
+                            <option value="Safe Behavior">Safe Behavior / Safe Act</option>
+                            <option value="Unsafe Behavior">Unsafe Behavior / Hazard Observed</option>
+                            <option value="Near Miss">Near Miss</option>
+                            <option value="Suggestion">Improvement Suggestion</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <textarea id="hs-interaction-details" placeholder="Details of observation (what was seen, context)..." style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box; height:50px;"></textarea>
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <textarea id="hs-interaction-action" placeholder="Action taken or recommended..." style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; box-sizing:border-box; height:50px;"></textarea>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="toggleAddInteractionForm(false)" style="flex:1; padding:6px; background:#eee; border:none; border-radius:4px; font-size:11px; cursor:pointer;">Cancel</button>
+                        <button onclick="saveSafetyInteraction()" style="flex:2; padding:6px; background:#2ecc71; color:white; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Save Log</button>
+                    </div>
+                </div>
+
+                <div id="hs-interactions-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Observations logs -->
+                </div>
+            </div>
+            
+            <!-- Setup Guide (collapsible/visible only if sync url missing) -->
+            <div id="hs-setup-guide" style="display:none; margin-top:20px; padding:10px; background:#fcf3cf; border:1px solid #f9e79f; border-radius:6px; font-size:11px; color:#7e5109; line-height:1.4;">
+                <b>Cloud Sync Setup:</b><br>
+                1. Create a Google Sheet.<br>
+                2. Copy code from <code>health_safety_apps_script.js</code> into Extensions > Apps Script.<br>
+                3. Deploy as a web app for "Anyone".<br>
+                4. Set the script URL in <code>index.html</code>.
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1784,6 +1962,17 @@
         /* === CONFIGURATION === */
         // Paste your Google Apps Script Web App URL here to enable cloud saving
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRkkZ9pxJnFYiBpbLdgy_WXoG_itdfnjL199NvOLLxCGrPfh2drA1lcCVditsKxbe2/exec";
+        const HS_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxXzS6W1h7B7c4oJqt6xAunrsOcWyfGA6CyODUcbnRUErd8_m2pAdBxsrQFV2XefPUh/exec";
+
+        /* Health & Safety State */
+        let hsStaff = JSON.parse(localStorage.getItem('hs_staff')) || [];
+        let hsHazards = JSON.parse(localStorage.getItem('hs_hazards')) || [];
+        let hsMeetings = JSON.parse(localStorage.getItem('hs_meetings')) || [];
+        let hsInteractions = JSON.parse(localStorage.getItem('hs_interactions')) || [];
+        let currentHSTab = 'staff';
+        let isDrawingHazard = false;
+        let hazardDrawingType = 'point'; // 'point' or 'area'
+        let hazardLayers = new Map(); // Store rendered Leaflet layers for hazards
 
         /* URLs */
         const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
@@ -2669,12 +2858,21 @@
 
             // UI Toggles
             document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
-            document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks') ? 'flex' : 'none';
-            document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks') ? 'block' : 'none';
+            document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'flex' : 'none';
+            document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
+            document.getElementById('health-safety-view').style.display = (mode === 'health_safety') ? 'block' : 'none';
 
             if (mode === 'breaks') {
                 loadBreaks();
+            }
+            if (mode === 'health_safety') {
+                loadHSTables();
+            } else {
+                if (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) cancelHazardDrawing();
+            }
+            if (typeof renderHazardsOnMap === 'function') {
+                renderHazardsOnMap();
             }
 
             // Map vs Overlay Logic
@@ -6582,6 +6780,1023 @@
             } catch (e) { alert('Failed to add email'); }
         }
 
+        }
+
+        /* ===================== HEALTH & SAFETY FUNCTIONS ===================== */
+        function setHSTab(tab) {
+            currentHSTab = tab;
+            
+            // Toggle Tab Buttons
+            ['staff', 'hazards', 'meetings', 'interactions'].forEach(t => {
+                const btn = document.getElementById(`tab-hs-${t}`);
+                const panel = document.getElementById(`hs-tab-content-${t}`);
+                if (btn && panel) {
+                    const isActive = t === tab;
+                    btn.style.background = isActive ? 'white' : 'transparent';
+                    btn.style.color = isActive ? '#333' : '#666';
+                    panel.style.display = isActive ? 'block' : 'none';
+                }
+            });
+
+            // Clean up drawing if changing tabs
+            if (tab !== 'hazards' && isDrawingHazard) {
+                cancelHazardDrawing();
+            }
+        }
+
+        function loadHSTables() {
+            renderStaffList();
+            renderHazardList();
+            renderMeetingsList();
+            renderInteractionsList();
+            syncHSFromCloud();
+        }
+
+        /* --- STAFF REGISTRY --- */
+        let authAppUsers = []; // Cache parsed authorized users
+
+        function loadAppUsersForStaffSelect() {
+            Papa.parse(AUTH_CSV_URL + "&t=" + Date.now(), {
+                download: true,
+                header: false,
+                complete: function(results) {
+                    authAppUsers = [];
+                    // Always include Admin first
+                    authAppUsers.push({ email: ADMIN_EMAIL.toLowerCase(), name: "Admin" });
+                    
+                    results.data.forEach(row => {
+                        const email = (row[0] || "").trim().toLowerCase();
+                        const name = (row[1] || "").trim();
+                        if (email && email !== ADMIN_EMAIL.toLowerCase()) {
+                            authAppUsers.push({ email: email, name: name || email });
+                        }
+                    });
+                    
+                    // Populate select dropdown
+                    const userSelect = document.getElementById('hs-staff-user-select');
+                    if (userSelect) {
+                        userSelect.innerHTML = '<option value="">-- Choose App User --</option>';
+                        authAppUsers.forEach(u => {
+                            const opt = document.createElement('option');
+                            opt.value = u.email;
+                            opt.dataset.name = u.name;
+                            opt.innerText = `${u.name} (${u.email})`;
+                            userSelect.appendChild(opt);
+                        });
+                    }
+                },
+                error: function(err) {
+                    console.error("Failed to parse app users for staff pre-fill:", err);
+                }
+            });
+        }
+
+        function onStaffUserSelectChange() {
+            const selectEl = document.getElementById('hs-staff-user-select');
+            if (!selectEl) return;
+            const selectedOpt = selectEl.options[selectEl.selectedIndex];
+            if (!selectedOpt || !selectedOpt.value) return;
+            
+            const email = selectedOpt.value;
+            const name = selectedOpt.dataset.name || "";
+            
+            document.getElementById('hs-staff-name').value = name;
+            document.getElementById('hs-staff-email').value = email;
+        }
+
+        function toggleAddStaffForm(show) {
+            const form = document.getElementById('hs-add-staff-form');
+            if (!form) return;
+            if (show === undefined) {
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            } else {
+                form.style.display = show ? 'block' : 'none';
+            }
+            if (form.style.display === 'block') {
+                document.getElementById('hs-staff-user-select').value = '';
+                document.getElementById('hs-staff-name').value = '';
+                document.getElementById('hs-staff-role').value = '';
+                document.getElementById('hs-staff-email').value = '';
+                document.getElementById('hs-staff-phone').value = '';
+                document.getElementById('hs-staff-emergency').value = '';
+                document.getElementById('hs-staff-allergies').value = '';
+                document.getElementById('hs-staff-training').value = '';
+                document.getElementById('hs-staff-induction').value = new Date().toISOString().split('T')[0];
+                loadAppUsersForStaffSelect();
+            }
+        }
+
+        function saveStaffMember() {
+            const name = document.getElementById('hs-staff-name').value.trim();
+            const role = document.getElementById('hs-staff-role').value.trim();
+            const email = document.getElementById('hs-staff-email').value.trim();
+            const phone = document.getElementById('hs-staff-phone').value.trim();
+            const emergency = document.getElementById('hs-staff-emergency').value.trim();
+            const allergies = document.getElementById('hs-staff-allergies').value.trim();
+            const training = document.getElementById('hs-staff-training').value.trim();
+            const induction = document.getElementById('hs-staff-induction').value;
+            
+            if (!name) return alert('Staff member name is required.');
+            
+            const staffId = 'staff_' + Date.now();
+            const newStaff = {
+                id: staffId,
+                name: name,
+                role: role || 'worker',
+                email: email || '',
+                phone: phone || '',
+                emergencyContact: emergency || '',
+                allergies: allergies || '',
+                training: training || '',
+                inductionDate: induction || new Date().toISOString().split('T')[0],
+                status: 'active'
+            };
+            
+            hsStaff.push(newStaff);
+            localStorage.setItem('hs_staff', JSON.stringify(hsStaff));
+            
+            toggleAddStaffForm(false);
+            renderStaffList();
+            saveHSToCloud();
+        }
+
+        function toggleStaffStatus(id) {
+            const s = hsStaff.find(item => item.id === id);
+            if (s) {
+                s.status = s.status === 'active' ? 'inactive' : 'active';
+                localStorage.setItem('hs_staff', JSON.stringify(hsStaff));
+                renderStaffList();
+                saveHSToCloud();
+            }
+        }
+
+        function deleteStaffMember(id) {
+            if (!confirm('Are you sure you want to remove this staff member?')) return;
+            hsStaff = hsStaff.filter(item => item.id !== id);
+            localStorage.setItem('hs_staff', JSON.stringify(hsStaff));
+            renderStaffList();
+            saveHSToCloud();
+        }
+
+        function renderStaffList() {
+            const listDiv = document.getElementById('hs-staff-list');
+            listDiv.innerHTML = '';
+            
+            if (hsStaff.length === 0) {
+                listDiv.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:15px; background:white; border-radius:6px; border:1px solid #eee;">No staff members registered.</div>';
+                return;
+            }
+            
+            hsStaff.forEach(s => {
+                const card = document.createElement('div');
+                const isActive = s.status === 'active';
+                
+                card.style.cssText = `background:white; padding:12px; border-radius:8px; border:1px solid #eee; border-left:4px solid ${isActive ? '#2ecc71' : '#bdc3c7'}; box-shadow:0 1px 3px rgba(0,0,0,0.05); position:relative;`;
+                
+                card.innerHTML = `
+                    <div style="font-weight:bold; color:#2c3e50; font-size:14px;">${s.name}</div>
+                    <div style="font-size:11px; color:#7f8c8d; font-weight:bold; margin-bottom:6px;">${s.role.toUpperCase()} • <span style="color:${isActive ? '#2ecc71' : '#e74c3c'}">${s.status.toUpperCase()}</span></div>
+                    
+                    ${s.email ? `<div style="font-size:11px; color:#555;">✉️ ${s.email}</div>` : ''}
+                    ${s.phone ? `<div style="font-size:11px; color:#555;">📞 ${s.phone}</div>` : ''}
+                    ${s.emergencyContact ? `<div style="font-size:11px; color:#e74c3c; font-weight:500; margin-top:2px;">🚨 Emergency: ${s.emergencyContact}</div>` : ''}
+                    ${s.allergies ? `<div style="font-size:11px; color:#e67e22; font-weight:500; margin-top:2px;">⚠️ Allergies: ${s.allergies}</div>` : ''}
+                    ${s.training ? `<div style="font-size:11px; color:#27ae60; font-weight:500; margin-top:2px;">🎓 Training: ${s.training}</div>` : ''}
+                    
+                    <div style="font-size:10px; color:#999; margin-top:6px; border-top:1px solid #f9f9f9; padding-top:4px;">Inducted: ${s.inductionDate}</div>
+                    
+                    <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px;">
+                        <button onclick="toggleStaffStatus('${s.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:1px solid #ddd; background:#f9f9f9; color:#555; cursor:pointer;">${isActive ? 'Deactivate' : 'Activate'}</button>
+                        <button onclick="deleteStaffMember('${s.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#f5f5f5; color:#e74c3c; cursor:pointer;">Delete</button>
+                    </div>
+                `;
+                listDiv.appendChild(card);
+            });
+        }
+
+        /* --- HAZARD MANAGEMENT & DRAWING --- */
+        let drawingVertices = [];
+        let tempMarkers = [];
+        let tempPolyline = null;
+        let tempPolygon = null;
+
+        function startDrawingHazard(type) {
+            if (isDrawingHazard) cancelHazardDrawing();
+            if (typeof isDrawingBreak !== 'undefined' && isDrawingBreak) cancelBreak();
+            
+            isDrawingHazard = true;
+            hazardDrawingType = type;
+            drawingVertices = [];
+            
+            document.getElementById('hazard-toolbar').style.display = 'flex';
+            document.getElementById('hazard-vertex-count').innerText = type === 'point' ? 'Click on map to drop hazard pin' : 'Click on map to draw hazard area (0 points)';
+            document.getElementById('btn-hazard-undo').style.display = type === 'area' ? 'inline-block' : 'none';
+            document.getElementById('btn-finish-hazard').disabled = type === 'area';
+            
+            map.getContainer().style.cursor = 'crosshair';
+            map.on('click', handleHazardMapClick);
+        }
+
+        function handleHazardMapClick(e) {
+            addHazardVertex(e.latlng);
+        }
+
+        function addHazardVertex(latlng) {
+            if (hazardDrawingType === 'point') {
+                drawingVertices = [latlng];
+                
+                // Clear any previous point
+                tempMarkers.forEach(m => map.removeLayer(m));
+                tempMarkers = [];
+                
+                const icon = L.divIcon({
+                    className: 'custom-hazard-marker',
+                    html: `<div style="background-color:#e74c3c; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; color:white; font-size:9px; font-weight:bold;">!</div>`,
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+                
+                const marker = L.marker(latlng, { icon: icon }).addTo(map);
+                tempMarkers.push(marker);
+                
+                finishHazard();
+            } else {
+                drawingVertices.push(latlng);
+                
+                // Draw vertex marker
+                const m = L.circleMarker(latlng, { radius: 5, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1 }).addTo(map);
+                tempMarkers.push(m);
+                
+                updateHazardDrawingOnMap();
+                
+                document.getElementById('hazard-vertex-count').innerText = `Drawing area (${drawingVertices.length} points)`;
+                document.getElementById('btn-finish-hazard').disabled = drawingVertices.length < 3;
+            }
+        }
+
+        function updateHazardDrawingOnMap() {
+            if (tempPolyline) map.removeLayer(tempPolyline);
+            if (tempPolygon) map.removeLayer(tempPolygon);
+            
+            if (drawingVertices.length >= 3) {
+                tempPolygon = L.polygon(drawingVertices, { color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 0.2, weight: 2 }).addTo(map);
+            } else if (drawingVertices.length >= 2) {
+                tempPolyline = L.polyline(drawingVertices, { color: '#e74c3c', weight: 2 }).addTo(map);
+            }
+        }
+
+        function undoLastHazardVertex() {
+            if (drawingVertices.length === 0) return;
+            drawingVertices.pop();
+            
+            const lastMarker = tempMarkers.pop();
+            if (lastMarker) map.removeLayer(lastMarker);
+            
+            updateHazardDrawingOnMap();
+            
+            document.getElementById('hazard-vertex-count').innerText = `Drawing area (${drawingVertices.length} points)`;
+            document.getElementById('btn-finish-hazard').disabled = drawingVertices.length < 3;
+        }
+
+        function cancelHazardDrawing() {
+            isDrawingHazard = false;
+            map.getContainer().style.cursor = '';
+            map.off('click', handleHazardMapClick);
+            
+            document.getElementById('hazard-toolbar').style.display = 'none';
+            
+            tempMarkers.forEach(m => map.removeLayer(m));
+            tempMarkers = [];
+            if (tempPolyline) map.removeLayer(tempPolyline);
+            if (tempPolygon) map.removeLayer(tempPolygon);
+            tempPolyline = null;
+            tempPolygon = null;
+            drawingVertices = [];
+            
+            renderHazardsOnMap();
+        }
+
+        function finishHazard() {
+            map.off('click', handleHazardMapClick);
+            map.getContainer().style.cursor = '';
+            
+            if (hazardDrawingType === 'area' && drawingVertices.length < 3) {
+                return alert('Please draw at least 3 points to complete a hazard area.');
+            }
+            openFinishHazardModal();
+        }
+
+        function openFinishHazardModal() {
+            const loggedInName = localStorage.getItem('auth_name') || '';
+            
+            document.getElementById('finish-hazard-modal').style.display = 'flex';
+            document.getElementById('modal-hazard-name').value = '';
+            document.getElementById('modal-hazard-desc').value = '';
+            document.getElementById('modal-hazard-severity').value = 'Medium';
+            
+            // Populate reporter dropdown list
+            const repSel = document.getElementById('modal-hazard-reporter');
+            repSel.innerHTML = '';
+            
+            // Logged-in User Option
+            if (loggedInName) {
+                const opt = document.createElement('option');
+                opt.value = loggedInName;
+                opt.innerText = `${loggedInName} (Logged-in User)`;
+                opt.selected = true;
+                repSel.appendChild(opt);
+            } else {
+                const opt = document.createElement('option');
+                opt.value = 'Anonymous';
+                opt.innerText = 'Anonymous / Visitor';
+                opt.selected = true;
+                repSel.appendChild(opt);
+            }
+            
+            // Active Staff options
+            hsStaff.forEach(s => {
+                if (s.status === 'active' && s.name !== loggedInName) {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.innerText = s.name;
+                    repSel.appendChild(opt);
+                }
+            });
+            
+            // Add Anonymous option fallback at bottom if loggedInName exists
+            if (loggedInName) {
+                const opt = document.createElement('option');
+                opt.value = 'Anonymous';
+                opt.innerText = 'Anonymous / Visitor';
+                repSel.appendChild(opt);
+            }
+        }
+
+        let editingHazardId = null;
+        let hazardEditVertices = [];
+        let hazardEditMarkers = [];
+        let hazardEditPolygon = null;
+        let hazardEditSelectedIdx = -1;
+
+        function cancelHazardSave() {
+            document.getElementById('finish-hazard-modal').style.display = 'none';
+            if (editingHazardId) {
+                cancelEditHazard();
+            } else {
+                cancelHazardDrawing();
+            }
+        }
+
+        function saveHazardDetails() {
+            const name = document.getElementById('modal-hazard-name').value.trim();
+            const desc = document.getElementById('modal-hazard-desc').value.trim();
+            const severity = document.getElementById('modal-hazard-severity').value;
+            const reporter = document.getElementById('modal-hazard-reporter').value || 'Anonymous';
+            
+            if (!name) return alert('Hazard Name is required.');
+            
+            if (editingHazardId) {
+                // Editing existing hazard
+                const h = hsHazards.find(haz => haz.id === editingHazardId);
+                if (h) {
+                    h.name = name;
+                    h.description = desc || '';
+                    h.severity = severity;
+                    h.reportedBy = reporter;
+                    h.coordinates = h.type === 'point' ? hazardEditVertices[0] : [...hazardEditVertices];
+                }
+                editingHazardId = null;
+                document.getElementById('hazard-edit-toolbar').style.display = 'none';
+                
+                hazardEditMarkers.forEach(m => map.removeLayer(m));
+                hazardEditMarkers = [];
+                if (hazardEditPolygon) {
+                    map.removeLayer(hazardEditPolygon);
+                    hazardEditPolygon = null;
+                }
+            } else {
+                // Creating new hazard
+                const newHazard = {
+                    id: 'hazard_' + Date.now(),
+                    name: name,
+                    description: desc || '',
+                    severity: severity,
+                    status: 'active',
+                    type: hazardDrawingType,
+                    coordinates: hazardDrawingType === 'point' ? drawingVertices[0] : [...drawingVertices],
+                    reportedBy: reporter,
+                    reportedAt: new Date().toISOString()
+                };
+                hsHazards.push(newHazard);
+            }
+            
+            localStorage.setItem('hs_hazards', JSON.stringify(hsHazards));
+            document.getElementById('finish-hazard-modal').style.display = 'none';
+            
+            if (isDrawingHazard) {
+                cancelHazardDrawing();
+            }
+            
+            renderHazardList();
+            renderHazardsOnMap();
+            saveHSToCloud();
+        }
+
+        function resolveHazard(id) {
+            const h = hsHazards.find(haz => haz.id === id);
+            if (h) {
+                h.status = 'resolved';
+                h.resolvedAt = new Date().toISOString();
+                localStorage.setItem('hs_hazards', JSON.stringify(hsHazards));
+                renderHazardList();
+                renderHazardsOnMap();
+                saveHSToCloud();
+            }
+        }
+
+        function deleteHazard(id) {
+            if (!confirm('Are you sure you want to delete this hazard from the log?')) return;
+            hsHazards = hsHazards.filter(haz => haz.id !== id);
+            localStorage.setItem('hs_hazards', JSON.stringify(hsHazards));
+            renderHazardList();
+            renderHazardsOnMap();
+            saveHSToCloud();
+        }
+
+        function startEditHazard(hazardId) {
+            if (isDrawingHazard || editingHazardId) return;
+            const h = hsHazards.find(haz => haz.id === hazardId);
+            if (!h) return;
+            
+            editingHazardId = hazardId;
+            
+            // Hide the active hazard layer from map
+            if (hazardLayers.has(hazardId)) {
+                map.removeLayer(hazardLayers.get(hazardId));
+            }
+            
+            if (h.type === 'point') {
+                // For point hazard, create a single draggable marker on the map
+                hazardEditVertices = [{ lat: h.coordinates.lat, lng: h.coordinates.lng }];
+                
+                // Show toolbar
+                document.getElementById('hazard-edit-toolbar').style.display = 'flex';
+                document.getElementById('hazard-edit-info').textContent = "Drag pin to move hazard";
+                document.getElementById('btn-hazard-delete-pt').style.display = 'none';
+                
+                const icon = L.divIcon({
+                    className: 'edit-marker',
+                    html: `<div style="width:18px;height:18px;background:#e74c3c;border:2px solid #fff;border-radius:50%;box-shadow:0 0 4px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:bold;">!</div>`,
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9]
+                });
+                
+                const marker = L.marker([h.coordinates.lat, h.coordinates.lng], {
+                    icon: icon,
+                    draggable: true
+                }).addTo(map);
+                
+                marker.on('drag', function () {
+                    const latlng = marker.getLatLng();
+                    hazardEditVertices[0] = { lat: latlng.lat, lng: latlng.lng };
+                });
+                
+                hazardEditMarkers.push(marker);
+            } else {
+                // For area hazard, load vertices and show edit polygon + markers
+                hazardEditVertices = h.coordinates.map(v => ({ lat: v.lat, lng: v.lng }));
+                hazardEditSelectedIdx = -1;
+                
+                document.getElementById('hazard-edit-toolbar').style.display = 'flex';
+                document.getElementById('hazard-edit-info').textContent = "Reshaping area...";
+                document.getElementById('btn-hazard-delete-pt').style.display = 'inline-block';
+                document.getElementById('btn-hazard-delete-pt').disabled = true;
+                
+                renderHazardEditPolygon();
+                renderHazardEditMarkers();
+            }
+        }
+
+        function renderHazardEditPolygon() {
+            if (hazardEditPolygon) map.removeLayer(hazardEditPolygon);
+            if (hazardEditVertices.length >= 3) {
+                const coords = hazardEditVertices.map(v => [v.lat, v.lng]);
+                hazardEditPolygon = L.polygon(coords, {
+                    color: '#e74c3c', weight: 2.5, fillColor: '#e74c3c',
+                    fillOpacity: 0.15, dashArray: '6, 4'
+                }).addTo(map);
+            } else if (hazardEditVertices.length >= 2) {
+                const coords = hazardEditVertices.map(v => [v.lat, v.lng]);
+                hazardEditPolygon = L.polyline(coords, {
+                    color: '#e74c3c', weight: 2.5, dashArray: '6, 4'
+                }).addTo(map);
+            }
+        }
+
+        function renderHazardEditMarkers() {
+            hazardEditMarkers.forEach(m => map.removeLayer(m));
+            hazardEditMarkers = [];
+            
+            hazardEditVertices.forEach((v, i) => {
+                const isSelected = (i === hazardEditSelectedIdx);
+                const bgColor = isSelected ? '#34495e' : '#e74c3c';
+                const size = isSelected ? 16 : 14;
+                const offset = size / 2;
+                
+                const icon = L.divIcon({
+                    className: 'edit-marker',
+                    html: `<div style="width:${size}px;height:${size}px;background:${bgColor};border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.5);"></div>`,
+                    iconSize: [size, size],
+                    iconAnchor: [offset, offset]
+                });
+
+                const marker = L.marker([v.lat, v.lng], {
+                    icon: icon,
+                    draggable: true,
+                    zIndexOffset: isSelected ? 1000 : 0
+                }).addTo(map);
+
+                marker.on('drag', function () {
+                    const latlng = marker.getLatLng();
+                    hazardEditVertices[i] = { lat: latlng.lat, lng: latlng.lng };
+                    renderHazardEditPolygon();
+                });
+
+                marker.on('click', function (e) {
+                    L.DomEvent.stopPropagation(e);
+                    hazardEditSelectedIdx = i;
+                    document.getElementById('btn-hazard-delete-pt').disabled = false;
+                    renderHazardEditMarkers();
+                });
+
+                hazardEditMarkers.push(marker);
+            });
+        }
+
+        function deleteEditHazardVertex() {
+            if (hazardEditSelectedIdx === -1 || hazardEditVertices.length <= 3) {
+                return alert("Areas must have at least 3 points. Cannot delete.");
+            }
+            hazardEditVertices.splice(hazardEditSelectedIdx, 1);
+            hazardEditSelectedIdx = -1;
+            document.getElementById('btn-hazard-delete-pt').disabled = true;
+            renderHazardEditPolygon();
+            renderHazardEditMarkers();
+        }
+
+        function cancelEditHazard() {
+            editingHazardId = null;
+            document.getElementById('hazard-edit-toolbar').style.display = 'none';
+            map.getContainer().style.cursor = '';
+            
+            hazardEditMarkers.forEach(m => map.removeLayer(m));
+            hazardEditMarkers = [];
+            if (hazardEditPolygon) {
+                map.removeLayer(hazardEditPolygon);
+                hazardEditPolygon = null;
+            }
+            
+            renderHazardsOnMap();
+        }
+
+        function finishEditHazard() {
+            const h = hsHazards.find(haz => haz.id === editingHazardId);
+            if (!h) return cancelEditHazard();
+            
+            if (h.type === 'area' && hazardEditVertices.length < 3) {
+                return alert("Area hazard must have at least 3 points.");
+            }
+            
+            document.getElementById('finish-hazard-modal').style.display = 'flex';
+            document.getElementById('modal-hazard-name').value = h.name;
+            document.getElementById('modal-hazard-desc').value = h.description;
+            document.getElementById('modal-hazard-severity').value = h.severity;
+            
+            const repSel = document.getElementById('modal-hazard-reporter');
+            repSel.innerHTML = '<option value="">Anonymous / Visitor</option>';
+            hsStaff.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.innerText = s.name;
+                if (s.name === h.reportedBy) opt.selected = true;
+                repSel.appendChild(opt);
+            });
+        }
+
+        function renderHazardList() {
+            const listDiv = document.getElementById('hs-hazard-list');
+            listDiv.innerHTML = '';
+            
+            const activeHazards = hsHazards.filter(h => h.status === 'active');
+            
+            if (activeHazards.length === 0) {
+                listDiv.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:15px; background:white; border-radius:6px; border:1px solid #eee;">No active hazards reported. Map is safe!</div>';
+                return;
+            }
+            
+            activeHazards.forEach(h => {
+                const card = document.createElement('div');
+                let badgeCol = '#f1c40f'; // Low
+                let textCol = '#333';
+                if (h.severity === 'High') { badgeCol = '#e74c3c'; textCol = 'white'; }
+                else if (h.severity === 'Medium') { badgeCol = '#e67e22'; textCol = 'white'; }
+                
+                card.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #eee; border-left:4px solid #e74c3c; box-shadow:0 1px 3px rgba(0,0,0,0.05); position:relative;";
+                
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:10px; font-weight:bold; background:${badgeCol}; color:${textCol}; padding:2px 6px; border-radius:4px;">${h.severity.toUpperCase()} RISK</span>
+                        <span style="font-size:10px; color:#999; margin-right:15px;">${h.type === 'point' ? '📍 Point' : '⬡ Area'}</span>
+                    </div>
+                    <div style="font-weight:bold; color:#2c3e50; font-size:14px; margin-bottom:4px;">${h.name}</div>
+                    ${h.description ? `<div style="font-size:11px; color:#555; margin-bottom:6px;">${h.description}</div>` : ''}
+                    <div style="font-size:10px; color:#999; margin-bottom:8px;">Reported by: ${h.reportedBy} on ${new Date(h.reportedAt).toLocaleDateString('en-NZ')}</div>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="resolveHazard('${h.id}')" style="flex:2; padding:5px; background:#2ecc71; border:none; color:white; font-weight:bold; border-radius:4px; font-size:11px; cursor:pointer;">✓ Resolve</button>
+                        <button onclick="startEditHazard('${h.id}')" style="flex:2; padding:5px; background:#3498db; border:none; color:white; font-weight:bold; border-radius:4px; font-size:11px; cursor:pointer;">✏️ Edit</button>
+                        <button onclick="deleteHazard('${h.id}')" style="flex:1; padding:5px; background:#f5f5f5; border:1px solid #ddd; color:#e74c3c; font-weight:bold; border-radius:4px; font-size:11px; cursor:pointer;">Delete</button>
+                    </div>
+                `;
+                listDiv.appendChild(card);
+            });
+        }
+
+        function renderHazardsOnMap() {
+            clearHazardsFromMap();
+            
+            hsHazards.forEach(h => {
+                if (h.status !== 'active') return;
+                
+                let markerLayer;
+                const severityCol = h.severity === 'High' ? '#e74c3c' : (h.severity === 'Medium' ? '#e67e22' : '#f1c40f');
+                
+                const showResolveBtn = currentDashboardMode === 'health_safety';
+                const popupContent = `
+                    <div style="font-family:sans-serif; width:150px;">
+                        <div style="font-weight:bold; font-size:13px; color:#2c3e50; margin-bottom:4px;">${h.name}</div>
+                        <div style="font-size:11px; background:${severityCol}; color:white; display:inline-block; padding:1px 5px; border-radius:3px; font-weight:bold; margin-bottom:6px;">${h.severity.toUpperCase()} RISK</div>
+                        <div style="font-size:11px; color:#666; margin-bottom:6px;">${h.description || 'No description'}</div>
+                        <div style="font-size:9px; color:#999; ${showResolveBtn ? 'margin-bottom:8px;' : ''}">By: ${h.reportedBy}</div>
+                        ${showResolveBtn ? `
+                        <div style="display:flex; gap:4px; margin-top:4px;">
+                            <button onclick="resolveHazard('${h.id}')" style="flex:1; background:#2ecc71; color:white; border:none; padding:4px 2px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">✓ Resolve</button>
+                            <button onclick="startEditHazard('${h.id}'); map.closePopup();" style="flex:1; background:#3498db; color:white; border:none; padding:4px 2px; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">✏️ Edit</button>
+                        </div>` : ''}
+                    </div>
+                `;
+                
+                if (h.type === 'point') {
+                    // Create point marker
+                    const hazardIcon = L.divIcon({
+                        className: 'custom-hazard-marker',
+                        html: `<div style="background-color:${severityCol}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; color:white; font-size:9px; font-weight:bold;">!</div>`,
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    });
+                    
+                    markerLayer = L.marker([h.coordinates.lat, h.coordinates.lng], { icon: hazardIcon })
+                        .addTo(map)
+                        .bindPopup(popupContent);
+                } else {
+                    // Create polygon area marker
+                    const polyCoords = h.coordinates.map(v => [v.lat, v.lng]);
+                    markerLayer = L.polygon(polyCoords, {
+                        color: severityCol,
+                        fillColor: severityCol,
+                        fillOpacity: 0.25,
+                        weight: 2
+                    }).addTo(map).bindPopup(popupContent);
+                }
+                
+                hazardLayers.set(h.id, markerLayer);
+            });
+        }
+
+        function clearHazardsFromMap() {
+            hazardLayers.forEach(layer => {
+                if (layer) map.removeLayer(layer);
+            });
+            hazardLayers.clear();
+        }
+
+        /* --- MEETINGS LOG --- */
+        function toggleAddMeetingForm(show) {
+            const form = document.getElementById('hs-add-meeting-form');
+            if (!form) return;
+            if (show === undefined) {
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            } else {
+                form.style.display = show ? 'block' : 'none';
+            }
+            
+            if (form.style.display === 'block') {
+                document.getElementById('hs-meeting-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('hs-meeting-topic').value = '';
+                document.getElementById('hs-meeting-notes').value = '';
+                
+                // Populate checkboxes with active staff members
+                const container = document.getElementById('hs-meeting-attendees-checkboxes');
+                container.innerHTML = '';
+                const activeStaff = hsStaff.filter(s => s.status === 'active');
+                
+                if (activeStaff.length === 0) {
+                    container.innerHTML = '<span style="font-size:11px; color:#999;">No active staff registered.</span>';
+                } else {
+                    activeStaff.forEach(s => {
+                        const lbl = document.createElement('label');
+                        lbl.style.cssText = "display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:4px; cursor:pointer;";
+                        lbl.innerHTML = `<input type="checkbox" class="hs-meeting-att-cb" value="${s.name}"> ${s.name}`;
+                        container.appendChild(lbl);
+                    });
+                }
+            }
+        }
+
+        function saveSafetyMeeting() {
+            const date = document.getElementById('hs-meeting-date').value;
+            const topic = document.getElementById('hs-meeting-topic').value.trim();
+            const notes = document.getElementById('hs-meeting-notes').value.trim();
+            
+            if (!topic) return alert('Meeting topic is required.');
+            
+            // Collect checked attendees
+            const checkboxes = document.querySelectorAll('.hs-meeting-att-cb');
+            const attendees = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) attendees.push(cb.value);
+            });
+            
+            const newMeeting = {
+                id: 'meeting_' + Date.now(),
+                date: date || new Date().toISOString().split('T')[0],
+                topic: topic,
+                attendees: attendees,
+                notes: notes || ''
+            };
+            
+            hsMeetings.push(newMeeting);
+            localStorage.setItem('hs_meetings', JSON.stringify(hsMeetings));
+            
+            toggleAddMeetingForm(false);
+            renderMeetingsList();
+            saveHSToCloud();
+        }
+
+        function deleteMeeting(id) {
+            if (!confirm('Are you sure you want to delete this meeting log?')) return;
+            hsMeetings = hsMeetings.filter(m => m.id !== id);
+            localStorage.setItem('hs_meetings', JSON.stringify(hsMeetings));
+            renderMeetingsList();
+            saveHSToCloud();
+        }
+
+        function renderMeetingsList() {
+            const listDiv = document.getElementById('hs-meetings-list');
+            listDiv.innerHTML = '';
+            
+            if (hsMeetings.length === 0) {
+                listDiv.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:15px; background:white; border-radius:6px; border:1px solid #eee;">No logged safety meetings.</div>';
+                return;
+            }
+            
+            // Sort meetings newest first
+            const sorted = [...hsMeetings].sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            sorted.forEach(m => {
+                const card = document.createElement('div');
+                card.style.cssText = "background:white; padding:12px; border-radius:8px; border:1px solid #eee; border-left:4px solid #3498db; box-shadow:0 1px 3px rgba(0,0,0,0.05); position:relative;";
+                
+                const formattedDate = new Date(m.date).toLocaleDateString('en-NZ');
+                const attList = (m.attendees && m.attendees.length > 0) ? m.attendees.join(', ') : 'None logged';
+                
+                card.innerHTML = `
+                    <div style="font-size:10px; color:#7f8c8d; font-weight:bold; margin-bottom:4px;">MEETING LOG • ${formattedDate}</div>
+                    <div style="font-weight:bold; color:#2c3e50; font-size:14px; margin-bottom:4px;">${m.topic}</div>
+                    <div style="font-size:11px; color:#555; margin-bottom:6px;">👥 <b>Attendees:</b> ${attList}</div>
+                    ${m.notes ? `<div style="font-size:11px; background:#fcfcfc; border:1px solid #f0f0f0; border-radius:4px; padding:6px; color:#666; line-height:1.35; white-space:pre-wrap;">${m.notes}</div>` : ''}
+                    <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                        <button onclick="deleteMeeting('${m.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#f5f5f5; color:#e74c3c; cursor:pointer;">Delete</button>
+                    </div>
+                `;
+                listDiv.appendChild(card);
+            });
+        }
+
+        /* --- INTERACTIONS / OBSERVATIONS LOG --- */
+        function toggleAddInteractionForm(show) {
+            const form = document.getElementById('hs-add-interaction-form');
+            if (!form) return;
+            if (show === undefined) {
+                form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            } else {
+                form.style.display = show ? 'block' : 'none';
+            }
+            
+            if (form.style.display === 'block') {
+                document.getElementById('hs-interaction-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('hs-interaction-details').value = '';
+                document.getElementById('hs-interaction-action').value = '';
+                
+                // Populate Observer & Observed dropdown selectors
+                const observerSel = document.getElementById('hs-interaction-observer');
+                const observedSel = document.getElementById('hs-interaction-observed');
+                
+                observerSel.innerHTML = '<option value="">-- Select Observer --</option>';
+                observedSel.innerHTML = '<option value="">-- Nobody / Visitor --</option>';
+                
+                const activeStaff = hsStaff.filter(s => s.status === 'active');
+                
+                // Pre-add logged-in user to observer
+                const loggedInName = localStorage.getItem('auth_name') || '';
+                if (loggedInName) {
+                    const opt = document.createElement('option');
+                    opt.value = loggedInName;
+                    opt.innerText = `${loggedInName} (Current User)`;
+                    opt.selected = true;
+                    observerSel.appendChild(opt);
+                }
+
+                activeStaff.forEach(s => {
+                    if (s.name !== loggedInName) {
+                        const opt = document.createElement('option');
+                        opt.value = s.name;
+                        opt.innerText = s.name;
+                        observerSel.appendChild(opt);
+                    }
+                    
+                    const optObs = document.createElement('option');
+                    optObs.value = s.name;
+                    optObs.innerText = s.name;
+                    observedSel.appendChild(optObs);
+                });
+            }
+        }
+
+        function saveSafetyInteraction() {
+            const date = document.getElementById('hs-interaction-date').value;
+            const observer = document.getElementById('hs-interaction-observer').value;
+            const observed = document.getElementById('hs-interaction-observed').value || 'N/A';
+            const type = document.getElementById('hs-interaction-type').value;
+            const details = document.getElementById('hs-interaction-details').value.trim();
+            const action = document.getElementById('hs-interaction-action').value.trim();
+            
+            if (!observer) return alert('Please select the person observing.');
+            if (!details) return alert('Please enter observation details.');
+            
+            const newLog = {
+                id: 'inter_' + Date.now(),
+                date: date || new Date().toISOString().split('T')[0],
+                observerId: observer,
+                observedId: observed,
+                type: type,
+                details: details,
+                actionTaken: action || ''
+            };
+            
+            hsInteractions.push(newLog);
+            localStorage.setItem('hs_interactions', JSON.stringify(hsInteractions));
+            
+            toggleAddInteractionForm(false);
+            renderInteractionsList();
+            saveHSToCloud();
+        }
+
+        function deleteInteraction(id) {
+            if (!confirm('Are you sure you want to delete this observation log?')) return;
+            hsInteractions = hsInteractions.filter(item => item.id !== id);
+            localStorage.setItem('hs_interactions', JSON.stringify(hsInteractions));
+            renderInteractionsList();
+            saveHSToCloud();
+        }
+
+        function renderInteractionsList() {
+            const listDiv = document.getElementById('hs-interactions-list');
+            listDiv.innerHTML = '';
+            
+            if (hsInteractions.length === 0) {
+                listDiv.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:15px; background:white; border-radius:6px; border:1px solid #eee;">No logged safety observations.</div>';
+                return;
+            }
+            
+            const sorted = [...hsInteractions].sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            sorted.forEach(item => {
+                const card = document.createElement('div');
+                let borderCol = '#2ecc71'; // Safe
+                if (item.type === 'Unsafe Behavior') borderCol = '#e67e22';
+                else if (item.type === 'Near Miss') borderCol = '#e74c3c';
+                else if (item.type === 'Suggestion') borderCol = '#9b59b6';
+                
+                card.style.cssText = `background:white; padding:12px; border-radius:8px; border:1px solid #eee; border-left:4px solid ${borderCol}; box-shadow:0 1px 3px rgba(0,0,0,0.05); position:relative;`;
+                
+                const formattedDate = new Date(item.date).toLocaleDateString('en-NZ');
+                
+                card.innerHTML = `
+                    <div style="font-size:10px; color:#7f8c8d; font-weight:bold; margin-bottom:4px;">OBSERVATION • ${formattedDate}</div>
+                    <div style="font-weight:bold; color:#2c3e50; font-size:13px; margin-bottom:4px;">${item.type.toUpperCase()}</div>
+                    <div style="font-size:11px; color:#555; margin-bottom:4px;"><b>Observer:</b> ${item.observerId} ${item.observedId !== 'N/A' ? `• <b>Observed:</b> ${item.observedId}` : ''}</div>
+                    <div style="font-size:11px; color:#666; margin-bottom:6px; line-height:1.35; white-space:pre-wrap;">${item.details}</div>
+                    ${item.actionTaken ? `<div style="font-size:11px; background:#f9ebea; border-left:2px solid #e74c3c; padding:4px 8px; color:#c0392b;">👉 <b>Action:</b> ${item.actionTaken}</div>` : ''}
+                    <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                        <button onclick="deleteInteraction('${item.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#f5f5f5; color:#e74c3c; cursor:pointer;">Delete</button>
+                    </div>
+                `;
+                listDiv.appendChild(item);
+            });
+        }
+
+        /* --- SYNC & CLOUD SPREADSHEET SYNC LOGIC --- */
+        let hsSyncTimeoutId = null;
+
+        function saveHSToCloud() {
+            document.getElementById('hs-sync-msg').innerText = "Saving locally...";
+            
+            if (hsSyncTimeoutId) clearTimeout(hsSyncTimeoutId);
+            
+            hsSyncTimeoutId = setTimeout(() => {
+                if (!HS_GOOGLE_SCRIPT_URL || HS_GOOGLE_SCRIPT_URL.length < 5) {
+                    document.getElementById('hs-sync-msg').innerText = "Saved (Local Cache Only)";
+                    return;
+                }
+                
+                document.getElementById('hs-sync-msg').innerText = "Syncing with Cloud...";
+                
+                const payload = {
+                    type: 'hs_sync_all',
+                    staff: hsStaff,
+                    hazards: hsHazards,
+                    meetings: hsMeetings,
+                    interactions: hsInteractions
+                };
+                
+                fetch(HS_GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data && (data.status === 'success' || data.success === true)) {
+                        document.getElementById('hs-sync-msg').innerText = "Synced with Cloud Spreadsheet!";
+                    } else {
+                        document.getElementById('hs-sync-msg').innerText = "Sync Failed: Server Error";
+                    }
+                })
+                .catch(err => {
+                    console.error("H&S Cloud sync failed:", err);
+                    document.getElementById('hs-sync-msg').innerText = "Sync Failed: Offline";
+                });
+            }, 1000);
+        }
+
+        function syncHSFromCloud() {
+            if (!HS_GOOGLE_SCRIPT_URL || HS_GOOGLE_SCRIPT_URL.length < 5) {
+                document.getElementById('hs-setup-guide').style.display = 'block';
+                return;
+            }
+            
+            document.getElementById('hs-sync-msg').innerText = "Checking cloud updates...";
+            document.getElementById('hs-setup-guide').style.display = 'none';
+            
+            fetch(HS_GOOGLE_SCRIPT_URL + '?type=hs_get_all&_t=' + Date.now(), { cache: 'no-store' })
+            .then(res => {
+                if (res.ok) return res.json().catch(() => null);
+                throw new Error("Failed to load H&S data");
+            })
+            .then(data => {
+                if (data) {
+                    // Sync schemas
+                    if (data.staff && Array.isArray(data.staff)) {
+                        hsStaff = data.staff;
+                        localStorage.setItem('hs_staff', JSON.stringify(hsStaff));
+                    }
+                    if (data.hazards && Array.isArray(data.hazards)) {
+                        hsHazards = data.hazards;
+                        localStorage.setItem('hs_hazards', JSON.stringify(hsHazards));
+                    }
+                    if (data.meetings && Array.isArray(data.meetings)) {
+                        hsMeetings = data.meetings;
+                        localStorage.setItem('hs_meetings', JSON.stringify(hsMeetings));
+                    }
+                    if (data.interactions && Array.isArray(data.interactions)) {
+                        hsInteractions = data.interactions;
+                        localStorage.setItem('hs_interactions', JSON.stringify(hsInteractions));
+                    }
+                    
+                    document.getElementById('hs-sync-msg').innerText = "Updated from Cloud!";
+                    
+                    // Re-render
+                    setHSTab(currentHSTab);
+                    if (currentDashboardMode === 'health_safety') {
+                        renderHazardsOnMap();
+                    }
+                }
+            })
+            .catch(err => {
+                console.log("H&S Load from cloud failed or returned empty - using local storage cache");
+                document.getElementById('hs-sync-msg').innerText = "Load failed: using local cache";
+            });
+        }
+
         async function removeAuthorizedEmail(email) {
             if (!confirm(`Remove access for ${email}?`)) return;
             try {
@@ -6646,6 +7861,59 @@
         <button class="btn-delete-pt" id="btn-delete-pt" onclick="event.stopPropagation(); deleteEditVertex()" disabled>✕ Delete Point</button>
         <button class="btn-done" onclick="event.stopPropagation(); finishEditBreak()">✓ Done</button>
         <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditBreak()">✕ Cancel</button>
+    </div>
+
+    <!-- Hazard Drawing Toolbar -->
+    <div id="hazard-toolbar" class="break-toolbar" style="display:none;" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+        <span class="vertex-count" id="hazard-vertex-count">Drop point on map</span>
+        <button class="btn-undo" id="btn-hazard-undo" style="display:none;" onclick="event.stopPropagation(); undoLastHazardVertex()">↩ Undo</button>
+        <button class="btn-finish" id="btn-finish-hazard" onclick="event.stopPropagation(); finishHazard()" style="background:#e74c3c; border-color:#e74c3c;">✓ Finish</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelHazardDrawing()">✕ Cancel</button>
+    </div>
+
+    <!-- Hazard Edit Toolbar -->
+    <div id="hazard-edit-toolbar" class="break-toolbar" style="display:none;" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+        <span class="vertex-count" id="hazard-edit-info">Editing Hazard</span>
+        <button class="btn-delete-pt" id="btn-hazard-delete-pt" onclick="event.stopPropagation(); deleteEditHazardVertex()" disabled>✕ Delete Point</button>
+        <button class="btn-done" onclick="event.stopPropagation(); finishEditHazard()">✓ Done</button>
+        <button class="btn-cancel" onclick="event.stopPropagation(); cancelEditHazard()">✕ Cancel</button>
+    </div>
+
+    <!-- Finish Hazard Details Modal -->
+    <div id="finish-hazard-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; align-items:center; justify-content:center;">
+        <div style="background:white; padding:20px; border-radius:12px; width:80%; max-width:320px; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+            <h3 style="margin-top:0; color:#2c3e50; text-align:center;">Hazard Details</h3>
+            
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Hazard Name</label>
+                <input type="text" id="modal-hazard-name" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px; box-sizing:border-box;" placeholder="e.g. Broken Fence, Deep Hole" />
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Description</label>
+                <textarea id="modal-hazard-desc" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px; box-sizing:border-box; height:60px;" placeholder="Details about the hazard..."></textarea>
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Severity</label>
+                <select id="modal-hazard-severity" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9;">
+                    <option value="Low">Low</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="High">High</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label style="font-size:12px; font-weight:bold; color:#7f8c8d; display:block; margin-bottom:5px;">Reported By</label>
+                <select id="modal-hazard-reporter" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:14px; background:#f9f9f9;">
+                </select>
+            </div>
+            
+            <div style="display:flex; gap:10px;">
+                <button onclick="cancelHazardSave()" style="flex:1; padding:10px; background:#f5f5f5; border:1px solid #ddd; border-radius:6px; color:#555; font-weight:bold; cursor:pointer;">CANCEL</button>
+                <button onclick="saveHazardDetails()" style="flex:1; padding:10px; background:#e74c3c; border:none; border-radius:6px; color:white; font-weight:bold; cursor:pointer;">SAVE</button>
+            </div>
+        </div>
     </div>
 
 </body>
