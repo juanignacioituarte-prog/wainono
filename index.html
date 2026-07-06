@@ -1581,6 +1581,7 @@
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('roster'); toggleSettingsMenu();" style="font-weight: bold; color: #3498db;">📅 Roster</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('weather'); toggleSettingsMenu();" style="font-weight: bold; color: #f1c40f;">☁️ Weather</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('vehicle_maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #e67e22;">🚜 Vehicle Maintenance</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
@@ -2003,6 +2004,11 @@
                 3. Deploy as a web app for "Anyone".<br>
                 4. Set the script URL in <code>index.html</code>.
             </div>
+        </div>
+
+        <!-- Weather Panel -->
+        <div id="weather-view" style="display:none; flex-grow:1; width:100%; height:100%; background:#f9f9f9; box-sizing:border-box;">
+            <iframe src="https://www.weather-pro.com/reports/index.php?SN=N914557" style="width:100%; height:100%; border:none;"></iframe>
         </div>
 
         <!-- Roster Panel -->
@@ -3086,6 +3092,7 @@
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
             document.getElementById('health-safety-view').style.display = (mode === 'health_safety') ? 'block' : 'none';
+            document.getElementById('weather-view').style.display = (mode === 'weather') ? 'block' : 'none';
             document.getElementById('roster-view').style.display = (mode === 'roster') ? 'block' : 'none';
             document.getElementById('vehicle-maintenance-view').style.display = (mode === 'vehicle_maintenance') ? 'block' : 'none';
             document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
@@ -3147,14 +3154,14 @@
                 }
                 return;
             } else {
-                document.getElementById('map').style.display = (mode === 'roster' || mode === 'vehicle_maintenance') ? 'none' : 'block';
-                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance') ? 'none' : 'block';
+                document.getElementById('map').style.display = (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
                 
                 const sidebar = document.getElementById('sidebar');
-                if (mode === 'roster' || mode === 'vehicle_maintenance') {
+                if (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') {
                     if (window.innerWidth > 768) {
                         sidebar.style.setProperty('width', '100vw', 'important');
                     }
@@ -3166,7 +3173,7 @@
                 const isMinimized = sidebar.classList.contains('minimized');
                 
                 if (window.innerWidth <= 768) {
-                    if (mode === 'roster' || mode === 'vehicle_maintenance') {
+                    if (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') {
                         sidebar.style.height = '100vh';
                         sidebar.style.width = '100%';
                         document.documentElement.style.setProperty('--sidebar-h', '100vh');
@@ -3177,7 +3184,7 @@
                         document.documentElement.style.setProperty('--sidebar-h', sideH);
                     }
                 } else {
-                    if (mode === 'roster' || mode === 'vehicle_maintenance') {
+                    if (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') {
                         sidebar.style.width = '100vw';
                         sidebar.style.height = '100%';
                     } else {
