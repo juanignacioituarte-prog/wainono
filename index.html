@@ -1760,7 +1760,8 @@
                 
                 <!-- Add Staff Inline Form -->
                 <div id="hs-add-staff-form" style="display:none; background:white; padding:12px; border-radius:8px; border:1px solid #ddd; margin-bottom:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    <div style="margin-bottom:8px;">
+                    <span id="hs-staff-form-title" style="font-weight:bold; font-size:12px; color:#2c3e50; display:block; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">Add New Staff Member</span>
+                    <div id="hs-staff-user-select-container" style="margin-bottom:8px;">
                         <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Select App User to Pre-fill</label>
                         <select id="hs-staff-user-select" onchange="onStaffUserSelectChange()" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; background:#fff; box-sizing:border-box;">
                             <option value="">-- Choose App User --</option>
@@ -6945,48 +6946,124 @@
             });
         }
 
-        function canEditStaffProfiles() {
+        let editStaffId = null;
+
+        function isAdmin() {
             const email = (localStorage.getItem('auth_email') || '').toLowerCase().trim();
             return email === 'juanignacioituarte@gmail.com' || email === 'cha.adrian94@gmail.com';
         }
 
-        function toggleAddStaffForm(show) {
-            if (!canEditStaffProfiles()) {
-                return alert('You are not authorized to edit staff profiles.');
-            }
+        function canEditThisProfile(s) {
+            const loggedInEmail = (localStorage.getItem('auth_email') || '').toLowerCase().trim();
+            if (!loggedInEmail) return false;
+            if (loggedInEmail === 'juanignacioituarte@gmail.com' || loggedInEmail === 'cha.adrian94@gmail.com') return true;
+            return s && s.email && s.email.toLowerCase().trim() === loggedInEmail;
+        }
+
+        function toggleAddStaffForm(show, staffId = null) {
             const form = document.getElementById('hs-add-staff-form');
             if (!form) return;
+            
             if (show === undefined) {
-                form.style.display = form.style.display === 'none' ? 'block' : 'none';
-            } else {
-                form.style.display = show ? 'block' : 'none';
+                show = form.style.display === 'none';
             }
-            if (form.style.display === 'block') {
-                document.getElementById('hs-staff-user-select').value = '';
-                document.getElementById('hs-staff-name').value = '';
-                document.getElementById('hs-staff-role').value = '';
-                document.getElementById('hs-staff-email').value = '';
-                document.getElementById('hs-staff-phone').value = '';
-                document.getElementById('hs-staff-emergency').value = '';
-                document.getElementById('hs-staff-allergies').value = '';
-                
-                // Clear training inputs and temp list
-                tempStaffTrainings = [];
-                renderTempTrainings();
-                document.getElementById('hs-staff-training-select').value = 'First Aid Certificate';
-                document.getElementById('hs-staff-training-date').value = new Date().toISOString().split('T')[0];
-                document.getElementById('hs-staff-training-custom').value = '';
-                document.getElementById('hs-staff-training-custom').style.display = 'none';
-
-                document.getElementById('hs-staff-induction').value = new Date().toISOString().split('T')[0];
-                loadAppUsersForStaffSelect();
+            
+            if (show) {
+                if (staffId) {
+                    // Editing profile
+                    const s = hsStaff.find(item => item.id === staffId);
+                    if (!s) return;
+                    if (!canEditThisProfile(s)) {
+                        return alert('You are not authorized to edit this profile.');
+                    }
+                    
+                    editStaffId = staffId;
+                    document.getElementById('hs-staff-form-title').innerText = "Edit Staff Profile";
+                    document.getElementById('hs-staff-user-select-container').style.display = 'none';
+                    
+                    document.getElementById('hs-staff-name').value = s.name;
+                    document.getElementById('hs-staff-role').value = s.role;
+                    document.getElementById('hs-staff-email').value = s.email;
+                    document.getElementById('hs-staff-phone').value = s.phone || '';
+                    document.getElementById('hs-staff-emergency').value = s.emergencyContact || '';
+                    document.getElementById('hs-staff-allergies').value = s.allergies || '';
+                    document.getElementById('hs-staff-induction').value = s.inductionDate || new Date().toISOString().split('T')[0];
+                    
+                    // Parse training summary string back to temp list
+                    tempStaffTrainings = [];
+                    if (s.training) {
+                        const parts = s.training.split(', ');
+                        parts.forEach(p => {
+                            const match = p.match(/(.+) \(([^)]+)\)/);
+                            if (match) {
+                                tempStaffTrainings.push({
+                                    course: match[1].trim(),
+                                    date: match[2].trim()
+                                });
+                            } else if (p.trim() !== "") {
+                                tempStaffTrainings.push({
+                                    course: p.trim(),
+                                    date: new Date().toISOString().split('T')[0]
+                                });
+                            }
+                        });
+                    }
+                    renderTempTrainings();
+                    
+                    // Permission restriction: Disable fields if not Admin
+                    const isUserAdmin = isAdmin();
+                    document.getElementById('hs-staff-name').disabled = !isUserAdmin;
+                    document.getElementById('hs-staff-role').disabled = !isUserAdmin;
+                    document.getElementById('hs-staff-email').disabled = !isUserAdmin;
+                    document.getElementById('hs-staff-induction').disabled = !isUserAdmin;
+                    
+                    // Hide/Show training record panel elements based on admin role
+                    document.getElementById('hs-staff-training-select').disabled = !isUserAdmin;
+                    document.getElementById('hs-staff-training-date').disabled = !isUserAdmin;
+                    const addBtn = document.querySelector("#hs-add-staff-form button[onclick='addTrainingToTempList()']");
+                    if (addBtn) addBtn.style.display = isUserAdmin ? 'inline-block' : 'none';
+                    
+                } else {
+                    // Creating new staff member
+                    if (!isAdmin()) {
+                        return alert('Only administrators can register new staff profiles.');
+                    }
+                    
+                    editStaffId = null;
+                    document.getElementById('hs-staff-form-title').innerText = "Add New Staff Member";
+                    document.getElementById('hs-staff-user-select-container').style.display = 'block';
+                    
+                    document.getElementById('hs-staff-name').value = '';
+                    document.getElementById('hs-staff-role').value = '';
+                    document.getElementById('hs-staff-email').value = '';
+                    document.getElementById('hs-staff-phone').value = '';
+                    document.getElementById('hs-staff-emergency').value = '';
+                    document.getElementById('hs-staff-allergies').value = '';
+                    document.getElementById('hs-staff-induction').value = new Date().toISOString().split('T')[0];
+                    
+                    tempStaffTrainings = [];
+                    renderTempTrainings();
+                    
+                    // Enable everything
+                    document.getElementById('hs-staff-name').disabled = false;
+                    document.getElementById('hs-staff-role').disabled = false;
+                    document.getElementById('hs-staff-email').disabled = false;
+                    document.getElementById('hs-staff-induction').disabled = false;
+                    document.getElementById('hs-staff-training-select').disabled = false;
+                    document.getElementById('hs-staff-training-date').disabled = false;
+                    const addBtn = document.querySelector("#hs-add-staff-form button[onclick='addTrainingToTempList()']");
+                    if (addBtn) addBtn.style.display = 'inline-block';
+                    
+                    loadAppUsersForStaffSelect();
+                }
+                form.style.display = 'block';
+            } else {
+                form.style.display = 'none';
+                editStaffId = null;
             }
         }
 
         function saveStaffMember() {
-            if (!canEditStaffProfiles()) {
-                return alert('You are not authorized to edit staff profiles.');
-            }
             const name = document.getElementById('hs-staff-name').value.trim();
             const role = document.getElementById('hs-staff-role').value.trim();
             const email = document.getElementById('hs-staff-email').value.trim();
@@ -6995,36 +7072,62 @@
             const allergies = document.getElementById('hs-staff-allergies').value.trim();
             const induction = document.getElementById('hs-staff-induction').value;
             
-            if (!name) return alert('Staff member name is required.');
+            if (editStaffId) {
+                const s = hsStaff.find(item => item.id === editStaffId);
+                if (!s) return;
+                if (!canEditThisProfile(s)) {
+                    return alert('You are not authorized to save changes to this profile.');
+                }
+                
+                if (isAdmin()) {
+                    if (!name) return alert('Name is required.');
+                    // Admin can update all fields
+                    s.name = name;
+                    s.role = role || 'worker';
+                    s.email = email || '';
+                    s.phone = phone || '';
+                    s.emergencyContact = emergency || '';
+                    s.allergies = allergies || '';
+                    s.inductionDate = induction || new Date().toISOString().split('T')[0];
+                    s.training = tempStaffTrainings.map(t => `${t.course} (${t.date})`).join(', ');
+                } else {
+                    // Standard user editing their own profile: update only basic info
+                    s.phone = phone || '';
+                    s.emergencyContact = emergency || '';
+                    s.allergies = allergies || '';
+                }
+            } else {
+                if (!isAdmin()) {
+                    return alert('Only administrators can register new staff profiles.');
+                }
+                if (!name) return alert('Staff member name is required.');
+                
+                const trainingSummary = tempStaffTrainings.map(t => `${t.course} (${t.date})`).join(', ');
+                const staffId = 'staff_' + Date.now();
+                const newStaff = {
+                    id: staffId,
+                    name: name,
+                    role: role || 'worker',
+                    email: email || '',
+                    phone: phone || '',
+                    emergencyContact: emergency || '',
+                    allergies: allergies || '',
+                    training: trainingSummary,
+                    inductionDate: induction || new Date().toISOString().split('T')[0],
+                    status: 'active'
+                };
+                hsStaff.push(newStaff);
+            }
             
-            // Build the training string summary from the temp list (e.g. "First Aid (2026-05-12), ATV (2026-06-15)")
-            const trainingSummary = tempStaffTrainings.map(t => `${t.course} (${t.date})`).join(', ');
-            
-            const staffId = 'staff_' + Date.now();
-            const newStaff = {
-                id: staffId,
-                name: name,
-                role: role || 'worker',
-                email: email || '',
-                phone: phone || '',
-                emergencyContact: emergency || '',
-                allergies: allergies || '',
-                training: trainingSummary,
-                inductionDate: induction || new Date().toISOString().split('T')[0],
-                status: 'active'
-            };
-            
-            hsStaff.push(newStaff);
             localStorage.setItem('hs_staff', JSON.stringify(hsStaff));
-            
             toggleAddStaffForm(false);
             renderStaffList();
             saveHSToCloud();
         }
 
         function toggleStaffStatus(id) {
-            if (!canEditStaffProfiles()) {
-                return alert('You are not authorized to edit staff profiles.');
+            if (!isAdmin()) {
+                return alert('Only administrators can toggle staff active/inactive status.');
             }
             const s = hsStaff.find(item => item.id === id);
             if (s) {
@@ -7036,8 +7139,8 @@
         }
 
         function deleteStaffMember(id) {
-            if (!canEditStaffProfiles()) {
-                return alert('You are not authorized to edit staff profiles.');
+            if (!isAdmin()) {
+                return alert('Only administrators can delete staff profiles.');
             }
             if (!confirm('Are you sure you want to remove this staff member?')) return;
             hsStaff = hsStaff.filter(item => item.id !== id);
@@ -7050,9 +7153,9 @@
             const listDiv = document.getElementById('hs-staff-list');
             listDiv.innerHTML = '';
             
-            const editAllowed = canEditStaffProfiles();
+            const isUserAdmin = isAdmin();
             const addBtn = document.getElementById('hs-add-staff-btn');
-            if (addBtn) addBtn.style.display = editAllowed ? 'block' : 'none';
+            if (addBtn) addBtn.style.display = isUserAdmin ? 'block' : 'none';
             
             if (hsStaff.length === 0) {
                 listDiv.innerHTML = '<div style="font-size:12px; color:#999; text-align:center; padding:15px; background:white; border-radius:6px; border:1px solid #eee;">No staff members registered.</div>';
@@ -7064,6 +7167,8 @@
                 const isActive = s.status === 'active';
                 
                 card.style.cssText = `background:white; padding:12px; border-radius:8px; border:1px solid #eee; border-left:4px solid ${isActive ? '#2ecc71' : '#bdc3c7'}; box-shadow:0 1px 3px rgba(0,0,0,0.05); position:relative;`;
+                
+                const userCanEdit = canEditThisProfile(s);
                 
                 card.innerHTML = `
                     <div style="font-weight:bold; color:#2c3e50; font-size:14px;">${s.name}</div>
@@ -7077,11 +7182,13 @@
                     
                     <div style="font-size:10px; color:#999; margin-top:6px; border-top:1px solid #f9f9f9; padding-top:4px;">Inducted: ${s.inductionDate}</div>
                     
-                    ${editAllowed ? `
                     <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px;">
+                        ${userCanEdit ? `<button onclick="toggleAddStaffForm(true, '${s.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:1px solid #3498db; background:#f0f8ff; color:#3498db; cursor:pointer;">✏️ Edit</button>` : ''}
+                        ${isUserAdmin ? `
                         <button onclick="toggleStaffStatus('${s.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:1px solid #ddd; background:#f9f9f9; color:#555; cursor:pointer;">${isActive ? 'Deactivate' : 'Activate'}</button>
                         <button onclick="deleteStaffMember('${s.id}')" style="padding:4px 8px; font-size:10px; font-weight:bold; border-radius:4px; border:none; background:#f5f5f5; color:#e74c3c; cursor:pointer;">Delete</button>
-                    </div>` : ''}
+                        ` : ''}
+                    </div>
                 `;
                 listDiv.appendChild(card);
             });
