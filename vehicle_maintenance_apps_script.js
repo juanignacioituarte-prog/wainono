@@ -75,7 +75,7 @@ function ensureSheet(ss, name) {
 function saveVehicleSheet(ss, sheetName, vehicles) {
   var sheet = ensureSheet(ss, sheetName);
   sheet.clear();
-  var headers = ['id', 'name', 'type', 'status', 'oosReason', 'lastService'];
+  var headers = ['id', 'name', 'type', 'status', 'oosReason', 'lastService', 'deleted'];
   sheet.appendRow(headers);
   vehicles.forEach(function(v) {
     sheet.appendRow([
@@ -84,7 +84,8 @@ function saveVehicleSheet(ss, sheetName, vehicles) {
       v.type || '',
       v.status || 'in_service',
       v.oosReason || '',
-      v.lastService || ''
+      v.lastService || '',
+      v.deleted ? 'true' : 'false'
     ]);
   });
 }
@@ -101,6 +102,8 @@ function readVehicleSheet(ss, sheetName, typeOverride) {
     var obj = {};
     headers.forEach(function(h, j) { obj[h] = row[j] || ''; });
     if (!obj.type && typeOverride) obj.type = typeOverride;
+    // Convert deleted string back to boolean
+    obj.deleted = (obj.deleted === 'true' || obj.deleted === true);
     list.push(obj);
   }
   return list;
