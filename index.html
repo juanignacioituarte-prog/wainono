@@ -2010,6 +2010,7 @@
         // Paste your Google Apps Script Web App URL here to enable cloud saving
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzRkkZ9pxJnFYiBpbLdgy_WXoG_itdfnjL199NvOLLxCGrPfh2drA1lcCVditsKxbe2/exec";
         const HS_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMYjvvuAoNrqzQSECZ_Jit2hN7L1uRyAQCmg1qzusXeRmZiZ4DLoOCxJCsorPBNcRu/exec";
+        const ROSTER_GOOGLE_SCRIPT_URL = "";
 
         /* Health & Safety State */
         let hsStaff = JSON.parse(localStorage.getItem('hs_staff')) || [];
@@ -8060,7 +8061,7 @@
 
         /* --- ROSTER MODULE --- */
         function fetchRoster() {
-            if (!HS_GOOGLE_SCRIPT_URL || HS_GOOGLE_SCRIPT_URL.length < 5) {
+            if (!ROSTER_GOOGLE_SCRIPT_URL || ROSTER_GOOGLE_SCRIPT_URL.length < 5) {
                 document.getElementById('roster-msg').innerText = "Roster URL not configured.";
                 document.getElementById('roster-setup-guide').style.display = 'block';
                 return;
@@ -8069,7 +8070,7 @@
             document.getElementById('roster-msg').innerText = "Loading roster from Google Sheets...";
             document.getElementById('roster-setup-guide').style.display = 'none';
             
-            fetch(HS_GOOGLE_SCRIPT_URL + '?type=get_roster&_t=' + Date.now(), { cache: 'no-store' })
+            fetch(ROSTER_GOOGLE_SCRIPT_URL + '?type=get_roster&_t=' + Date.now(), { cache: 'no-store' })
             .then(res => {
                 if (res.ok) return res.json().catch(() => null);
                 throw new Error("Network response error");
