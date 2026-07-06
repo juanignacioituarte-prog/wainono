@@ -7858,8 +7858,6 @@
             const h = hsHazards.find(haz => haz.id === id);
             if (!h) return;
             
-            switchDashboardMode('manual');
-            
             if (h.type === 'point') {
                 map.setView([h.coordinates.lat, h.coordinates.lng], 17);
             } else if (h.type === 'area' && h.coordinates.length > 0) {
