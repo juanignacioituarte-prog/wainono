@@ -44,7 +44,7 @@ async function main() {
   });
 
   let count = 0;
-  for (const row of data) {
+  for (const row of data as any[]) {
     // Format: Paddock Name, Date, NDVI, Cloud%, TileURL
     if (row.length < 3) continue;
     

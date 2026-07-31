@@ -1,6 +1,6 @@
 
 
-async function fetchCSV(name, url) {
+async function fetchCSV(name: string, url: string) {
   try {
     const res = await fetch(url);
     const text = await res.text();
