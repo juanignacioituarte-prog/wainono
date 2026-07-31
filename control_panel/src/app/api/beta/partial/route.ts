@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   
   // Format as CSV
   const rows = [',']; // Header is empty comma in the google sheet
-  partials.forEach(p => rows.push(`${p.paddockName},${p.status}`));
+  partials.forEach((p: any) => rows.push(`${p.paddockName},${p.status}`));
 
   return new NextResponse(rows.join('\n'), { 
     headers: {

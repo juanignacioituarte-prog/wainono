@@ -25,7 +25,7 @@ model Farm {
   paddockExclusions PaddockExclusion[]
   paddockPartials   PaddockPartial[]
   calibrations      Calibration[]
-  manualMode        ManualMode?
+  manualModes       ManualMode[]
 }
 
 model User {
@@ -66,6 +66,8 @@ model PastureRecord {
   cover      Float? // Optional: so we can have NDVI-only records
   ndvi       Float? // Optional: so we can have manual-only records
   growthRate Float?
+  cloudCover Float?
+  tileUrl    String?
   type       String   @default("MANUAL") // 'MANUAL' or 'SATELLITE'
 
   paddock Paddock @relation(fields: [paddockId], references: [id], onDelete: Cascade)
@@ -120,6 +122,7 @@ model HS_Hazard {
   mitigation  String?
   date        DateTime @default(now())
   reportedBy  String?
+  coordinates String? // JSON string of coordinates
 
   farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
 }
@@ -249,5 +252,5 @@ model ManualMode {
 
   farm Farm @relation(fields: [farmId], references: [id], onDelete: Cascade)
 
-  @@unique([farmId])
+  @@unique([farmId, paddockName])
 }

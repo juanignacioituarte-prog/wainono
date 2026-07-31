@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   
   // Format as CSV
   const rows = ['paddock_name,measured_cover,date'];
-  cals.forEach(c => {
+  cals.forEach((c: any) => {
     let dateStr = '';
     if (c.date) {
       dateStr = `${c.date.getUTCDate().toString().padStart(2, '0')}/${(c.date.getUTCMonth()+1).toString().padStart(2, '0')}/${c.date.getUTCFullYear()}`;

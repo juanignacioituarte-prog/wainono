@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     type: "FeatureCollection",
     name: "Paddocks",
     crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
-    features: paddocks.map(p => ({
+    features: paddocks.map((p: any) => ({
       type: "Feature",
       properties: {
         id: p.id,

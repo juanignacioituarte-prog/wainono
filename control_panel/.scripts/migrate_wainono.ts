@@ -55,17 +55,17 @@ async function main() {
   const hsData = await hsRes.json();
   
   if (hsData.incidents) {
-    await prisma.healthSafetyIncident.deleteMany({ where: { farmId: farm.id } });
+    await prisma.hS_Incident.deleteMany({ where: { farmId: farm.id } });
     for (const inc of hsData.incidents) {
       if (!inc.date) continue;
-      await prisma.healthSafetyIncident.create({
+      await prisma.hS_Incident.create({
         data: {
           farmId: farm.id,
           date: new Date(inc.date),
           reportedBy: inc.reportedBy || 'Unknown',
           description: inc.description || '',
           severity: inc.severity || 'Minor',
-          actionTaken: inc.actionTaken || ''
+          actionTaken: inc.actionTaken || '', status: inc.status || 'Open'
         }
       });
     }

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     
     return NextResponse.json({
       vehicles,
-      logs: logs.map(l => ({
+      logs: logs.map((l: any) => ({
         ...l,
         date: l.date.toISOString(),
         checkedPoints: typeof l.checkedPoints === 'string' ? JSON.parse(l.checkedPoints) : l.checkedPoints

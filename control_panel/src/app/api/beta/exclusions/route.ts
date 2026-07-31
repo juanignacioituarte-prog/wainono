@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   
   // Format as CSV
   const rows = ['paddock,reason'];
-  exclusions.forEach(e => rows.push(`${e.paddockName},${e.reason}`));
+  exclusions.forEach((e: any) => rows.push(`${e.paddockName},${e.reason}`));
 
   return new NextResponse(rows.join('\n'), { 
     headers: {

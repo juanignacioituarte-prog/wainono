@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import * as shp from 'shpjs';
+
+const InteractiveMap = dynamic(() => import('./InteractiveMap'), {
+  ssr: false,
+  loading: () => <div className="w-full h-[500px] bg-slate-900/50 animate-pulse rounded-xl border border-slate-700/50 flex items-center justify-center text-slate-500">Loading Map...</div>
+});
 
 type Farm = {
   id: string;
@@ -15,10 +21,21 @@ export default function FarmDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedFarm, setSelectedFarm] = useState<Farm | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{msg: string, type: 'error'|'success'|'info'} | null>(null);
+  
+  const [mapData, setMapData] = useState<{paddocks: any[], breaks: any[], hazards: any[]}>({ paddocks: [], breaks: [], hazards: [] });
 
   useEffect(() => {
     fetchFarms();
   }, []);
+
+  useEffect(() => {
+    if (selectedFarm) {
+      fetch(`/api/farms/${selectedFarm.id}/map`)
+        .then(res => res.json())
+        .then(data => setMapData(data))
+        .catch(console.error);
+    }
+  }, [selectedFarm]);
 
   const fetchFarms = async () => {
     try {
@@ -219,7 +236,21 @@ export default function FarmDashboard() {
                   <div className="inline-block h-8 w-8 rounded-full ring-2 ring-slate-800 bg-emerald-800/50 border border-emerald-500 flex items-center justify-center"><span className="text-xs text-emerald-300">+</span></div>
                 </div>
               </div>
+            </div>
 
+            {/* Map Section */}
+            <div className="mt-8">
+              <h3 className="text-lg font-medium text-slate-200 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Farm Map
+              </h3>
+              <InteractiveMap 
+                paddocks={mapData.paddocks} 
+                breaks={mapData.breaks} 
+                hazards={mapData.hazards} 
+              />
             </div>
           </div>
         ) : (

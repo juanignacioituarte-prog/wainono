@@ -1,0 +1,1 @@
+const { Client } = require('pg'); const client = new Client({ connectionString: process.env.DIRECT_URL }); client.connect().then(() => client.query("SELECT indexname FROM pg_indexes WHERE tablename = 'ManualMode';")).then(res => console.log('Indexes:', res.rows)).catch(e => console.log('Error:', e.message)).finally(() => client.end());

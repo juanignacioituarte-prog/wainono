@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
   if (type === 'get_auth') {
     const users = await prisma.user.findMany({ select: { email: true } });
-    return NextResponse.json({ emails: users.map(u => u.email) }, { headers: getCorsHeaders() });
+    return NextResponse.json({ emails: users.map((u: any) => u.email) }, { headers: getCorsHeaders() });
   }
 
   if (type === 'hs_get_all') {
@@ -17,8 +17,8 @@ export async function GET(request: Request) {
     const staff = await prisma.hS_Staff.findMany({ where: { farmId } });
     
     return NextResponse.json({
-      incidents: incidents.map(i => ({ ...i, date: i.date.toISOString() })),
-      observations: observations.map(o => ({ ...o, date: o.date.toISOString() })),
+      incidents: incidents.map((i: any) => ({ ...i, date: i.date.toISOString() })),
+      observations: observations.map((o: any) => ({ ...o, date: o.date.toISOString() })),
       staff: staff
     }, { headers: getCorsHeaders() });
   }

@@ -1,0 +1,1 @@
+const { Client } = require('pg'); const client = new Client({ connectionString: process.env.DIRECT_URL }); client.connect().then(() => client.query('SELECT conname FROM pg_constraint WHERE conrelid = \'"ManualMode"\'::regclass;')).then(res => console.log('Constraints:', res.rows)).catch(e => console.log('Error:', e.message)).finally(() => client.end());

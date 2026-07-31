@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const settings = await prisma.feedSetting.findMany({ where: { farmId } });
   
   // Format as CSV string
-  const csvStr = settings.map(s => `${s.key},${s.value}`).join('\n');
+  const csvStr = settings.map((s: any) => `${s.key},${s.value}`).join('\n');
 
   return new NextResponse(csvStr, { 
     headers: {

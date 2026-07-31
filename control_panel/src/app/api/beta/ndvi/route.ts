@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   });
   
   // Format as array of arrays: [Paddock Name, Date (dd/MM/yyyy), NDVI, Cloud%, TileURL]
-  const rows = records.map(r => {
+  const rows = records.map((r: any) => {
     const d = r.date;
     const dateStr = `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth()+1).toString().padStart(2, '0')}/${d.getUTCFullYear()}`;
     return `${r.paddock.name},${dateStr},${r.ndvi || ""},0,`;

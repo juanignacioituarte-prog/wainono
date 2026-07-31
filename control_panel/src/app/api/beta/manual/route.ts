@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const farmId = searchParams.get('farmId') || 'c7972aad-664f-43ad-934d-d88708d3e315';
 
-  const manual = await prisma.manualMode.findUnique({ where: { farmId } });
+  const manual = await prisma.manualMode.findFirst({ where: { farmId } });
   
   const csvStr = manual ? manual.data : "Date\n";
 
