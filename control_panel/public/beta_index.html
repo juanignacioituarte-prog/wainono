@@ -3023,7 +3023,7 @@
 
         async function loadGeoJSON() {
             try {
-                const response = await fetch(GEOJSON_URL + "?t=" + Date.now());
+                const response = await fetch(GEOJSON_URL + "&t=" + Date.now());
                 const data = await response.json();
                 data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
                 geoLayer = L.geoJSON(data, {
@@ -3124,7 +3124,7 @@
                         msg.innerText = "Syncing from Cloud...";
                         msg.style.display = 'inline-block';
                     }
-                    fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now(), { cache: 'no-store' })
+                    fetch(GOOGLE_SCRIPT_URL + "&t=" + Date.now(), { cache: 'no-store' })
                         .then(res => res.json())
                         .then(data => {
                             if (data) {
