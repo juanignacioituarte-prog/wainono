@@ -2198,9 +2198,8 @@
     <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
     <script>
         /* === CONFIGURATION === */
-        // Paste your Google Apps Script Web App URL here to enable cloud saving
-        const GOOGLE_SCRIPT_URL = "http://localhost:3000/api/beta/hs";
-        const HS_GOOGLE_SCRIPT_URL = "http://localhost:3000/api/beta/hs";
+        const GOOGLE_SCRIPT_URL = "/api/beta/hs";
+        const HS_GOOGLE_SCRIPT_URL = "/api/beta/hs";
         const ROSTER_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx_qBldXyEMoIev8kxT8mCOZGSZBTlnymEsBA6pMLiJGboKVBYEryrMJDSzIdeIdlVUfA/exec";
 
         /* Health & Safety State */
@@ -3024,7 +3023,7 @@
 
         async function loadGeoJSON() {
             try {
-                const response = await fetch(GEOJSON_URL + "?t=" + Date.now());
+                const response = await fetch(GEOJSON_URL + "&t=" + Date.now());
                 const data = await response.json();
                 data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
                 geoLayer = L.geoJSON(data, {
@@ -3125,7 +3124,7 @@
                         msg.innerText = "Syncing from Cloud...";
                         msg.style.display = 'inline-block';
                     }
-                    fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now(), { cache: 'no-store' })
+                    fetch(GOOGLE_SCRIPT_URL + "&t=" + Date.now(), { cache: 'no-store' })
                         .then(res => res.json())
                         .then(data => {
                             if (data) {
@@ -8594,7 +8593,7 @@
         }
 
         /* ===================== VEHICLE MAINTENANCE MODULE ===================== */
-        const VEHICLE_GOOGLE_SCRIPT_URL = "http://localhost:3000/api/beta/vehicles";
+        const VEHICLE_GOOGLE_SCRIPT_URL = "/api/beta/vehicles";
         let vmVehicles = JSON.parse(localStorage.getItem('vm_vehicles')) || [];
         let vmLogs = JSON.parse(localStorage.getItem('vm_logs')) || [];
         let currentVMTab = 'vehicles';
