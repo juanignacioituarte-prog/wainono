@@ -1,0 +1,4059 @@
+﻿{
+    "status":  "success",
+    "breaks":  [
+                   {
+                       "id":  "mqj72cvk2vy8e",
+                       "name":  "Lower Fescue Crop Break 13",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.096687,
+                                            "lng":  170.88109
+                                        },
+                                        {
+                                            "lat":  -44.097272,
+                                            "lng":  170.881648
+                                        },
+                                        {
+                                            "lat":  -44.097233,
+                                            "lng":  170.881053
+                                        }
+                                    ],
+                       "areaSqm":  1455,
+                       "areaHa":  0.145,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T07:44:35.505Z",
+                       "createdBy":  "Juan",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-18T07:44:52.437Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqj6vfbuiyzig",
+                       "name":  "Lower Fescue Crop Break 12",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.096251,
+                                            "lng":  170.880587
+                                        },
+                                        {
+                                            "lat":  -44.096399,
+                                            "lng":  170.880471
+                                        },
+                                        {
+                                            "lat":  -44.097497,
+                                            "lng":  170.880079
+                                        },
+                                        {
+                                            "lat":  -44.097854,
+                                            "lng":  170.881901
+                                        },
+                                        {
+                                            "lat":  -44.096938,
+                                            "lng":  170.882241
+                                        },
+                                        {
+                                            "lat":  -44.096359,
+                                            "lng":  170.88145
+                                        },
+                                        {
+                                            "lat":  -44.096265,
+                                            "lng":  170.880991
+                                        }
+                                    ],
+                       "areaSqm":  20982,
+                       "areaHa":  2.098,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T07:39:12.090Z",
+                       "createdBy":  "Juan",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-18T07:45:26.312Z"
+                   },
+                   {
+                       "id":  "mqj6ucvqpy7ej",
+                       "name":  "Old house 2 Crop Break 12",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095254,
+                                            "lng":  170.869286
+                                        },
+                                        {
+                                            "lat":  -44.09439,
+                                            "lng":  170.869562
+                                        },
+                                        {
+                                            "lat":  -44.094404,
+                                            "lng":  170.869751
+                                        },
+                                        {
+                                            "lat":  -44.094849,
+                                            "lng":  170.86962
+                                        },
+                                        {
+                                            "lat":  -44.095293,
+                                            "lng":  170.869489
+                                        }
+                                    ],
+                       "areaSqm":  1591,
+                       "areaHa":  0.159,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T07:38:22.262Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqj6svy02y0kb",
+                       "name":  "Oneils hill Crop Break 13",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097912,
+                                            "lng":  170.873077
+                                        },
+                                        {
+                                            "lat":  -44.097482,
+                                            "lng":  170.872591
+                                        },
+                                        {
+                                            "lat":  -44.097155,
+                                            "lng":  170.872538
+                                        },
+                                        {
+                                            "lat":  -44.097744,
+                                            "lng":  170.873302
+                                        }
+                                    ],
+                       "areaSqm":  1765,
+                       "areaHa":  0.177,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T07:37:13.657Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqj5gnae5bs08",
+                       "name":  "Shanes Crop Break 16",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097548,
+                                            "lng":  170.876425
+                                        },
+                                        {
+                                            "lat":  -44.097425,
+                                            "lng":  170.87649
+                                        },
+                                        {
+                                            "lat":  -44.096952,
+                                            "lng":  170.876015
+                                        },
+                                        {
+                                            "lat":  -44.09708,
+                                            "lng":  170.875846
+                                        }
+                                    ],
+                       "areaSqm":  1080,
+                       "areaHa":  0.108,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T06:59:42.950Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqj5g340qifcu",
+                       "name":  "Top dark side Crop Break 2",
+                       "paddock":  "Top dark side",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.096942,
+                                            "lng":  170.876022
+                                        },
+                                        {
+                                            "lat":  -44.096735,
+                                            "lng":  170.876645
+                                        },
+                                        {
+                                            "lat":  -44.096529,
+                                            "lng":  170.877269
+                                        },
+                                        {
+                                            "lat":  -44.096696,
+                                            "lng":  170.877378
+                                        },
+                                        {
+                                            "lat":  -44.096891,
+                                            "lng":  170.876772
+                                        },
+                                        {
+                                            "lat":  -44.097086,
+                                            "lng":  170.876165
+                                        }
+                                    ],
+                       "areaSqm":  2158,
+                       "areaHa":  0.216,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T06:59:16.801Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqj5aro7oo0lb",
+                       "name":  "Top dark side Line 1",
+                       "paddock":  "Top dark side",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098429,
+                                            "lng":  170.878871
+                                        },
+                                        {
+                                            "lat":  -44.097797,
+                                            "lng":  170.878336
+                                        },
+                                        {
+                                            "lat":  -44.097165,
+                                            "lng":  170.8778
+                                        },
+                                        {
+                                            "lat":  -44.096532,
+                                            "lng":  170.877264
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  247,
+                       "cropWidthMeters":  7.84,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-18T06:55:08.697Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqj4qgv2en3f4",
+                       "name":  "Crop Break 85",
+                       "paddock":  "Top sunny side airstrip",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09671,
+                                            "lng":  170.879774
+                                        },
+                                        {
+                                            "lat":  -44.096364,
+                                            "lng":  170.879507
+                                        },
+                                        {
+                                            "lat":  -44.095956,
+                                            "lng":  170.880448
+                                        },
+                                        {
+                                            "lat":  -44.096051,
+                                            "lng":  170.880536
+                                        }
+                                    ],
+                       "areaSqm":  2514,
+                       "areaHa":  0.251,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T06:39:21.567Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-18T07:18:06.212Z"
+                   },
+                   {
+                       "id":  "mqiontlrzvj6b",
+                       "name":  "Lower Fescue Line 11",
+                       "paddock":  "Top sunny side airstrip",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095017,
+                                            "lng":  170.878423
+                                        },
+                                        {
+                                            "lat":  -44.095742,
+                                            "lng":  170.879
+                                        },
+                                        {
+                                            "lat":  -44.096467,
+                                            "lng":  170.879578
+                                        },
+                                        {
+                                            "lat":  -44.097192,
+                                            "lng":  170.880155
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  279,
+                       "cropWidthMeters":  10.78,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-17T23:09:24.255Z",
+                       "createdBy":  "gaspar",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-18T07:32:28.434Z"
+                   },
+                   {
+                       "id":  "mqio35uu2qiik",
+                       "name":  "Crop Break 83",
+                       "paddock":  "Top sunny side airstrip",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.096091,
+                                            "lng":  170.880577
+                                        },
+                                        {
+                                            "lat":  -44.096679,
+                                            "lng":  170.88036
+                                        },
+                                        {
+                                            "lat":  -44.097212,
+                                            "lng":  170.880168
+                                        },
+                                        {
+                                            "lat":  -44.096709,
+                                            "lng":  170.879787
+                                        },
+                                        {
+                                            "lat":  -44.096048,
+                                            "lng":  170.880561
+                                        }
+                                    ],
+                       "areaSqm":  2999,
+                       "areaHa":  0.3,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-17T22:53:20.359Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-18T07:02:10.938Z"
+                   },
+                   {
+                       "id":  "mqin32tj0bsb9",
+                       "name":  "Old house 2 Crop Break 11",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095246,
+                                            "lng":  170.869227
+                                        },
+                                        {
+                                            "lat":  -44.095271,
+                                            "lng":  170.869271
+                                        },
+                                        {
+                                            "lat":  -44.09483,
+                                            "lng":  170.869408
+                                        },
+                                        {
+                                            "lat":  -44.094388,
+                                            "lng":  170.869545
+                                        },
+                                        {
+                                            "lat":  -44.094333,
+                                            "lng":  170.869137
+                                        },
+                                        {
+                                            "lat":  -44.094705,
+                                            "lng":  170.869
+                                        },
+                                        {
+                                            "lat":  -44.094758,
+                                            "lng":  170.869361
+                                        }
+                                    ],
+                       "areaSqm":  1730,
+                       "areaHa":  0.173,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-17T22:25:16.807Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqimzh2cygu4n",
+                       "name":  "Old house 2 Crop Break 10",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094701,
+                                            "lng":  170.868994
+                                        },
+                                        {
+                                            "lat":  -44.094758,
+                                            "lng":  170.869364
+                                        },
+                                        {
+                                            "lat":  -44.095265,
+                                            "lng":  170.869217
+                                        },
+                                        {
+                                            "lat":  -44.095209,
+                                            "lng":  170.868852
+                                        }
+                                    ],
+                       "areaSqm":  1734,
+                       "areaHa":  0.173,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-17T22:22:28.645Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqiklq5w55knc",
+                       "name":  "A1 Crop Break 7",
+                       "paddock":  "A1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.108504,
+                                            "lng":  170.835144
+                                        },
+                                        {
+                                            "lat":  -44.108394,
+                                            "lng":  170.835037
+                                        },
+                                        {
+                                            "lat":  -44.10795,
+                                            "lng":  170.836469
+                                        },
+                                        {
+                                            "lat":  -44.108059,
+                                            "lng":  170.836535
+                                        },
+                                        {
+                                            "lat":  -44.108281,
+                                            "lng":  170.83584
+                                        }
+                                    ],
+                       "areaSqm":  1719,
+                       "areaHa":  0.172,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-17T21:15:48.020Z",
+                       "createdBy":  "yukimi",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqijzg3t9jm67",
+                       "name":  "A1 Crop Break 6",
+                       "paddock":  "A1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.108625,
+                                            "lng":  170.83524
+                                        },
+                                        {
+                                            "lat":  -44.1085,
+                                            "lng":  170.835135
+                                        },
+                                        {
+                                            "lat":  -44.10828,
+                                            "lng":  170.835833
+                                        },
+                                        {
+                                            "lat":  -44.10806,
+                                            "lng":  170.836532
+                                        },
+                                        {
+                                            "lat":  -44.108168,
+                                            "lng":  170.836587
+                                        },
+                                        {
+                                            "lat":  -44.108395,
+                                            "lng":  170.835898
+                                        }
+                                    ],
+                       "areaSqm":  1705,
+                       "areaHa":  0.171,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-17T20:58:28.553Z",
+                       "createdBy":  "yukimi",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "grazed",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqijnyq0aw1u1",
+                       "name":  "A1 Line 5",
+                       "paddock":  "A1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.108161,
+                                            "lng":  170.836584
+                                        },
+                                        {
+                                            "lat":  -44.108055,
+                                            "lng":  170.836523
+                                        },
+                                        {
+                                            "lat":  -44.108286,
+                                            "lng":  170.835847
+                                        },
+                                        {
+                                            "lat":  -44.108528,
+                                            "lng":  170.835153
+                                        },
+                                        {
+                                            "lat":  -44.108628,
+                                            "lng":  170.835237
+                                        },
+                                        {
+                                            "lat":  -44.108404,
+                                            "lng":  170.835891
+                                        },
+                                        {
+                                            "lat":  -44.10818,
+                                            "lng":  170.836545
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  263,
+                       "cropWidthMeters":  6.49,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-17T20:49:32.808Z",
+                       "createdBy":  "yukimi",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "yukimi",
+                       "deletedAt":  "2026-06-17T20:58:31.808Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqijhkp0rmo0v",
+                       "name":  "Shanes Crop Break 15",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097278,
+                                            "lng":  170.87559
+                                        },
+                                        {
+                                            "lat":  -44.097802,
+                                            "lng":  170.876274
+                                        },
+                                        {
+                                            "lat":  -44.097558,
+                                            "lng":  170.87643
+                                        },
+                                        {
+                                            "lat":  -44.097081,
+                                            "lng":  170.875833
+                                        }
+                                    ],
+                       "areaSqm":  2152,
+                       "areaHa":  0.215,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-17T20:44:34.692Z",
+                       "createdBy":  "gaspar",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqijbv3haoal3",
+                       "name":  "Shanes Crop Break 14",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09744,
+                                            "lng":  170.875368
+                                        },
+                                        {
+                                            "lat":  -44.097965,
+                                            "lng":  170.876007
+                                        },
+                                        {
+                                            "lat":  -44.097887,
+                                            "lng":  170.876232
+                                        },
+                                        {
+                                            "lat":  -44.097814,
+                                            "lng":  170.876278
+                                        },
+                                        {
+                                            "lat":  -44.097275,
+                                            "lng":  170.87559
+                                        }
+                                    ],
+                       "areaSqm":  2157,
+                       "areaHa":  0.216,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-17T20:40:08.237Z",
+                       "createdBy":  "gaspar",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqh7ezs9c9awf",
+                       "name":  "Shanes Crop Break 13",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097977,
+                                            "lng":  170.876001
+                                        },
+                                        {
+                                            "lat":  -44.09745,
+                                            "lng":  170.875337
+                                        },
+                                        {
+                                            "lat":  -44.097262,
+                                            "lng":  170.875596
+                                        },
+                                        {
+                                            "lat":  -44.097825,
+                                            "lng":  170.876289
+                                        },
+                                        {
+                                            "lat":  -44.097888,
+                                            "lng":  170.87625
+                                        }
+                                    ],
+                       "areaSqm":  2410,
+                       "areaHa":  0.241,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-16T22:18:52.713Z",
+                       "createdBy":  "gaspar",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  true,
+                       "deletedBy":  "gaspar",
+                       "deletedAt":  "2026-06-17T20:37:25.789Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqh6mchv8lnr2",
+                       "name":  "Oneils hill Crop Break 12",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097746,
+                                            "lng":  170.874973
+                                        },
+                                        {
+                                            "lat":  -44.09764,
+                                            "lng":  170.875103
+                                        },
+                                        {
+                                            "lat":  -44.096957,
+                                            "lng":  170.87416
+                                        },
+                                        {
+                                            "lat":  -44.097107,
+                                            "lng":  170.874003
+                                        },
+                                        {
+                                            "lat":  -44.097426,
+                                            "lng":  170.874488
+                                        }
+                                    ],
+                       "areaSqm":  1936,
+                       "areaHa":  0.194,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-16T21:56:36.163Z",
+                       "createdBy":  "gaspar",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "gaspar",
+                       "lastEditedAt":  "2026-06-16T21:57:43.102Z"
+                   },
+                   {
+                       "id":  "mqh63yc0ls81h",
+                       "name":  "Oneils hill Crop Break 11",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097846,
+                                            "lng":  170.874799
+                                        },
+                                        {
+                                            "lat":  -44.097542,
+                                            "lng":  170.874331
+                                        },
+                                        {
+                                            "lat":  -44.097238,
+                                            "lng":  170.873862
+                                        },
+                                        {
+                                            "lat":  -44.097103,
+                                            "lng":  170.874002
+                                        },
+                                        {
+                                            "lat":  -44.097413,
+                                            "lng":  170.874485
+                                        },
+                                        {
+                                            "lat":  -44.097724,
+                                            "lng":  170.874968
+                                        }
+                                    ],
+                       "areaSqm":  1934,
+                       "areaHa":  0.193,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-16T21:42:18.000Z",
+                       "createdBy":  "Bruno",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqh5xrxpqw794",
+                       "name":  "Shanes Crop Break 12",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098068,
+                                            "lng":  170.875649
+                                        },
+                                        {
+                                            "lat":  -44.097648,
+                                            "lng":  170.875077
+                                        },
+                                        {
+                                            "lat":  -44.097445,
+                                            "lng":  170.875372
+                                        },
+                                        {
+                                            "lat":  -44.097951,
+                                            "lng":  170.875992
+                                        }
+                                    ],
+                       "areaSqm":  2163,
+                       "areaHa":  0.216,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-16T21:37:29.773Z",
+                       "createdBy":  "Bruno",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqh4fdwiva3c2",
+                       "name":  "Corner flat Crop Break 14",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.093503,
+                                            "lng":  170.870608
+                                        },
+                                        {
+                                            "lat":  -44.092985,
+                                            "lng":  170.870728
+                                        },
+                                        {
+                                            "lat":  -44.092467,
+                                            "lng":  170.870849
+                                        },
+                                        {
+                                            "lat":  -44.092483,
+                                            "lng":  170.871314
+                                        },
+                                        {
+                                            "lat":  -44.093032,
+                                            "lng":  170.87117
+                                        },
+                                        {
+                                            "lat":  -44.093566,
+                                            "lng":  170.871034
+                                        }
+                                    ],
+                       "areaSqm":  4288,
+                       "areaHa":  0.429,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-16T20:55:12.162Z",
+                       "createdBy":  "Bruno",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqh4bpqpgo96v",
+                       "name":  "Corner flat Crop Break 13",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.093467,
+                                            "lng":  170.870112
+                                        },
+                                        {
+                                            "lat":  -44.09298,
+                                            "lng":  170.870225
+                                        },
+                                        {
+                                            "lat":  -44.092493,
+                                            "lng":  170.870338
+                                        },
+                                        {
+                                            "lat":  -44.092466,
+                                            "lng":  170.870831
+                                        },
+                                        {
+                                            "lat":  -44.092983,
+                                            "lng":  170.870707
+                                        },
+                                        {
+                                            "lat":  -44.0935,
+                                            "lng":  170.870583
+                                        }
+                                    ],
+                       "areaSqm":  4315,
+                       "areaHa":  0.431,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-16T20:52:20.881Z",
+                       "createdBy":  "Bruno",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqfsorb2c7fx7",
+                       "name":  "Old house 2 Crop Break 9",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094593,
+                                            "lng":  170.871243
+                                        },
+                                        {
+                                            "lat":  -44.09548,
+                                            "lng":  170.871075
+                                        },
+                                        {
+                                            "lat":  -44.095434,
+                                            "lng":  170.870856
+                                        },
+                                        {
+                                            "lat":  -44.094557,
+                                            "lng":  170.871031
+                                        }
+                                    ],
+                       "areaSqm":  1754,
+                       "areaHa":  0.175,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T22:38:47.870Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqfso2rnoxgzl",
+                       "name":  "Old house 2 Crop Break 8",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094639,
+                                            "lng":  170.871479
+                                        },
+                                        {
+                                            "lat":  -44.095498,
+                                            "lng":  170.871326
+                                        },
+                                        {
+                                            "lat":  -44.095472,
+                                            "lng":  170.871097
+                                        },
+                                        {
+                                            "lat":  -44.094603,
+                                            "lng":  170.87126
+                                        }
+                                    ],
+                       "areaSqm":  1765,
+                       "areaHa":  0.177,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T22:38:16.067Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqfsmzxcrhxtb",
+                       "name":  "Old house 2 Crop Break 7",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095517,
+                                            "lng":  170.871524
+                                        },
+                                        {
+                                            "lat":  -44.095497,
+                                            "lng":  170.871315
+                                        },
+                                        {
+                                            "lat":  -44.094629,
+                                            "lng":  170.871471
+                                        },
+                                        {
+                                            "lat":  -44.094647,
+                                            "lng":  170.871709
+                                        }
+                                    ],
+                       "areaSqm":  1756,
+                       "areaHa":  0.176,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T22:37:25.728Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqfrb5mtiae40",
+                       "name":  "Corner flat Crop Break 12",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.093827,
+                                            "lng":  170.871411
+                                        },
+                                        {
+                                            "lat":  -44.093894,
+                                            "lng":  170.871662
+                                        },
+                                        {
+                                            "lat":  -44.094078,
+                                            "lng":  170.871531
+                                        },
+                                        {
+                                            "lat":  -44.094486,
+                                            "lng":  170.871268
+                                        },
+                                        {
+                                            "lat":  -44.094459,
+                                            "lng":  170.871379
+                                        },
+                                        {
+                                            "lat":  -44.094032,
+                                            "lng":  170.871674
+                                        },
+                                        {
+                                            "lat":  -44.093733,
+                                            "lng":  170.871966
+                                        },
+                                        {
+                                            "lat":  -44.093773,
+                                            "lng":  170.872231
+                                        },
+                                        {
+                                            "lat":  -44.094158,
+                                            "lng":  170.871984
+                                        },
+                                        {
+                                            "lat":  -44.094599,
+                                            "lng":  170.871706
+                                        },
+                                        {
+                                            "lat":  -44.094546,
+                                            "lng":  170.871213
+                                        },
+                                        {
+                                            "lat":  -44.094082,
+                                            "lng":  170.871352
+                                        }
+                                    ],
+                       "areaSqm":  3740,
+                       "areaHa":  0.374,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T22:00:13.637Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-17T21:48:36.838Z"
+                   },
+                   {
+                       "id":  "mqfow4h1mi6zo",
+                       "name":  "Shanes Crop Break 11",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098285,
+                                            "lng":  170.875378
+                                        },
+                                        {
+                                            "lat":  -44.097876,
+                                            "lng":  170.87479
+                                        },
+                                        {
+                                            "lat":  -44.097659,
+                                            "lng":  170.875069
+                                        },
+                                        {
+                                            "lat":  -44.09809,
+                                            "lng":  170.875673
+                                        }
+                                    ],
+                       "areaSqm":  2165,
+                       "areaHa":  0.217,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T20:52:33.062Z",
+                       "createdBy":  "Bruno",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqezgmr0dhy6p",
+                       "name":  "Oneils hill Line 10",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097925,
+                                            "lng":  170.873085
+                                        },
+                                        {
+                                            "lat":  -44.096904,
+                                            "lng":  170.87423
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  146,
+                       "cropWidthMeters":  13.2,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-15T09:00:39.852Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqezfplnsqcka",
+                       "name":  "Shanes Line 10",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097888,
+                                            "lng":  170.876226
+                                        },
+                                        {
+                                            "lat":  -44.098074,
+                                            "lng":  170.875706
+                                        },
+                                        {
+                                            "lat":  -44.098287,
+                                            "lng":  170.87539
+                                        },
+                                        {
+                                            "lat":  -44.098455,
+                                            "lng":  170.87527
+                                        },
+                                        {
+                                            "lat":  -44.098865,
+                                            "lng":  170.875292
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  148,
+                       "cropWidthMeters":  14.57,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-15T08:59:56.891Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqezbszdgkvef",
+                       "name":  "Oneils hill Crop Break 9",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097365,
+                                            "lng":  170.873715
+                                        },
+                                        {
+                                            "lat":  -44.097242,
+                                            "lng":  170.873854
+                                        },
+                                        {
+                                            "lat":  -44.09756,
+                                            "lng":  170.874346
+                                        },
+                                        {
+                                            "lat":  -44.097878,
+                                            "lng":  170.874838
+                                        },
+                                        {
+                                            "lat":  -44.097995,
+                                            "lng":  170.874667
+                                        },
+                                        {
+                                            "lat":  -44.09768,
+                                            "lng":  170.874191
+                                        }
+                                    ],
+                       "areaSqm":  1908,
+                       "areaHa":  0.191,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T08:56:54.650Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqez6l26fuzgt",
+                       "name":  "Oneils hill Crop Break 8",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098131,
+                                            "lng":  170.874513
+                                        },
+                                        {
+                                            "lat":  -44.097813,
+                                            "lng":  170.874038
+                                        },
+                                        {
+                                            "lat":  -44.097494,
+                                            "lng":  170.873564
+                                        },
+                                        {
+                                            "lat":  -44.097368,
+                                            "lng":  170.873706
+                                        },
+                                        {
+                                            "lat":  -44.098001,
+                                            "lng":  170.874671
+                                        }
+                                    ],
+                       "areaSqm":  1940,
+                       "areaHa":  0.194,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T08:52:51.104Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqez4en7umn9h",
+                       "name":  "Shanes Break 9",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097884,
+                                            "lng":  170.876229
+                                        },
+                                        {
+                                            "lat":  -44.098082,
+                                            "lng":  170.875705
+                                        },
+                                        {
+                                            "lat":  -44.098283,
+                                            "lng":  170.875393
+                                        },
+                                        {
+                                            "lat":  -44.098458,
+                                            "lng":  170.875265
+                                        },
+                                        {
+                                            "lat":  -44.098859,
+                                            "lng":  170.875302
+                                        },
+                                        {
+                                            "lat":  -44.098502,
+                                            "lng":  170.875898
+                                        }
+                                    ],
+                       "areaSqm":  3547,
+                       "areaHa":  0.355,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T08:51:09.476Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "No kale",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "mateo",
+                       "deletedAt":  "2026-06-15T09:00:12.384Z",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:51:37.561Z"
+                   },
+                   {
+                       "id":  "mqez1y40d8ylu",
+                       "name":  "Shanes Crop Break 8",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098203,
+                                            "lng":  170.874471
+                                        },
+                                        {
+                                            "lat":  -44.097887,
+                                            "lng":  170.874792
+                                        },
+                                        {
+                                            "lat":  -44.098305,
+                                            "lng":  170.87537
+                                        },
+                                        {
+                                            "lat":  -44.098491,
+                                            "lng":  170.875284
+                                        },
+                                        {
+                                            "lat":  -44.098894,
+                                            "lng":  170.875261
+                                        }
+                                    ],
+                       "areaSqm":  3682,
+                       "areaHa":  0.368,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T08:49:14.736Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Bruno",
+                       "lastEditedAt":  "2026-06-15T23:33:40.392Z"
+                   },
+                   {
+                       "id":  "mqev9w2jm9zro",
+                       "name":  "Corner flat Crop Break 11",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094479,
+                                            "lng":  170.870703
+                                        },
+                                        {
+                                            "lat":  -44.094542,
+                                            "lng":  170.871204
+                                        },
+                                        {
+                                            "lat":  -44.094086,
+                                            "lng":  170.871349
+                                        },
+                                        {
+                                            "lat":  -44.09363,
+                                            "lng":  170.871495
+                                        },
+                                        {
+                                            "lat":  -44.093565,
+                                            "lng":  170.870953
+                                        },
+                                        {
+                                            "lat":  -44.094022,
+                                            "lng":  170.870828
+                                        }
+                                    ],
+                       "areaSqm":  4392,
+                       "areaHa":  0.439,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-15T07:03:26.875Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-15T21:22:48.902Z"
+                   },
+                   {
+                       "id":  "mqev8so0vguo1",
+                       "name":  "Corner flat Line 10",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.093741,
+                                            "lng":  170.872236
+                                        },
+                                        {
+                                            "lat":  -44.093618,
+                                            "lng":  170.871259
+                                        },
+                                        {
+                                            "lat":  -44.093494,
+                                            "lng":  170.870282
+                                        },
+                                        {
+                                            "lat":  -44.093371,
+                                            "lng":  170.869305
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  238,
+                       "cropWidthMeters":  18.1,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-15T07:02:35.808Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-15T23:04:34.047Z"
+                   },
+                   {
+                       "id":  "mqeaqoxc9q6yx",
+                       "name":  "Corner flat Crop Break 9",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094415,
+                                            "lng":  170.870204
+                                        },
+                                        {
+                                            "lat":  -44.094471,
+                                            "lng":  170.870681
+                                        },
+                                        {
+                                            "lat":  -44.094017,
+                                            "lng":  170.870816
+                                        },
+                                        {
+                                            "lat":  -44.093562,
+                                            "lng":  170.870951
+                                        },
+                                        {
+                                            "lat":  -44.093494,
+                                            "lng":  170.870381
+                                        },
+                                        {
+                                            "lat":  -44.093937,
+                                            "lng":  170.870303
+                                        }
+                                    ],
+                       "areaSqm":  4359,
+                       "areaHa":  0.436,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-14T21:28:38.832Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-15T21:21:45.877Z"
+                   },
+                   {
+                       "id":  "mqeakzqcn4ii9",
+                       "name":  "Corner flat Line 8",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094381,
+                                            "lng":  170.869926
+                                        },
+                                        {
+                                            "lat":  -44.09246,
+                                            "lng":  170.870361
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  216,
+                       "cropWidthMeters":  19.88,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-14T21:24:12.902Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Fede",
+                       "deletedAt":  "2026-06-14T21:25:49.346Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqd1857f4y457",
+                       "name":  "Corner flat Crop Break 7",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09441,
+                                            "lng":  170.869938
+                                        },
+                                        {
+                                            "lat":  -44.093906,
+                                            "lng":  170.870034
+                                        },
+                                        {
+                                            "lat":  -44.093462,
+                                            "lng":  170.870124
+                                        },
+                                        {
+                                            "lat":  -44.093462,
+                                            "lng":  170.870388
+                                        },
+                                        {
+                                            "lat":  -44.094427,
+                                            "lng":  170.870193
+                                        }
+                                    ],
+                       "areaSqm":  2235,
+                       "areaHa":  0.224,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-14T00:14:30.747Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Fede",
+                       "deletedAt":  "2026-06-15T07:00:53.240Z",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-14T21:27:35.969Z"
+                   },
+                   {
+                       "id":  "mqcywp19cw03r",
+                       "name":  "Corner flat Line 6",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.093439,
+                                            "lng":  170.870198
+                                        },
+                                        {
+                                            "lat":  -44.0935,
+                                            "lng":  170.871254
+                                        },
+                                        {
+                                            "lat":  -44.093561,
+                                            "lng":  170.872309
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  169,
+                       "cropWidthMeters":  25.43,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-13T23:09:37.341Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Fede",
+                       "deletedAt":  "2026-06-15T07:01:40.308Z",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-14T21:27:10.661Z"
+                   },
+                   {
+                       "id":  "mqcygkblw5xol",
+                       "name":  "Corner flat Crop Break 5",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.092439,
+                                            "lng":  170.870166
+                                        },
+                                        {
+                                            "lat":  -44.092433,
+                                            "lng":  170.870295
+                                        },
+                                        {
+                                            "lat":  -44.092947,
+                                            "lng":  170.870194
+                                        },
+                                        {
+                                            "lat":  -44.09346,
+                                            "lng":  170.870094
+                                        },
+                                        {
+                                            "lat":  -44.093468,
+                                            "lng":  170.870374
+                                        },
+                                        {
+                                            "lat":  -44.093961,
+                                            "lng":  170.870269
+                                        },
+                                        {
+                                            "lat":  -44.094432,
+                                            "lng":  170.870178
+                                        },
+                                        {
+                                            "lat":  -44.094378,
+                                            "lng":  170.869806
+                                        },
+                                        {
+                                            "lat":  -44.093742,
+                                            "lng":  170.86992
+                                        },
+                                        {
+                                            "lat":  -44.093091,
+                                            "lng":  170.870043
+                                        }
+                                    ],
+                       "areaSqm":  4403,
+                       "areaHa":  0.44,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-13T22:57:04.737Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-15T07:00:07.264Z"
+                   },
+                   {
+                       "id":  "mqcwgxto6ge1p",
+                       "name":  "21 Line 2",
+                       "paddock":  21,
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.120145,
+                                            "lng":  170.858107
+                                        },
+                                        {
+                                            "lat":  -44.119903,
+                                            "lng":  170.85915
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  88,
+                       "cropWidthMeters":  9.08,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-13T22:01:23.004Z",
+                       "createdBy":  "Fede",
+                       "group":  "pennos",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqbicrpnqpuiz",
+                       "name":  "Old house 2 Crop ",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094639,
+                                            "lng":  170.871735
+                                        },
+                                        {
+                                            "lat":  -44.094633,
+                                            "lng":  170.871712
+                                        },
+                                        {
+                                            "lat":  -44.095096,
+                                            "lng":  170.871597
+                                        },
+                                        {
+                                            "lat":  -44.095558,
+                                            "lng":  170.871482
+                                        },
+                                        {
+                                            "lat":  -44.095555,
+                                            "lng":  170.871521
+                                        },
+                                        {
+                                            "lat":  -44.095137,
+                                            "lng":  170.871621
+                                        }
+                                    ],
+                       "areaSqm":  269,
+                       "areaHa":  0.027,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:38:27.659Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "mateo",
+                       "deletedAt":  "2026-06-12T22:53:05.955Z",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-12T22:39:38.394Z"
+                   },
+                   {
+                       "id":  "mqbi7ffgtkiz0",
+                       "name":  "Old house 2 Crop Break 15/6",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095117,
+                                            "lng":  170.872763
+                                        },
+                                        {
+                                            "lat":  -44.095105,
+                                            "lng":  170.873137
+                                        },
+                                        {
+                                            "lat":  -44.095564,
+                                            "lng":  170.873141
+                                        },
+                                        {
+                                            "lat":  -44.095569,
+                                            "lng":  170.872759
+                                        }
+                                    ],
+                       "areaSqm":  1533,
+                       "areaHa":  0.153,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:34:18.460Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-12T22:35:02.648Z"
+                   },
+                   {
+                       "id":  "mqbhxbcck3non",
+                       "name":  "Lower Fescue Crop Break 10",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09843,
+                                            "lng":  170.879833
+                                        },
+                                        {
+                                            "lat":  -44.098521,
+                                            "lng":  170.880016
+                                        },
+                                        {
+                                            "lat":  -44.098788,
+                                            "lng":  170.881453
+                                        },
+                                        {
+                                            "lat":  -44.098602,
+                                            "lng":  170.88066
+                                        }
+                                    ],
+                       "areaSqm":  442,
+                       "areaHa":  0.044,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:26:26.604Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-12T22:29:51.391Z"
+                   },
+                   {
+                       "id":  "mqbhwkpygnw3n",
+                       "name":  "Lower Fescue Crop Break 9",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098304,
+                                            "lng":  170.879856
+                                        },
+                                        {
+                                            "lat":  -44.098454,
+                                            "lng":  170.880729
+                                        },
+                                        {
+                                            "lat":  -44.098608,
+                                            "lng":  170.881574
+                                        },
+                                        {
+                                            "lat":  -44.098794,
+                                            "lng":  170.881538
+                                        },
+                                        {
+                                            "lat":  -44.09862,
+                                            "lng":  170.880719
+                                        },
+                                        {
+                                            "lat":  -44.098438,
+                                            "lng":  170.87985
+                                        }
+                                    ],
+                       "areaSqm":  2509,
+                       "areaHa":  0.251,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:25:52.102Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqbhr96sky0dt",
+                       "name":  "Lower Fescue Crop Break 8",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098144,
+                                            "lng":  170.879894
+                                        },
+                                        {
+                                            "lat":  -44.098301,
+                                            "lng":  170.880761
+                                        },
+                                        {
+                                            "lat":  -44.098458,
+                                            "lng":  170.881628
+                                        },
+                                        {
+                                            "lat":  -44.098614,
+                                            "lng":  170.881595
+                                        },
+                                        {
+                                            "lat":  -44.098457,
+                                            "lng":  170.880724
+                                        },
+                                        {
+                                            "lat":  -44.098299,
+                                            "lng":  170.879852
+                                        }
+                                    ],
+                       "areaSqm":  2516,
+                       "areaHa":  0.252,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:21:43.876Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqbhiiqacgt2z",
+                       "name":  "Lower Fescue Crop Break 7",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098302,
+                                            "lng":  170.881704
+                                        },
+                                        {
+                                            "lat":  -44.098153,
+                                            "lng":  170.880801
+                                        },
+                                        {
+                                            "lat":  -44.098,
+                                            "lng":  170.87992
+                                        },
+                                        {
+                                            "lat":  -44.098146,
+                                            "lng":  170.879881
+                                        },
+                                        {
+                                            "lat":  -44.098462,
+                                            "lng":  170.881654
+                                        }
+                                    ],
+                       "areaSqm":  2517,
+                       "areaHa":  0.252,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:14:56.338Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqbh8zlkiq2lm",
+                       "name":  "Lower Fescue Crop Break 6",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09784,
+                                            "lng":  170.879978
+                                        },
+                                        {
+                                            "lat":  -44.097997,
+                                            "lng":  170.879921
+                                        },
+                                        {
+                                            "lat":  -44.098302,
+                                            "lng":  170.881717
+                                        },
+                                        {
+                                            "lat":  -44.098155,
+                                            "lng":  170.881747
+                                        },
+                                        {
+                                            "lat":  -44.097997,
+                                            "lng":  170.880862
+                                        }
+                                    ],
+                       "areaSqm":  2536,
+                       "areaHa":  0.254,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:07:31.640Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-12T22:10:28.920Z"
+                   },
+                   {
+                       "id":  "mqbh674freykj",
+                       "name":  "Lower Fescue Crop Break 5",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097671,
+                                            "lng":  170.88
+                                        },
+                                        {
+                                            "lat":  -44.097827,
+                                            "lng":  170.879989
+                                        },
+                                        {
+                                            "lat":  -44.098143,
+                                            "lng":  170.881773
+                                        },
+                                        {
+                                            "lat":  -44.097992,
+                                            "lng":  170.881825
+                                        },
+                                        {
+                                            "lat":  -44.097833,
+                                            "lng":  170.880942
+                                        }
+                                    ],
+                       "areaSqm":  2582,
+                       "areaHa":  0.258,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T22:05:21.423Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-12T22:09:33.729Z"
+                   },
+                   {
+                       "id":  "mqbgqeu6dchut",
+                       "name":  "Old house 2 Crop 14/6",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095577,
+                                            "lng":  170.872299
+                                        },
+                                        {
+                                            "lat":  -44.095125,
+                                            "lng":  170.872334
+                                        },
+                                        {
+                                            "lat":  -44.095115,
+                                            "lng":  170.872763
+                                        },
+                                        {
+                                            "lat":  -44.095565,
+                                            "lng":  170.872752
+                                        }
+                                    ],
+                       "areaSqm":  1769,
+                       "areaHa":  0.177,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T21:53:04.926Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-12T22:34:50.367Z"
+                   },
+                   {
+                       "id":  "mqbfykgtd12a4",
+                       "name":  "Oneils hill Crop Break 7",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097653,
+                                            "lng":  170.873396
+                                        },
+                                        {
+                                            "lat":  -44.097493,
+                                            "lng":  170.873566
+                                        },
+                                        {
+                                            "lat":  -44.097814,
+                                            "lng":  170.874042
+                                        },
+                                        {
+                                            "lat":  -44.098134,
+                                            "lng":  170.874519
+                                        },
+                                        {
+                                            "lat":  -44.09829,
+                                            "lng":  170.874299
+                                        },
+                                        {
+                                            "lat":  -44.097971,
+                                            "lng":  170.873847
+                                        }
+                                    ],
+                       "areaSqm":  2411,
+                       "areaHa":  0.241,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T21:31:25.854Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:55:22.552Z"
+                   },
+                   {
+                       "id":  "mqbeyph1cgoah",
+                       "name":  "Oneils hill Crop Break 6",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098476,
+                                            "lng":  170.874047
+                                        },
+                                        {
+                                            "lat":  -44.09813,
+                                            "lng":  170.873638
+                                        },
+                                        {
+                                            "lat":  -44.097785,
+                                            "lng":  170.873228
+                                        },
+                                        {
+                                            "lat":  -44.097652,
+                                            "lng":  170.873381
+                                        },
+                                        {
+                                            "lat":  -44.097972,
+                                            "lng":  170.873837
+                                        },
+                                        {
+                                            "lat":  -44.098293,
+                                            "lng":  170.874293
+                                        }
+                                    ],
+                       "areaSqm":  2401,
+                       "areaHa":  0.24,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T21:03:32.725Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:55:10.913Z"
+                   },
+                   {
+                       "id":  "mqbeuo0tg2f6d",
+                       "name":  "Oneils hill Crop Break 5",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098482,
+                                            "lng":  170.874053
+                                        },
+                                        {
+                                            "lat":  -44.098604,
+                                            "lng":  170.873873
+                                        },
+                                        {
+                                            "lat":  -44.098217,
+                                            "lng":  170.873431
+                                        },
+                                        {
+                                            "lat":  -44.097926,
+                                            "lng":  170.873082
+                                        },
+                                        {
+                                            "lat":  -44.097792,
+                                            "lng":  170.873233
+                                        }
+                                    ],
+                       "areaSqm":  1898,
+                       "areaHa":  0.19,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T21:00:24.222Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:53:26.779Z"
+                   },
+                   {
+                       "id":  "mqbec9bxx18ax",
+                       "name":  "Corner flat Crop Break 4",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094375,
+                                            "lng":  170.869696
+                                        },
+                                        {
+                                            "lat":  -44.093709,
+                                            "lng":  170.869811
+                                        },
+                                        {
+                                            "lat":  -44.093042,
+                                            "lng":  170.869925
+                                        },
+                                        {
+                                            "lat":  -44.092376,
+                                            "lng":  170.870039
+                                        },
+                                        {
+                                            "lat":  -44.092376,
+                                            "lng":  170.870175
+                                        },
+                                        {
+                                            "lat":  -44.093045,
+                                            "lng":  170.870055
+                                        },
+                                        {
+                                            "lat":  -44.094385,
+                                            "lng":  170.869799
+                                        }
+                                    ],
+                       "areaSqm":  2187,
+                       "areaHa":  0.219,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T20:46:05.373Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqbdy8bp1ul2c",
+                       "name":  "Shanes Crop Break 7",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098329,
+                                            "lng":  170.874273
+                                        },
+                                        {
+                                            "lat":  -44.098195,
+                                            "lng":  170.87445
+                                        },
+                                        {
+                                            "lat":  -44.098541,
+                                            "lng":  170.874869
+                                        },
+                                        {
+                                            "lat":  -44.098887,
+                                            "lng":  170.875288
+                                        },
+                                        {
+                                            "lat":  -44.099009,
+                                            "lng":  170.875065
+                                        }
+                                    ],
+                       "areaSqm":  2148,
+                       "areaHa":  0.215,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T20:35:10.885Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:48:03.286Z"
+                   },
+                   {
+                       "id":  "mqbd1yd5104te",
+                       "name":  "Oneils hill Crop Break 4",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097917,
+                                            "lng":  170.873092
+                                        },
+                                        {
+                                            "lat":  -44.09741,
+                                            "lng":  170.873663
+                                        },
+                                        {
+                                            "lat":  -44.096903,
+                                            "lng":  170.874235
+                                        },
+                                        {
+                                            "lat":  -44.097589,
+                                            "lng":  170.875149
+                                        },
+                                        {
+                                            "lat":  -44.098084,
+                                            "lng":  170.874499
+                                        },
+                                        {
+                                            "lat":  -44.098579,
+                                            "lng":  170.873849
+                                        }
+                                    ],
+                       "areaSqm":  14780,
+                       "areaHa":  1.478,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-12T20:10:04.985Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "mateo",
+                       "deletedAt":  "2026-06-15T09:00:49.002Z",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:53:07.275Z"
+                   },
+                   {
+                       "id":  "mqa5l5f7jrnxz",
+                       "name":  "21 Line 1",
+                       "paddock":  21,
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.119582,
+                                            "lng":  170.859018
+                                        },
+                                        {
+                                            "lat":  -44.119789,
+                                            "lng":  170.85799
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  85,
+                       "cropWidthMeters":  6.09,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-11T23:53:17.492Z",
+                       "createdBy":  "Fede",
+                       "group":  "pennos",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqa2jx4quvhgf",
+                       "name":  "Lower Fescue Crop Break 4",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097865,
+                                            "lng":  170.881879
+                                        },
+                                        {
+                                            "lat":  -44.097991,
+                                            "lng":  170.881843
+                                        },
+                                        {
+                                            "lat":  -44.09783,
+                                            "lng":  170.880922
+                                        },
+                                        {
+                                            "lat":  -44.09767,
+                                            "lng":  170.88002
+                                        },
+                                        {
+                                            "lat":  -44.097504,
+                                            "lng":  170.880076
+                                        },
+                                        {
+                                            "lat":  -44.097685,
+                                            "lng":  170.880977
+                                        }
+                                    ],
+                       "areaSqm":  2497,
+                       "areaHa":  0.25,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T22:28:21.242Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqa07u48zje0k",
+                       "name":  "Old house 2 Crop Break 3",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095565,
+                                            "lng":  170.871843
+                                        },
+                                        {
+                                            "lat":  -44.095137,
+                                            "lng":  170.871891
+                                        },
+                                        {
+                                            "lat":  -44.095121,
+                                            "lng":  170.87233
+                                        },
+                                        {
+                                            "lat":  -44.095574,
+                                            "lng":  170.872297
+                                        }
+                                    ],
+                       "areaSqm":  1749,
+                       "areaHa":  0.175,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T21:22:58.232Z",
+                       "createdBy":  "Juan",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-12T21:53:19.865Z"
+                   },
+                   {
+                       "id":  "mqa05v8hxwbju",
+                       "name":  "Old house 2 Crop Break 2",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095558,
+                                            "lng":  170.871522
+                                        },
+                                        {
+                                            "lat":  -44.095137,
+                                            "lng":  170.871628
+                                        },
+                                        {
+                                            "lat":  -44.095131,
+                                            "lng":  170.871894
+                                        },
+                                        {
+                                            "lat":  -44.095567,
+                                            "lng":  170.871833
+                                        }
+                                    ],
+                       "areaSqm":  1100,
+                       "areaHa":  0.11,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T21:21:26.369Z",
+                       "createdBy":  "Juan",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-12T20:08:09.857Z"
+                   },
+                   {
+                       "id":  "mqa04fzltazc2",
+                       "name":  "Old house 2 Crop Break 1",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095552,
+                                            "lng":  170.871542
+                                        },
+                                        {
+                                            "lat":  -44.095133,
+                                            "lng":  170.871624
+                                        },
+                                        {
+                                            "lat":  -44.095131,
+                                            "lng":  170.871904
+                                        },
+                                        {
+                                            "lat":  -44.095579,
+                                            "lng":  170.871827
+                                        }
+                                    ],
+                       "areaSqm":  1100,
+                       "areaHa":  0.11,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T21:20:19.953Z",
+                       "createdBy":  "Juan",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-11T21:20:32.672Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq9zoimlkaq1d",
+                       "name":  "Shanes Crop Break 6",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098444,
+                                            "lng":  170.874121
+                                        },
+                                        {
+                                            "lat":  -44.098333,
+                                            "lng":  170.874271
+                                        },
+                                        {
+                                            "lat":  -44.099016,
+                                            "lng":  170.875071
+                                        },
+                                        {
+                                            "lat":  -44.09917,
+                                            "lng":  170.874815
+                                        }
+                                    ],
+                       "areaSqm":  2154,
+                       "areaHa":  0.215,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T21:07:56.877Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:46:22.218Z"
+                   },
+                   {
+                       "id":  "mq9zegxv8se81",
+                       "name":  "Shanes Crop Break 5",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098523,
+                                            "lng":  170.873944
+                                        },
+                                        {
+                                            "lat":  -44.098924,
+                                            "lng":  170.874254
+                                        },
+                                        {
+                                            "lat":  -44.099326,
+                                            "lng":  170.874563
+                                        },
+                                        {
+                                            "lat":  -44.099177,
+                                            "lng":  170.87481
+                                        },
+                                        {
+                                            "lat":  -44.098796,
+                                            "lng":  170.874453
+                                        },
+                                        {
+                                            "lat":  -44.098416,
+                                            "lng":  170.874095
+                                        }
+                                    ],
+                       "areaSqm":  2145,
+                       "areaHa":  0.215,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T21:00:08.132Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:47:11.214Z"
+                   },
+                   {
+                       "id":  "mq8v71konxbbc",
+                       "name":  "Corner flat Line 3",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.093422,
+                                            "lng":  170.869845
+                                        },
+                                        {
+                                            "lat":  -44.093376,
+                                            "lng":  170.869314
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  43,
+                       "cropWidthMeters":  100.68,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-11T02:14:36.984Z",
+                       "createdBy":  "Juan",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-11T02:16:42.253Z"
+                   },
+                   {
+                       "id":  "mq8uuuwvakfgr",
+                       "name":  "Corner flat Crop Break 2",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094303,
+                                            "lng":  170.869134
+                                        },
+                                        {
+                                            "lat":  -44.093659,
+                                            "lng":  170.86925
+                                        },
+                                        {
+                                            "lat":  -44.093014,
+                                            "lng":  170.869365
+                                        },
+                                        {
+                                            "lat":  -44.092369,
+                                            "lng":  170.869481
+                                        },
+                                        {
+                                            "lat":  -44.092376,
+                                            "lng":  170.870028
+                                        },
+                                        {
+                                            "lat":  -44.093043,
+                                            "lng":  170.869915
+                                        },
+                                        {
+                                            "lat":  -44.09371,
+                                            "lng":  170.869802
+                                        },
+                                        {
+                                            "lat":  -44.094376,
+                                            "lng":  170.86969
+                                        }
+                                    ],
+                       "areaSqm":  9770,
+                       "areaHa":  0.977,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T02:05:08.479Z",
+                       "createdBy":  "Juan",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq8u709g1spy1",
+                       "name":  "Corner flat Crop Break 1",
+                       "paddock":  "Corner flat",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.094305,
+                                            "lng":  170.869136
+                                        },
+                                        {
+                                            "lat":  -44.094409,
+                                            "lng":  170.869993
+                                        },
+                                        {
+                                            "lat":  -44.094514,
+                                            "lng":  170.87085
+                                        },
+                                        {
+                                            "lat":  -44.094618,
+                                            "lng":  170.871707
+                                        },
+                                        {
+                                            "lat":  -44.094438,
+                                            "lng":  170.871844
+                                        },
+                                        {
+                                            "lat":  -44.094078,
+                                            "lng":  170.86917
+                                        }
+                                    ],
+                       "areaSqm":  5010,
+                       "areaHa":  0.501,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T01:46:35.668Z",
+                       "createdBy":  "Juan",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-11T02:04:29.713Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq8tbukuec58k",
+                       "name":  "Mitch heifers Crop Break 2",
+                       "paddock":  "Mitch heifers",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.088538,
+                                            "lng":  170.863104
+                                        },
+                                        {
+                                            "lat":  -44.088701,
+                                            "lng":  170.863129
+                                        },
+                                        {
+                                            "lat":  -44.089044,
+                                            "lng":  170.865598
+                                        },
+                                        {
+                                            "lat":  -44.088828,
+                                            "lng":  170.86568
+                                        },
+                                        {
+                                            "lat":  -44.088731,
+                                            "lng":  170.864821
+                                        },
+                                        {
+                                            "lat":  -44.088634,
+                                            "lng":  170.863963
+                                        }
+                                    ],
+                       "areaSqm":  4339,
+                       "areaHa":  0.434,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T01:22:21.966Z",
+                       "createdBy":  "Juan",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-11T01:43:40.015Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq8t96ohgbvh1",
+                       "name":  "Mitch heifers Crop Break 1",
+                       "paddock":  "Mitch heifers",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.088613,
+                                            "lng":  170.865727
+                                        },
+                                        {
+                                            "lat":  -44.088509,
+                                            "lng":  170.864825
+                                        },
+                                        {
+                                            "lat":  -44.088405,
+                                            "lng":  170.863924
+                                        },
+                                        {
+                                            "lat":  -44.088301,
+                                            "lng":  170.863022
+                                        },
+                                        {
+                                            "lat":  -44.088533,
+                                            "lng":  170.863102
+                                        },
+                                        {
+                                            "lat":  -44.088822,
+                                            "lng":  170.865648
+                                        }
+                                    ],
+                       "areaSqm":  5151,
+                       "areaHa":  0.515,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-11T01:20:17.682Z",
+                       "createdBy":  "Juan",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-11T01:43:42.251Z",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-11T01:21:06.039Z"
+                   },
+                   {
+                       "id":  "mq7c8bpf9u56o",
+                       "name":  "Council 3 Crop Break 2",
+                       "paddock":  "Council 3",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.105978,
+                                            "lng":  170.853752
+                                        },
+                                        {
+                                            "lat":  -44.106136,
+                                            "lng":  170.853639
+                                        },
+                                        {
+                                            "lat":  -44.105853,
+                                            "lng":  170.852927
+                                        },
+                                        {
+                                            "lat":  -44.105681,
+                                            "lng":  170.853093
+                                        }
+                                    ],
+                       "areaSqm":  1368,
+                       "areaHa":  0.137,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-10T00:35:57.891Z",
+                       "createdBy":  "Fede",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Fede",
+                       "lastEditedAt":  "2026-06-10T00:41:07.823Z"
+                   },
+                   {
+                       "id":  "mq79wd9xw2i3g",
+                       "name":  "Oneils hill Crop Break 3",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.098719,
+                                            "lng":  170.873687
+                                        },
+                                        {
+                                            "lat":  -44.098243,
+                                            "lng":  170.873191
+                                        },
+                                        {
+                                            "lat":  -44.097754,
+                                            "lng":  170.872644
+                                        },
+                                        {
+                                            "lat":  -44.097513,
+                                            "lng":  170.872608
+                                        },
+                                        {
+                                            "lat":  -44.098053,
+                                            "lng":  170.873232
+                                        },
+                                        {
+                                            "lat":  -44.098593,
+                                            "lng":  170.873857
+                                        }
+                                    ],
+                       "areaSqm":  2403,
+                       "areaHa":  0.24,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T23:30:40.822Z",
+                       "createdBy":  "Bruno",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:54:47.060Z"
+                   },
+                   {
+                       "id":  "mq79p3d1iqvrc",
+                       "name":  "Oneils hill Crop Break 2",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097893,
+                                            "lng":  170.872552
+                                        },
+                                        {
+                                            "lat":  -44.09776,
+                                            "lng":  170.872647
+                                        },
+                                        {
+                                            "lat":  -44.098701,
+                                            "lng":  170.873657
+                                        },
+                                        {
+                                            "lat":  -44.098843,
+                                            "lng":  170.873603
+                                        }
+                                    ],
+                       "areaSqm":  1884,
+                       "areaHa":  0.188,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T23:25:01.381Z",
+                       "createdBy":  "Bruno",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:54:52.774Z"
+                   },
+                   {
+                       "id":  "mq78ylklys6nk",
+                       "name":  "Council 3 Break 1",
+                       "paddock":  "Council 3",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.106123,
+                                            "lng":  170.853596
+                                        },
+                                        {
+                                            "lat":  -44.106046,
+                                            "lng":  170.853655
+                                        },
+                                        {
+                                            "lat":  -44.105802,
+                                            "lng":  170.853007
+                                        },
+                                        {
+                                            "lat":  -44.105891,
+                                            "lng":  170.852901
+                                        }
+                                    ],
+                       "areaSqm":  669,
+                       "areaHa":  0.067,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T23:04:25.269Z",
+                       "createdBy":  "Juan",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-09T23:11:12.523Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq78adte36rcj",
+                       "name":  "Lower Fescue Crop Break 3",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097362,
+                                            "lng":  170.880118
+                                        },
+                                        {
+                                            "lat":  -44.09749,
+                                            "lng":  170.880073
+                                        },
+                                        {
+                                            "lat":  -44.09769,
+                                            "lng":  170.880984
+                                        },
+                                        {
+                                            "lat":  -44.097891,
+                                            "lng":  170.881895
+                                        },
+                                        {
+                                            "lat":  -44.097735,
+                                            "lng":  170.881943
+                                        },
+                                        {
+                                            "lat":  -44.097553,
+                                            "lng":  170.881036
+                                        }
+                                    ],
+                       "areaSqm":  2432,
+                       "areaHa":  0.243,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T22:45:35.474Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-10T05:47:47.632Z"
+                   },
+                   {
+                       "id":  "mq77u5pksfqgg",
+                       "name":  "Lower Fescue Crop Break 2",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097244,
+                                            "lng":  170.880161
+                                        },
+                                        {
+                                            "lat":  -44.097397,
+                                            "lng":  170.880133
+                                        },
+                                        {
+                                            "lat":  -44.097732,
+                                            "lng":  170.881936
+                                        },
+                                        {
+                                            "lat":  -44.097581,
+                                            "lng":  170.881986
+                                        }
+                                    ],
+                       "areaSqm":  2575,
+                       "areaHa":  0.257,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T22:32:58.472Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-10T05:46:15.886Z",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-11T01:23:38.546Z"
+                   },
+                   {
+                       "id":  "mq77k0emngb91",
+                       "name":  "A1 Crop Break 4",
+                       "paddock":  "A1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.108895,
+                                            "lng":  170.837046
+                                        },
+                                        {
+                                            "lat":  -44.109114,
+                                            "lng":  170.83645
+                                        },
+                                        {
+                                            "lat":  -44.109323,
+                                            "lng":  170.835876
+                                        },
+                                        {
+                                            "lat":  -44.109187,
+                                            "lng":  170.83574
+                                        },
+                                        {
+                                            "lat":  -44.108786,
+                                            "lng":  170.836961
+                                        }
+                                    ],
+                       "areaSqm":  1717,
+                       "areaHa":  0.172,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T22:25:05.038Z",
+                       "createdBy":  "yukimi",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "adrian",
+                       "lastEditedAt":  "2026-06-12T19:55:42.959Z"
+                   },
+                   {
+                       "id":  "mq77h43e93s89",
+                       "name":  "A1 Crop Break 3",
+                       "paddock":  "A1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.109065,
+                                            "lng":  170.835638
+                                        },
+                                        {
+                                            "lat":  -44.108652,
+                                            "lng":  170.836877
+                                        },
+                                        {
+                                            "lat":  -44.10878,
+                                            "lng":  170.836973
+                                        },
+                                        {
+                                            "lat":  -44.108989,
+                                            "lng":  170.836352
+                                        },
+                                        {
+                                            "lat":  -44.109184,
+                                            "lng":  170.835742
+                                        }
+                                    ],
+                       "areaSqm":  1748,
+                       "areaHa":  0.175,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T22:22:49.850Z",
+                       "createdBy":  "yukimi",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "adrian",
+                       "lastEditedAt":  "2026-06-11T22:11:32.637Z"
+                   },
+                   {
+                       "id":  "mq68jzbdv1hkf",
+                       "name":  "Shanes Crop Break 4",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.099387,
+                                            "lng":  170.874354
+                                        },
+                                        {
+                                            "lat":  -44.099322,
+                                            "lng":  170.874555
+                                        },
+                                        {
+                                            "lat":  -44.098914,
+                                            "lng":  170.874253
+                                        },
+                                        {
+                                            "lat":  -44.098529,
+                                            "lng":  170.873942
+                                        },
+                                        {
+                                            "lat":  -44.098644,
+                                            "lng":  170.873785
+                                        }
+                                    ],
+                       "areaSqm":  1745,
+                       "areaHa":  0.175,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T06:05:17.065Z",
+                       "createdBy":  "Bruno",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-11T01:23:20.685Z"
+                   },
+                   {
+                       "id":  "mq63pfe28egig",
+                       "name":  "H2 Line 1",
+                       "paddock":  "H2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.129165,
+                                            "lng":  170.852526
+                                        },
+                                        {
+                                            "lat":  -44.1286,
+                                            "lng":  170.85502
+                                        }
+                                    ],
+                       "areaSqm":  0,
+                       "areaHa":  0,
+                       "distanceMeters":  209,
+                       "cropWidthMeters":  8.82,
+                       "cropMode":  "line",
+                       "createdAt":  "2026-06-09T03:49:33.098Z",
+                       "createdBy":  "Juan",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  false,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-09T03:49:53.059Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq63gyeccf8x0",
+                       "name":  "A1 Crop Break 2",
+                       "paddock":  "A1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.110548,
+                                            "lng":  170.836533
+                                        },
+                                        {
+                                            "lat":  -44.110287,
+                                            "lng":  170.836589
+                                        },
+                                        {
+                                            "lat":  -44.109917,
+                                            "lng":  170.837686
+                                        },
+                                        {
+                                            "lat":  -44.110092,
+                                            "lng":  170.837769
+                                        },
+                                        {
+                                            "lat":  -44.110269,
+                                            "lng":  170.83719
+                                        }
+                                    ],
+                       "areaSqm":  2115,
+                       "areaHa":  0.211,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T03:42:57.828Z",
+                       "createdBy":  "yukimi",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-09T03:50:30.521Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq639a65hc1hm",
+                       "name":  "Shanes Crop Break 3",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.099464,
+                                            "lng":  170.874067
+                                        },
+                                        {
+                                            "lat":  -44.099151,
+                                            "lng":  170.873907
+                                        },
+                                        {
+                                            "lat":  -44.098765,
+                                            "lng":  170.873631
+                                        },
+                                        {
+                                            "lat":  -44.098643,
+                                            "lng":  170.873783
+                                        },
+                                        {
+                                            "lat":  -44.099386,
+                                            "lng":  170.874354
+                                        }
+                                    ],
+                       "areaSqm":  1748,
+                       "areaHa":  0.175,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T03:36:59.837Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:46:28.950Z"
+                   },
+                   {
+                       "id":  "mq6386kkvde67",
+                       "name":  "Old House Crop Break 5",
+                       "paddock":  "Old House",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.096337,
+                                            "lng":  170.871162
+                                        },
+                                        {
+                                            "lat":  -44.096297,
+                                            "lng":  170.870986
+                                        },
+                                        {
+                                            "lat":  -44.096626,
+                                            "lng":  170.870857
+                                        },
+                                        {
+                                            "lat":  -44.096716,
+                                            "lng":  170.871045
+                                        }
+                                    ],
+                       "areaSqm":  645,
+                       "areaHa":  0.065,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T03:36:08.516Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-11T21:22:01.379Z"
+                   },
+                   {
+                       "id":  "mq62mpiflisij",
+                       "name":  "Old House Crop Break 4",
+                       "paddock":  "Old House",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09633,
+                                            "lng":  170.870986
+                                        },
+                                        {
+                                            "lat":  -44.09669,
+                                            "lng":  170.870863
+                                        },
+                                        {
+                                            "lat":  -44.096796,
+                                            "lng":  170.871474
+                                        },
+                                        {
+                                            "lat":  -44.09558,
+                                            "lng":  170.871743
+                                        },
+                                        {
+                                            "lat":  -44.095559,
+                                            "lng":  170.87155
+                                        },
+                                        {
+                                            "lat":  -44.096044,
+                                            "lng":  170.871303
+                                        },
+                                        {
+                                            "lat":  -44.096177,
+                                            "lng":  170.871389
+                                        },
+                                        {
+                                            "lat":  -44.096262,
+                                            "lng":  170.871362
+                                        },
+                                        {
+                                            "lat":  -44.096358,
+                                            "lng":  170.871225
+                                        }
+                                    ],
+                       "areaSqm":  4032,
+                       "areaHa":  0.403,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-09T03:19:26.631Z",
+                       "createdBy":  "Juan",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-09T03:19:46.749Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq5sm29k8muot",
+                       "name":  "Old House Crop Break 3",
+                       "paddock":  "Old House",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095529,
+                                            "lng":  170.871255
+                                        },
+                                        {
+                                            "lat":  -44.095573,
+                                            "lng":  170.871534
+                                        },
+                                        {
+                                            "lat":  -44.095863,
+                                            "lng":  170.871463
+                                        },
+                                        {
+                                            "lat":  -44.096154,
+                                            "lng":  170.871189
+                                        },
+                                        {
+                                            "lat":  -44.09634,
+                                            "lng":  170.871177
+                                        },
+                                        {
+                                            "lat":  -44.096303,
+                                            "lng":  170.870978
+                                        }
+                                    ],
+                       "areaSqm":  1761,
+                       "areaHa":  0.176,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T22:39:00.344Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-11T21:21:48.862Z"
+                   },
+                   {
+                       "id":  "mq5sitzbsx37n",
+                       "name":  "Old House Crop Break 2",
+                       "paddock":  "Old House",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09658,
+                                            "lng":  170.870887
+                                        },
+                                        {
+                                            "lat":  -44.096697,
+                                            "lng":  170.87104
+                                        },
+                                        {
+                                            "lat":  -44.096327,
+                                            "lng":  170.87124
+                                        },
+                                        {
+                                            "lat":  -44.096242,
+                                            "lng":  170.871115
+                                        },
+                                        {
+                                            "lat":  -44.095831,
+                                            "lng":  170.871492
+                                        },
+                                        {
+                                            "lat":  -44.095779,
+                                            "lng":  170.871142
+                                        }
+                                    ],
+                       "areaSqm":  1786,
+                       "areaHa":  0.179,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T22:36:29.639Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Fede",
+                       "deletedAt":  "2026-06-08T22:38:43.703Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mq5scxi14nlfq",
+                       "name":  "Old House Crop Break 1",
+                       "paddock":  "Old House",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095483,
+                                            "lng":  170.871037
+                                        },
+                                        {
+                                            "lat":  -44.095476,
+                                            "lng":  170.871263
+                                        },
+                                        {
+                                            "lat":  -44.096585,
+                                            "lng":  170.870876
+                                        },
+                                        {
+                                            "lat":  -44.096585,
+                                            "lng":  170.870876
+                                        },
+                                        {
+                                            "lat":  -44.096493,
+                                            "lng":  170.870726
+                                        }
+                                    ],
+                       "areaSqm":  1902,
+                       "areaHa":  0.19,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T22:31:54.266Z",
+                       "createdBy":  "Bruno",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-11T21:21:56.223Z"
+                   },
+                   {
+                       "id":  "mq5qtc9wf64yn",
+                       "name":  "Shanes Crop Break 2",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.099163,
+                                            "lng":  170.873891
+                                        },
+                                        {
+                                            "lat":  -44.099147,
+                                            "lng":  170.873065
+                                        },
+                                        {
+                                            "lat":  -44.099209,
+                                            "lng":  170.87284
+                                        },
+                                        {
+                                            "lat":  -44.098809,
+                                            "lng":  170.873637
+                                        }
+                                    ],
+                       "areaSqm":  1466,
+                       "areaHa":  0.147,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T21:48:40.676Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:46:35.601Z"
+                   },
+                   {
+                       "id":  "mq5qk6nkxjqco",
+                       "name":  "A1 Crop Break 1",
+                       "paddock":  "A1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.110739,
+                                            "lng":  170.836634
+                                        },
+                                        {
+                                            "lat":  -44.110869,
+                                            "lng":  170.836691
+                                        },
+                                        {
+                                            "lat":  -44.110719,
+                                            "lng":  170.837394
+                                        },
+                                        {
+                                            "lat":  -44.110569,
+                                            "lng":  170.838098
+                                        },
+                                        {
+                                            "lat":  -44.11044,
+                                            "lng":  170.838024
+                                        }
+                                    ],
+                       "areaSqm":  1783,
+                       "areaHa":  0.178,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T21:41:33.489Z",
+                       "createdBy":  "Juan",
+                       "group":  "1st",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-10T05:44:38.195Z"
+                   },
+                   {
+                       "id":  "mq5ptnyd8bgsa",
+                       "name":  "Oneils hill Crop Break 1",
+                       "paddock":  "Oneils hill",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.09802,
+                                            "lng":  170.872464
+                                        },
+                                        {
+                                            "lat":  -44.097895,
+                                            "lng":  170.872522
+                                        },
+                                        {
+                                            "lat":  -44.098841,
+                                            "lng":  170.873655
+                                        },
+                                        {
+                                            "lat":  -44.098938,
+                                            "lng":  170.873493
+                                        }
+                                    ],
+                       "areaSqm":  1984,
+                       "areaHa":  0.198,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T21:20:56.197Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1778724780405",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "mateo",
+                       "lastEditedAt":  "2026-06-15T08:54:58.813Z"
+                   },
+                   {
+                       "id":  "mq5olpp00gaiw",
+                       "name":  "Lower Fescue Crop Break 1",
+                       "paddock":  "Lower Fescue",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097482,
+                                            "lng":  170.882005
+                                        },
+                                        {
+                                            "lat":  -44.097591,
+                                            "lng":  170.882
+                                        },
+                                        {
+                                            "lat":  -44.097251,
+                                            "lng":  170.880137
+                                        },
+                                        {
+                                            "lat":  -44.097082,
+                                            "lng":  170.880231
+                                        }
+                                    ],
+                       "areaSqm":  2418,
+                       "areaHa":  0.242,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T20:46:45.588Z",
+                       "createdBy":  "Fede",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-10T05:44:55.296Z"
+                   },
+                   {
+                       "id":  "mq5my6ssmns7u",
+                       "name":  "H1 Crop Break 1",
+                       "paddock":  "H1",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.127526,
+                                            "lng":  170.849316
+                                        },
+                                        {
+                                            "lat":  -44.127909,
+                                            "lng":  170.849552
+                                        },
+                                        {
+                                            "lat":  -44.127779,
+                                            "lng":  170.849979
+                                        },
+                                        {
+                                            "lat":  -44.127349,
+                                            "lng":  170.849807
+                                        }
+                                    ],
+                       "areaSqm":  1938,
+                       "areaHa":  0.194,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T20:00:28.396Z",
+                       "createdBy":  "Juan",
+                       "group":  "2nd",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-08T20:01:57.660Z",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-08T20:00:42.433Z"
+                   },
+                   {
+                       "id":  "mq5m79hle63tk",
+                       "name":  "Shanes Crop Break 1",
+                       "paddock":  "Shanes",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.100119,
+                                            "lng":  170.87397
+                                        },
+                                        {
+                                            "lat":  -44.099484,
+                                            "lng":  170.874068
+                                        },
+                                        {
+                                            "lat":  -44.099348,
+                                            "lng":  170.874543
+                                        },
+                                        {
+                                            "lat":  -44.098819,
+                                            "lng":  170.873541
+                                        },
+                                        {
+                                            "lat":  -44.099126,
+                                            "lng":  170.872917
+                                        },
+                                        {
+                                            "lat":  -44.099434,
+                                            "lng":  170.872293
+                                        },
+                                        {
+                                            "lat":  -44.099661,
+                                            "lng":  170.871859
+                                        },
+                                        {
+                                            "lat":  -44.099924,
+                                            "lng":  170.872758
+                                        }
+                                    ],
+                       "areaSqm":  15547,
+                       "areaHa":  1.555,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-08T19:39:32.169Z",
+                       "createdBy":  "Juan",
+                       "group":  "herd_1780901470094",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "",
+                       "isDeleted":  true,
+                       "deletedBy":  "Juan",
+                       "deletedAt":  "2026-06-08T19:39:48.840Z",
+                       "lastEditedBy":  "Juan",
+                       "lastEditedAt":  "2026-06-08T19:39:38.109Z"
+                   },
+                   {
+                       "id":  "mqj74vqrbsn0f",
+                       "name":  "Top sunny side airstrip Crop Break 1",
+                       "paddock":  "Top sunny side airstrip",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.097118,
+                                            "lng":  170.879835
+                                        },
+                                        {
+                                            "lat":  -44.096752,
+                                            "lng":  170.879343
+                                        },
+                                        {
+                                            "lat":  -44.097019,
+                                            "lng":  170.879186
+                                        },
+                                        {
+                                            "lat":  -44.097311,
+                                            "lng":  170.879643
+                                        }
+                                    ],
+                       "areaSqm":  1481,
+                       "areaHa":  0.148,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T07:46:33.267Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1776635776659",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  true,
+                       "deletedBy":  "mateo",
+                       "deletedAt":  "2026-06-18T07:47:40.233Z",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   },
+                   {
+                       "id":  "mqj72m5nyjfmj",
+                       "name":  "Old house 2 Crop Break 13",
+                       "paddock":  "Old house 2",
+                       "vertices":  [
+                                        {
+                                            "lat":  -44.095287,
+                                            "lng":  170.86949
+                                        },
+                                        {
+                                            "lat":  -44.094845,
+                                            "lng":  170.869627
+                                        },
+                                        {
+                                            "lat":  -44.094404,
+                                            "lng":  170.869764
+                                        },
+                                        {
+                                            "lat":  -44.094411,
+                                            "lng":  170.869968
+                                        },
+                                        {
+                                            "lat":  -44.094858,
+                                            "lng":  170.869844
+                                        },
+                                        {
+                                            "lat":  -44.095306,
+                                            "lng":  170.869719
+                                        }
+                                    ],
+                       "areaSqm":  1742,
+                       "areaHa":  0.174,
+                       "distanceMeters":  0,
+                       "cropWidthMeters":  0,
+                       "cropMode":  "polygon",
+                       "createdAt":  "2026-06-18T07:44:47.531Z",
+                       "createdBy":  "mateo",
+                       "group":  "herd_1777521608978",
+                       "comment":  "",
+                       "isCropBreak":  true,
+                       "cropStatus":  "marked",
+                       "isDeleted":  false,
+                       "deletedBy":  "",
+                       "deletedAt":  "",
+                       "lastEditedBy":  "",
+                       "lastEditedAt":  ""
+                   }
+               ]
+}
