@@ -3,10 +3,10 @@ import prisma from '@/lib/prisma';
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ farmId: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { farmId } = await context.params;
+    const { id: farmId } = await context.params;
     const body = await request.json(); // Assuming GeoJSON is sent as JSON body
     
     if (!body || body.type !== 'FeatureCollection') {
@@ -50,10 +50,10 @@ export async function POST(
 // GET all paddocks for a farm
 export async function GET(
   request: Request,
-  context: { params: Promise<{ farmId: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { farmId } = await context.params;
+    const { id: farmId } = await context.params;
     const paddocks = await prisma.paddock.findMany({
       where: { farmId }
     });
