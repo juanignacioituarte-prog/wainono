@@ -2198,8 +2198,8 @@
     <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
     <script>
         /* === CONFIGURATION === */
-        const GOOGLE_SCRIPT_URL = "/api/beta/hs";
-        const HS_GOOGLE_SCRIPT_URL = "/api/beta/hs";
+        const GOOGLE_SCRIPT_URL = "/api/beta/hs?farmId=c7972aad-664f-43ad-934d-d88708d3e315";
+        const HS_GOOGLE_SCRIPT_URL = "/api/beta/hs?farmId=c7972aad-664f-43ad-934d-d88708d3e315";
         const ROSTER_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx_qBldXyEMoIev8kxT8mCOZGSZBTlnymEsBA6pMLiJGboKVBYEryrMJDSzIdeIdlVUfA/exec";
 
         /* Health & Safety State */
@@ -2754,21 +2754,8 @@
             // 1. Load Local Storage IMMEDIATELY (Fastest)
             loadLocalFeedSettings();
 
-            // 2. Try to fetch from Apps Script (Cloud) if configured
-            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
-                try {
-                    const res = await fetch(GOOGLE_SCRIPT_URL);
-                    const data = await res.json();
-                    if (data) {
-                        // Cloud data found, update UI
-                        setFeedInputs(data);
-                        loadLocalFeedSettings();
-                        calculateFeedLogic();
-                    }
-                } catch (e) { console.log("Cloud load failed, using local/csv"); }
-            } else {
-                // 3. Fallback to CSV (Read Only) if no script
-                try {
+            // Try to fetch from CSV
+            try {
                     const res = await fetch(FEED_SETTINGS_CSV + "&t=" + Date.now());
                     const txt = await res.text();
                     Papa.parse(txt, {
@@ -2790,7 +2777,6 @@
                         }
                     });
                 } catch (e) { }
-            }
         }
 
         function setFeedInputs(data) {
@@ -4629,7 +4615,7 @@
             // 2. Try to load from cloud and merge
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                 console.log("Loading breaks from cloud...");
-                fetch(GOOGLE_SCRIPT_URL + '?type=breaks&_t=' + Date.now(), { cache: 'no-store' })
+                fetch(GOOGLE_SCRIPT_URL + '&type=breaks&_t=' + Date.now(), { cache: 'no-store' })
                     .then(res => res.json())
                     .then(data => {
                         if (data && Array.isArray(data.breaks)) {
@@ -4747,7 +4733,7 @@
                 
                 // Fetch the latest breaks from the cloud first to merge and prevent overwriting other users' data
                 console.log("Fetching latest cloud breaks for merging before write...");
-                fetch(GOOGLE_SCRIPT_URL + '?type=breaks&_t=' + Date.now(), { cache: 'no-store' })
+                fetch(GOOGLE_SCRIPT_URL + '&type=breaks&_t=' + Date.now(), { cache: 'no-store' })
                 .then(res => {
                     if (res.ok) return res.json().catch(() => null);
                     throw new Error("Failed to fetch cloud breaks for pre-write merge");
@@ -7022,7 +7008,7 @@
             listDiv.innerHTML = '<p style="font-size:12px; color:#999;">Loading authorized users...</p>';
 
             try {
-                const res = await fetch(GOOGLE_SCRIPT_URL + '?type=auth_list&_t=' + Date.now());
+                const res = await fetch(GOOGLE_SCRIPT_URL + '&type=auth_list&_t=' + Date.now());
                 const data = await res.json();
                 const emails = data.emails || [];
 
@@ -8399,7 +8385,7 @@
             document.getElementById('hs-sync-msg').innerText = "Checking cloud updates...";
             document.getElementById('hs-setup-guide').style.display = 'none';
             
-            fetch(HS_GOOGLE_SCRIPT_URL + '?type=hs_get_all&_t=' + Date.now(), { cache: 'no-store' })
+            fetch(HS_GOOGLE_SCRIPT_URL + '&type=hs_get_all&_t=' + Date.now(), { cache: 'no-store' })
             .then(res => {
                 if (res.ok) return res.json().catch(() => null);
                 throw new Error("Failed to load H&S data");
@@ -8593,7 +8579,7 @@
         }
 
         /* ===================== VEHICLE MAINTENANCE MODULE ===================== */
-        const VEHICLE_GOOGLE_SCRIPT_URL = "/api/beta/vehicles";
+        const VEHICLE_GOOGLE_SCRIPT_URL = "/api/beta/vehicles?farmId=c7972aad-664f-43ad-934d-d88708d3e315";
         let vmVehicles = JSON.parse(localStorage.getItem('vm_vehicles')) || [];
         let vmLogs = JSON.parse(localStorage.getItem('vm_logs')) || [];
         let currentVMTab = 'vehicles';
@@ -8999,7 +8985,7 @@
                 return;
             }
             document.getElementById('vm-sync-msg').innerText = 'Loading from Cloud...';
-            fetch(VEHICLE_GOOGLE_SCRIPT_URL + '?type=vm_get_all&_t=' + Date.now(), { cache: 'no-store' })
+            fetch(VEHICLE_GOOGLE_SCRIPT_URL + '&type=vm_get_all&_t=' + Date.now(), { cache: 'no-store' })
             .then(res => res.json())
             .then(data => {
                 if (data && data.success) {

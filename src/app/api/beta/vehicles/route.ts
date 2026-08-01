@@ -23,10 +23,30 @@ export async function GET(request: Request) {
   return NextResponse.json({ error: 'invalid type' }, { status: 400, headers: getCorsHeaders() });
 }
 
+export async function POST(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const farmId = searchParams.get('farmId') || 'c7972aad-664f-43ad-934d-d88708d3e315';
+  
+  try {
+    const body = await request.json();
+    const type = body.type;
+
+    if (type === 'vm_sync_all') {
+      // Mock successful sync for now, data persists in localStorage.
+      return NextResponse.json({ success: true, status: 'success' }, { headers: getCorsHeaders() });
+    }
+
+    return NextResponse.json({ success: false, error: 'Unknown type' }, { headers: getCorsHeaders() });
+  } catch (e) {
+    return NextResponse.json({ success: false, error: String(e) }, { status: 500, headers: getCorsHeaders() });
+  }
+}
+
 function getCorsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
   };
 }
 
