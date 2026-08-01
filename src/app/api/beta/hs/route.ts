@@ -16,9 +16,17 @@ export async function GET(request: Request) {
     const observations = await prisma.hS_Observation.findMany({ where: { farmId } });
     const staff = await prisma.hS_Staff.findMany({ where: { farmId } });
     
+    let hazards: any[] = [];
+    let meetings: any[] = [];
+    try { hazards = await prisma.hS_Hazard.findMany({ where: { farmId } }); } catch(e) {}
+    try { meetings = await prisma.hS_Meeting.findMany({ where: { farmId } }); } catch(e) {}
+    
     return NextResponse.json({
       incidents: incidents.map((i: any) => ({ ...i, date: i.date.toISOString() })),
       observations: observations.map((o: any) => ({ ...o, date: o.date.toISOString() })),
+      interactions: observations.map((o: any) => ({ ...o, date: o.date.toISOString() })), // Front-end expects interactions
+      hazards: hazards.map((h: any) => ({ ...h, date: h.date ? h.date.toISOString() : undefined })),
+      meetings: meetings.map((m: any) => ({ ...m, date: m.date ? m.date.toISOString() : undefined })),
       staff: staff
     }, { headers: getCorsHeaders() });
   }
