@@ -21,6 +21,7 @@ export async function GET(request: Request) {
     return `${r.paddock.name},${dateStr},${r.ndvi || ""},0,`;
   });
 
+  rows.unshift('paddock_name,date,ndvi_mean,cloud_pc,map_id');
   const csvStr = rows.join('\n');
 
   return new NextResponse(csvStr, {
