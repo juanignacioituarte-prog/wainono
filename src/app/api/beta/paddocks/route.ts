@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const farmId = searchParams.get('farmId');
+  const farmId = searchParams.get('farmId') || 'c7972aad-664f-43ad-934d-d88708d3e315'; // Default to Wainono
   
   if (!farmId) {
     return NextResponse.json({ error: 'farmId is required' }, { status: 400 });
