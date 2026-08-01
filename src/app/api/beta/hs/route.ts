@@ -25,7 +25,13 @@ export async function GET(request: Request) {
 
   if (type === 'breaks') {
     const breaks = await prisma.break.findMany({ where: { farmId } });
-    return NextResponse.json({ breaks }, { headers: getCorsHeaders() });
+    const formattedBreaks = breaks.map((b: any) => ({
+      ...b,
+      vertices: b.vertices ? JSON.parse(b.vertices) : [],
+      createdAt: b.createdAt ? b.createdAt.toISOString() : null,
+      deletedAt: b.deletedAt ? b.deletedAt.toISOString() : null
+    }));
+    return NextResponse.json({ breaks: formattedBreaks }, { headers: getCorsHeaders() });
   }
 
   return NextResponse.json({ error: 'invalid type' }, { status: 400, headers: getCorsHeaders() });
