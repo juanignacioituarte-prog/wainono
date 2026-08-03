@@ -2787,6 +2787,7 @@
             updateFarmStats();
             renderDashboard();
             updateGeoStyles();
+            syncPaddockEditToCloud(pName);
         }
 
         function deleteRecord(pName, target) {
@@ -2837,6 +2838,37 @@
             updateFarmStats();
             renderDashboard();
             updateGeoStyles();
+            syncPaddockEditToCloud(pName);
+        }
+
+        async function syncPaddockEditToCloud(pName) {
+            let p = manualModeData.find(d => d.name === pName);
+            if (!p) return;
+
+            const entries = [];
+            if (p.latest && p.latest.cover !== undefined && p.latest.formattedDate !== 'None') {
+                entries.push({ date: p.latest.formattedDate, paddock: p.name, cover: p.latest.cover, reason: p.reason || '' });
+            }
+            if (p.previous && p.previous.cover !== undefined && p.previous.formattedDate !== 'None') {
+                entries.push({ date: p.previous.formattedDate, paddock: p.name, cover: p.previous.cover, reason: '' });
+            }
+
+            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            type: 'update_paddock_history',
+                            paddock: p.name,
+                            entries: entries
+                        })
+                    });
+                } catch(e) {
+                    console.error("Cloud sync error for paddock edit:", e);
+                }
+            }
         }
 
         function setupLongPress(cardEl, paddockName) {
