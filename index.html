@@ -153,6 +153,12 @@
             background: #f0f7ff;
         }
 
+        .card.is-unmeasured {
+            border-left-color: #f39c12 !important;
+            background: #fffcf5 !important;
+            opacity: 0.88;
+        }
+
         path.leaflet-interactive {
             -webkit-tap-highlight-color: transparent;
             outline: none;
@@ -1623,6 +1629,7 @@
                         <div class="avg-item"><small>FARM AVG COVER</small>
                             <div id="total-avg" style="font-size: 22px; font-weight: bold;">0</div>
                             <small>kgDM/ha</small>
+                            <div id="partial-farmwalk-remark" style="display:none; font-size:9px; font-weight:bold; color:#e67e22; background:rgba(230,126,34,0.15); padding:2px 6px; border-radius:4px; margin-top:4px; text-align:center;">PARTIAL FARMWALK</div>
                         </div>
                         <div class="avg-item"><small>GROWTH</small>
                             <div id="avg-growth" style="font-size: 22px; font-weight: bold;">0</div>
@@ -3864,6 +3871,23 @@
             if (elFeedAvgCover) elFeedAvgCover.innerText = avgCoverVal;
             if (elFeedAvgGrowth) elFeedAvgGrowth.innerText = avgGrowthVal;
             
+            // Partial Farmwalk Remark
+            const activePaddocks = manualModeData.filter(p => !p.isOut);
+            const activeTsList = activePaddocks.map(p => p.latest ? p.latest.ts : 0).filter(t => t > 0);
+            const maxTs = activeTsList.length > 0 ? Math.max(...activeTsList) : 0;
+            const measuredInLatest = activePaddocks.filter(p => p.latest && p.latest.ts === maxTs);
+            const isPartialWalk = (currentDashboardMode === 'manual' && maxTs > 0 && measuredInLatest.length > 0 && measuredInLatest.length < activePaddocks.length);
+
+            const remarkEl = document.getElementById('partial-farmwalk-remark');
+            if (remarkEl) {
+                if (isPartialWalk) {
+                    remarkEl.innerText = `PARTIAL FARMWALK (${measuredInLatest.length}/${activePaddocks.length} measured)`;
+                    remarkEl.style.display = 'inline-block';
+                } else {
+                    remarkEl.style.display = 'none';
+                }
+            }
+
             return { tAreaC, avgCoverVal, avgGrowthVal };
         }
 
@@ -3879,15 +3903,23 @@
             updateFarmStats();
             calculateFeedLogic();
 
+            const activePaddocks = data.filter(p => !p.isOut);
+            const activeTsList = activePaddocks.map(p => p.latest ? p.latest.ts : 0).filter(t => t > 0);
+            const maxTs = activeTsList.length > 0 ? Math.max(...activeTsList) : 0;
+            const measuredInLatest = activePaddocks.filter(p => p.latest && p.latest.ts === maxTs);
+            const isPartialWalk = (currentDashboardMode === 'manual' && maxTs > 0 && measuredInLatest.length > 0 && measuredInLatest.length < activePaddocks.length);
+
             const list = document.getElementById('list'); list.innerHTML = "";
             sorted.forEach(p => {
+                const isUnmeasuredInLatest = (isPartialWalk && !p.isOut && p.latest && p.latest.ts < maxTs);
                 const div = document.createElement('div');
-                div.className = `card ${p.isOut ? 'is-out' : ''} ${p.isPartial ? 'is-partial' : ''}`;
+                div.className = `card ${p.isOut ? 'is-out' : ''} ${p.isPartial ? 'is-partial' : ''} ${isUnmeasuredInLatest ? 'is-unmeasured' : ''}`;
                 div.id = `card-${p.name.replace(/\s+/g, '-')}`;
 
                 let badges = "";
                 if (p.isOut) badges += `<span class="badge" style="background:${p.reason && p.reason.toUpperCase() === 'CROP' ? 'var(--warning)' : 'var(--out)'}">${(p.reason || 'OUT').toUpperCase()}</span>`;
                 if (p.isPartial) badges += `<span class="badge" style="background:var(--partial)">PARTIAL GRAZED</span>`;
+                if (isUnmeasuredInLatest) badges += `<span class="badge" style="background:#f39c12;">UNMEASURED</span>`;
 
                 if (currentDashboardMode === 'satellite' && p.manual && calibrationModel) {
                     badges += `<span class="badge" style="background:var(--prev)">M</span>`;
