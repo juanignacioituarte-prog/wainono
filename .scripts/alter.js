@@ -1,1 +1,0 @@
-const { Client } = require('pg'); const client = new Client({ connectionString: process.env.DIRECT_URL }); client.connect().then(() => client.query('ALTER TABLE "PastureRecord" ADD COLUMN "cloudCover" DOUBLE PRECISION, ADD COLUMN "tileUrl" TEXT;')).then(() => console.log('Columns Added!')).catch(e => console.log('Error:', e.message)).finally(() => client.end());
