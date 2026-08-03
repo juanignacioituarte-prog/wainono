@@ -2664,7 +2664,7 @@
                                 isOut: isOut, 
                                 area: areaLookup[name] || 0
                             };
-                        });
+                        }).filter(p => !/^\d+$/.test(p.name));
 
                         Object.keys(paddockMap).forEach(pName => {
                             if (!manualModeData.find(m => m.name === pName)) {
