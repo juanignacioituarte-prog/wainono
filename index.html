@@ -131,6 +131,9 @@
             border-left: 5px solid #ccc;
             position: relative;
             transition: 0.2s;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .card:hover {
@@ -2773,16 +2776,46 @@
             updateGeoStyles();
         }
 
-        let pressTimer = null;
         function setupLongPress(cardEl, paddockName) {
+            let pressTimer = null;
+            let startX = 0, startY = 0;
+
             const startPress = (e) => {
                 if (!isFarmwalkEntryActive || currentDashboardMode !== 'manual') return;
                 if (['INPUT', 'BUTTON', 'A', 'SELECT'].includes(e.target.tagName)) return;
 
+                if (e.touches && e.touches[0]) {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                } else {
+                    startX = e.clientX || 0;
+                    startY = e.clientY || 0;
+                }
+
+                if (pressTimer) clearTimeout(pressTimer);
+
                 pressTimer = setTimeout(() => {
                     if (navigator.vibrate) try { navigator.vibrate(100); } catch(err) {}
                     toggleEditPrevious(paddockName);
-                }, 3000);
+                    pressTimer = null;
+                }, 1500); // 1.5s touch-tolerant hold
+            };
+
+            const movePress = (e) => {
+                if (!pressTimer) return;
+                let curX = 0, curY = 0;
+                if (e.touches && e.touches[0]) {
+                    curX = e.touches[0].clientX;
+                    curY = e.touches[0].clientY;
+                } else {
+                    curX = e.clientX || 0;
+                    curY = e.clientY || 0;
+                }
+                const dx = curX - startX;
+                const dy = curY - startY;
+                if (Math.hypot(dx, dy) > 15) { // 15px drift threshold
+                    cancelPress();
+                }
             };
 
             const cancelPress = () => {
@@ -2795,11 +2828,18 @@
             cardEl.addEventListener('mousedown', startPress);
             cardEl.addEventListener('mouseup', cancelPress);
             cardEl.addEventListener('mouseleave', cancelPress);
+            cardEl.addEventListener('mousemove', movePress);
 
             cardEl.addEventListener('touchstart', startPress, { passive: true });
             cardEl.addEventListener('touchend', cancelPress);
             cardEl.addEventListener('touchcancel', cancelPress);
-            cardEl.addEventListener('touchmove', cancelPress);
+            cardEl.addEventListener('touchmove', movePress, { passive: true });
+
+            cardEl.addEventListener('contextmenu', (e) => {
+                if (isFarmwalkEntryActive && currentDashboardMode === 'manual') {
+                    e.preventDefault();
+                }
+            });
         }
 
         function toggleFarmwalkEntryMode() {
