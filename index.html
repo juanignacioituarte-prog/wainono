@@ -2608,6 +2608,7 @@
 
         /* Loaders */
         async function loadManualRankCSV() {
+            console.log("=== LOAD MANUAL RANK CSV STARTED ===");
             try {
                 const res = await fetch(MANUAL_MODE_CSV + "&t=" + Date.now());
                 const txt = await res.text();
@@ -2996,6 +2997,8 @@
             loadCustomPaddocks(); // Load external paddocks
 
             await Promise.all([loadStatusSheets(), loadManualSheet()]);
+            loadCSV();
+            loadManualRankCSV();
             await loadGeoJSON();
 
             const calibHoverArea = document.getElementById('calib-hover-area');
@@ -3060,9 +3063,9 @@
                     }
                 }).addTo(map);
                 map.fitBounds(geoLayer.getBounds());
-                loadCSV();
-                loadManualRankCSV();
-            } catch (e) { }
+            } catch (e) {
+                console.error("Error in loadGeoJSON:", e);
+            }
         }
 
         /* Dashboard Mode Switching */
