@@ -2670,6 +2670,20 @@
                         }
                     }
 
+                    // Check for locally cached manual entries
+                    let localSavedData = {};
+                    try {
+                        const rawLocal = localStorage.getItem('wn_cached_manual_data');
+                        if (rawLocal) {
+                            const arr = JSON.parse(rawLocal);
+                            if (Array.isArray(arr)) {
+                                arr.forEach(item => {
+                                    if (item.name) localSavedData[normName(item.name)] = item;
+                                });
+                            }
+                        }
+                    } catch(e) {}
+
                     const parsedData = [];
                     Object.values(paddockMap).forEach(p => {
                         p.entries.sort((a, b) => b.dateObj - a.dateObj);
@@ -2703,6 +2717,23 @@
                                         prevCover = mPrev.cover;
                                     }
                                 }
+                            }
+                        }
+
+                        // Merge locally saved entry if newer
+                        const localItem = localSavedData[norm];
+                        if (localItem && localItem.latest && localItem.latest.ts) {
+                            if (!lDate || localItem.latest.ts >= lDate.getTime()) {
+                                if (lDate && (!pDate || lDate.getTime() > (pDate ? pDate.getTime() : 0))) {
+                                    pDate = lDate;
+                                    prevCover = latestCover;
+                                }
+                                latestCover = localItem.latest.cover;
+                                if (localItem.latest.formattedDate) lDate = parseStrangeDate(localItem.latest.formattedDate) || lDate;
+                                if (localItem.reason !== undefined) reason = localItem.reason;
+                            }
+                            if (localItem.previous && localItem.previous.cover !== undefined) {
+                                prevCover = localItem.previous.cover;
                             }
                         }
 
@@ -3003,12 +3034,18 @@
                 return b.latest.cover - a.latest.cover;
             });
 
+            // Save updated manualModeData to localStorage immediately
+            try {
+                localStorage.setItem('wn_cached_manual_data', JSON.stringify(manualModeData));
+            } catch(e) {}
+
             updateFarmStats();
             renderDashboard();
             updateGeoStyles();
 
             if (entriesToSave.length > 0 && GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                 try {
+                    // Send batch payload
                     await fetch(GOOGLE_SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
@@ -3017,6 +3054,22 @@
                             type: 'farmwalk_batch',
                             entries: entriesToSave
                         })
+                    });
+
+                    // Send fallback individual entry payloads to guarantee saving on older Apps Script deployments
+                    entriesToSave.forEach(entry => {
+                        fetch(GOOGLE_SCRIPT_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify({
+                                type: 'farmwalk_entry',
+                                date: entry.date,
+                                paddock: entry.paddock,
+                                cover: entry.cover,
+                                reason: entry.reason
+                            })
+                        }).catch(() => {});
                     });
                 } catch(e) {
                     console.error("Cloud save error:", e);
