@@ -2712,8 +2712,9 @@
 
                         parsedData.push({
                             name: p.name,
+                            entries: p.entries || [],
                             latest: { cover: latestCover, formattedDate: fmtNZ(lDate), ts: lDate ? lDate.getTime() : null },
-                            previous: pDate ? { cover: prevCover, formattedDate: fmtNZ(pDate) } : null,
+                            previous: pDate ? { cover: prevCover, formattedDate: fmtNZ(pDate), ts: pDate ? pDate.getTime() : null } : null,
                             growthRate: growth,
                             isOut: isOut,
                             reason: reason,
@@ -2792,16 +2793,38 @@
             let p = manualModeData.find(d => d.name === pName);
             if (!p) return;
 
+            if (!p.entries) p.entries = [];
+
             if (target === 'latest') {
-                if (p.previous) {
-                    p.latest = { ...p.previous };
-                    p.previous = null;
+                if (p.entries.length > 0) {
+                    p.entries.shift(); // Remove latest entry (index 0)
+                }
+                if (p.entries.length > 0) {
+                    const l = p.entries[0];
+                    p.latest = { cover: l.cover, formattedDate: fmtNZ(l.dateObj), ts: l.dateObj ? l.dateObj.getTime() : null };
+                    p.isOut = (l.cover === 0);
+
+                    if (p.entries.length > 1) {
+                        const pr = p.entries[1];
+                        p.previous = { cover: pr.cover, formattedDate: fmtNZ(pr.dateObj), ts: pr.dateObj ? pr.dateObj.getTime() : null };
+                    } else {
+                        p.previous = null;
+                    }
                 } else {
                     p.latest = { cover: 0, formattedDate: 'None', ts: 0 };
+                    p.previous = null;
+                    p.isOut = true;
                 }
-                p.isOut = (p.latest.cover === 0);
             } else if (target === 'previous') {
-                p.previous = null;
+                if (p.entries.length > 1) {
+                    p.entries.splice(1, 1); // Remove previous entry (index 1)
+                }
+                if (p.entries.length > 1) {
+                    const pr = p.entries[1]; // Next older entry becomes previous
+                    p.previous = { cover: pr.cover, formattedDate: fmtNZ(pr.dateObj), ts: pr.dateObj ? pr.dateObj.getTime() : null };
+                } else {
+                    p.previous = null;
+                }
             }
 
             if (!p.isOut && p.latest && p.previous && p.latest.ts && p.previous.ts) {
