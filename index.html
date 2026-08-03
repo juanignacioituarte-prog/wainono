@@ -2504,14 +2504,9 @@
             icon.textContent = isCollapsed ? '▶' : '▼';
         }
 
-        // Auto-collapse header and legend on mobile
+        // Keep header expanded on mobile so green avg box and +Farmwalk button are always visible
         if (window.innerWidth <= 768) {
-            const details = document.getElementById('header-details');
-            const toggle = document.getElementById('header-toggle');
-            if (details) details.classList.add('collapsed');
-            if (toggle) toggle.classList.add('collapsed');
-            
-            // Wait for DOM to then collapse legend
+            // Wait for DOM to then collapse legend if needed
             setTimeout(() => {
                 const legendContent = document.getElementById('legend-content');
                 const legendIcon = document.getElementById('legend-toggle-icon');
