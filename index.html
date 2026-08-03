@@ -2776,6 +2776,34 @@
             updateGeoStyles();
         }
 
+        function deleteRecord(pName, target) {
+            let p = manualModeData.find(d => d.name === pName);
+            if (!p) return;
+
+            if (target === 'latest') {
+                if (p.previous) {
+                    p.latest = { ...p.previous };
+                    p.previous = null;
+                } else {
+                    p.latest = { cover: 0, formattedDate: 'None', ts: 0 };
+                }
+                p.isOut = (p.latest.cover === 0);
+            } else if (target === 'previous') {
+                p.previous = null;
+            }
+
+            if (!p.isOut && p.latest && p.previous && p.latest.ts && p.previous.ts) {
+                const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
+                p.growthRate = Math.round((p.latest.cover - p.previous.cover) / dDiff);
+            } else {
+                p.growthRate = 0;
+            }
+
+            updateFarmStats();
+            renderDashboard();
+            updateGeoStyles();
+        }
+
         function setupLongPress(cardEl, paddockName) {
             let pressTimer = null;
             let longPressTriggered = false;
@@ -4062,10 +4090,12 @@
                                 <div>
                                     <small style="font-size:9px; color:#555; font-weight:bold; display:block; margin-bottom:2px;">Latest (${p.latest ? p.latest.formattedDate : 'Latest'})</small>
                                     <input type="number" id="inp-edit-latest-cover-${p.name}" value="${(p.latest && p.latest.cover !== undefined) ? p.latest.cover : ''}" placeholder="Latest kgDM" style="width:100%; padding:5px 6px; border:1px solid #3498db; border-radius:4px; font-size:12px; font-weight:bold;" />
+                                    ${p.latest ? `<button onclick="deleteRecord('${p.name}', 'latest')" style="background:#e74c3c; color:white; border:none; padding:4px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer; margin-top:4px; width:100%;">🗑️ Delete Latest</button>` : ''}
                                 </div>
                                 <div>
                                     <small style="font-size:9px; color:#555; font-weight:bold; display:block; margin-bottom:2px;">Previous (${p.previous ? p.previous.formattedDate : 'Prev'})</small>
                                     <input type="number" id="inp-edit-prev-cover-${p.name}" value="${(p.previous && p.previous.cover !== undefined) ? p.previous.cover : ''}" placeholder="Prev kgDM" style="width:100%; padding:5px 6px; border:1px solid #3498db; border-radius:4px; font-size:12px; font-weight:bold;" />
+                                    ${p.previous ? `<button onclick="deleteRecord('${p.name}', 'previous')" style="background:#c0392b; color:white; border:none; padding:4px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer; margin-top:4px; width:100%;">🗑️ Delete Prev</button>` : ''}
                                 </div>
                             </div>
                             <button onclick="updateCovers('${p.name}')" style="width:100%; background:#3498db; color:white; border:none; padding:6px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Update Covers</button>
