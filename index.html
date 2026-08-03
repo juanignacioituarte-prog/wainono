@@ -2220,7 +2220,7 @@
         const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
         const PARTIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=369172552&single=true&output=csv";
         const CAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv";
-        const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1312869086&single=true&output=csv";
+        const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=1329741462&single=true&output=csv";
         const FEED_SETTINGS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1218249029&single=true&output=csv";
         const AUTH_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=581275033&single=true&output=csv";
 
@@ -2608,41 +2608,62 @@
 
         /* Loaders */
         async function loadManualRankCSV() {
-            console.log("=== LOAD MANUAL RANK CSV STARTED ===");
             try {
                 const res = await fetch(MANUAL_MODE_CSV + "&t=" + Date.now());
                 const txt = await res.text();
                 Papa.parse(txt, {
                     header: false,
+                    skipEmptyLines: true,
                     complete: (results) => {
                         const rows = results.data || [];
                         if (rows.length < 1) return;
-                        const latestDate = parseStrangeDate(rows[0][1]);
-                        const prevDate = parseStrangeDate(rows[0][2]);
-                        const dayDiff = (latestDate && prevDate) ? Math.max(1, (latestDate - prevDate) / 86400000) : 1;
 
-                        manualModeData = rows.slice(1).map(r => {
-                            const name = (r[0] || "").trim();
+                        const paddockMap = {};
+                        const startIdx = (rows[0][0] && rows[0][0].toLowerCase().includes('date')) ? 1 : 0;
+
+                        for (let i = startIdx; i < rows.length; i++) {
+                            const r = rows[i];
+                            if (!r || r.length < 3) continue;
+                            const dObj = parseStrangeDate(r[0]);
+                            const name = (r[1] || "").trim();
+                            const cover = safeNum(r[2]);
+                            if (!name) continue;
+
                             const norm = normName(name);
-                            let latestCover = safeNum(r[1]);
-                            let prevCover = safeNum(r[2]);
-                            let lDate = latestDate;
-                            let pDate = prevDate;
+                            if (!paddockMap[norm]) {
+                                paddockMap[norm] = { name: name, entries: [] };
+                            }
+                            if (dObj) {
+                                paddockMap[norm].entries.push({ dateObj: dObj, cover: cover });
+                            }
+                        }
+
+                        const parsedData = [];
+                        Object.values(paddockMap).forEach(p => {
+                            p.entries.sort((a, b) => b.dateObj - a.dateObj);
+                            if (p.entries.length === 0) return;
+
+                            const latest = p.entries[0];
+                            const prev = p.entries.length > 1 ? p.entries[1] : null;
+
+                            let latestCover = latest.cover;
+                            let prevCover = prev ? prev.cover : latestCover;
+                            let lDate = latest.dateObj;
+                            let pDate = prev ? prev.dateObj : null;
 
                             // Merge from calibration sheet (manualEntries) if more recent
+                            const norm = normName(p.name);
                             const paddockEntries = manualEntries.filter(e => e.lower === norm).sort((a, b) => b.dateObj - a.dateObj);
                             if (paddockEntries.length > 0) {
                                 const mLatest = paddockEntries[0];
                                 if (!lDate || mLatest.dateObj > lDate) {
-                                    // Shift grid latest to previous if it was actually older
                                     if (lDate && (!pDate || lDate > pDate)) {
                                         pDate = lDate;
                                         prevCover = latestCover;
                                     }
                                     lDate = mLatest.dateObj;
                                     latestCover = mLatest.cover;
-                                    
-                                    // If we have a second newest entry in calibration sheet, use it as previous
+
                                     if (paddockEntries.length > 1) {
                                         const mPrev = paddockEntries[1];
                                         if (!pDate || mPrev.dateObj > pDate) {
@@ -2654,20 +2675,21 @@
                             }
 
                             const isOut = (latestCover === 0);
-                            const dDiff = (lDate && pDate) ? Math.max(1, (lDate - pDate) / 86400000) : dayDiff;
+                            const dDiff = (lDate && pDate) ? Math.max(1, (lDate - pDate) / 86400000) : 1;
                             const growth = isOut ? 0 : Math.round((latestCover - prevCover) / dDiff);
 
-                            return {
-                                name, 
+                            parsedData.push({
+                                name: p.name,
                                 latest: { cover: latestCover, formattedDate: fmtNZ(lDate), ts: lDate ? lDate.getTime() : null },
-                                previous: { cover: prevCover, formattedDate: fmtNZ(pDate) },
-                                growthRate: growth, 
-                                isOut: isOut, 
-                                area: areaLookup[name] || 0
-                            };
+                                previous: pDate ? { cover: prevCover, formattedDate: fmtNZ(pDate) } : null,
+                                growthRate: growth,
+                                isOut: isOut,
+                                area: areaLookup[p.name] || 0
+                            });
                         });
 
-                        
+                        manualModeData = parsedData;
+
                         let tWGrowth = 0, tAreaG = 0;
                         manualModeData.forEach(p => {
                             if (!p.isOut && p.area > 0 && p.growthRate && p.growthRate > 0) {
@@ -2683,7 +2705,9 @@
                         }
                     }
                 });
-            } catch (e) { }
+            } catch (e) {
+                console.error("Error loading manual ranks:", e);
+            }
         }
 
         async function loadManualSheet() {
@@ -3601,7 +3625,7 @@
             savedBreaks.forEach(b => {
                 if (b.isCropBreak && b.createdAt && new Date(b.createdAt).getTime() >= daysAgoTs) {
                     // Only subtract if it's not already in an 'OUT' paddock (to avoid double-counting)
-                    const pStatus = b.paddock ? excludedPaddocks.get(b.paddock.toLowerCase()) : null;
+                    const pStatus = b.paddock ? excludedPaddocks.get(String(b.paddock).toLowerCase()) : null;
                     if (!pStatus || pStatus === 'IN' || pStatus === 'PARTIAL') {
                         totalCropBreakArea += (b.areaHa || 0);
                     }
