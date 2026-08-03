@@ -1632,11 +1632,14 @@
                 </div>
                 <div class="sync-note">Synchronized on <span id="sync-time">...</span></div>
 
-                <div id="farmwalk-entry-bar" style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+                <div id="farmwalk-entry-bar" style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     <button id="btn-farmwalk-entry" onclick="toggleFarmwalkEntryMode()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         <span>+</span> Farmwalk
                     </button>
                     <input type="date" id="farmwalk-entry-date" style="display:none; padding:6px 10px; border-radius:6px; border:1px solid #27ae60; font-size:12px; font-weight:bold; color:#2c3e50;" />
+                    <button id="btn-save-farmwalk-all" onclick="saveEntireFarmwalk()" style="display:none; background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; transition:0.2s;">
+                        💾 SAVE FARMWALK
+                    </button>
                 </div>
             </div>
 
@@ -2726,6 +2729,7 @@
             isFarmwalkEntryActive = !isFarmwalkEntryActive;
             const btn = document.getElementById('btn-farmwalk-entry');
             const dateInp = document.getElementById('farmwalk-entry-date');
+            const btnSaveAll = document.getElementById('btn-save-farmwalk-all');
 
             if (isFarmwalkEntryActive) {
                 if (btn) {
@@ -2738,14 +2742,107 @@
                         dateInp.value = new Date().toISOString().split('T')[0];
                     }
                 }
+                if (btnSaveAll) btnSaveAll.style.display = 'inline-block';
             } else {
                 if (btn) {
                     btn.innerHTML = '<span>+</span> Farmwalk';
                     btn.style.background = '#27ae60';
                 }
                 if (dateInp) dateInp.style.display = 'none';
+                if (btnSaveAll) btnSaveAll.style.display = 'none';
             }
             renderDashboard();
+        }
+
+        async function saveEntireFarmwalk() {
+            const btnSave = document.getElementById('btn-save-farmwalk-all');
+            const dateVal = document.getElementById('farmwalk-entry-date')?.value || new Date().toISOString().split('T')[0];
+            const dateObj = new Date(dateVal + 'T12:00:00');
+
+            const entriesToSave = [];
+
+            manualModeData.forEach(p => {
+                const inp = document.getElementById(`inp-cover-${p.name}`);
+                const inpReturn = document.getElementById(`inp-return-cover-${p.name}`);
+
+                let valStr = inp ? inp.value.trim() : (inpReturn ? inpReturn.value.trim() : '');
+                if (valStr !== '') {
+                    let coverVal = parseFloat(valStr);
+                    if (!isNaN(coverVal)) {
+                        let reasonVal = coverVal === 0 ? (p.reason || 'out') : '';
+
+                        if (p.latest && p.latest.ts && dateObj.getTime() > p.latest.ts) {
+                            p.previous = { cover: p.latest.cover, formattedDate: p.latest.formattedDate, ts: p.latest.ts };
+                        }
+
+                        p.isOut = (coverVal === 0);
+                        if (reasonVal) p.reason = reasonVal; else p.reason = '';
+
+                        p.latest = {
+                            cover: coverVal,
+                            formattedDate: fmtNZ(dateObj),
+                            ts: dateObj.getTime()
+                        };
+
+                        if (!p.isOut && p.previous && p.latest.ts && p.previous.ts) {
+                            const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
+                            p.growthRate = Math.round((p.latest.cover - p.previous.cover) / dDiff);
+                        } else if (p.isOut) {
+                            p.growthRate = 0;
+                        }
+
+                        entriesToSave.push({
+                            date: dateVal,
+                            paddock: p.name,
+                            cover: coverVal,
+                            reason: p.reason || ''
+                        });
+                    }
+                }
+            });
+
+            if (entriesToSave.length === 0) {
+                alert("Please enter cover numbers in paddock cards before saving.");
+                return;
+            }
+
+            if (btnSave) {
+                btnSave.disabled = true;
+                btnSave.innerText = "SAVING...";
+            }
+
+            manualModeData.sort((a, b) => {
+                if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
+                return b.latest.cover - a.latest.cover;
+            });
+
+            updateFarmStats();
+            renderDashboard();
+            updateGeoStyles();
+
+            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            type: 'farmwalk_batch',
+                            entries: entriesToSave
+                        })
+                    });
+                } catch(e) {
+                    console.error("Cloud save error:", e);
+                }
+            }
+
+            setTimeout(() => {
+                if (btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.innerText = "✓ SAVED!";
+                    setTimeout(() => { btnSave.innerText = "💾 SAVE FARMWALK"; }, 2500);
+                }
+            }, 600);
         }
 
         function toggleOutRotationMenu(pName) {
@@ -3808,10 +3905,7 @@
                     if (!p.isOut) {
                         entryControlsHtml = `
                             <div class="farmwalk-card-controls" style="margin-top:10px; padding-top:8px; border-top:1px dashed #ddd; display:flex; flex-direction:column; gap:8px;" onclick="event.stopPropagation();">
-                                <div style="display:flex; gap:6px; align-items:center;">
-                                    <input type="number" id="inp-cover-${p.name}" placeholder="Cover kgDM" value="" style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:5px; font-size:12px; font-weight:bold;" />
-                                    <button onclick="savePaddockCover('${p.name}')" style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">Save</button>
-                                </div>
+                                <input type="number" id="inp-cover-${p.name}" placeholder="Cover kgDM" value="" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:5px; font-size:12px; font-weight:bold;" />
                                 <div style="display:flex; flex-direction:column; gap:4px;">
                                     <button onclick="toggleOutRotationMenu('${p.name}')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Take out of rotation ▾</button>
                                     <div id="out-menu-${p.name}" style="display:none; gap:6px; margin-top:4px;">
@@ -3828,7 +3922,6 @@
                                 <button onclick="toggleBringBackMenu('${p.name}')" style="background:#2980b9; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Bring back to rotation ▾</button>
                                 <div id="in-menu-${p.name}" style="display:none; gap:6px; margin-top:4px; align-items:center;">
                                     <input type="number" id="inp-return-cover-${p.name}" placeholder="New cover kgDM" value="" style="flex:1; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:12px; font-weight:bold;" />
-                                    <button onclick="savePaddockReturn('${p.name}')" style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Save</button>
                                 </div>
                             </div>
                         `;
