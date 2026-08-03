@@ -1631,6 +1631,13 @@
                     </div>
                 </div>
                 <div class="sync-note">Synchronized on <span id="sync-time">...</span></div>
+
+                <div id="farmwalk-entry-bar" style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+                    <button id="btn-farmwalk-entry" onclick="toggleFarmwalkEntryMode()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                        <span>+</span> Farmwalk
+                    </button>
+                    <input type="date" id="farmwalk-entry-date" style="display:none; padding:6px 10px; border-radius:6px; border:1px solid #27ae60; font-size:12px; font-weight:bold; color:#2c3e50;" />
+                </div>
             </div>
 
             <input type="text" id="search" placeholder="Search paddocks..." style="margin-top:8px;">
@@ -2710,6 +2717,114 @@
             }
         }
 
+        let isFarmwalkEntryActive = false;
+
+        function toggleFarmwalkEntryMode() {
+            isFarmwalkEntryActive = !isFarmwalkEntryActive;
+            const btn = document.getElementById('btn-farmwalk-entry');
+            const dateInp = document.getElementById('farmwalk-entry-date');
+
+            if (isFarmwalkEntryActive) {
+                if (btn) {
+                    btn.innerHTML = '<span>✕</span> Cancel Entry';
+                    btn.style.background = '#e74c3c';
+                }
+                if (dateInp) {
+                    dateInp.style.display = 'inline-block';
+                    if (!dateInp.value) {
+                        dateInp.value = new Date().toISOString().split('T')[0];
+                    }
+                }
+            } else {
+                if (btn) {
+                    btn.innerHTML = '<span>+</span> Farmwalk';
+                    btn.style.background = '#27ae60';
+                }
+                if (dateInp) dateInp.style.display = 'none';
+            }
+            renderDashboard();
+        }
+
+        function toggleOutRotationMenu(pName) {
+            const menu = document.getElementById(`out-menu-${pName}`);
+            if (menu) {
+                menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+            }
+        }
+
+        function toggleBringBackMenu(pName) {
+            const menu = document.getElementById(`in-menu-${pName}`);
+            if (menu) {
+                menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+            }
+        }
+
+        function savePaddockReturn(pName) {
+            const inp = document.getElementById(`inp-return-cover-${pName}`);
+            let val = parseFloat(inp ? inp.value : '1500');
+            if (isNaN(val) || val <= 0) val = 1500;
+            savePaddockCover(pName, val, '');
+        }
+
+        async function savePaddockCover(pName, coverOverride, reasonOverride) {
+            const dateVal = document.getElementById('farmwalk-entry-date')?.value || new Date().toISOString().split('T')[0];
+            let coverVal = (coverOverride !== undefined) ? coverOverride : parseFloat(document.getElementById(`inp-cover-${pName}`)?.value);
+            if (isNaN(coverVal)) coverVal = 0;
+
+            const reasonVal = reasonOverride || (coverVal === 0 ? 'out' : '');
+            const dateObj = new Date(dateVal + 'T12:00:00');
+
+            let item = manualModeData.find(d => d.name === pName);
+            if (!item) {
+                item = { name: pName, latest: {}, previous: null, area: areaLookup[pName] || 0 };
+                manualModeData.push(item);
+            }
+
+            if (item.latest && item.latest.ts && dateObj.getTime() > item.latest.ts) {
+                item.previous = { cover: item.latest.cover, formattedDate: item.latest.formattedDate, ts: item.latest.ts };
+            }
+
+            item.isOut = (coverVal === 0);
+            if (reasonVal) item.reason = reasonVal;
+
+            item.latest = {
+                cover: coverVal,
+                formattedDate: fmtNZ(dateObj),
+                ts: dateObj.getTime()
+            };
+
+            if (!item.isOut && item.previous && item.latest.ts && item.previous.ts) {
+                const dDiff = Math.max(1, (item.latest.ts - item.previous.ts) / 86400000);
+                item.growthRate = Math.round((item.latest.cover - item.previous.cover) / dDiff);
+            } else if (item.isOut) {
+                item.growthRate = 0;
+            }
+
+            manualModeData.sort((a, b) => {
+                if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
+                return b.latest.cover - a.latest.cover;
+            });
+
+            updateFarmStats();
+            renderDashboard();
+            updateGeoStyles();
+
+            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                try {
+                    fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            type: 'farmwalk_entry',
+                            date: dateVal,
+                            paddock: pName,
+                            cover: coverVal,
+                            reason: reasonVal
+                        })
+                    }).catch(e => console.error("Cloud save error:", e));
+                } catch(e) {}
+            }
+        }
+
         async function loadManualSheet() {
             manualEntries = [];
             try {
@@ -3115,6 +3230,7 @@
             }
 
             // UI Toggles
+            document.getElementById('farmwalk-entry-bar').style.display = (mode === 'manual') ? 'flex' : 'none';
             document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'flex' : 'none';
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'block' : 'none';
@@ -3682,6 +3798,38 @@
 
                 const manualHtml = (currentDashboardMode === 'satellite' && p.manual) ? `<div class="manual-chip ${p.mStatus ? p.mStatus.className : ''}"><span class="muted">MANUAL COVER</span> <b>${Math.round(p.manual.cover)}</b> kgDM/ha <span class="muted"> • </span>${fmtNZ(p.manual.dateObj)}</div>` : ``;
 
+                let entryControlsHtml = "";
+                if (isFarmwalkEntryActive && currentDashboardMode === 'manual') {
+                    if (!p.isOut) {
+                        entryControlsHtml = `
+                            <div class="farmwalk-card-controls" style="margin-top:10px; padding-top:8px; border-top:1px dashed #ddd; display:flex; flex-direction:column; gap:8px;" onclick="event.stopPropagation();">
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <input type="number" id="inp-cover-${p.name}" placeholder="Cover kgDM" value="${p.latest.cover || ''}" style="flex:1; padding:6px 8px; border:1px solid #ccc; border-radius:5px; font-size:12px; font-weight:bold;" />
+                                    <button onclick="savePaddockCover('${p.name}')" style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">Save</button>
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    <button onclick="toggleOutRotationMenu('${p.name}')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Take out of rotation ▾</button>
+                                    <div id="out-menu-${p.name}" style="display:none; gap:6px; margin-top:4px;">
+                                        <button onclick="savePaddockCover('${p.name}', 0, 'silage')" style="flex:1; background:#e67e22; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Silage</button>
+                                        <button onclick="savePaddockCover('${p.name}', 0, 'crop')" style="flex:1; background:#d35400; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Crop</button>
+                                        <button onclick="savePaddockCover('${p.name}', 0, 'other')" style="flex:1; background:#7f8c8d; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Other</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        entryControlsHtml = `
+                            <div class="farmwalk-card-controls" style="margin-top:10px; padding-top:8px; border-top:1px dashed #ddd; display:flex; flex-direction:column; gap:8px;" onclick="event.stopPropagation();">
+                                <button onclick="toggleBringBackMenu('${p.name}')" style="background:#2980b9; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Bring back to rotation ▾</button>
+                                <div id="in-menu-${p.name}" style="display:none; gap:6px; margin-top:4px; align-items:center;">
+                                    <input type="number" id="inp-return-cover-${p.name}" placeholder="New cover" value="1500" style="flex:1; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:12px; font-weight:bold;" />
+                                    <button onclick="savePaddockReturn('${p.name}')" style="background:#27ae60; color:white; border:none; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Save</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gaap:10px">
@@ -3689,6 +3837,7 @@
                 ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
             </div>
             ${(p.growthRate && !p.isOut) ? `<div style="position:absolute; top:14px; right:60px; text-align:right"><span style="color:var(--growth); font-weight:bold">${p.growthRate > 0 ? '+' : ''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
+            ${entryControlsHtml}
         `;
 
                 div.onclick = () => {
