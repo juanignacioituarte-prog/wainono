@@ -2634,6 +2634,7 @@
                             const dObj = parseStrangeDate(r[0]);
                             const name = (r[1] || "").trim();
                             const cover = safeNum(r[2]);
+                            const reason = (r[3] || "").trim();
                             if (!name) continue;
 
                             const norm = normName(name);
@@ -2641,7 +2642,7 @@
                                 paddockMap[norm] = { name: name, entries: [] };
                             }
                             if (dObj) {
-                                paddockMap[norm].entries.push({ dateObj: dObj, cover: cover });
+                                paddockMap[norm].entries.push({ dateObj: dObj, cover: cover, reason: reason });
                             }
                         }
 
@@ -2657,6 +2658,7 @@
                             let prevCover = prev ? prev.cover : latestCover;
                             let lDate = latest.dateObj;
                             let pDate = prev ? prev.dateObj : null;
+                            let reason = latest.reason || '';
 
                             // Merge from calibration sheet (manualEntries) if more recent
                             const norm = normName(p.name);
@@ -2691,6 +2693,7 @@
                                 previous: pDate ? { cover: prevCover, formattedDate: fmtNZ(pDate) } : null,
                                 growthRate: growth,
                                 isOut: isOut,
+                                reason: reason,
                                 area: areaLookup[p.name] || 0
                             });
                         });
