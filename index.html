@@ -2664,18 +2664,8 @@
                                 isOut: isOut, 
                                 area: areaLookup[name] || 0
                             };
-                        }).filter(p => isNaN(p.name.trim()) || p.name.trim() === '');
-
-                        Object.keys(paddockMap).forEach(pName => {
-                            if (!isNaN(pName.trim()) && pName.trim() !== '') return;
-                            if (!manualModeData.find(m => m.name === pName)) {
-                                manualModeData.push({
-                                    name: pName, latest: { cover: 0, formattedDate: "--", ts: null },
-                                    previous: { cover: 0, formattedDate: "--" },
-                                    growthRate: 0, isOut: true, area: areaLookup[pName] || 0
-                                });
-                            }
                         });
+
                         
                         let tWGrowth = 0, tAreaG = 0;
                         manualModeData.forEach(p => {
