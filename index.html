@@ -2738,20 +2738,33 @@
             renderDashboard();
         }
 
-        function updatePreviousCover(pName) {
-            const inp = document.getElementById(`inp-prev-cover-${pName}`);
-            if (!inp) return;
-            const newVal = parseFloat(inp.value);
-            if (isNaN(newVal)) return;
+        function updateCovers(pName) {
+            const inpLatest = document.getElementById(`inp-edit-latest-cover-${pName}`);
+            const inpPrev = document.getElementById(`inp-edit-prev-cover-${pName}`);
 
             let p = manualModeData.find(d => d.name === pName);
             if (p) {
-                if (!p.previous) p.previous = { cover: newVal, formattedDate: 'Manual' };
-                else p.previous.cover = newVal;
+                if (inpLatest && inpLatest.value.trim() !== '') {
+                    const lVal = parseFloat(inpLatest.value);
+                    if (!isNaN(lVal)) {
+                        p.latest.cover = lVal;
+                        p.isOut = (lVal === 0);
+                    }
+                }
 
-                if (!p.isOut && p.latest && p.latest.ts && p.previous.ts) {
+                if (inpPrev && inpPrev.value.trim() !== '') {
+                    const prVal = parseFloat(inpPrev.value);
+                    if (!isNaN(prVal)) {
+                        if (!p.previous) p.previous = { cover: prVal, formattedDate: 'Manual' };
+                        else p.previous.cover = prVal;
+                    }
+                }
+
+                if (!p.isOut && p.latest && p.previous && p.latest.ts && p.previous.ts) {
                     const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
                     p.growthRate = Math.round((p.latest.cover - p.previous.cover) / dDiff);
+                } else if (p.isOut) {
+                    p.growthRate = 0;
                 }
             }
             editingPrevPaddocks.delete(pName);
@@ -4020,15 +4033,22 @@
                 let editPrevHtml = "";
                 if (editingPrevPaddocks.has(p.name) && currentDashboardMode === 'manual') {
                     editPrevHtml = `
-                        <div class="edit-previous-container" style="margin-top:8px; padding:8px; background:#ebf5fb; border:1px solid #3498db; border-radius:5px;" onclick="event.stopPropagation();">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <small style="font-weight:bold; color:#2980b9;">✏️ Edit Previous Cover (${p.previous ? p.previous.formattedDate : 'Prev'})</small>
-                                <button onclick="toggleEditPrevious('${p.name}')" style="background:none; border:none; color:#7f8c8d; font-weight:bold; cursor:pointer; font-size:12px;">✕</button>
+                        <div class="edit-previous-container" style="margin-top:8px; padding:8px 10px; background:#ebf5fb; border:1px solid #3498db; border-radius:6px;" onclick="event.stopPropagation();">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <small style="font-weight:bold; color:#2980b9; font-size:11px;">✏️ Modify Latest & Previous Covers</small>
+                                <button onclick="toggleEditPrevious('${p.name}')" style="background:none; border:none; color:#7f8c8d; font-weight:bold; cursor:pointer; font-size:13px;">✕</button>
                             </div>
-                            <div style="display:flex; gap:6px; margin-top:6px;">
-                                <input type="number" id="inp-prev-cover-${p.name}" value="${p.previous ? p.previous.cover : ''}" placeholder="New prev cover" style="flex:1; padding:5px 8px; border:1px solid #3498db; border-radius:4px; font-size:12px; font-weight:bold;" />
-                                <button onclick="updatePreviousCover('${p.name}')" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Update</button>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:6px;">
+                                <div>
+                                    <small style="font-size:9px; color:#555; font-weight:bold; display:block; margin-bottom:2px;">Latest (${p.latest ? p.latest.formattedDate : 'Latest'})</small>
+                                    <input type="number" id="inp-edit-latest-cover-${p.name}" value="${(p.latest && p.latest.cover !== undefined) ? p.latest.cover : ''}" placeholder="Latest kgDM" style="width:100%; padding:5px 6px; border:1px solid #3498db; border-radius:4px; font-size:12px; font-weight:bold;" />
+                                </div>
+                                <div>
+                                    <small style="font-size:9px; color:#555; font-weight:bold; display:block; margin-bottom:2px;">Previous (${p.previous ? p.previous.formattedDate : 'Prev'})</small>
+                                    <input type="number" id="inp-edit-prev-cover-${p.name}" value="${(p.previous && p.previous.cover !== undefined) ? p.previous.cover : ''}" placeholder="Prev kgDM" style="width:100%; padding:5px 6px; border:1px solid #3498db; border-radius:4px; font-size:12px; font-weight:bold;" />
+                                </div>
                             </div>
+                            <button onclick="updateCovers('${p.name}')" style="width:100%; background:#3498db; color:white; border:none; padding:6px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Update Covers</button>
                         </div>
                     `;
                 }
