@@ -2938,11 +2938,6 @@
                 }
             });
 
-            if (entriesToSave.length === 0) {
-                alert("Please enter cover numbers in paddock cards before saving.");
-                return;
-            }
-
             if (btnSave) {
                 btnSave.disabled = true;
                 btnSave.innerText = "SAVING...";
@@ -2957,7 +2952,7 @@
             renderDashboard();
             updateGeoStyles();
 
-            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+            if (entriesToSave.length > 0 && GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                 try {
                     await fetch(GOOGLE_SCRIPT_URL, {
                         method: 'POST',
