@@ -2667,6 +2667,7 @@
                         }).filter(p => !/^\d+$/.test(p.name));
 
                         Object.keys(paddockMap).forEach(pName => {
+                            if (/^\d+$/.test(pName)) return;
                             if (!manualModeData.find(m => m.name === pName)) {
                                 manualModeData.push({
                                     name: pName, latest: { cover: 0, formattedDate: "--" },
