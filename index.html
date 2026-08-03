@@ -2727,6 +2727,68 @@
 
         let isFarmwalkEntryActive = false;
 
+        const editingPrevPaddocks = new Set();
+
+        function toggleEditPrevious(pName) {
+            if (editingPrevPaddocks.has(pName)) {
+                editingPrevPaddocks.delete(pName);
+            } else {
+                editingPrevPaddocks.add(pName);
+            }
+            renderDashboard();
+        }
+
+        function updatePreviousCover(pName) {
+            const inp = document.getElementById(`inp-prev-cover-${pName}`);
+            if (!inp) return;
+            const newVal = parseFloat(inp.value);
+            if (isNaN(newVal)) return;
+
+            let p = manualModeData.find(d => d.name === pName);
+            if (p) {
+                if (!p.previous) p.previous = { cover: newVal, formattedDate: 'Manual' };
+                else p.previous.cover = newVal;
+
+                if (!p.isOut && p.latest && p.latest.ts && p.previous.ts) {
+                    const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
+                    p.growthRate = Math.round((p.latest.cover - p.previous.cover) / dDiff);
+                }
+            }
+            editingPrevPaddocks.delete(pName);
+            updateFarmStats();
+            renderDashboard();
+            updateGeoStyles();
+        }
+
+        let pressTimer = null;
+        function setupLongPress(cardEl, paddockName) {
+            const startPress = (e) => {
+                if (!isFarmwalkEntryActive || currentDashboardMode !== 'manual') return;
+                if (['INPUT', 'BUTTON', 'A', 'SELECT'].includes(e.target.tagName)) return;
+
+                pressTimer = setTimeout(() => {
+                    if (navigator.vibrate) try { navigator.vibrate(100); } catch(err) {}
+                    toggleEditPrevious(paddockName);
+                }, 3000);
+            };
+
+            const cancelPress = () => {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+            };
+
+            cardEl.addEventListener('mousedown', startPress);
+            cardEl.addEventListener('mouseup', cancelPress);
+            cardEl.addEventListener('mouseleave', cancelPress);
+
+            cardEl.addEventListener('touchstart', startPress, { passive: true });
+            cardEl.addEventListener('touchend', cancelPress);
+            cardEl.addEventListener('touchcancel', cancelPress);
+            cardEl.addEventListener('touchmove', cancelPress);
+        }
+
         function toggleFarmwalkEntryMode() {
             isFarmwalkEntryActive = !isFarmwalkEntryActive;
             const btn = document.getElementById('btn-farmwalk-entry');
@@ -3955,6 +4017,22 @@
                     }
                 }
 
+                let editPrevHtml = "";
+                if (editingPrevPaddocks.has(p.name) && currentDashboardMode === 'manual') {
+                    editPrevHtml = `
+                        <div class="edit-previous-container" style="margin-top:8px; padding:8px; background:#ebf5fb; border:1px solid #3498db; border-radius:5px;" onclick="event.stopPropagation();">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <small style="font-weight:bold; color:#2980b9;">✏️ Edit Previous Cover (${p.previous ? p.previous.formattedDate : 'Prev'})</small>
+                                <button onclick="toggleEditPrevious('${p.name}')" style="background:none; border:none; color:#7f8c8d; font-weight:bold; cursor:pointer; font-size:12px;">✕</button>
+                            </div>
+                            <div style="display:flex; gap:6px; margin-top:6px;">
+                                <input type="number" id="inp-prev-cover-${p.name}" value="${p.previous ? p.previous.cover : ''}" placeholder="New prev cover" style="flex:1; padding:5px 8px; border:1px solid #3498db; border-radius:4px; font-size:12px; font-weight:bold;" />
+                                <button onclick="updatePreviousCover('${p.name}')" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Update</button>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gaap:10px">
@@ -3963,7 +4041,10 @@
             </div>
             ${(p.growthRate && !p.isOut) ? `<div style="position:absolute; top:14px; right:60px; text-align:right"><span style="color:var(--growth); font-weight:bold">${p.growthRate > 0 ? '+' : ''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
             ${entryControlsHtml}
+            ${editPrevHtml}
         `;
+
+                setupLongPress(div, p.name);
 
                 div.onclick = () => {
                     document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
