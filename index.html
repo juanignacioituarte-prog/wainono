@@ -2623,109 +2623,122 @@
 
         /* Loaders */
         async function loadManualRankCSV() {
+            // Instant load from localStorage cache if available
+            const cachedTxt = localStorage.getItem('wn_cached_farmwalk_csv');
+            if (cachedTxt && manualModeData.length === 0) {
+                parseAndApplyFarmwalkCSV(cachedTxt);
+            }
+
             try {
-                const res = await fetch(MANUAL_MODE_CSV + "&t=" + Date.now());
+                // Fetch fresh CSV in background with 10s cache window
+                const res = await fetch(MANUAL_MODE_CSV + "&t=" + Math.floor(Date.now() / 10000));
                 const txt = await res.text();
-                Papa.parse(txt, {
-                    header: false,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        const rows = results.data || [];
-                        if (rows.length < 1) return;
-
-                        const paddockMap = {};
-                        const startIdx = (rows[0][0] && rows[0][0].toLowerCase().includes('date')) ? 1 : 0;
-
-                        for (let i = startIdx; i < rows.length; i++) {
-                            const r = rows[i];
-                            if (!r || r.length < 3) continue;
-                            const dObj = parseStrangeDate(r[0]);
-                            const name = (r[1] || "").trim();
-                            const cover = safeNum(r[2]);
-                            const reason = (r[3] || "").trim();
-                            if (!name) continue;
-
-                            const norm = normName(name);
-                            if (!paddockMap[norm]) {
-                                paddockMap[norm] = { name: name, entries: [] };
-                            }
-                            if (dObj) {
-                                paddockMap[norm].entries.push({ dateObj: dObj, cover: cover, reason: reason });
-                            }
-                        }
-
-                        const parsedData = [];
-                        Object.values(paddockMap).forEach(p => {
-                            p.entries.sort((a, b) => b.dateObj - a.dateObj);
-                            if (p.entries.length === 0) return;
-
-                            const latest = p.entries[0];
-                            const prev = p.entries.length > 1 ? p.entries[1] : null;
-
-                            let latestCover = latest.cover;
-                            let prevCover = prev ? prev.cover : latestCover;
-                            let lDate = latest.dateObj;
-                            let pDate = prev ? prev.dateObj : null;
-                            let reason = latest.reason || '';
-
-                            // Merge from calibration sheet (manualEntries) if more recent
-                            const norm = normName(p.name);
-                            const paddockEntries = manualEntries.filter(e => e.lower === norm).sort((a, b) => b.dateObj - a.dateObj);
-                            if (paddockEntries.length > 0) {
-                                const mLatest = paddockEntries[0];
-                                if (!lDate || mLatest.dateObj > lDate) {
-                                    if (lDate && (!pDate || lDate > pDate)) {
-                                        pDate = lDate;
-                                        prevCover = latestCover;
-                                    }
-                                    lDate = mLatest.dateObj;
-                                    latestCover = mLatest.cover;
-
-                                    if (paddockEntries.length > 1) {
-                                        const mPrev = paddockEntries[1];
-                                        if (!pDate || mPrev.dateObj > pDate) {
-                                            pDate = mPrev.dateObj;
-                                            prevCover = mPrev.cover;
-                                        }
-                                    }
-                                }
-                            }
-
-                            const isOut = (latestCover === 0);
-                            const dDiff = (lDate && pDate) ? Math.max(1, (lDate - pDate) / 86400000) : 1;
-                            const growth = isOut ? 0 : Math.round((latestCover - prevCover) / dDiff);
-
-                            parsedData.push({
-                                name: p.name,
-                                latest: { cover: latestCover, formattedDate: fmtNZ(lDate), ts: lDate ? lDate.getTime() : null },
-                                previous: pDate ? { cover: prevCover, formattedDate: fmtNZ(pDate) } : null,
-                                growthRate: growth,
-                                isOut: isOut,
-                                reason: reason,
-                                area: areaLookup[p.name] || 0
-                            });
-                        });
-
-                        manualModeData = parsedData;
-
-                        let tWGrowth = 0, tAreaG = 0;
-                        manualModeData.forEach(p => {
-                            if (!p.isOut && p.area > 0 && p.growthRate && p.growthRate > 0) {
-                                tWGrowth += p.growthRate * p.area;
-                                tAreaG += p.area;
-                            }
-                        });
-                        manualFarmGrowthRate = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
-
-                        if (currentDashboardMode === 'manual') {
-                            renderDashboard();
-                            updateGeoStyles();
-                        }
-                    }
-                });
+                if (txt && txt.length > 10) {
+                    localStorage.setItem('wn_cached_farmwalk_csv', txt);
+                    parseAndApplyFarmwalkCSV(txt);
+                }
             } catch (e) {
                 console.error("Error loading manual ranks:", e);
             }
+        }
+
+        function parseAndApplyFarmwalkCSV(txt) {
+            Papa.parse(txt, {
+                header: false,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    const rows = results.data || [];
+                    if (rows.length < 1) return;
+
+                    const paddockMap = {};
+                    const startIdx = (rows[0][0] && rows[0][0].toLowerCase().includes('date')) ? 1 : 0;
+
+                    for (let i = startIdx; i < rows.length; i++) {
+                        const r = rows[i];
+                        if (!r || r.length < 3) continue;
+                        const dObj = parseStrangeDate(r[0]);
+                        const name = (r[1] || "").trim();
+                        const cover = safeNum(r[2]);
+                        const reason = (r[3] || "").trim();
+                        if (!name) continue;
+
+                        const norm = normName(name);
+                        if (!paddockMap[norm]) {
+                            paddockMap[norm] = { name: name, entries: [] };
+                        }
+                        if (dObj) {
+                            paddockMap[norm].entries.push({ dateObj: dObj, cover: cover, reason: reason });
+                        }
+                    }
+
+                    const parsedData = [];
+                    Object.values(paddockMap).forEach(p => {
+                        p.entries.sort((a, b) => b.dateObj - a.dateObj);
+                        if (p.entries.length === 0) return;
+
+                        const latest = p.entries[0];
+                        const prev = p.entries.length > 1 ? p.entries[1] : null;
+
+                        let latestCover = latest.cover;
+                        let prevCover = prev ? prev.cover : latestCover;
+                        let lDate = latest.dateObj;
+                        let pDate = prev ? prev.dateObj : null;
+                        let reason = latest.reason || '';
+
+                        const norm = normName(p.name);
+                        const paddockEntries = (typeof manualEntries !== 'undefined' ? manualEntries : []).filter(e => e.lower === norm).sort((a, b) => b.dateObj - a.dateObj);
+                        if (paddockEntries.length > 0) {
+                            const mLatest = paddockEntries[0];
+                            if (!lDate || mLatest.dateObj > lDate) {
+                                if (lDate && (!pDate || lDate > pDate)) {
+                                    pDate = lDate;
+                                    prevCover = latestCover;
+                                }
+                                lDate = mLatest.dateObj;
+                                latestCover = mLatest.cover;
+
+                                if (paddockEntries.length > 1) {
+                                    const mPrev = paddockEntries[1];
+                                    if (!pDate || mPrev.dateObj > pDate) {
+                                        pDate = mPrev.dateObj;
+                                        prevCover = mPrev.cover;
+                                    }
+                                }
+                            }
+                        }
+
+                        const isOut = (latestCover === 0);
+                        const dDiff = (lDate && pDate) ? Math.max(1, (lDate - pDate) / 86400000) : 1;
+                        const growth = isOut ? 0 : Math.round((latestCover - prevCover) / dDiff);
+
+                        parsedData.push({
+                            name: p.name,
+                            latest: { cover: latestCover, formattedDate: fmtNZ(lDate), ts: lDate ? lDate.getTime() : null },
+                            previous: pDate ? { cover: prevCover, formattedDate: fmtNZ(pDate) } : null,
+                            growthRate: growth,
+                            isOut: isOut,
+                            reason: reason,
+                            area: areaLookup[p.name] || 0
+                        });
+                    });
+
+                    manualModeData = parsedData;
+
+                    let tWGrowth = 0, tAreaG = 0;
+                    manualModeData.forEach(p => {
+                        if (!p.isOut && p.area > 0 && p.growthRate && p.growthRate > 0) {
+                            tWGrowth += p.growthRate * p.area;
+                            tAreaG += p.area;
+                        }
+                    });
+                    manualFarmGrowthRate = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
+
+                    if (currentDashboardMode === 'manual') {
+                        renderDashboard();
+                        updateGeoStyles();
+                    }
+                }
+            });
         }
 
         let isFarmwalkEntryActive = false;
