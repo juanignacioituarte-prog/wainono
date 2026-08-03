@@ -2778,44 +2778,21 @@
 
         function setupLongPress(cardEl, paddockName) {
             let pressTimer = null;
-            let startX = 0, startY = 0;
+            let longPressTriggered = false;
 
             const startPress = (e) => {
-                if (!isFarmwalkEntryActive || currentDashboardMode !== 'manual') return;
+                if (currentDashboardMode !== 'manual') return;
                 if (['INPUT', 'BUTTON', 'A', 'SELECT'].includes(e.target.tagName)) return;
 
-                if (e.touches && e.touches[0]) {
-                    startX = e.touches[0].clientX;
-                    startY = e.touches[0].clientY;
-                } else {
-                    startX = e.clientX || 0;
-                    startY = e.clientY || 0;
-                }
-
+                longPressTriggered = false;
                 if (pressTimer) clearTimeout(pressTimer);
 
                 pressTimer = setTimeout(() => {
+                    longPressTriggered = true;
                     if (navigator.vibrate) try { navigator.vibrate(100); } catch(err) {}
                     toggleEditPrevious(paddockName);
                     pressTimer = null;
-                }, 1500); // 1.5s touch-tolerant hold
-            };
-
-            const movePress = (e) => {
-                if (!pressTimer) return;
-                let curX = 0, curY = 0;
-                if (e.touches && e.touches[0]) {
-                    curX = e.touches[0].clientX;
-                    curY = e.touches[0].clientY;
-                } else {
-                    curX = e.clientX || 0;
-                    curY = e.clientY || 0;
-                }
-                const dx = curX - startX;
-                const dy = curY - startY;
-                if (Math.hypot(dx, dy) > 15) { // 15px drift threshold
-                    cancelPress();
-                }
+                }, 1000); // 1-second touch hold
             };
 
             const cancelPress = () => {
@@ -2828,15 +2805,18 @@
             cardEl.addEventListener('mousedown', startPress);
             cardEl.addEventListener('mouseup', cancelPress);
             cardEl.addEventListener('mouseleave', cancelPress);
-            cardEl.addEventListener('mousemove', movePress);
 
             cardEl.addEventListener('touchstart', startPress, { passive: true });
-            cardEl.addEventListener('touchend', cancelPress);
+            cardEl.addEventListener('touchend', (e) => {
+                cancelPress();
+                if (longPressTriggered) {
+                    if (e.cancelable) e.preventDefault();
+                }
+            });
             cardEl.addEventListener('touchcancel', cancelPress);
-            cardEl.addEventListener('touchmove', movePress, { passive: true });
 
             cardEl.addEventListener('contextmenu', (e) => {
-                if (isFarmwalkEntryActive && currentDashboardMode === 'manual') {
+                if (currentDashboardMode === 'manual') {
                     e.preventDefault();
                 }
             });
@@ -4094,7 +4074,13 @@
                 }
 
                 div.innerHTML = `
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+                <b>${p.name} ${badges}</b>
+                <div style="display:flex; align-items:center; gap:6px;" onclick="event.stopPropagation();">
+                    ${currentDashboardMode === 'manual' ? `<button onclick="toggleEditPrevious('${p.name}')" title="Modify Latest & Previous Covers" style="background:#eef6fc; color:#2980b9; border:1px solid #a9cce3; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">✏️ Edit</button>` : ''}
+                    <span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span>
+                </div>
+            </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gaap:10px">
                 <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.isPartial ? 'var(--partial)' : 'var(--accent)')}">${p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.latest.formattedDate}</small>${manualHtml}</div>
                 ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
