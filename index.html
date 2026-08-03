@@ -1632,7 +1632,6 @@
                         <div class="avg-item"><small>FARM AVG COVER</small>
                             <div id="total-avg" style="font-size: 22px; font-weight: bold;">0</div>
                             <small>kgDM/ha</small>
-                            <div id="partial-farmwalk-remark" style="display:none; font-size:9px; font-weight:bold; color:#e67e22; background:rgba(230,126,34,0.15); padding:2px 6px; border-radius:4px; margin-top:4px; text-align:center;">PARTIAL FARMWALK</div>
                         </div>
                         <div class="avg-item"><small>GROWTH</small>
                             <div id="avg-growth" style="font-size: 22px; font-weight: bold;">0</div>
@@ -4007,23 +4006,6 @@
             if (elFeedAvgCover) elFeedAvgCover.innerText = avgCoverVal;
             if (elFeedAvgGrowth) elFeedAvgGrowth.innerText = avgGrowthVal;
             
-            // Partial Farmwalk Remark
-            const activePaddocks = manualModeData.filter(p => !p.isOut);
-            const activeTsList = activePaddocks.map(p => p.latest ? p.latest.ts : 0).filter(t => t > 0);
-            const maxTs = activeTsList.length > 0 ? Math.max(...activeTsList) : 0;
-            const measuredInLatest = activePaddocks.filter(p => p.latest && p.latest.ts === maxTs);
-            const isPartialWalk = (currentDashboardMode === 'manual' && maxTs > 0 && measuredInLatest.length > 0 && measuredInLatest.length < activePaddocks.length);
-
-            const remarkEl = document.getElementById('partial-farmwalk-remark');
-            if (remarkEl) {
-                if (isPartialWalk) {
-                    remarkEl.innerText = `PARTIAL FARMWALK (${measuredInLatest.length}/${activePaddocks.length} measured)`;
-                    remarkEl.style.display = 'inline-block';
-                } else {
-                    remarkEl.style.display = 'none';
-                }
-            }
-
             return { tAreaC, avgCoverVal, avgGrowthVal };
         }
 
