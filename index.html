@@ -2816,6 +2816,8 @@
                 try {
                     fetch(GOOGLE_SCRIPT_URL, {
                         method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({
                             type: 'farmwalk_entry',
                             date: dateVal,
