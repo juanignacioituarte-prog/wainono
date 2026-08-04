@@ -2869,7 +2869,7 @@
             updateFarmStats();
             renderDashboard();
             updateGeoStyles();
-            syncPaddockEditToCloud(pName);
+            syncPaddockEntriesToCloud(pName);
         }
 
         async function syncPaddockEditToCloud(pName) {
@@ -2898,6 +2898,35 @@
                     });
                 } catch(e) {
                     console.error("Cloud sync error for paddock edit:", e);
+                }
+            }
+        }
+
+        async function syncPaddockEntriesToCloud(pName) {
+            let p = manualModeData.find(d => d.name === pName);
+            if (!p) return;
+
+            const entries = (p.entries || []).map(e => ({
+                date: fmtNZ(e.dateObj),
+                paddock: p.name,
+                cover: e.cover,
+                reason: e.reason || ''
+            }));
+
+            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify({
+                            type: 'update_paddock_history',
+                            paddock: p.name,
+                            entries: entries
+                        })
+                    });
+                } catch(e) {
+                    console.error("Cloud sync error for paddock history:", e);
                 }
             }
         }
@@ -3006,6 +3035,14 @@
                             formattedDate: fmtNZ(dateObj),
                             ts: dateObj.getTime()
                         };
+
+                        if (!p.entries) p.entries = [];
+                        if (p.entries.length > 0 && p.entries[0].dateObj && p.entries[0].dateObj.toDateString() === dateObj.toDateString()) {
+                            p.entries[0].cover = coverVal;
+                            p.entries[0].reason = p.reason || '';
+                        } else {
+                            p.entries.unshift({ dateObj: dateObj, cover: coverVal, reason: p.reason || '' });
+                        }
 
                         if (!p.isOut && p.previous && p.latest.ts && p.previous.ts) {
                             const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
@@ -3116,6 +3153,14 @@
                 formattedDate: fmtNZ(dateObj),
                 ts: dateObj.getTime()
             };
+
+            if (!item.entries) item.entries = [];
+            if (item.entries.length > 0 && item.entries[0].dateObj && item.entries[0].dateObj.toDateString() === dateObj.toDateString()) {
+                item.entries[0].cover = coverVal;
+                item.entries[0].reason = item.reason || '';
+            } else {
+                item.entries.unshift({ dateObj: dateObj, cover: coverVal, reason: item.reason || '' });
+            }
 
             if (!item.isOut && item.previous && item.latest.ts && item.previous.ts) {
                 const dDiff = Math.max(1, (item.latest.ts - item.previous.ts) / 86400000);
