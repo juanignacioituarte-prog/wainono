@@ -1592,6 +1592,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('roster'); toggleSettingsMenu();" style="font-weight: bold; color: #3498db;">📅 Roster</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weather'); toggleSettingsMenu();" style="font-weight: bold; color: #f1c40f;">☁️ Weather</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('vehicle_maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #e67e22;">🚜 Vehicle Maintenance</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('farm_config'); toggleSettingsMenu();" style="font-weight: bold; color: #9b59b6;">🗺️ Farm Configuration</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
@@ -1649,6 +1650,7 @@
                     <button id="btn-save-farmwalk-all" onclick="saveEntireFarmwalk()" style="display:none; background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; transition:0.2s;">
                         💾 SAVE FARMWALK
                     </button>
+                    <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
                 </div>
             </div>
 
@@ -1671,6 +1673,24 @@
             <div id="auth-email-list" style="display:flex; flex-direction:column; gap:8px;">
                 <!-- Emails will be listed here -->
             </div>
+        </div>
+
+        <div id="farm-config-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <h3 style="margin-top:0;">Farm Configuration</h3>
+
+            <h4 style="margin:0 0 4px; font-size:13px; color:#2c3e50;">Farm Units</h4>
+            <p style="font-size:12px; color:#666; margin:0 0 12px;">
+                Group paddocks into units. In FARMWALK a button appears for each unit, showing only
+                that unit's paddocks ranked by cover. Farm averages and feed figures are not affected.
+            </p>
+
+            <div id="unit-edit-banner" style="display:none; color:#fff; font-size:12px; font-weight:bold; padding:8px 10px; border-radius:6px; margin-bottom:10px;"></div>
+
+            <div id="farm-units-list"></div>
+
+            <button onclick="addUnit()" style="width:100%; background:#9b59b6; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">
+                + ADD UNIT
+            </button>
         </div>
 
         <div id="audio-settings-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
@@ -2242,6 +2262,10 @@
         const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=470390408&single=true&output=csv";
         const FEED_SETTINGS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1218249029&single=true&output=csv";
         const AUTH_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=581275033&single=true&output=csv";
+        // Optional. The Units tab is created by the Apps Script on first save; once you
+        // publish it to the web, paste its CSV URL here and units load from it directly.
+        // Left empty, units load through the script's ?type=units endpoint instead.
+        const UNITS_CSV_URL = "";
 
         /* Rules */
         const NDVI_LOW_THRESHOLD = 0.30;
@@ -2281,6 +2305,234 @@
         ];
         let BREAK_GROUPS = JSON.parse(localStorage.getItem('custom_herds')) || default_BREAK_GROUPS;
         let manualBreakOverrides = JSON.parse(localStorage.getItem('manual_break_overrides')) || {};
+
+        /* Farm Units State */
+        // A unit is a named group of paddocks: { id, name, color, paddocks: [name, ...] }
+        // Units only scope the farmwalk RANKING and map colouring. Farm averages,
+        // growth and every feed calculation stay whole-farm and are untouched.
+        const UNIT_COLORS = ['#9b59b6', '#16a085', '#e67e22', '#2980b9', '#c0392b', '#8e44ad', '#27ae60', '#d35400'];
+        const OUT_OF_UNIT_COLOR = '#1f6aa5'; // other units go flat blue while a unit is selected
+        const UNASSIGNED_COLOR = '#95a5a6';
+        let FARM_UNITS = [];
+        try { FARM_UNITS = JSON.parse(localStorage.getItem('farm_units')) || []; } catch (e) { FARM_UNITS = []; }
+        let activeUnitId = null;   // null = whole farm
+        let unitEditingId = null;  // set while assigning paddocks on the map
+
+        // Units live in their own "Units" tab, NOT in Settings: saveFeedSettings()
+        // clears and rewrites Settings from its own payload, so anything stored
+        // there would be wiped by the next feed autosave.
+        function saveFarmUnits() {
+            try { localStorage.setItem('farm_units', JSON.stringify(FARM_UNITS)); } catch (e) {}
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ type: 'save_units', units: FARM_UNITS })
+            }).catch(e => console.error("Unit cloud save failed (kept locally):", e));
+        }
+
+        async function loadFarmUnits() {
+            // localStorage has already seeded FARM_UNITS, so the UI is never blocked on this.
+            if (UNITS_CSV_URL && UNITS_CSV_URL.length > 5) {
+                try {
+                    const res = await fetch(UNITS_CSV_URL + "&t=" + Math.floor(Date.now() / 10000));
+                    const txt = await res.text();
+                    const parsed = Papa.parse(txt, { header: true, skipEmptyLines: true });
+                    const units = (parsed.data || []).map(r => {
+                        let paddocks = [];
+                        try { paddocks = JSON.parse(r.paddocks || "[]"); } catch (e) {
+                            paddocks = String(r.paddocks || "").split(/[|,]/).map(s => s.trim()).filter(Boolean);
+                        }
+                        return { id: r.id, name: r.name, color: r.color || UNIT_COLORS[0], paddocks: Array.isArray(paddocks) ? paddocks : [] };
+                    }).filter(u => u.id && u.name);
+                    applyLoadedUnits(units);
+                    return;
+                } catch (e) { console.log("Units CSV unavailable, falling back to script endpoint"); }
+            }
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + "?type=units&t=" + Date.now(), { cache: 'no-store' });
+                const data = await res.json();
+                if (data && Array.isArray(data.units)) applyLoadedUnits(data.units);
+            } catch (e) {
+                console.log("Units cloud load failed, using local copy");
+            }
+        }
+
+        function applyLoadedUnits(units) {
+            FARM_UNITS = units;
+            try { localStorage.setItem('farm_units', JSON.stringify(FARM_UNITS)); } catch (e) {}
+            if (activeUnitId && !FARM_UNITS.some(u => u.id === activeUnitId)) activeUnitId = null;
+            renderUnitChips();
+            if (currentDashboardMode === 'manual') { renderDashboard(); updateGeoStyles(); }
+        }
+
+        function getActiveUnit() {
+            return activeUnitId ? (FARM_UNITS.find(u => u.id === activeUnitId) || null) : null;
+        }
+
+        function unitHasPaddock(unit, pName) {
+            if (!unit || !unit.paddocks) return false;
+            const n = normName(pName);
+            return unit.paddocks.some(x => normName(x) === n);
+        }
+
+        function unitForPaddock(pName) {
+            return FARM_UNITS.find(u => unitHasPaddock(u, pName)) || null;
+        }
+
+        function escUnit(s) {
+            return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        /* ---- Unit chips beside the + Farmwalk button ---- */
+        function renderUnitChips() {
+            const bar = document.getElementById('unit-chips');
+            if (!bar) return;
+            if (FARM_UNITS.length === 0) { bar.innerHTML = ""; return; }
+
+            const chip = (label, color, isActive, onClick) => `
+                <button onclick="${onClick}" style="
+                    background:${isActive ? color : '#fff'};
+                    color:${isActive ? '#fff' : '#2c3e50'};
+                    border:1.5px solid ${color};
+                    padding:5px 11px; border-radius:14px; font-size:11px;
+                    font-weight:bold; cursor:pointer; white-space:nowrap; transition:0.15s;">${escUnit(label)}</button>`;
+
+            let html = chip('ALL', '#7f8c8d', activeUnitId === null, `setActiveUnit(null)`);
+            FARM_UNITS.forEach(u => {
+                html += chip(u.name, u.color || UNIT_COLORS[0], activeUnitId === u.id, `setActiveUnit('${escUnit(u.id)}')`);
+            });
+            bar.innerHTML = html;
+        }
+
+        function setActiveUnit(id) {
+            activeUnitId = (id === activeUnitId) ? null : id;
+            renderUnitChips();
+            renderDashboard();
+            updateGeoStyles();
+        }
+
+        /* ---- Farm Configuration: unit editor ---- */
+        function renderFarmConfig() {
+            const box = document.getElementById('farm-units-list');
+            if (!box) return;
+
+            if (FARM_UNITS.length === 0) {
+                box.innerHTML = `<p style="font-size:12px; color:#777; margin:0 0 12px;">No units yet. Add one, then tap paddocks on the map to put them in it.</p>`;
+                return;
+            }
+
+            box.innerHTML = FARM_UNITS.map(u => {
+                const isEditing = unitEditingId === u.id;
+                return `
+                <div style="background:#fff; border:1px solid ${isEditing ? u.color : '#ddd'}; border-left:5px solid ${u.color}; border-radius:6px; padding:10px; margin-bottom:8px;">
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                        <input type="color" value="${escUnit(u.color)}" onchange="setUnitColor('${escUnit(u.id)}', this.value)"
+                            style="width:34px; height:30px; padding:0; border:1px solid #ccc; border-radius:4px; cursor:pointer; background:#fff;">
+                        <input type="text" value="${escUnit(u.name)}" onchange="renameUnit('${escUnit(u.id)}', this.value)"
+                            style="flex:1; margin-top:0; padding:6px 8px; border:1px solid #ddd; border-radius:5px; font-weight:bold; font-size:13px;">
+                        <button onclick="deleteUnit('${escUnit(u.id)}')" title="Delete unit"
+                            style="background:none; border:none; color:#e74c3c; font-size:16px; font-weight:bold; cursor:pointer;">🗑</button>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button onclick="${isEditing ? 'stopUnitEdit()' : `startUnitEdit('${escUnit(u.id)}')`}" style="
+                            flex:1; background:${isEditing ? '#e74c3c' : u.color}; color:#fff; border:none;
+                            padding:7px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">
+                            ${isEditing ? '✓ DONE SELECTING' : '✎ SELECT PADDOCKS ON MAP'}</button>
+                        <span style="font-size:11px; color:#7f8c8d; white-space:nowrap;">${u.paddocks.length} paddock${u.paddocks.length === 1 ? '' : 's'}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function addUnit() {
+            const name = (prompt("Name for the new unit (e.g. Dairy Platform, Run-off):") || "").trim();
+            if (!name) return;
+            const id = 'unit_' + Date.now();
+            FARM_UNITS.push({ id, name, color: UNIT_COLORS[FARM_UNITS.length % UNIT_COLORS.length], paddocks: [] });
+            saveFarmUnits();
+            renderFarmConfig();
+            renderUnitChips();
+            startUnitEdit(id);
+        }
+
+        function renameUnit(id, val) {
+            const u = FARM_UNITS.find(x => x.id === id);
+            if (!u) return;
+            const name = (val || "").trim();
+            if (!name) return renderFarmConfig();
+            u.name = name;
+            saveFarmUnits();
+            renderUnitChips();
+        }
+
+        function setUnitColor(id, val) {
+            const u = FARM_UNITS.find(x => x.id === id);
+            if (!u) return;
+            u.color = val;
+            saveFarmUnits();
+            renderFarmConfig();
+            renderUnitChips();
+            updateGeoStyles();
+        }
+
+        function deleteUnit(id) {
+            const u = FARM_UNITS.find(x => x.id === id);
+            if (!u) return;
+            if (!confirm(`Delete the unit "${u.name}"? Its ${u.paddocks.length} paddock(s) go back to unassigned. No cover data is affected.`)) return;
+            FARM_UNITS = FARM_UNITS.filter(x => x.id !== id);
+            if (activeUnitId === id) activeUnitId = null;
+            if (unitEditingId === id) unitEditingId = null;
+            saveFarmUnits();
+            renderFarmConfig();
+            renderUnitChips();
+            updateGeoStyles();
+        }
+
+        function startUnitEdit(id) {
+            unitEditingId = id;
+            renderFarmConfig();
+            updateGeoStyles();
+            const banner = document.getElementById('unit-edit-banner');
+            const u = FARM_UNITS.find(x => x.id === id);
+            if (banner && u) {
+                banner.style.display = 'block';
+                banner.style.background = u.color;
+                banner.innerHTML = `Tap paddocks on the map to add or remove them from <b>${escUnit(u.name)}</b>`;
+            }
+        }
+
+        function stopUnitEdit() {
+            unitEditingId = null;
+            renderFarmConfig();
+            updateGeoStyles();
+            const banner = document.getElementById('unit-edit-banner');
+            if (banner) banner.style.display = 'none';
+        }
+
+        function togglePaddockInUnit(pName) {
+            const editing = FARM_UNITS.find(u => u.id === unitEditingId);
+            if (!editing) return;
+
+            const owner = unitForPaddock(pName);
+
+            if (owner && owner.id === editing.id) {
+                editing.paddocks = editing.paddocks.filter(x => normName(x) !== normName(pName));
+            } else {
+                if (owner) {
+                    if (!confirm(`"${pName}" is already in ${owner.name}.\n\nRemove it from ${owner.name} and add it to ${editing.name}?`)) return;
+                    owner.paddocks = owner.paddocks.filter(x => normName(x) !== normName(pName));
+                }
+                editing.paddocks.push(pName);
+            }
+
+            saveFarmUnits();
+            renderFarmConfig();
+            renderUnitChips();
+            updateGeoStyles();
+        }
 
         function saveHerdSettings() {
             localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
@@ -3519,7 +3771,10 @@
             }
 
             switchDashboardMode('manual');
-            
+
+            // Units render instantly from localStorage; this refreshes them from the cloud.
+            loadFarmUnits();
+
             // Auto-start GPS tracking
             setTimeout(() => {
                 if (gpsWatchId === null) toggleGPS(true);
@@ -3542,8 +3797,16 @@
                         
                         layer.on('click', (e) => {
                             if (isDrawingBreak || (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) || (typeof editingHazardId !== 'undefined' && editingHazardId)) return; // bubble up for drawing
+
+                            // Assigning paddocks to a unit takes over the tap entirely
+                            if (unitEditingId && currentDashboardMode === 'farm_config') {
+                                L.DomEvent.stopPropagation(e);
+                                togglePaddockInUnit(pName);
+                                return;
+                            }
+
                             L.DomEvent.stopPropagation(e);
-                            
+
                             const tip = layer.getTooltip();
                             if (tip) {
                                 if (!layer.isTooltipOpen()) {
@@ -3612,6 +3875,14 @@
             document.getElementById('vehicle-maintenance-view').style.display = (mode === 'vehicle_maintenance') ? 'block' : 'none';
             document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
 
+            const farmConfigView = document.getElementById('farm-config-view');
+            if (farmConfigView) farmConfigView.style.display = (mode === 'farm_config') ? 'block' : 'none';
+            if (mode === 'farm_config') {
+                renderFarmConfig();
+            } else if (unitEditingId) {
+                stopUnitEdit();
+            }
+
             if (mode !== 'health_safety' && typeof isDrawingHazard !== 'undefined' && isDrawingHazard) {
                 cancelHazardDrawing();
             }
@@ -3656,7 +3927,7 @@
                 return;
             } else {
                 document.getElementById('map').style.display = (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
-                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
@@ -3719,6 +3990,7 @@
                 if (mode === 'manual') {
                     if (ndviLayer) map.removeLayer(ndviLayer);
                     document.getElementById('legend').style.display = 'block';
+                    renderUnitChips();
                     setLayerMode('cover');
                 } else if (mode === 'satellite') {
                     setLayerMode('ndvi');
@@ -3757,6 +4029,33 @@
                     document.getElementById('inp-break-days').value = getBreakDisplayDays();
                     
                     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    return;
+                } else if (mode === 'farm_config') {
+                    document.getElementById('map').style.display = 'block';
+                    document.getElementById('list').style.display = 'none';
+                    document.getElementById('admin-view').style.display = 'none';
+                    if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
+                    if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
+                    document.getElementById('farm-config-view').style.display = 'block';
+
+                    const sidebarFc = document.getElementById('sidebar');
+                    const isMinFc = sidebarFc.classList.contains('minimized');
+                    if (window.innerWidth <= 768) {
+                        const sideHFc = isMinFc ? '0px' : '55vh';
+                        sidebarFc.style.height = sideHFc;
+                        sidebarFc.style.width = '100%';
+                        document.documentElement.style.setProperty('--sidebar-h', sideHFc);
+                    } else {
+                        sidebarFc.style.width = isMinFc ? '40px' : '380px';
+                        sidebarFc.style.height = '100%';
+                    }
+                    setTimeout(() => map.invalidateSize(), 50);
+
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    document.getElementById('legend').style.display = 'none';
+                    if (ndviLayer) map.removeLayer(ndviLayer);
+                    renderFarmConfig();
+                    updateGeoStyles();
                     return;
                 } else if (mode === 'weekly_report') {
                     document.getElementById('map').style.display = 'block';
@@ -4145,21 +4444,35 @@
         function renderDashboard() {
             if (currentDashboardMode !== 'manual' && currentDashboardMode !== 'satellite') return;
             const data = getCurrentModeData();
-            const sorted = [...data].sort((a, b) => {
+
+            // Farm stats and feed logic stay whole-farm on purpose — a unit only
+            // scopes which paddocks are listed and how the map is coloured.
+            updateFarmStats();
+            calculateFeedLogic();
+
+            const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
+            const scoped = activeUnit ? data.filter(p => unitHasPaddock(activeUnit, p.name)) : data;
+
+            const sorted = [...scoped].sort((a, b) => {
                 if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
                 return b.latest.cover - a.latest.cover;
             });
 
-            updateFarmStats();
-            calculateFeedLogic();
-
-            const activePaddocks = data.filter(p => !p.isOut);
+            const activePaddocks = scoped.filter(p => !p.isOut);
             const activeTsList = activePaddocks.map(p => p.latest ? p.latest.ts : 0).filter(t => t > 0);
             const maxTs = activeTsList.length > 0 ? Math.max(...activeTsList) : 0;
             const measuredInLatest = activePaddocks.filter(p => p.latest && p.latest.ts === maxTs);
             const isPartialWalk = (currentDashboardMode === 'manual' && maxTs > 0 && measuredInLatest.length > 0 && measuredInLatest.length < activePaddocks.length);
 
             const list = document.getElementById('list'); list.innerHTML = "";
+
+            if (activeUnit && sorted.length === 0) {
+                list.innerHTML = `<div style="padding:20px; text-align:center; color:#7f8c8d; font-size:12px;">
+                    No paddocks in <b>${escUnit(activeUnit.name)}</b> yet.<br>
+                    Add some in ⋮ → Farm Configuration.</div>`;
+                return;
+            }
+
             sorted.forEach(p => {
                 const isUnmeasuredInLatest = (isPartialWalk && !p.isOut && p.latest && p.latest.ts < maxTs);
                 const div = document.createElement('div');
@@ -4266,18 +4579,33 @@
         function updateGeoStyles() {
             if (!geoLayer) return;
             const currentData = getCurrentModeData();
+            const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
             geoLayer.eachLayer(layer => {
                 const pName = layer.feature.properties.name;
                 const p = currentData.find(pd => pd.name === pName);
-                
+
                 if (p) {
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>`);
                 } else {
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#95a5a6;">-- kgDM</div>`);
                 }
 
-                if (currentDashboardMode === 'breaks') {
+                if (currentDashboardMode === 'farm_config') {
+                    // Unit editor: every paddock wears its unit's colour, grey if unassigned.
+                    const owner = unitForPaddock(pName);
+                    const isTarget = unitEditingId && owner && owner.id === unitEditingId;
+                    layer.setStyle({
+                        fillColor: owner ? owner.color : UNASSIGNED_COLOR,
+                        fillOpacity: owner ? 0.75 : 0.3,
+                        color: isTarget ? '#ffffff' : 'white',
+                        opacity: 1,
+                        weight: isTarget ? 3.5 : 1
+                    });
+                } else if (currentDashboardMode === 'breaks') {
                     layer.setStyle({ fillColor: 'transparent', fillOpacity: 0, color: 'white', opacity: 0.8, weight: 1.5 });
+                } else if (activeUnit && !unitHasPaddock(activeUnit, pName)) {
+                    // A unit is selected: everything outside it goes flat blue and recedes.
+                    layer.setStyle({ fillColor: OUT_OF_UNIT_COLOR, fillOpacity: 0.5, color: 'white', opacity: 1, weight: 1 });
                 } else if ((currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentViewMode === 'cover') && p && p.latest) {
                     let color = getCoverColor(p.latest.cover);
                     if (p.isOut) color = '#ff7675'; else if (p.isPartial) color = '#3498db';
