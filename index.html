@@ -24,7 +24,6 @@
             --growth: #27ae60;
             --out: #e74c3c;
             --warning: #f39c12;
-            --partial: #3498db;
         }
 
         body {
@@ -149,11 +148,6 @@
         .card.is-out {
             opacity: 0.8;
             border-left-color: var(--out);
-        }
-
-        .card.is-partial {
-            border-left-color: var(--partial);
-            background: #f0f7ff;
         }
 
         .card.is-unmeasured {
@@ -1418,9 +1412,6 @@
                     </div>
                     <hr style="border:0; border-top:1px solid #eee; margin:8px 0;">
                     <div class="legend-item">
-                        <div class="legend-color" style="background:#3498db"></div> Partial Grazed
-                    </div>
-                    <div class="legend-item">
                         <div class="legend-color" style="background:#ff7675"></div> Out of Rotation
                     </div>
                 </div>
@@ -2257,7 +2248,6 @@
         const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
         const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
         const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
-        const PARTIAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=369172552&single=true&output=csv";
         const CAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv";
         const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=470390408&single=true&output=csv";
         const FEED_SETTINGS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1218249029&single=true&output=csv";
@@ -2283,7 +2273,6 @@
         let paddockMap = {};
         let areaLookup = {};
         let excludedPaddocks = new Map();
-        let partialPaddocks = new Set();
         let currentViewMode = 'ndvi';
         let currentDashboardMode = 'manual';
         let manualEntries = [];
@@ -3476,10 +3465,7 @@
 
         async function loadStatusSheets() {
             try {
-                const [resEx, resPa] = await Promise.all([
-                    fetch(EXCLUSIONS_CSV_URL + "&t=" + Date.now()),
-                    fetch(PARTIAL_CSV_URL + "&t=" + Date.now())
-                ]);
+                const resEx = await fetch(EXCLUSIONS_CSV_URL + "&t=" + Date.now());
                 const textEx = await resEx.text();
                 allCropPaddocks = [];
                 textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
@@ -3494,11 +3480,6 @@
                             allCropPaddocks.push(name);
                         }
                     }
-                });
-                const textPa = await resPa.text();
-                textPa.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
-                    const name = line.split(',')[0].trim().toLowerCase();
-                    if (name) partialPaddocks.add(name);
                 });
             } catch (e) {
                 console.warn("Status sheets not loaded");
@@ -3826,8 +3807,7 @@
                             
                             const p = getCurrentModeData().find(d => d.name === pName);
                             const isOut = p ? p.isOut : true;
-                            const isPartial = p ? p.isPartial : false;
-                            const color = isOut ? '#e74c3c' : (isPartial ? 'var(--partial)' : 'var(--accent)');
+                            const color = isOut ? '#e74c3c' : 'var(--accent)';
                             focusPaddockOnMap(pName, color);
                             const cardId = `card-${pName.replace(/\s+/g, '-')}`;
                             const card = document.getElementById(cardId);
@@ -4136,8 +4116,7 @@
                 if (!isFinite(g) || g <= 0) return;
 
                 const isOut = !!excludedPaddocks.get(normName(name));
-                const isPartial = partialPaddocks.has(normName(name));
-                if (isOut || isPartial) return;
+                if (isOut) return;
 
                 const area = areaLookup[name] || 0;
                 if (area > 0) { tWGrowth += g * area; tAreaG += area; } else { tWGrowth += g; tAreaG += 1; }
@@ -4185,7 +4164,6 @@
             const pairs = [];
             for (const m of combinedEntries) {
                 const hist = historyLower[m.lower]; if (!hist || hist.length === 0) continue;
-                if (partialPaddocks.has(m.lower)) continue;
 
                 const s = hist[0]; if (!s || !s.dateObj) continue;
                 
@@ -4355,7 +4333,7 @@
                 const sorted = satelliteHistory[name]; const latest = sorted[0];
                 const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
                 const area = areaLookup[name] || 0; const lowerName = name.toLowerCase();
-                const isOut = !!excludedPaddocks.get(normName(name)); const isPartial = partialPaddocks.has(lowerName) && !isOut;
+                const isOut = !!excludedPaddocks.get(normName(name));
                 if (latest.formattedDate && (!globalLatestDate || latest.formattedDate !== "")) globalLatestDate = latest.formattedDate;
                 let growthRate = null;
                 if (previous && latest.dateObj && previous.dateObj) {
@@ -4363,7 +4341,7 @@
                     if (dayDiff > 0 && latest.cover > previous.cover) growthRate = Math.round((latest.cover - previous.cover) / dayDiff);
                 }
                 const manual = findBestManualForPaddock(name);
-                return { name, latest, previous, growthRate, area, isOut, reason: excludedPaddocks.get(lowerName), isPartial, manual, mStatus: manual ? manualCalibratorStatus(manual, latest.cover_raw, lowerName) : { ok: false, reason: "", className: "" } };
+                return { name, latest, previous, growthRate, area, isOut, reason: excludedPaddocks.get(lowerName), manual, mStatus: manual ? manualCalibratorStatus(manual, latest.cover_raw, lowerName) : { ok: false, reason: "", className: "" } };
             });
             document.getElementById('latest-date').innerText = `LATEST IMAGERY: ${selectedSceneTs ? fmtNZ(new Date(selectedSceneTs)) : globalLatestDate}`;
 
@@ -4375,7 +4353,6 @@
 
         function manualCalibratorStatus(manual, satRaw, lowerName) {
             if (!manual || !selectedSceneTs) return { ok: false, reason: "", className: "" };
-            if (partialPaddocks.has(lowerName)) return { ok: false, reason: "partial", className: "bad" };
             if (manual.gapDays > GAP_DAYS_MAX) return { ok: false, reason: `gap ${manual.gapDays.toFixed(0)}d`, className: "bad" };
             const projected = manual.cover + (manualFarmGrowthRate * manual.signedGap);
             if (!isFinite(projected) || projected <= 0 || !isFinite(satRaw) || satRaw <= 0) return { ok: false, reason: "invalid", className: "bad" };
@@ -4476,12 +4453,11 @@
             sorted.forEach(p => {
                 const isUnmeasuredInLatest = (isPartialWalk && !p.isOut && p.latest && p.latest.ts < maxTs);
                 const div = document.createElement('div');
-                div.className = `card ${p.isOut ? 'is-out' : ''} ${p.isPartial ? 'is-partial' : ''} ${isUnmeasuredInLatest ? 'is-unmeasured' : ''}`;
+                div.className = `card ${p.isOut ? 'is-out' : ''} ${isUnmeasuredInLatest ? 'is-unmeasured' : ''}`;
                 div.id = `card-${p.name.replace(/\s+/g, '-')}`;
 
                 let badges = "";
                 if (p.isOut) badges += `<span class="badge" style="background:${p.reason && p.reason.toUpperCase() === 'CROP' ? 'var(--warning)' : 'var(--out)'}">${(p.reason || 'OUT').toUpperCase()}</span>`;
-                if (p.isPartial) badges += `<span class="badge" style="background:var(--partial)">PARTIAL GRAZED</span>`;
                 if (isUnmeasuredInLatest) badges += `<span class="badge" style="background:#f39c12;">UNMEASURED</span>`;
 
                 if (currentDashboardMode === 'satellite' && p.manual && calibrationModel) {
@@ -4546,7 +4522,7 @@
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
-                <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.isPartial ? 'var(--partial)' : 'var(--accent)')}">${p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.latest.formattedDate}</small>${manualHtml}</div>
+                <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : 'var(--accent)'}">${p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.latest.formattedDate}</small>${manualHtml}</div>
                 ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
             </div>
             <div style="position:absolute; top:14px; right:60px; text-align:right; display:flex; flex-direction:column; align-items:flex-end;">
@@ -4563,7 +4539,7 @@
                     document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
                     div.classList.add('active');
                     if (currentDashboardMode === 'satellite') updateMapTile(p.latest.url);
-                    focusPaddockOnMap(p.name, p.isOut ? '#e74c3c' : (p.isPartial ? 'var(--partial)' : 'var(--accent)'));
+                    focusPaddockOnMap(p.name, p.isOut ? '#e74c3c' : 'var(--accent)');
                 };
                 list.appendChild(div);
             });
@@ -4608,7 +4584,7 @@
                     layer.setStyle({ fillColor: OUT_OF_UNIT_COLOR, fillOpacity: 0.5, color: 'white', opacity: 1, weight: 1 });
                 } else if ((currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentViewMode === 'cover') && p && p.latest) {
                     let color = getCoverColor(p.latest.cover);
-                    if (p.isOut) color = '#ff7675'; else if (p.isPartial) color = '#3498db';
+                    if (p.isOut) color = '#ff7675';
                     layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', opacity: 1, weight: 1 });
                 } else {
                     layer.setStyle({ fillColor: 'transparent', fillOpacity: 0.1, color: 'white', opacity: 1, weight: 1.5 });
