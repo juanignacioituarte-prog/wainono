@@ -1592,10 +1592,10 @@
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
                         onclick="switchDashboardMode('satellite')">SATELLITE</button>
-                    <button id="btn-mode-man" class="mode-btn active"
+                    <button id="btn-mode-man" class="mode-btn"
                         onclick="switchDashboardMode('manual')">FARMWALK</button>
                     <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED</button>
-                    <button id="btn-mode-breaks" class="mode-btn"
+                    <button id="btn-mode-breaks" class="mode-btn active"
                         onclick="switchDashboardMode('breaks')">BREAKS</button>
                 </div>
                 <button class="header-toggle" id="header-toggle" onclick="toggleHeaderDetails()">▼</button>
@@ -2274,7 +2274,7 @@
         let areaLookup = {};
         let excludedPaddocks = new Map();
         let currentViewMode = 'ndvi';
-        let currentDashboardMode = 'manual';
+        let currentDashboardMode = 'breaks';
         let manualEntries = [];
         let farmGrowthRate = 0;
         let calibrationModel = null;
@@ -3775,7 +3775,8 @@
             }
 
             applyUnitPermissions();
-            switchDashboardMode('manual');
+            renderUnitChips();
+            switchDashboardMode('breaks');
 
             // Units render instantly from localStorage; this refreshes them from the cloud.
             loadFarmUnits();
