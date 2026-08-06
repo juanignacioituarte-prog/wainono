@@ -1682,6 +1682,8 @@
             <button onclick="addUnit()" style="width:100%; background:#9b59b6; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">
                 + ADD UNIT
             </button>
+
+            <div id="unit-sync-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
         </div>
 
         <div id="audio-settings-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
@@ -2310,14 +2312,43 @@
         // Units live in their own "Units" tab, NOT in Settings: saveFeedSettings()
         // clears and rewrites Settings from its own payload, so anything stored
         // there would be wiped by the next feed autosave.
+        function setUnitSyncStatus(text, color) {
+            const el = document.getElementById('unit-sync-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color;
+        }
+
         function saveFarmUnits() {
             if (!canEditUnits()) return; // backstop: never let a non-admin write units
             try { localStorage.setItem('farm_units', JSON.stringify(FARM_UNITS)); } catch (e) {}
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+
+            setUnitSyncStatus('Saving to sheet...', '#7f8c8d');
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 body: JSON.stringify({ type: 'save_units', units: FARM_UNITS })
-            }).catch(e => console.error("Unit cloud save failed (kept locally):", e));
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data && (data.status === 'success' || data.success === true)) {
+                        setUnitSyncStatus('✓ Saved to the Units tab', '#27ae60');
+                        return;
+                    }
+                    // The script answers 200 with an error body when it has no save_units
+                    // branch, so a bare .catch() would never see this.
+                    const msg = (data && data.message) ? data.message : 'unknown error';
+                    console.error("Unit save rejected by Apps Script:", msg);
+                    setUnitSyncStatus(
+                        /unknown payload type/i.test(msg)
+                            ? '⚠ Saved on this device only — the Apps Script needs the getUnits/saveUnits update.'
+                            : '⚠ Saved on this device only — sheet rejected it: ' + msg,
+                        '#e67e22');
+                })
+                .catch(e => {
+                    console.error("Unit cloud save failed (kept locally):", e);
+                    setUnitSyncStatus('⚠ Saved on this device only — could not reach the sheet.', '#e67e22');
+                });
         }
 
         async function loadFarmUnits() {
