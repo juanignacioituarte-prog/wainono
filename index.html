@@ -1583,7 +1583,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('roster'); toggleSettingsMenu();" style="font-weight: bold; color: #3498db;">📅 Roster</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weather'); toggleSettingsMenu();" style="font-weight: bold; color: #f1c40f;">☁️ Weather</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('vehicle_maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #e67e22;">🚜 Vehicle Maintenance</div>
-                    <div class="dropdown-item" onclick="switchDashboardMode('farm_config'); toggleSettingsMenu();" style="font-weight: bold; color: #9b59b6;">🗺️ Farm Configuration</div>
+                    <div class="dropdown-item" id="menu-item-farm-config" style="display:none; font-weight: bold; color: #9b59b6;" onclick="switchDashboardMode('farm_config'); toggleSettingsMenu();">🗺️ Farm Configuration</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
@@ -2311,6 +2311,7 @@
         // clears and rewrites Settings from its own payload, so anything stored
         // there would be wiped by the next feed autosave.
         function saveFarmUnits() {
+            if (!canEditUnits()) return; // backstop: never let a non-admin write units
             try { localStorage.setItem('farm_units', JSON.stringify(FARM_UNITS)); } catch (e) {}
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
             fetch(GOOGLE_SCRIPT_URL, {
@@ -2354,6 +2355,22 @@
             if (activeUnitId && !FARM_UNITS.some(u => u.id === activeUnitId)) activeUnitId = null;
             renderUnitChips();
             if (currentDashboardMode === 'manual') { renderDashboard(); updateGeoStyles(); }
+        }
+
+        // Everyone can filter the farmwalk by unit; only admins can change what the units are.
+        function canEditUnits() {
+            return typeof isAdmin === 'function' && isAdmin();
+        }
+
+        function applyUnitPermissions() {
+            const item = document.getElementById('menu-item-farm-config');
+            if (item) item.style.display = canEditUnits() ? 'block' : 'none';
+        }
+
+        function requireUnitAdmin() {
+            if (canEditUnits()) return true;
+            alert("Only administrators can edit farm units.");
+            return false;
         }
 
         function getActiveUnit() {
@@ -2437,6 +2454,7 @@
         }
 
         function addUnit() {
+            if (!requireUnitAdmin()) return;
             const name = (prompt("Name for the new unit (e.g. Dairy Platform, Run-off):") || "").trim();
             if (!name) return;
             const id = 'unit_' + Date.now();
@@ -2448,6 +2466,7 @@
         }
 
         function renameUnit(id, val) {
+            if (!requireUnitAdmin()) return renderFarmConfig();
             const u = FARM_UNITS.find(x => x.id === id);
             if (!u) return;
             const name = (val || "").trim();
@@ -2458,6 +2477,7 @@
         }
 
         function setUnitColor(id, val) {
+            if (!requireUnitAdmin()) return renderFarmConfig();
             const u = FARM_UNITS.find(x => x.id === id);
             if (!u) return;
             u.color = val;
@@ -2468,6 +2488,7 @@
         }
 
         function deleteUnit(id) {
+            if (!requireUnitAdmin()) return;
             const u = FARM_UNITS.find(x => x.id === id);
             if (!u) return;
             if (!confirm(`Delete the unit "${u.name}"? Its ${u.paddocks.length} paddock(s) go back to unassigned. No cover data is affected.`)) return;
@@ -2481,6 +2502,7 @@
         }
 
         function startUnitEdit(id) {
+            if (!requireUnitAdmin()) return;
             unitEditingId = id;
             renderFarmConfig();
             updateGeoStyles();
@@ -2502,6 +2524,7 @@
         }
 
         function togglePaddockInUnit(pName) {
+            if (!canEditUnits()) return;
             const editing = FARM_UNITS.find(u => u.id === unitEditingId);
             if (!editing) return;
 
@@ -3751,6 +3774,7 @@
                 calibHoverArea.addEventListener('mouseleave', () => { calibText.style.display = 'none'; });
             }
 
+            applyUnitPermissions();
             switchDashboardMode('manual');
 
             // Units render instantly from localStorage; this refreshes them from the cloud.
@@ -3823,6 +3847,10 @@
 
         /* Dashboard Mode Switching */
         function switchDashboardMode(mode) {
+            if (mode === 'farm_config' && !canEditUnits()) {
+                alert("Only administrators can edit farm units.");
+                return;
+            }
             if (isDrawingBreak) cancelBreak();
             breakSelectMode = false;
             selectedBreakIds.clear();
