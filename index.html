@@ -1567,6 +1567,33 @@
                     </div>
                 </div>
             </div>
+
+            <div class="feed-card">
+                <div class="feed-title">Silage</div>
+                <div class="calc-grid">
+                    <div class="input-group">
+                        <label>Dry Matter (%DM)</label>
+                        <input type="number" id="inp-silage-dm" step="0.1" min="0" max="100" value="35" oninput="onSilageSettingChange()">
+                    </div>
+                    <div class="input-group">
+                        <label>kgDM per Bale</label>
+                        <input type="number" id="inp-silage-bale" step="1" min="0" value="200" oninput="onSilageSettingChange()">
+                    </div>
+                </div>
+
+                <div id="silage-herd-list" style="display:flex; flex-direction:column; gap:8px; margin-top:12px;"></div>
+
+                <div id="silage-totals" style="margin-top:12px; padding-top:10px; border-top:2px solid #eee; display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="result-highlight" style="flex:1; min-width:130px;">
+                        <h3 id="res-silage-bales">0</h3>
+                        <small>Bales per day</small>
+                    </div>
+                    <div class="result-highlight" style="flex:1; min-width:130px;">
+                        <h3 id="res-silage-wholecrop">0</h3>
+                        <small>Wholecrop (kg fresh/day)</small>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -3638,6 +3665,21 @@
             if (data.herdCows) {
                 localStorage.setItem('herd_cow_numbers', JSON.stringify(data.herdCows));
             }
+            if (data.silage) {
+                // getFeedSettings() only JSON-parses a fixed whitelist of keys, and
+                // 'silage' is not on it, so this arrives as a string unless the
+                // Apps Script is later updated. Accept either form.
+                let s = data.silage;
+                if (typeof s === 'string') {
+                    try { s = JSON.parse(s); } catch (e) { s = null; }
+                }
+                if (s && typeof s === 'object') {
+                    silageSettings = Object.assign({ dm: 35, kgPerBale: 200, herds: {} }, s);
+                    if (!silageSettings.herds) silageSettings.herds = {};
+                    try { localStorage.setItem('feed_silage', JSON.stringify(silageSettings)); } catch (e) {}
+                    renderSilage();
+                }
+            }
             if (data.cropHerds) {
                 localStorage.setItem('herd_in_crops', JSON.stringify(data.cropHerds));
             }
@@ -3749,7 +3791,119 @@
                 });
             }
             updateEditGroupSelect();
+            renderSilage();
             calculateFeedLogic();
+        }
+
+        /* ================== SILAGE ================== */
+        // Per-herd silage allocation. Bales:     cows x kgDM/cow/day / kgDM per bale
+        //                              Wholecrop: cows x kgDM/cow/day / (%DM / 100)
+        let silageSettings = { dm: 35, kgPerBale: 200, herds: {} };
+        try {
+            const rawSilage = localStorage.getItem('feed_silage');
+            if (rawSilage) silageSettings = Object.assign(silageSettings, JSON.parse(rawSilage));
+        } catch (e) {}
+        if (!silageSettings.herds) silageSettings.herds = {};
+
+        function saveSilageSettings() {
+            try { localStorage.setItem('feed_silage', JSON.stringify(silageSettings)); } catch (e) {}
+            triggerAutoSave();
+        }
+
+        function onSilageSettingChange() {
+            const dmEl = document.getElementById('inp-silage-dm');
+            const baleEl = document.getElementById('inp-silage-bale');
+            if (dmEl) silageSettings.dm = safeNum(dmEl.value);
+            if (baleEl) silageSettings.kgPerBale = safeNum(baleEl.value);
+            saveSilageSettings();
+            updateSilageTotals();
+        }
+
+        function setSilageHerd(id, field, value) {
+            if (!silageSettings.herds[id]) silageSettings.herds[id] = { kg: 0, type: 'bales' };
+            silageSettings.herds[id][field] = (field === 'kg') ? safeNum(value) : value;
+            saveSilageSettings();
+            updateSilageTotals();
+        }
+
+        function renderSilage() {
+            const box = document.getElementById('silage-herd-list');
+            if (!box) return;
+
+            const dmEl = document.getElementById('inp-silage-dm');
+            const baleEl = document.getElementById('inp-silage-bale');
+            if (dmEl) dmEl.value = silageSettings.dm;
+            if (baleEl) baleEl.value = silageSettings.kgPerBale;
+
+            const herds = BREAK_GROUPS.filter(g => g.id !== 'all');
+            if (herds.length === 0) {
+                box.innerHTML = `<div style="font-size:11px; color:#7f8c8d;">No herds set up yet.</div>`;
+                return;
+            }
+
+            box.innerHTML = herds.map(g => {
+                const s = silageSettings.herds[g.id] || { kg: 0, type: 'bales' };
+                return `
+                <div style="background:#fff; border:1px solid #ddd; border-left:4px solid ${g.color}; border-radius:6px; padding:8px 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(g.name)}</div>
+                    <div style="font-size:10px; color:#7f8c8d;">Cows <b id="silage-cows-${g.id}">0</b></div>
+                    <div style="display:flex; flex-direction:column;">
+                        <label style="font-size:9px; color:#95a5a6; font-weight:bold; text-transform:uppercase;">kgDM/cow/day</label>
+                        <input type="number" step="0.1" min="0" id="silage-kg-${g.id}" value="${s.kg || 0}"
+                            style="width:70px; padding:4px; border:1px solid #ccc; border-radius:4px; text-align:center; font-weight:bold;"
+                            oninput="setSilageHerd('${g.id}','kg',this.value)">
+                    </div>
+                    <select onchange="setSilageHerd('${g.id}','type',this.value)"
+                        style="padding:5px; border:1px solid #ccc; border-radius:4px; font-size:11px; font-weight:bold;">
+                        <option value="bales" ${s.type !== 'wholecrop' ? 'selected' : ''}>Bales</option>
+                        <option value="wholecrop" ${s.type === 'wholecrop' ? 'selected' : ''}>Wholecrop</option>
+                    </select>
+                    <div style="margin-left:auto; text-align:right;">
+                        <div id="silage-out-${g.id}" style="font-weight:bold; font-size:15px; color:var(--accent);">0</div>
+                        <div id="silage-unit-${g.id}" style="font-size:9px; color:#95a5a6;">bales/day</div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            updateSilageTotals();
+        }
+
+        function updateSilageTotals() {
+            if (!document.getElementById('silage-herd-list')) return;
+            const cows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+            const dmPct = safeNum(silageSettings.dm);
+            const kgPerBale = safeNum(silageSettings.kgPerBale);
+
+            let totalBales = 0, totalWholecrop = 0;
+
+            BREAK_GROUPS.forEach(g => {
+                if (g.id === 'all') return;
+                const s = silageSettings.herds[g.id] || { kg: 0, type: 'bales' };
+                const nCows = safeNum(cows[g.id]);
+                const totalKgDM = nCows * safeNum(s.kg);
+
+                let out = 0, unit = 'bales/day';
+                if (s.type === 'wholecrop') {
+                    out = dmPct > 0 ? (totalKgDM / (dmPct / 100)) : 0;
+                    unit = 'kg fresh/day';
+                    totalWholecrop += out;
+                } else {
+                    out = kgPerBale > 0 ? (totalKgDM / kgPerBale) : 0;
+                    totalBales += out;
+                }
+
+                const cowsEl = document.getElementById(`silage-cows-${g.id}`);
+                const outEl = document.getElementById(`silage-out-${g.id}`);
+                const unitEl = document.getElementById(`silage-unit-${g.id}`);
+                if (cowsEl) cowsEl.textContent = nCows;
+                if (outEl) outEl.textContent = (s.type === 'wholecrop') ? Math.round(out).toLocaleString() : out.toFixed(1);
+                if (unitEl) unitEl.textContent = unit;
+            });
+
+            const bEl = document.getElementById('res-silage-bales');
+            const wEl = document.getElementById('res-silage-wholecrop');
+            if (bEl) bEl.textContent = totalBales.toFixed(1);
+            if (wEl) wEl.textContent = Math.round(totalWholecrop).toLocaleString();
         }
 
         function updateEditGroupSelect() {
@@ -5153,6 +5307,9 @@
             }
             document.getElementById('res-supp').innerText = supp.toFixed(1);
 
+            // Silage figures depend on herd cow numbers, so refresh whenever they change.
+            updateSilageTotals();
+
             // ----- GRASS MANAGEMENT HERD CALCULATIONS -----
             const freq = document.querySelector('input[name="milking_freq"]:checked').value;
             const amPct = safeNum(document.getElementById('inp-am-pct').value) / 100;
@@ -5499,6 +5656,7 @@
                 cropYields: cropYields,
                 cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
+                silage: silageSettings,
                 manualBreaks: manualBreakOverrides,
                 customPaddocks: customPaddocks.map(cp => ({
                     ...cp,
