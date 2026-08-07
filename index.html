@@ -281,7 +281,12 @@
             z-index: 10001;
             display: none;
             flex-direction: column;
-            overflow: hidden;
+            overflow-x: hidden;
+            /* body is overflow:hidden, so the menu must scroll itself or the
+               items past the viewport edge become unreachable. */
+            overflow-y: auto;
+            max-height: calc(100vh - 100px);
+            -webkit-overflow-scrolling: touch;
             min-width: 120px;
         }
 
@@ -1060,6 +1065,16 @@
 
             .header {
                 padding: 10px 12px;
+            }
+
+            /* The sidebar sits at the bottom of the screen on mobile, so a menu
+               opening downward runs off the edge — worst in FEED/PLAN where the
+               sidebar shrinks to the header alone. Open upward instead. */
+            .dropdown-menu {
+                top: auto;
+                bottom: 100%;
+                margin-bottom: 6px;
+                max-height: 70vh;
             }
 
             .mode-toggle-container {
