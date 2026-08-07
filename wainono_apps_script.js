@@ -4,9 +4,12 @@
  * Complete script. Select all in the Apps Script editor and paste this over
  * the top, then Deploy > Manage deployments > edit > New version > Deploy.
  *
- * Only difference from the previous version: the 'units' branch in doGet,
- * the 'save_units' branch in doPost, and the getUnits/saveUnits functions
- * at the bottom. Everything else is unchanged.
+ * Differences from the original version:
+ *   1. doGet     - added the 'units' branch
+ *   2. doPost    - added the 'save_units' branch
+ *   3. getUnits / saveUnits functions at the bottom (Farm Units)
+ *   4. getFeedSettings - 'silage' added to the JSON-parse whitelist
+ * Everything else is byte-identical to what you had.
  */
 
 function jsonResponse(data) {
@@ -213,7 +216,7 @@ function getFeedSettings() {
     var data = sheet.getRange(1, 1, lastRow, 2).getValues();
     data.forEach(function(row) {
       var key = row[0]; var val = row[1];
-      if (['herdCows', 'cropYields', 'cropHerds', 'customHerds', 'manualBreaks', 'customPaddocks'].indexOf(key) !== -1) {
+      if (['herdCows', 'cropYields', 'cropHerds', 'customHerds', 'manualBreaks', 'customPaddocks', 'silage'].indexOf(key) !== -1) {
         try { settings[key] = JSON.parse(val || "{}"); } catch (e) { settings[key] = {}; }
       } else { settings[key] = val; }
     });
