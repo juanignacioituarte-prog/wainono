@@ -1067,15 +1067,6 @@
                 padding: 10px 12px;
             }
 
-            /* The sidebar sits at the bottom of the screen on mobile, so a menu
-               opening downward runs off the edge — worst in FEED/PLAN where the
-               sidebar shrinks to the header alone. Open upward instead. */
-            .dropdown-menu {
-                top: auto;
-                bottom: 100%;
-                margin-bottom: 6px;
-                max-height: 70vh;
-            }
 
             .mode-toggle-container {
                 margin-bottom: 8px;
@@ -2807,11 +2798,48 @@
             toggle.classList.toggle('collapsed');
         }
 
+        // Float the menu against the viewport rather than the header. The sidebar
+        // moves between the side and the bottom of the screen and shrinks to the
+        // header alone in FEED/PLAN, so a fixed open direction always runs off one
+        // edge. Measure at open time, pick the roomier side, and cap the height so
+        // it scrolls instead of overflowing.
+        function positionSettingsMenu(menu) {
+            const btn = document.querySelector('.btn-dots');
+            if (!btn) return;
+            const r = btn.getBoundingClientRect();
+            const vh = window.innerHeight;
+            const vw = window.innerWidth;
+            const GAP = 6, EDGE = 10;
+
+            menu.style.position = 'fixed';
+
+            const spaceBelow = vh - r.bottom - GAP - EDGE;
+            const spaceAbove = r.top - GAP - EDGE;
+
+            if (spaceBelow >= spaceAbove) {
+                menu.style.top = (r.bottom + GAP) + 'px';
+                menu.style.bottom = 'auto';
+                menu.style.maxHeight = Math.max(120, spaceBelow) + 'px';
+            } else {
+                menu.style.bottom = (vh - r.top + GAP) + 'px';
+                menu.style.top = 'auto';
+                menu.style.maxHeight = Math.max(120, spaceAbove) + 'px';
+            }
+
+            // Keep it on screen horizontally too.
+            menu.style.left = '0px';
+            const w = menu.offsetWidth || 180;
+            menu.style.left = Math.max(EDGE, Math.min(r.left, vw - w - EDGE)) + 'px';
+            menu.style.right = 'auto';
+            menu.style.marginBottom = '0';
+        }
+
         function toggleSettingsMenu() {
             const menu = document.getElementById('settings-menu');
             const isVisible = menu.style.display === 'flex';
             menu.style.display = isVisible ? 'none' : 'flex';
-            
+            if (!isVisible) positionSettingsMenu(menu);
+
             // Close menu if clicking outside
             if (!isVisible) {
                 setTimeout(() => {
