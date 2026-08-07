@@ -1710,6 +1710,22 @@
         <div id="farm-config-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
             <h3 style="margin-top:0;">Farm Configuration</h3>
 
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+                <button id="fc-tab-units" onclick="showFarmConfigSection('units')" style="flex:1; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #9b59b6;">🗺️ FARM UNITS</button>
+                <button id="fc-tab-out" onclick="showFarmConfigSection('out')" style="flex:1; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #e67e22;">🚧 PADDOCKS OUT</button>
+            </div>
+
+            <div id="fc-section-out" style="display:none;">
+                <h4 style="margin:0 0 4px; font-size:13px; color:#2c3e50;">Paddocks Out of Rotation</h4>
+                <p style="font-size:12px; color:#666; margin:0 0 12px;">
+                    Change why a paddock is out, or put it back in rotation. A paddock stops
+                    appearing in Crop Management as soon as it is no longer on crop.
+                </p>
+                <div id="out-paddock-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                <div id="out-sync-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
+            </div>
+
+            <div id="fc-section-units">
             <h4 style="margin:0 0 4px; font-size:13px; color:#2c3e50;">Farm Units</h4>
             <p style="font-size:12px; color:#666; margin:0 0 12px;">
                 Group paddocks into units. In FARMWALK a button appears for each unit, showing only
@@ -1725,6 +1741,7 @@
             </button>
 
             <div id="unit-sync-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
+            </div>
         </div>
 
         <div id="audio-settings-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
@@ -2290,7 +2307,11 @@
         /* URLs */
         const GEOJSON_URL = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
         const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
-        const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
+        // Paddocks out of rotation now live in the feed sync sheet's "out" tab.
+        // LEGACY_OUT_CSV_URL is the old out_w tab, read only as a fallback while the
+        // new tab is still empty so the app never shows every paddock back in rotation.
+        const EXCLUSIONS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=376904965&single=true&output=csv";
+        const LEGACY_OUT_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=653318078&single=true&output=csv";
         const CAL_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=2878588&single=true&output=csv";
         const MANUAL_MODE_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=470390408&single=true&output=csv";
         const FEED_SETTINGS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1218249029&single=true&output=csv";
@@ -2492,6 +2513,128 @@
             updateGeoStyles();
         }
 
+        /* ---- Farm Configuration: section switcher ---- */
+        let farmConfigSection = 'units';
+
+        function showFarmConfigSection(which) {
+            farmConfigSection = which;
+            const unitsBtn = document.getElementById('fc-tab-units');
+            const outBtn = document.getElementById('fc-tab-out');
+            const unitsSec = document.getElementById('fc-section-units');
+            const outSec = document.getElementById('fc-section-out');
+            if (!unitsBtn || !outBtn) return;
+
+            const on = (btn, color) => { btn.style.background = color; btn.style.color = '#fff'; };
+            const off = (btn, color) => { btn.style.background = '#fff'; btn.style.color = color; };
+
+            if (which === 'out') {
+                on(outBtn, '#e67e22'); off(unitsBtn, '#9b59b6');
+                if (unitsSec) unitsSec.style.display = 'none';
+                if (outSec) outSec.style.display = 'block';
+                if (unitEditingId) stopUnitEdit();
+                renderOutManager();
+            } else {
+                on(unitsBtn, '#9b59b6'); off(outBtn, '#e67e22');
+                if (unitsSec) unitsSec.style.display = 'block';
+                if (outSec) outSec.style.display = 'none';
+                renderFarmConfig();
+            }
+            updateGeoStyles();
+        }
+
+        /* ---- Paddocks out of rotation ---- */
+        const OUT_STATUSES = [
+            { value: 'CROP', label: 'Crop' },
+            { value: 'SILAGE', label: 'Silage' },
+            { value: 'OTHER', label: 'Other' }
+        ];
+
+        function setOutSyncStatus(text, color) {
+            const el = document.getElementById('out-sync-status');
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = color;
+        }
+
+        function renderOutManager() {
+            const box = document.getElementById('out-paddock-list');
+            if (!box) return;
+
+            const rows = outRows.slice().sort((a, b) => a.paddock.localeCompare(b.paddock));
+            if (rows.length === 0) {
+                box.innerHTML = `<div style="font-size:12px; color:#7f8c8d;">No paddocks are out of rotation.</div>`;
+                return;
+            }
+
+            box.innerHTML = rows.map(r => {
+                const opts = OUT_STATUSES.map(s =>
+                    `<option value="${s.value}" ${r.status === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
+                return `
+                <div style="background:#fff; border:1px solid #ddd; border-left:4px solid ${r.status === 'CROP' ? '#d35400' : (r.status === 'SILAGE' ? '#e67e22' : '#7f8c8d')}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(r.paddock)}</div>
+                    <select onchange="setOutStatus('${escUnit(r.paddock)}', this.value)"
+                        style="padding:5px; border:1px solid #ccc; border-radius:4px; font-size:11px; font-weight:bold;">${opts}</select>
+                    <button onclick="returnToRotation('${escUnit(r.paddock)}')"
+                        style="margin-left:auto; background:#27ae60; color:#fff; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">
+                        ↩ BACK IN</button>
+                </div>`;
+            }).join('');
+        }
+
+        function refreshAfterOutChange() {
+            applyOutRows(outRows);
+            renderOutManager();
+            if (typeof calculateFeedLogic === 'function') calculateFeedLogic(); // redraws Crop Management
+            renderDashboard();
+            updateGeoStyles();
+        }
+
+        function setOutStatus(paddock, status) {
+            if (!requireUnitAdmin()) return renderOutManager();
+            const row = outRows.find(r => normName(r.paddock) === normName(paddock));
+            if (!row) return;
+            row.status = status;
+            refreshAfterOutChange();
+            saveOutRows();
+        }
+
+        function returnToRotation(paddock) {
+            if (!requireUnitAdmin()) return;
+            if (!confirm(`Put "${paddock}" back into rotation?`)) return;
+            outRows = outRows.filter(r => normName(r.paddock) !== normName(paddock));
+            refreshAfterOutChange();
+            saveOutRows();
+        }
+
+        function saveOutRows() {
+            try { localStorage.setItem('out_paddocks', JSON.stringify(outRows)); } catch (e) {}
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+
+            setOutSyncStatus('Saving to sheet...', '#7f8c8d');
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ type: 'save_out', out: outRows })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data && (data.status === 'success' || data.success === true)) {
+                        setOutSyncStatus('✓ Saved to the out tab', '#27ae60');
+                        return;
+                    }
+                    const msg = (data && data.message) ? data.message : 'unknown error';
+                    console.error("Out-of-rotation save rejected:", msg);
+                    setOutSyncStatus(
+                        /unknown payload type/i.test(msg)
+                            ? '⚠ Saved on this device only — the Apps Script needs the save_out update.'
+                            : '⚠ Saved on this device only — sheet rejected it: ' + msg,
+                        '#e67e22');
+                })
+                .catch(e => {
+                    console.error("Out-of-rotation cloud save failed:", e);
+                    setOutSyncStatus('⚠ Saved on this device only — could not reach the sheet.', '#e67e22');
+                });
+        }
+
         /* ---- Farm Configuration: unit editor ---- */
         function renderFarmConfig() {
             const box = document.getElementById('farm-units-list');
@@ -2672,6 +2815,7 @@
         let activeBreakGroup = 'all';
         let cropYields = {}; // { paddockName: yield }
         let allCropPaddocks = []; // List of paddock names with 'CROP' status
+        let outRows = [];         // [{ paddock, status }] — the out tab, source of the above
         let customPaddocks = []; // Array of { id, name, yield, vertices, areaHa }
         let pendingCPData = null; // Temporary storage for modal data during drawing
         let customPaddockLayer = null;
@@ -3595,27 +3739,53 @@
             } catch (e) { }
         }
 
+        function parseOutCsv(text) {
+            const rows = [];
+            text.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
+                const cols = line.split(',').map(c => c.trim());
+                const name = cols[0];
+                if (!name) return;
+                rows.push({ paddock: name, status: (cols[1] || 'OUT').toUpperCase() });
+            });
+            return rows;
+        }
+
+        // Rebuilds both derived views of the out list. allCropPaddocks drives the
+        // Crop Management list in FEED, so dropping a paddock's CROP status here is
+        // what makes it disappear from there.
+        function applyOutRows(rows) {
+            outRows = rows;
+            excludedPaddocks = new Map();
+            allCropPaddocks = [];
+            rows.forEach(r => {
+                excludedPaddocks.set(normName(r.paddock), r.status || 'OUT');
+                if (r.status === 'CROP') allCropPaddocks.push(r.paddock);
+            });
+            try { localStorage.setItem('out_paddocks', JSON.stringify(rows)); } catch (e) {}
+        }
+
         async function loadStatusSheets() {
+            let rows = [];
             try {
-                const resEx = await fetch(EXCLUSIONS_CSV_URL + "&t=" + Date.now());
-                const textEx = await resEx.text();
-                allCropPaddocks = [];
-                textEx.split('\n').filter(l => l.trim() !== '').slice(1).forEach(line => {
-                    const cols = line.split(',').map(c => c.trim());
-                    const name = cols[0];
-                    const lowerName = name.toLowerCase();
-                    const status = (cols[1] || "").toUpperCase();
-                    
-                    if (name) {
-                        excludedPaddocks.set(lowerName, status || 'OUT');
-                        if (status === 'CROP') {
-                            allCropPaddocks.push(name);
-                        }
-                    }
-                });
-            } catch (e) {
-                console.warn("Status sheets not loaded");
+                const res = await fetch(EXCLUSIONS_CSV_URL + "&t=" + Date.now());
+                rows = parseOutCsv(await res.text());
+            } catch (e) { console.warn("out tab unreachable"); }
+
+            if (rows.length === 0) {
+                // Migration guard: the new tab is empty, so fall back to the old
+                // out_w tab rather than putting every paddock back in rotation.
+                try {
+                    const res = await fetch(LEGACY_OUT_CSV_URL + "&t=" + Date.now());
+                    rows = parseOutCsv(await res.text());
+                    if (rows.length) console.warn("Reading the legacy out_w tab — the new out tab is still empty.");
+                } catch (e) { console.warn("Status sheets not loaded"); }
             }
+
+            if (rows.length === 0) {
+                try { rows = JSON.parse(localStorage.getItem('out_paddocks') || '[]'); } catch (e) { rows = []; }
+            }
+
+            applyOutRows(rows);
         }
 
         async function loadFeedSettings() {
@@ -4124,7 +4294,7 @@
             const farmConfigView = document.getElementById('farm-config-view');
             if (farmConfigView) farmConfigView.style.display = (mode === 'farm_config') ? 'block' : 'none';
             if (mode === 'farm_config') {
-                renderFarmConfig();
+                showFarmConfigSection(farmConfigSection);
             } else if (unitEditingId) {
                 stopUnitEdit();
             }
@@ -4303,8 +4473,7 @@
                     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     document.getElementById('legend').style.display = 'none';
                     if (ndviLayer) map.removeLayer(ndviLayer);
-                    renderFarmConfig();
-                    updateGeoStyles();
+                    showFarmConfigSection(farmConfigSection);
                     return;
                 } else if (mode === 'weekly_report') {
                     document.getElementById('map').style.display = 'block';

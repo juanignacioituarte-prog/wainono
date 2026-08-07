@@ -28,6 +28,8 @@ function doGet(e) {
     return getBreaks();
   } else if (type === 'units') {
     return getUnits();
+  } else if (type === 'out') {
+    return getOut();
   } else {
     return getFeedSettings();
   }
@@ -57,6 +59,8 @@ function doPost(e) {
       return saveFarmwalkEntry(payload);
     } else if (type === 'save_units' || type === 'units') {
       return saveUnits(payload.units);
+    } else if (type === 'save_out' || type === 'out') {
+      return saveOut(payload.out);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -279,6 +283,50 @@ function getUnits() {
   });
 
   return jsonResponse({ status: "success", units: units });
+}
+
+/* ================== PADDOCKS OUT OF ROTATION ================== */
+// Sheet "out": paddock | status   (status is CROP, SILAGE or OTHER)
+// Row 1 is a header, matching how the app's CSV reader skips the first line.
+
+function getOut() {
+  var sheet = getOrCreateSheet("out");
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResponse({ status: "success", out: [] });
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  var out = [];
+  data.forEach(function(row) {
+    var name = String(row[0] || "").trim();
+    if (!name) return;
+    out.push({
+      paddock: name,
+      status: String(row[1] || "OUT").trim().toUpperCase()
+    });
+  });
+  return jsonResponse({ status: "success", out: out });
+}
+
+function saveOut(outList) {
+  if (!Array.isArray(outList)) return errorResponse("Payload out must be array");
+
+  var sheet = getOrCreateSheet("out");
+  sheet.clearContents();
+  sheet.appendRow(["paddock", "status"]);
+
+  var rows = [];
+  outList.forEach(function(o) {
+    if (!o) return;
+    var name = String(o.paddock || "").trim();
+    if (!name) return;
+    rows.push([name, String(o.status || "OUT").trim().toUpperCase()]);
+  });
+
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, 2).setValues(rows);
+  }
+
+  return jsonResponse({ status: "success", count: rows.length });
 }
 
 function saveUnits(unitsList) {
