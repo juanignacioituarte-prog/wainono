@@ -447,7 +447,8 @@
         }
 
         /* Feed Calculations View */
-        #feed-view {
+        #feed-view,
+        #plan-view {
             flex-grow: 1;
             background: #f4f7f6;
             display: none;
@@ -1461,14 +1462,6 @@
             </div>
 
             <div class="feed-card">
-                <div class="feed-title-row">
-                    <div class="feed-title">Herd Management</div>
-                    <button class="btn-save" onclick="addCustomHerd()">+ ADD HERD</button>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:10px;" id="herd-inputs"></div>
-            </div>
-
-            <div class="feed-card">
                 <div class="feed-title">Crop Management</div>
 
                 <button class="btn-save" style="margin-top:10px; width:100%; background:#8e44ad; border-color:#8e44ad; margin-bottom:15px;" onclick="showAddCustomPaddockModal()">+ ADD EXTERNAL PADDOCK</button>
@@ -1484,6 +1477,45 @@
                 <div id="crop-herd-outputs"></div>
             </div>
 
+            <div class="feed-card">
+                <div class="feed-title">Silage</div>
+                <div class="calc-grid">
+                    <div class="input-group">
+                        <label>Dry Matter (%DM)</label>
+                        <input type="number" id="inp-silage-dm" step="0.1" min="0" max="100" value="35" oninput="onSilageSettingChange()">
+                    </div>
+                    <div class="input-group">
+                        <label>kgDM per Bale</label>
+                        <input type="number" id="inp-silage-bale" step="1" min="0" value="200" oninput="onSilageSettingChange()">
+                    </div>
+                </div>
+
+                <div id="silage-herd-list" style="display:flex; flex-direction:column; gap:8px; margin-top:12px;"></div>
+
+                <div id="silage-totals" style="margin-top:12px; padding-top:10px; border-top:2px solid #eee; display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="result-highlight" style="flex:1; min-width:130px;">
+                        <h3 id="res-silage-bales">0</h3>
+                        <small>Bales per day</small>
+                    </div>
+                    <div class="result-highlight" style="flex:1; min-width:130px;">
+                        <h3 id="res-silage-wholecrop">0</h3>
+                        <small>Wholecrop (kg fresh/day)</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="feed-card">
+                <div class="feed-title-row">
+                    <div class="feed-title">Herd Management</div>
+                    <button class="btn-save" onclick="addCustomHerd()">+ ADD HERD</button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px;" id="herd-inputs"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="plan-view">
+        <div class="feed-container">
             <div class="feed-card">
                 <div class="feed-title">Feed Wedge & Demand</div>
                 <div class="chart-box">
@@ -1567,33 +1599,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="feed-card">
-                <div class="feed-title">Silage</div>
-                <div class="calc-grid">
-                    <div class="input-group">
-                        <label>Dry Matter (%DM)</label>
-                        <input type="number" id="inp-silage-dm" step="0.1" min="0" max="100" value="35" oninput="onSilageSettingChange()">
-                    </div>
-                    <div class="input-group">
-                        <label>kgDM per Bale</label>
-                        <input type="number" id="inp-silage-bale" step="1" min="0" value="200" oninput="onSilageSettingChange()">
-                    </div>
-                </div>
-
-                <div id="silage-herd-list" style="display:flex; flex-direction:column; gap:8px; margin-top:12px;"></div>
-
-                <div id="silage-totals" style="margin-top:12px; padding-top:10px; border-top:2px solid #eee; display:flex; gap:10px; flex-wrap:wrap;">
-                    <div class="result-highlight" style="flex:1; min-width:130px;">
-                        <h3 id="res-silage-bales">0</h3>
-                        <small>Bales per day</small>
-                    </div>
-                    <div class="result-highlight" style="flex:1; min-width:130px;">
-                        <h3 id="res-silage-wholecrop">0</h3>
-                        <small>Wholecrop (kg fresh/day)</small>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -1667,6 +1672,9 @@
                     <input type="date" id="farmwalk-entry-date" style="display:none; padding:6px 10px; border-radius:6px; border:1px solid #27ae60; font-size:12px; font-weight:bold; color:#2c3e50;" />
                     <button id="btn-save-farmwalk-all" onclick="saveEntireFarmwalk()" style="display:none; background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; transition:0.2s;">
                         💾 SAVE FARMWALK
+                    </button>
+                    <button id="btn-plan" onclick="switchDashboardMode('plan')" style="background:#8e44ad; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                        📊 PLAN
                     </button>
                     <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
                 </div>
@@ -4063,6 +4071,7 @@
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'flex' : 'none';
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'block' : 'none';
             document.getElementById('feed-view').style.display = (mode === 'feed') ? 'flex' : 'none';
+            document.getElementById('plan-view').style.display = (mode === 'plan') ? 'flex' : 'none';
             document.getElementById('health-safety-view').style.display = (mode === 'health_safety') ? 'block' : 'none';
             document.getElementById('weather-view').style.display = (mode === 'weather') ? 'flex' : 'none';
             document.getElementById('roster-view').style.display = (mode === 'roster') ? 'block' : 'none';
@@ -4082,13 +4091,16 @@
             }
 
             // Map vs Overlay Logic
-            if (mode === 'feed') {
+            if (mode === 'feed' || mode === 'plan') {
                 document.getElementById('map').style.display = 'none';
                 document.getElementById('list').style.display = 'none';
                 if (window.innerWidth <= 768) {
                     document.getElementById('sidebar').style.height = 'auto'; // Shrink sidebar to header only
                 }
 
+                // PLAN reuses every feed calculation: saveAndRecalc below runs
+                // calculateFeedLogic, which redraws the wedge. plan-view is already
+                // visible by this point, so the canvas sizes correctly.
                 const msg = document.getElementById('save-msg');
                 if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                     if (msg) {
