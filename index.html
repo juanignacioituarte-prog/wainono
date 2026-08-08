@@ -2782,7 +2782,12 @@
                 on_crop: false,
                 custom_crop_feed: 4,
                 custom_crop_paddock: null,
-                is_oad: false
+                is_oad: false,
+                m2_per_cow: null,
+                mag_on: false,
+                mag_g: null,
+                cal_on: false,
+                cal_g: null
             });
             saveHerdSettings();
         }
@@ -3987,7 +3992,39 @@
                             </label>
                         </div>
                     `;
-                    
+
+                    if (g.on_grass) {
+                        html += `
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; background:#f3fbf5; border:1px solid #dcefe1; padding:8px; border-radius:6px;">
+                                <label style="font-weight:600; color:#555; font-size:10px;">GRASS ALLOCATION (m²/COW/DAY):</label>
+                                <input type="number" step="1" min="0" style="width:70px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:11px;" value="${g.m2_per_cow !== null && g.m2_per_cow !== undefined && g.m2_per_cow !== '' ? g.m2_per_cow : ''}" placeholder="auto" title="Leave blank to share the farm's daily area proportionally" onchange="updateCustomHerd('${g.id}', 'm2_per_cow', this.value !== '' ? parseFloat(this.value) : null)">
+                            </div>
+                        `;
+                    }
+
+                    html += `
+                        <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px; background:#f7f5fd; border:1px solid #e6e0f5; padding:8px; border-radius:6px; font-size:11px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
+                                    <input type="checkbox" ${g.mag_on ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'mag_on', this.checked)"> Magnesium
+                                </label>
+                                ${g.mag_on ? `<div style="display:flex; align-items:center; gap:4px;">
+                                    <input type="number" step="1" min="0" style="width:60px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:11px;" value="${g.mag_g !== null && g.mag_g !== undefined && g.mag_g !== '' ? g.mag_g : ''}" placeholder="0" onchange="updateCustomHerd('${g.id}', 'mag_g', this.value !== '' ? parseFloat(this.value) : null)">
+                                    <span style="color:#7f8c8d; font-weight:600;">g/cow</span>
+                                </div>` : ''}
+                            </div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
+                                    <input type="checkbox" ${g.cal_on ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'cal_on', this.checked)"> Calcium
+                                </label>
+                                ${g.cal_on ? `<div style="display:flex; align-items:center; gap:4px;">
+                                    <input type="number" step="1" min="0" style="width:60px; padding:2px; border:1px solid #ccc; border-radius:4px; text-align:center; font-size:11px;" value="${g.cal_g !== null && g.cal_g !== undefined && g.cal_g !== '' ? g.cal_g : ''}" placeholder="0" onchange="updateCustomHerd('${g.id}', 'cal_g', this.value !== '' ? parseFloat(this.value) : null)">
+                                    <span style="color:#7f8c8d; font-weight:600;">g/cow</span>
+                                </div>` : ''}
+                            </div>
+                        </div>
+                    `;
+
                     if (g.on_crop) {
                         html += `
                             <div style="display:flex; flex-direction:column; gap:4px; margin-top:8px; border-top:1px solid #eee; padding-top:8px; width:100%;">
@@ -5600,7 +5637,15 @@
                         }
                     }
 
-                    herdLockedCache[g.id] = { isLocked: isLocked, lockedDailyArea: lockedDailyArea, isOAD: g.is_oad };
+                    // Herd Management m2/cow/day sets the break size unless a manual ha break is typed in
+                    const perCowM2 = parseFloat(g.m2_per_cow);
+                    const hasPerCowM2 = !isNaN(perCowM2) && perCowM2 > 0;
+                    if (!isLocked && hasPerCowM2) {
+                        lockedDailyArea = (perCowM2 * hCows) / 10000;
+                        isLocked = true;
+                    }
+
+                    herdLockedCache[g.id] = { isLocked: isLocked, lockedDailyArea: lockedDailyArea, isOAD: g.is_oad, fromPerCowM2: !amLocked && !pmLocked && !longLocked && !shortLocked && hasPerCowM2 };
 
                     if (isLocked) {
                         totalManualCows += hCows;
@@ -5654,9 +5699,12 @@
                     
                     totalGrassAssigned += hAreaHa;
 
+                    const effM2PerCow = hCows > 0 ? (hAreaHa * 10000) / hCows : 0;
+
                     let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
                         <div style="font-weight:bold; color:${g.color}; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
                             <span>${g.name} <span style="font-size:10px; color:#95a5a6; font-weight:normal;">(${hCows} cows)</span></span>
+                            <span style="font-size:10px; font-weight:600; color:${cache.fromPerCowM2 ? '#27ae60' : '#95a5a6'};">${Math.round(effM2PerCow)} m²/cow/day${cache.fromPerCowM2 ? ' (set)' : ''}</span>
                         </div>`;
 
                     hHtml += `<div style="display:flex; justify-content:space-between; font-size:12px;">`;
@@ -5684,7 +5732,25 @@
                         hHtml += `<div><span>Long:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${longStr}" value="${overrides['long'] !== undefined ? overrides['long'] : ''}" onchange="saveManualBreak('${g.id}', 'long', this.value)"> <b>ha</b></div>
                                   <div><span>Short:</span> <input type="number" step="0.1" style="width:55px; padding:2px; border:1px solid #ccc; border-radius:4px; font-weight:bold; text-align:right;" placeholder="${shortStr}" value="${overrides['short'] !== undefined ? overrides['short'] : ''}" onchange="saveManualBreak('${g.id}', 'short', this.value)"> <b>ha</b></div>`;
                     }
-                    hHtml += `</div></div>`;
+                    hHtml += `</div>`;
+
+                    // Minerals for this herd (from Herd Management)
+                    const magG = parseFloat(g.mag_g);
+                    const calG = parseFloat(g.cal_g);
+                    const minerals = [];
+                    if (g.mag_on && !isNaN(magG) && magG > 0) minerals.push({ label: 'Mg', color: '#8e44ad', gPerCow: magG });
+                    if (g.cal_on && !isNaN(calG) && calG > 0) minerals.push({ label: 'Ca', color: '#2980b9', gPerCow: calG });
+
+                    if (minerals.length > 0) {
+                        hHtml += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">`;
+                        minerals.forEach(m => {
+                            const totalKg = (m.gPerCow * hCows) / 1000;
+                            hHtml += `<span style="font-size:10px; font-weight:600; color:${m.color}; background:#f7f5fd; border:1px solid #e6e0f5; padding:2px 6px; border-radius:4px;">${m.label} ${m.gPerCow} g/cow &middot; ${totalKg.toFixed(2)} kg/day</span>`;
+                        });
+                        hHtml += `</div>`;
+                    }
+
+                    hHtml += `</div>`;
                     grassHtml += hHtml;
                 }
 

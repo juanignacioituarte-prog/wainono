@@ -9,6 +9,10 @@
  *   2. doPost    - added the 'save_units' branch
  *   3. getUnits / saveUnits functions at the bottom (Farm Units)
  *   4. getFeedSettings - 'silage' added to the JSON-parse whitelist
+ *   5. Herd grass allocation (m2/cow/day) and magnesium / calcium dosing:
+ *      normalizeHerds keeps the new fields typed, getFeedSettings no longer
+ *      hands the app an empty herd list when the cell is blank, and
+ *      saveFeedSettings mirrors the herds into a readable "Herds" sheet.
  * Everything else is byte-identical to what you had.
  */
 
@@ -212,6 +216,9 @@ function saveBreaks(breaksList) {
   return jsonResponse({ status: "success", count: rows.length });
 }
 
+var JSON_SETTING_KEYS = ['herdCows', 'cropYields', 'cropHerds', 'customHerds', 'manualBreaks', 'customPaddocks', 'silage'];
+var ARRAY_SETTING_KEYS = ['cropHerds', 'customHerds', 'customPaddocks'];
+
 function getFeedSettings() {
   var sheet = getOrCreateSheet("Settings");
   var lastRow = sheet.getLastRow();
@@ -220,11 +227,23 @@ function getFeedSettings() {
     var data = sheet.getRange(1, 1, lastRow, 2).getValues();
     data.forEach(function(row) {
       var key = row[0]; var val = row[1];
-      if (['herdCows', 'cropYields', 'cropHerds', 'customHerds', 'manualBreaks', 'customPaddocks', 'silage'].indexOf(key) !== -1) {
-        try { settings[key] = JSON.parse(val || "{}"); } catch (e) { settings[key] = {}; }
+      if (JSON_SETTING_KEYS.indexOf(key) !== -1) {
+        var fallback = ARRAY_SETTING_KEYS.indexOf(key) !== -1 ? [] : {};
+        try { settings[key] = JSON.parse(val || JSON.stringify(fallback)); }
+        catch (e) { settings[key] = fallback; }
       } else { settings[key] = val; }
     });
   }
+
+  // The app assigns customHerds straight onto BREAK_GROUPS. A blank or corrupt
+  // cell used to hand it {} or [], leaving it with no herds at all - drop the
+  // key instead so the app keeps the herds it already has.
+  if (Array.isArray(settings.customHerds) && settings.customHerds.length > 0) {
+    settings.customHerds = normalizeHerds(settings.customHerds);
+  } else {
+    delete settings.customHerds;
+  }
+
   return jsonResponse(settings);
 }
 
@@ -232,6 +251,9 @@ function saveFeedSettings(payload) {
   var sheet = getOrCreateSheet("Settings");
   sheet.clearContents();
   var keysToIgnore = ['type', 'breaks'];
+
+  if (payload.customHerds) payload.customHerds = normalizeHerds(payload.customHerds);
+
   var rows = [];
   Object.keys(payload).forEach(function(key) {
     if (keysToIgnore.indexOf(key) !== -1) return;
@@ -240,7 +262,89 @@ function saveFeedSettings(payload) {
     rows.push([key, val]);
   });
   if (rows.length > 0) sheet.getRange(1, 1, rows.length, 2).setValues(rows);
+
+  writeHerdSheet(payload.customHerds, payload.herdCows);
+
   return jsonResponse({ status: "success" });
+}
+
+/* ================== HERDS: GRASS ALLOCATION & MINERALS ================== */
+
+function toNumberOrNull(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+function toBool(v) {
+  return v === true || String(v).toUpperCase() === 'TRUE';
+}
+
+/**
+ * Keep the per-herd grass allocation (m2/cow/day) and the magnesium / calcium
+ * dosing fields as real numbers and booleans, whatever the cell happened to
+ * hold. A herd that has never been given these fields keeps them empty, which
+ * the app reads as "share the daily area proportionally, no minerals".
+ */
+function normalizeHerds(herds) {
+  if (!Array.isArray(herds)) return [];
+  return herds.map(function(h) {
+    if (!h || typeof h !== 'object') return h;
+    h.m2_per_cow = toNumberOrNull(h.m2_per_cow);
+    h.mag_on = toBool(h.mag_on);
+    h.mag_g  = toNumberOrNull(h.mag_g);
+    h.cal_on = toBool(h.cal_on);
+    h.cal_g  = toNumberOrNull(h.cal_g);
+    return h;
+  });
+}
+
+/**
+ * Mirror the herds into a readable "Herds" sheet so break size and the mineral
+ * amounts to load can be read straight off the spreadsheet. The app still reads
+ * herds from the customHerds JSON in Settings - this sheet is a report, not a
+ * source, so it can never disagree with what the app is using.
+ */
+function writeHerdSheet(herds, herdCows) {
+  if (!Array.isArray(herds)) return;
+  try {
+    var cows = (herdCows && typeof herdCows === 'object') ? herdCows : {};
+    var sheet = getOrCreateSheet("Herds");
+    sheet.clearContents();
+
+    var headers = ["id", "name", "cows", "on grass", "on crop", "OAD",
+                   "m2/cow/day", "break ha/day",
+                   "magnesium", "Mg g/cow", "Mg kg/day",
+                   "calcium", "Ca g/cow", "Ca kg/day"];
+    sheet.appendRow(headers);
+
+    var rows = [];
+    herds.forEach(function(h) {
+      if (!h || h.id === 'all') return;
+      var n    = Number(cows[h.id]) || 0;
+      var m2   = toNumberOrNull(h.m2_per_cow);
+      var magOn = toBool(h.mag_on), magG = toNumberOrNull(h.mag_g);
+      var calOn = toBool(h.cal_on), calG = toNumberOrNull(h.cal_g);
+      rows.push([
+        h.id || "", h.name || "", n,
+        h.on_grass ? "TRUE" : "FALSE",
+        h.on_crop  ? "TRUE" : "FALSE",
+        h.is_oad   ? "TRUE" : "FALSE",
+        m2 === null ? "" : m2,
+        m2 === null ? "" : (m2 * n) / 10000,
+        magOn ? "TRUE" : "FALSE",
+        magG === null ? "" : magG,
+        (magOn && magG !== null) ? (magG * n) / 1000 : "",
+        calOn ? "TRUE" : "FALSE",
+        calG === null ? "" : calG,
+        (calOn && calG !== null) ? (calG * n) / 1000 : ""
+      ]);
+    });
+
+    if (rows.length > 0) sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  } catch (err) {
+    // A reporting sheet must never cost the user their settings save.
+  }
 }
 
 function getOrCreateSheet(name) {
