@@ -2316,6 +2316,42 @@
         const HS_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMYjvvuAoNrqzQSECZ_Jit2hN7L1uRyAQCmg1qzusXeRmZiZ4DLoOCxJCsorPBNcRu/exec";
         const ROSTER_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx_qBldXyEMoIev8kxT8mCOZGSZBTlnymEsBA6pMLiJGboKVBYEryrMJDSzIdeIdlVUfA/exec";
 
+        /* === LOCAL COPY SAFETY RAIL ===
+         * The script URLs above are baked into the file, so a copy of this page
+         * opened straight off disk talks to the real farm's sheets. Touching any
+         * input there fires the 1.5s autosave and overwrites live settings with
+         * whatever that copy happens to be holding - which is how a stray local
+         * copy can wipe the herd list.
+         *
+         * On file:// we let reads through, so a local copy still shows real data,
+         * and refuse every write. The refusal is shaped like the Apps Script's own
+         * error reply, so each caller shows its normal "saved on this device only"
+         * message instead of failing in some new way. None of this runs on the
+         * published site - the branch is dead unless the protocol is file:.
+         */
+        const IS_LOCAL_COPY = location.protocol === 'file:';
+        if (IS_LOCAL_COPY) {
+            const realFetch = window.fetch.bind(window);
+            window.fetch = function(input, init) {
+                const url = typeof input === 'string' ? input : ((input && input.url) || '');
+                const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+                if (method === 'POST' && url.indexOf('script.google.com') !== -1) {
+                    console.warn('Local copy: refused to write to the live sheet.', init && init.body);
+                    return Promise.resolve(new Response(
+                        JSON.stringify({ status: 'error', message: 'local copy: cloud writes are disabled' }),
+                        { status: 200, headers: { 'Content-Type': 'application/json' } }
+                    ));
+                }
+                return realFetch(input, init);
+            };
+            window.addEventListener('DOMContentLoaded', function() {
+                const tag = document.createElement('div');
+                tag.textContent = 'LOCAL COPY — READ ONLY';
+                tag.style.cssText = 'position:fixed; bottom:0; left:0; z-index:99999; background:#e67e22; color:#fff; font:bold 10px/1 sans-serif; padding:4px 8px; border-top-right-radius:6px; pointer-events:none;';
+                document.body.appendChild(tag);
+            });
+        }
+
         /* Health & Safety State */
         let hsStaff = JSON.parse(localStorage.getItem('hs_staff')) || [];
         let hsHazards = JSON.parse(localStorage.getItem('hs_hazards')) || [];
