@@ -13,6 +13,8 @@
  *      normalizeHerds keeps the new fields typed, getFeedSettings no longer
  *      hands the app an empty herd list when the cell is blank, and
  *      saveFeedSettings mirrors the herds into a readable "Herds" sheet.
+ *   6. Herd numbers log: doGet 'herd_log' branch, doPost 'herd_log' branch and
+ *      getHerdLog / appendHerdLog, backed by a new append-only "HerdLog" sheet.
  * Everything else is byte-identical to what you had.
  */
 
@@ -34,6 +36,8 @@ function doGet(e) {
     return getUnits();
   } else if (type === 'out') {
     return getOut();
+  } else if (type === 'herd_log') {
+    return getHerdLog();
   } else {
     return getFeedSettings();
   }
@@ -65,6 +69,8 @@ function doPost(e) {
       return saveUnits(payload.units);
     } else if (type === 'save_out' || type === 'out') {
       return saveOut(payload.out);
+    } else if (type === 'herd_log') {
+      return appendHerdLog(payload.entries);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -431,6 +437,87 @@ function saveOut(outList) {
   }
 
   return jsonResponse({ status: "success", count: rows.length });
+}
+
+/* ================== HERD NUMBERS LOG ================== */
+// Sheet "HerdLog": id | timestamp | herd id | herd | from | to | change | user
+//
+// Append only. Nothing in here rewrites or clears an existing row, which is why
+// it cannot live in Settings - saveFeedSettings clears that sheet on every save.
+// Rows are keyed by id so a client re-sending an entry can never duplicate it.
+
+var HERD_LOG_HEADERS = ["id", "timestamp", "herd id", "herd", "from", "to", "change", "user"];
+
+function getHerdLogSheet() {
+  var sheet = getOrCreateSheet("HerdLog");
+  if (sheet.getLastRow() === 0) sheet.appendRow(HERD_LOG_HEADERS);
+  return sheet;
+}
+
+function getHerdLog() {
+  var sheet = getHerdLogSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResponse({ status: "success", entries: [] });
+
+  var data = sheet.getRange(2, 1, lastRow - 1, HERD_LOG_HEADERS.length).getValues();
+  var entries = [];
+  data.forEach(function(row) {
+    if (!row[0]) return;
+    // A timestamp cell comes back as a Date when the sheet has formatted it and
+    // as a plain string when it has not, so duck-type rather than instanceof.
+    var ts = row[1];
+    var isDate = ts && typeof ts.getTime === 'function' && !isNaN(ts.getTime());
+    entries.push({
+      id: String(row[0]),
+      ts: isDate ? ts.toISOString() : String(ts || ""),
+      herd: String(row[2] || ""),
+      herdName: String(row[3] || ""),
+      from: Number(row[4]) || 0,
+      to: Number(row[5]) || 0,
+      delta: Number(row[6]) || 0,
+      user: String(row[7] || "")
+    });
+  });
+  return jsonResponse({ status: "success", entries: entries });
+}
+
+function appendHerdLog(entries) {
+  if (!Array.isArray(entries)) return errorResponse("Payload entries must be array");
+  if (entries.length === 0) return jsonResponse({ status: "success", added: 0 });
+
+  var sheet = getHerdLogSheet();
+  var lastRow = sheet.getLastRow();
+
+  var seen = {};
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(function(r) {
+      if (r[0]) seen[String(r[0])] = true;
+    });
+  }
+
+  var rows = [];
+  entries.forEach(function(e) {
+    if (!e || !e.id || seen[String(e.id)]) return;
+    seen[String(e.id)] = true;
+    var from = Number(e.from) || 0;
+    var to   = Number(e.to) || 0;
+    rows.push([
+      String(e.id),
+      e.ts || new Date().toISOString(),
+      String(e.herd || ""),
+      String(e.herdName || ""),
+      from,
+      to,
+      (e.delta === undefined || e.delta === null) ? (to - from) : Number(e.delta),
+      String(e.user || "Unknown User")
+    ]);
+  });
+
+  if (rows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, HERD_LOG_HEADERS.length).setValues(rows);
+  }
+
+  return jsonResponse({ status: "success", added: rows.length });
 }
 
 function saveUnits(unitsList) {
