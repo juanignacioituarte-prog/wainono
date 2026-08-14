@@ -3070,12 +3070,25 @@
                 const data = await res.json();
                 if (data && Array.isArray(data.entries)) {
                     mergeHerdCowLog(data.entries);
+                    // The stamp under each Cows box has to show the last change made
+                    // by anyone, not just the ones typed on this device.
+                    refreshHerdCowStamps();
                     setHerdLogStatus(`${HERD_COW_LOG.length} change${HERD_COW_LOG.length === 1 ? '' : 's'} logged`, '#95a5a6');
                 }
             } catch (e) {
                 console.log("Herd log cloud load failed, using local copy");
                 setHerdLogStatus('⚠ Showing this device only — could not reach the sheet.', '#e67e22');
             }
+        }
+
+        /* Pull everyone else's changes down and push up anything this device
+         * still owes. Runs at startup and periodically, so a phone shows the
+         * change the office just made without anyone opening the log. */
+        async function refreshHerdCowLogFromCloud() {
+            await loadHerdCowLog();
+            const unsynced = HERD_COW_LOG.filter(e => !e.synced);
+            if (unsynced.length > 0) await syncHerdCowLog(unsynced);
+            refreshHerdCowStamps();
         }
 
         async function showHerdLogReport() {
@@ -3092,11 +3105,8 @@
             setHerdLogStatus('Loading from the sheet...', '#7f8c8d');
             renderHerdLogReport();
 
-            await loadHerdCowLog();
-            const unsynced = HERD_COW_LOG.filter(e => !e.synced);
-            if (unsynced.length > 0) await syncHerdCowLog(unsynced);
+            await refreshHerdCowLogFromCloud();
             renderHerdLogReport();
-            refreshHerdCowStamps();
         }
 
         function closeHerdLogReport() {
@@ -4626,6 +4636,11 @@
 
             // Units render instantly from localStorage; this refreshes them from the cloud.
             loadFarmUnits();
+
+            // Same for the herd log: without this a device only ever shows the
+            // changes typed on it, so the stamp under each Cows box would miss
+            // whatever anyone else did.
+            refreshHerdCowLogFromCloud();
 
             // Auto-start GPS tracking
             setTimeout(() => {
@@ -6670,6 +6685,9 @@
                 saveBreaks();
             }
         }, 120000);
+
+        // Keep the herd log level across devices without needing a reload.
+        setInterval(() => { refreshHerdCowLogFromCloud(); }, 120000);
 
 
         /* ===================== CUSTOM PADDOCKS (EXTERNAL) ===================== */
