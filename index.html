@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.68</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.69</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.68</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.69</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2909,25 +2909,6 @@
             });
         }
 
-        function recordHerdCowChange(herdId, prev, next) {
-            if (prev === next) return;
-            const g = BREAK_GROUPS.find(h => h.id === herdId);
-            const entry = {
-                id: 'hl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-                ts: new Date().toISOString(),
-                herd: herdId,
-                herdName: g ? g.name : herdId,
-                from: prev,
-                to: next,
-                delta: next - prev,
-                user: localStorage.getItem('auth_name') || 'Unknown User'
-            };
-            HERD_COW_LOG.push(entry);
-            persistHerdCowLog();
-            refreshHerdCowStamps();
-            syncHerdCowLog([entry]);
-        }
-
         /* ========== ADD / REMOVE COWS ==========
          * Tapping the Cows box opens this rather than the keyboard: on a farm the
          * number that is known is "15 went out", not the new total, and doing that
@@ -2958,6 +2939,21 @@
 
             document.getElementById('herd-cow-modal').style.display = 'flex';
             setTimeout(() => { amt.focus(); amt.select(); }, 50);
+
+            // What is on screen may be old. Check the sheet while the person is
+            // still typing, so "Currently N" is the real number by the time they
+            // press a button. The sheet decides either way - this is only so they
+            // are not surprised by the result.
+            refreshHerdCowNumbersFromCloud().then(() => {
+                if (herdCowEditorId !== herdId) return;
+                const now = currentHerdCows(herdId);
+                if (now === cows) return;
+                document.getElementById('herd-cow-modal-current').innerHTML =
+                    `Currently <b style="color:#2c3e50; font-size:18px;">${now}</b> cows
+                     <span style="color:#e67e22;">(was showing ${cows})</span>`;
+                document.getElementById('herd-cow-total').value = now;
+                updateHerdCowPreview();
+            });
         }
 
         function closeHerdCowEditor() {
@@ -2982,30 +2978,123 @@
             if (!herdCowEditorId) return;
             const raw = parseFloat(document.getElementById('herd-cow-amount').value);
             if (!isFinite(raw) || raw === 0) { alert("Type how many cows first."); return; }
-            const prev = currentHerdCows(herdCowEditorId);
-            let next = prev + (sign * Math.abs(raw));
-            if (next < 0) {
-                if (!confirm(`${prev} cows in this herd - taking out ${Math.abs(raw)} would go below zero. Set it to 0 instead?`)) return;
-                next = 0;
-            }
-            commitHerdCowChange(herdCowEditorId, next);
+            sendHerdCowChange(herdCowEditorId, { mode: 'delta', delta: sign * Math.abs(raw) });
         }
 
         function setHerdCowTotal() {
             if (!herdCowEditorId) return;
             const raw = parseFloat(document.getElementById('herd-cow-total').value);
             if (!isFinite(raw) || raw < 0) { alert("Enter the new total."); return; }
-            commitHerdCowChange(herdCowEditorId, raw);
+            sendHerdCowChange(herdCowEditorId, { mode: 'set', to: raw });
         }
 
-        function commitHerdCowChange(herdId, next) {
-            const el = document.getElementById(`herd-cows-${herdId}`);
-            if (!el) return;
-            const prev = parseFloat(el.value) || 0;
-            el.value = next;
+        /* The sheet owns the cow numbers, not this device.
+         *
+         * Several people move cows at once, and a phone can hold an open page for
+         * days. Working out the new number here from what happens to be on screen
+         * is what made a change start from a count that was three days old and
+         * then write it back over everyone else. So we send what the person did -
+         * "take out 15", "set it to 200" - and the sheet applies it to the number
+         * that is really there and tells us where it landed.
+         */
+        let herdCowBusy = false;
+        // A send that fails keeps its id, so tapping the same button again is the
+        // same change and not a second one. The sheet recognises the id and will
+        // not apply it twice, which matters when the reply was lost but the write
+        // had already gone through.
+        let herdCowRetry = { key: null, id: null };
+
+        function setHerdCowModalBusy(busy) {
+            herdCowBusy = busy;
+            document.querySelectorAll('#herd-cow-modal button').forEach(b => { b.disabled = busy; });
+            const note = document.getElementById('herd-cow-modal-preview');
+            if (busy && note) note.innerHTML = '<span style="color:#7f8c8d;">saving…</span>';
+        }
+
+        async function sendHerdCowChange(herdId, change) {
+            if (herdCowBusy) return;                       // a double tap must not count twice
+            const g = BREAK_GROUPS.find(h => h.id === herdId);
+            const shown = currentHerdCows(herdId);
+
+            const key = `${herdId}|${change.mode}|${change.delta !== undefined ? change.delta : change.to}`;
+            if (herdCowRetry.key !== key) {
+                herdCowRetry = { key: key, id: 'hl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) };
+            }
+
+            const body = Object.assign({
+                type: 'herd_cows',
+                herd: herdId,
+                herdName: g ? g.name : herdId,
+                user: localStorage.getItem('auth_name') || 'Unknown User',
+                expectedFrom: shown,
+                id: herdCowRetry.id,
+                ts: new Date().toISOString()
+            }, change);
+
+            setHerdCowModalBusy(true);
+            let data = null;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(body) });
+                data = await res.json();
+            } catch (e) {
+                console.error("Herd cow change failed:", e);
+            }
+            setHerdCowModalBusy(false);
+
+            if (!data || data.status !== 'success' || !data.entry) {
+                const msg = (data && data.message) ? data.message : 'could not reach the sheet';
+                // It may still have gone through and only the reply was lost, so
+                // show the real number rather than letting anyone guess.
+                await refreshHerdCowNumbersFromCloud();
+                alert(/unknown payload type/i.test(msg)
+                    ? `The change was NOT saved.\n\nThe Google Sheet script is an older version and does not ` +
+                      `know how to change cow numbers yet. It needs the herd_cows update pasted in and redeployed.`
+                    : `The change was NOT saved - ${msg}.\n\n` +
+                      `${g ? g.name : herdId} is on ${currentHerdCows(herdId)} cows now. ` +
+                      `Press the same button again when you have signal - it will not count twice.`);
+                updateHerdCowPreview();
+                return;
+            }
+
+            herdCowRetry = { key: null, id: null };   // landed, so the next tap is a new change
+            applyHerdCowNumbers(data.herdCows);
+            mergeHerdCowLog([data.entry]);
+            refreshHerdCowStamps();
             closeHerdCowEditor();
-            saveAndRecalc();                          // persists the count and queues the cloud save
-            recordHerdCowChange(herdId, prev, next);  // and the audit line
+
+            if (data.repeated) {
+                alert(`That change had already been saved. ${data.entry.herdName} is on ${data.entry.to} cows.`);
+            } else if (data.staleOnClient) {
+                alert(`${data.entry.herdName} was on ${data.entry.from}, not ${shown} - someone else had changed it.\n\n` +
+                      `Your change was applied to the real number. It is now ${data.entry.to}.`);
+            }
+        }
+
+        // Take the sheet's cow numbers as the truth and put them on screen.
+        function applyHerdCowNumbers(map) {
+            if (!map || typeof map !== 'object') return false;
+            let changed = false;
+            BREAK_GROUPS.forEach(g => {
+                if (g.id === 'all' || map[g.id] === undefined) return;
+                const el = document.getElementById(`herd-cows-${g.id}`);
+                if (el && String(el.value) !== String(map[g.id])) { el.value = map[g.id]; changed = true; }
+            });
+            const stored = localStorage.getItem('herd_cow_numbers');
+            const next = JSON.stringify(map);
+            if (stored !== next) { localStorage.setItem('herd_cow_numbers', next); changed = true; }
+            if (changed) saveAndRecalc();
+            return changed;
+        }
+
+        async function refreshHerdCowNumbersFromCloud() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now(), { cache: 'no-store' });
+                const d = await res.json();
+                if (d && d.herdCows) applyHerdCowNumbers(d.herdCows);
+            } catch (e) {
+                console.log("Cow numbers refresh failed, keeping what is on screen");
+            }
         }
 
         function setHerdLogStatus(text, color) {
@@ -6686,8 +6775,13 @@
             }
         }, 120000);
 
-        // Keep the herd log level across devices without needing a reload.
-        setInterval(() => { refreshHerdCowLogFromCloud(); }, 120000);
+        // Keep the herd log and the cow numbers level across devices without
+        // needing a reload. A page left open all day was the root of counts
+        // being written back from days-old data.
+        setInterval(() => {
+            refreshHerdCowLogFromCloud();
+            refreshHerdCowNumbersFromCloud();
+        }, 120000);
 
 
         /* ===================== CUSTOM PADDOCKS (EXTERNAL) ===================== */

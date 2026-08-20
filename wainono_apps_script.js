@@ -15,6 +15,10 @@
  *      saveFeedSettings mirrors the herds into a readable "Herds" sheet.
  *   6. Herd numbers log: doGet 'herd_log' branch, doPost 'herd_log' branch and
  *      getHerdLog / appendHerdLog, backed by a new append-only "HerdLog" sheet.
+ *   7. Cow numbers are now owned by the sheet. doPost 'herd_cows' applies one
+ *      add / remove / set at a time under the script lock and writes the log row
+ *      itself, and saveFeedSettings no longer takes herdCows from the payload,
+ *      so a phone holding an old page cannot overwrite everyone else's counts.
  * Everything else is byte-identical to what you had.
  */
 
@@ -71,6 +75,8 @@ function doPost(e) {
       return saveOut(payload.out);
     } else if (type === 'herd_log') {
       return appendHerdLog(payload.entries);
+    } else if (type === 'herd_cows') {
+      return applyHerdCows(payload);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -253,8 +259,38 @@ function getFeedSettings() {
   return jsonResponse(settings);
 }
 
+// Read one Settings key without disturbing the rest of the sheet.
+function readSettingValue(sheet, key) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 1) return null;
+  var data = sheet.getRange(1, 1, lastRow, 2).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === key) return data[i][1];
+  }
+  return null;
+}
+
+function writeSettingValue(sheet, key, val) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 1) {
+    var data = sheet.getRange(1, 1, lastRow, 1).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] === key) { sheet.getRange(i + 1, 2).setValue(val); return; }
+    }
+  }
+  sheet.appendRow([key, val]);
+}
+
 function saveFeedSettings(payload) {
   var sheet = getOrCreateSheet("Settings");
+
+  // Cow numbers are NOT taken from this payload. They belong to the herd_cows
+  // endpoint, which applies one change at a time under the script lock. A phone
+  // can sit on an open page for days, and this save rewrites the whole sheet -
+  // so honouring herdCows here let a stale device push old counts back over
+  // everyone else's work. Whatever the sheet already holds wins.
+  var existingHerdCows = readSettingValue(sheet, 'herdCows');
+
   sheet.clearContents();
   var keysToIgnore = ['type', 'breaks'];
 
@@ -264,14 +300,93 @@ function saveFeedSettings(payload) {
   Object.keys(payload).forEach(function(key) {
     if (keysToIgnore.indexOf(key) !== -1) return;
     var val = payload[key];
+    // Only seed herdCows from a client when the sheet has never had it.
+    if (key === 'herdCows' && existingHerdCows) val = existingHerdCows;
     if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
     rows.push([key, val]);
   });
   if (rows.length > 0) sheet.getRange(1, 1, rows.length, 2).setValues(rows);
 
-  writeHerdSheet(payload.customHerds, payload.herdCows);
+  var herdCowsForReport = existingHerdCows || payload.herdCows;
+  if (typeof herdCowsForReport === 'string') {
+    try { herdCowsForReport = JSON.parse(herdCowsForReport); } catch (e) { herdCowsForReport = {}; }
+  }
+  writeHerdSheet(payload.customHerds, herdCowsForReport);
 
   return jsonResponse({ status: "success" });
+}
+
+/**
+ * The only thing that may change a herd's cow number.
+ *
+ * doPost holds the script lock, so read-modify-write here is atomic: two people
+ * moving cows at the same moment both land, and "from" is always the number that
+ * was really there, not what some phone last saw. The log row is written here
+ * for the same reason - a client cannot know the true previous value.
+ *
+ * mode 'delta' adds or removes; mode 'set' forces a total.
+ */
+function applyHerdCows(payload) {
+  if (!payload || !payload.herd) return errorResponse("Missing herd");
+
+  var sheet = getOrCreateSheet("Settings");
+
+  // Signal at a gate is poor. If the reply was lost on the way back the person
+  // is told it failed and taps again, so the same change must never be applied
+  // twice. The log row is the record of it having happened.
+  if (payload.id) {
+    var already = findHerdLogEntry(payload.id);
+    if (already) {
+      var currentRaw = readSettingValue(sheet, 'herdCows');
+      var currentCows = {};
+      if (currentRaw) { try { currentCows = JSON.parse(currentRaw) || {}; } catch (e) { currentCows = {}; } }
+      return jsonResponse({ status: "success", entry: already, herdCows: currentCows,
+                            staleOnClient: false, repeated: true });
+    }
+  }
+
+  var raw = readSettingValue(sheet, 'herdCows');
+  var cows = {};
+  if (raw) { try { cows = JSON.parse(raw) || {}; } catch (e) { cows = {}; } }
+  if (typeof cows !== 'object' || cows === null || Array.isArray(cows)) cows = {};
+
+  var from = Number(cows[payload.herd]) || 0;
+  var to;
+
+  if (payload.mode === 'set') {
+    to = Number(payload.to);
+    if (!isFinite(to)) return errorResponse("Bad total");
+  } else {
+    var delta = Number(payload.delta);
+    if (!isFinite(delta) || delta === 0) return errorResponse("Bad delta");
+    to = from + delta;
+  }
+  if (to < 0) to = 0;
+  to = Math.round(to);
+
+  cows[payload.herd] = to;
+  writeSettingValue(sheet, 'herdCows', JSON.stringify(cows));
+
+  var entry = {
+    id: payload.id || ('hl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+    ts: payload.ts || new Date().toISOString(),
+    herd: String(payload.herd),
+    herdName: String(payload.herdName || payload.herd),
+    from: from,
+    to: to,
+    delta: to - from,
+    user: String(payload.user || 'Unknown User')
+  };
+  if (entry.delta !== 0) appendHerdLogRows([entry]);
+
+  return jsonResponse({
+    status: "success",
+    entry: entry,
+    herdCows: cows,
+    // So the client can say "someone else changed it" instead of silently
+    // showing a jump the person did not make.
+    staleOnClient: (payload.expectedFrom !== undefined && Number(payload.expectedFrom) !== from)
+  });
 }
 
 /* ================== HERDS: GRASS ALLOCATION & MINERALS ================== */
@@ -481,10 +596,28 @@ function getHerdLog() {
   return jsonResponse({ status: "success", entries: entries });
 }
 
-function appendHerdLog(entries) {
-  if (!Array.isArray(entries)) return errorResponse("Payload entries must be array");
-  if (entries.length === 0) return jsonResponse({ status: "success", added: 0 });
+function findHerdLogEntry(id) {
+  var sheet = getHerdLogSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  var data = sheet.getRange(2, 1, lastRow - 1, HERD_LOG_HEADERS.length).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      var ts = data[i][1];
+      var isDate = ts && typeof ts.getTime === 'function' && !isNaN(ts.getTime());
+      return {
+        id: String(data[i][0]),
+        ts: isDate ? ts.toISOString() : String(ts || ""),
+        herd: String(data[i][2] || ""), herdName: String(data[i][3] || ""),
+        from: Number(data[i][4]) || 0, to: Number(data[i][5]) || 0,
+        delta: Number(data[i][6]) || 0, user: String(data[i][7] || "")
+      };
+    }
+  }
+  return null;
+}
 
+function appendHerdLogRows(entries) {
   var sheet = getHerdLogSheet();
   var lastRow = sheet.getLastRow();
 
@@ -516,8 +649,13 @@ function appendHerdLog(entries) {
   if (rows.length > 0) {
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, HERD_LOG_HEADERS.length).setValues(rows);
   }
+  return rows.length;
+}
 
-  return jsonResponse({ status: "success", added: rows.length });
+function appendHerdLog(entries) {
+  if (!Array.isArray(entries)) return errorResponse("Payload entries must be array");
+  if (entries.length === 0) return jsonResponse({ status: "success", added: 0 });
+  return jsonResponse({ status: "success", added: appendHerdLogRows(entries) });
 }
 
 function saveUnits(unitsList) {
