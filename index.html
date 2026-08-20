@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.70</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.71</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.70</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.71</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2851,9 +2851,18 @@
             updateGeoStyles();
         }
 
-        // Only a deliberate herd change - add, rename, delete, tick a box - is
-        // allowed to shorten the herd list on the sheet. Everything else that
-        // saves settings leaves the list alone. See saveFeedSettings.
+        // Set once the sheet has been read. Nothing is saved before that.
+        let cloudSettingsLoaded = false;
+
+        /* A herd is only ever removed by name.
+         *
+         * The first attempt let a "deliberate" edit shorten the list, but a
+         * person who ticks a box on a page that never saw a herd is still
+         * deliberate - and that herd vanished. A herd missing from the list now
+         * means nothing at all. Deleting one puts its id in here, and that is
+         * the only thing the sheet acts on.
+         */
+        let pendingHerdDeletes = [];
         let herdListEdited = false;
 
         function saveHerdSettings() {
@@ -3331,8 +3340,10 @@
         }
 
         function deleteCustomHerd(id) {
-            if(confirm("Are you sure you want to remove this herd?")) {
+            const g = BREAK_GROUPS.find(h => h.id === id);
+            if (confirm(`Remove ${g ? g.name : 'this herd'}?\n\nIt will be removed for everyone.`)) {
                 BREAK_GROUPS = BREAK_GROUPS.filter(g => g.id !== id);
+                if (pendingHerdDeletes.indexOf(id) === -1) pendingHerdDeletes.push(id);
                 saveHerdSettings();
             }
         }
@@ -4453,6 +4464,10 @@
                 localStorage.setItem('custom_paddocks', JSON.stringify(customPaddocks));
                 renderCustomPaddocksOnMap();
             }
+            // The sheet has been read, so this device is now safe to save from.
+            // Until this point everything on screen came from localStorage and
+            // could be days old - see saveToCloud.
+            cloudSettingsLoaded = true;
             // Always reload the UI after settings are injected
             loadLocalFeedSettings();
         }
@@ -6456,6 +6471,25 @@
                 if (!isAuto) alert("Please set the GOOGLE_SCRIPT_URL variable in the code to enable cloud saving.");
                 return;
             }
+
+            /* Nothing may be saved until the sheet has been read once.
+             *
+             * The app draws itself from localStorage straight away, so for the
+             * first second or two everything on screen is this device's old copy.
+             * People open the app and start working immediately. Saving in that
+             * window sends the old copy - herds, crop yields, manual breaks, the
+             * lot - back over what everyone else has done since.
+             */
+            if (!cloudSettingsLoaded) {
+                console.warn("Settings not loaded from the sheet yet - refusing to save.");
+                const m = document.getElementById('save-msg');
+                if (!isAuto && m) {
+                    m.innerText = "Still loading - wait a moment";
+                    m.style.display = 'inline-block';
+                    setTimeout(() => m.style.display = 'none', 3000);
+                }
+                return;
+            }
             const btn = document.querySelector('.btn-save');
             const msg = document.getElementById('save-msg');
 
@@ -6486,7 +6520,8 @@
                 cropYields: cropYields,
                 cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
-                herdEdit: herdListEdited,   // sheet only shortens the list when this is true
+                herdEdit: herdListEdited,
+                deleteHerds: pendingHerdDeletes.slice(),   // the ONLY way a herd is removed
                 silage: silageSettings,
                 manualBreaks: manualBreakOverrides,
                 customPaddocks: customPaddocks.map(cp => ({
@@ -6502,7 +6537,8 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data && (data.status === 'success' || data.success === true)) {
-                        herdListEdited = false;   // that edit is on the sheet now
+                        herdListEdited = false;      // that edit is on the sheet now
+                        pendingHerdDeletes = [];
                         if (!isAuto && btn) {
                             btn.disabled = false;
                             btn.innerText = "SAVE TO CLOUD";

@@ -292,21 +292,35 @@ function saveFeedSettings(payload) {
   var existingHerdCows = readSettingValue(sheet, 'herdCows');
 
   // Same danger for the herd list itself. This payload carries whatever herds
-  // that device happens to know about, so a page opened before a herd was added
-  // would delete it again on its next save. Only a deliberate herd edit
-  // (herdEdit) may shorten the list; any other save keeps the herds the sheet
-  // already has and merges in anything new.
+  // that device happens to know about, so a herd it has never heard of must
+  // survive the save. Removal happens only through deleteHerds.
   var existingHerdsRaw = readSettingValue(sheet, 'customHerds');
-  var existingHerds = null;
+  var existingHerds = [];
   if (existingHerdsRaw) {
-    try { existingHerds = JSON.parse(existingHerdsRaw); } catch (e) { existingHerds = null; }
+    try { existingHerds = JSON.parse(existingHerdsRaw) || []; } catch (e) { existingHerds = []; }
   }
-  if (Array.isArray(existingHerds) && existingHerds.length > 0 && Array.isArray(payload.customHerds)) {
-    payload.customHerds = mergeHerdLists(existingHerds, payload.customHerds, payload.herdEdit === true);
+  if (!Array.isArray(existingHerds)) existingHerds = [];
+
+  // A delete has to be remembered for a while. Otherwise the next device that
+  // still has the herd in its list simply puts it back.
+  var tombstones = readHerdTombstones(sheet);
+  if (Array.isArray(payload.deleteHerds)) {
+    payload.deleteHerds.forEach(function(id) {
+      if (!id) return;
+      var known = false;
+      tombstones.forEach(function(t) { if (String(t.id) === String(id)) known = true; });
+      if (!known) tombstones.push({ id: String(id), ts: new Date().toISOString() });
+    });
   }
 
+  if (Array.isArray(payload.customHerds)) {
+    payload.customHerds = mergeHerdLists(existingHerds, payload.customHerds,
+                                         tombstones.map(function(t) { return t.id; }));
+  }
+  payload.deletedHerds = tombstones;
+
   sheet.clearContents();
-  var keysToIgnore = ['type', 'breaks', 'herdEdit'];
+  var keysToIgnore = ['type', 'breaks', 'herdEdit', 'deleteHerds'];
 
   if (payload.customHerds) payload.customHerds = normalizeHerds(payload.customHerds);
 
@@ -333,21 +347,56 @@ function saveFeedSettings(payload) {
 /**
  * Decide what the herd list should be after a save.
  *
- * incoming wins for herds it knows about, so edits still work. Herds the sheet
- * has and incoming does not are only dropped when allowDeletes is true, i.e.
- * the person actually pressed delete. An ordinary settings save from a device
- * with an old list therefore cannot remove anybody.
+ * A herd being absent from the incoming list means NOTHING. The device may
+ * simply never have heard of it - a page opened before it was created, or one
+ * that started work before it had finished reading the sheet. Absence used to
+ * mean "delete", and that quietly removed herds again and again.
+ *
+ * incoming wins for herds it knows about, so renames and tick boxes still work.
+ * A herd only goes when its id is named in deleteIds, which the app fills in
+ * only when someone presses delete on that herd.
  */
-function mergeHerdLists(existing, incoming, allowDeletes) {
-  if (allowDeletes) return incoming;
+// How long a deleted herd stays deleted even if a device still lists it. Long
+// enough for every phone to have refreshed, short enough that the same id can
+// be used again later.
+var HERD_TOMBSTONE_DAYS = 7;
+
+function readHerdTombstones(sheet) {
+  var raw = readSettingValue(sheet, 'deletedHerds');
+  var list = [];
+  if (raw) { try { list = JSON.parse(raw) || []; } catch (e) { list = []; } }
+  if (!Array.isArray(list)) list = [];
+
+  var cutoff = new Date().getTime() - (HERD_TOMBSTONE_DAYS * 24 * 60 * 60 * 1000);
+  var live = [];
+  list.forEach(function(t) {
+    if (!t || !t.id) return;
+    var when = new Date(t.ts).getTime();
+    if (!isFinite(when) || when > cutoff) live.push(t);   // undated entries are kept
+  });
+  return live;
+}
+
+function mergeHerdLists(existing, incoming, deleteIds) {
+  var doomed = {};
+  if (Array.isArray(deleteIds)) {
+    deleteIds.forEach(function(id) { if (id) doomed[String(id)] = true; });
+  }
 
   var seen = {};
-  incoming.forEach(function(h) { if (h && h.id) seen[String(h.id)] = true; });
-
-  var out = incoming.slice();
-  existing.forEach(function(h) {
-    if (h && h.id && !seen[String(h.id)]) out.push(h);
+  var out = [];
+  incoming.forEach(function(h) {
+    if (!h || !h.id || doomed[String(h.id)]) return;
+    seen[String(h.id)] = true;
+    out.push(h);
   });
+
+  existing.forEach(function(h) {
+    if (!h || !h.id) return;
+    if (seen[String(h.id)] || doomed[String(h.id)]) return;
+    out.push(h);            // the sender did not know about this one - keep it
+  });
+
   return out;
 }
 
