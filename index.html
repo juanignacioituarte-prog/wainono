@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.69</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.70</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.69</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.70</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2851,7 +2851,13 @@
             updateGeoStyles();
         }
 
+        // Only a deliberate herd change - add, rename, delete, tick a box - is
+        // allowed to shorten the herd list on the sheet. Everything else that
+        // saves settings leaves the list alone. See saveFeedSettings.
+        let herdListEdited = false;
+
         function saveHerdSettings() {
+            herdListEdited = true;
             localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
             saveAndRecalc();
             loadLocalFeedSettings();
@@ -3082,8 +3088,30 @@
             const stored = localStorage.getItem('herd_cow_numbers');
             const next = JSON.stringify(map);
             if (stored !== next) { localStorage.setItem('herd_cow_numbers', next); changed = true; }
-            if (changed) saveAndRecalc();
+            if (changed) saveAndRecalc(true);   // quiet: must never push settings back
             return changed;
+        }
+
+        // True while someone is actually working in the herd cards, so a
+        // background refresh never pulls the ground out from under them.
+        function herdCardsInUse() {
+            if (document.getElementById('herd-cow-modal').style.display === 'flex') return true;
+            if (document.getElementById('herd-log-modal').style.display === 'flex') return true;
+            const a = document.activeElement;
+            return !!(a && a.closest && a.closest('#herd-inputs'));
+        }
+
+        // Take the sheet's herd list as the truth. Without this a page left open
+        // keeps an old list, and the next thing that person does writes it back,
+        // deleting herds other people added.
+        function applyCloudHerdList(list) {
+            if (!Array.isArray(list) || list.length === 0) return false;
+            if (JSON.stringify(list) === JSON.stringify(BREAK_GROUPS)) return false;
+            if (herdCardsInUse()) return false;
+            BREAK_GROUPS = list;
+            try { localStorage.setItem('custom_herds', JSON.stringify(list)); } catch (e) {}
+            loadLocalFeedSettings();     // redraws the cards; does not push anything
+            return true;
         }
 
         async function refreshHerdCowNumbersFromCloud() {
@@ -3091,6 +3119,7 @@
             try {
                 const res = await fetch(GOOGLE_SCRIPT_URL + "?t=" + Date.now(), { cache: 'no-store' });
                 const d = await res.json();
+                if (d && d.customHerds) applyCloudHerdList(d.customHerds);
                 if (d && d.herdCows) applyHerdCowNumbers(d.herdCows);
             } catch (e) {
                 console.log("Cow numbers refresh failed, keeping what is on screen");
@@ -5968,7 +5997,11 @@
             }
         }
 
-        function saveAndRecalc() {
+        // quiet = recalculate and store locally, but do NOT push settings to the
+        // sheet. Background refreshes must never write: the payload carries this
+        // device's whole herd list, so an unattended page was able to push a
+        // stale list up and delete herds someone had just added.
+        function saveAndRecalc(quiet) {
             localStorage.setItem('feed_residual', document.getElementById('inp-residual').value);
             localStorage.setItem('feed_cows', document.getElementById('inp-cows').value);
             localStorage.setItem('feed_intake', document.getElementById('inp-intake').value);
@@ -6022,7 +6055,7 @@
                 localStorage.setItem('herd_in_crops', JSON.stringify(cropHerds));
             }
             calculateFeedLogic();
-            triggerAutoSave();
+            if (!quiet) triggerAutoSave();
         }
 
         function calculateFeedLogic() {
@@ -6453,6 +6486,7 @@
                 cropYields: cropYields,
                 cropHerds: JSON.parse(localStorage.getItem('herd_in_crops') || '[]'),
                 customHerds: BREAK_GROUPS,
+                herdEdit: herdListEdited,   // sheet only shortens the list when this is true
                 silage: silageSettings,
                 manualBreaks: manualBreakOverrides,
                 customPaddocks: customPaddocks.map(cp => ({
@@ -6468,6 +6502,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data && (data.status === 'success' || data.success === true)) {
+                        herdListEdited = false;   // that edit is on the sheet now
                         if (!isAuto && btn) {
                             btn.disabled = false;
                             btn.innerText = "SAVE TO CLOUD";

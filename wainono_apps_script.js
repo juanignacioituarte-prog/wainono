@@ -291,8 +291,22 @@ function saveFeedSettings(payload) {
   // everyone else's work. Whatever the sheet already holds wins.
   var existingHerdCows = readSettingValue(sheet, 'herdCows');
 
+  // Same danger for the herd list itself. This payload carries whatever herds
+  // that device happens to know about, so a page opened before a herd was added
+  // would delete it again on its next save. Only a deliberate herd edit
+  // (herdEdit) may shorten the list; any other save keeps the herds the sheet
+  // already has and merges in anything new.
+  var existingHerdsRaw = readSettingValue(sheet, 'customHerds');
+  var existingHerds = null;
+  if (existingHerdsRaw) {
+    try { existingHerds = JSON.parse(existingHerdsRaw); } catch (e) { existingHerds = null; }
+  }
+  if (Array.isArray(existingHerds) && existingHerds.length > 0 && Array.isArray(payload.customHerds)) {
+    payload.customHerds = mergeHerdLists(existingHerds, payload.customHerds, payload.herdEdit === true);
+  }
+
   sheet.clearContents();
-  var keysToIgnore = ['type', 'breaks'];
+  var keysToIgnore = ['type', 'breaks', 'herdEdit'];
 
   if (payload.customHerds) payload.customHerds = normalizeHerds(payload.customHerds);
 
@@ -314,6 +328,27 @@ function saveFeedSettings(payload) {
   writeHerdSheet(payload.customHerds, herdCowsForReport);
 
   return jsonResponse({ status: "success" });
+}
+
+/**
+ * Decide what the herd list should be after a save.
+ *
+ * incoming wins for herds it knows about, so edits still work. Herds the sheet
+ * has and incoming does not are only dropped when allowDeletes is true, i.e.
+ * the person actually pressed delete. An ordinary settings save from a device
+ * with an old list therefore cannot remove anybody.
+ */
+function mergeHerdLists(existing, incoming, allowDeletes) {
+  if (allowDeletes) return incoming;
+
+  var seen = {};
+  incoming.forEach(function(h) { if (h && h.id) seen[String(h.id)] = true; });
+
+  var out = incoming.slice();
+  existing.forEach(function(h) {
+    if (h && h.id && !seen[String(h.id)]) out.push(h);
+  });
+  return out;
 }
 
 /**
