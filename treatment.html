@@ -319,11 +319,6 @@
             <div id="treated-body"></div>
         </section>
 
-        <!-- ============ CLEARING COWS ============ -->
-        <section class="view" id="view-clearing">
-            <div id="clearing-body"></div>
-        </section>
-
         <!-- ============ MEAT WITHHOLD ============ -->
         <section class="view" id="view-meat">
             <div id="meat-body"></div>
@@ -703,6 +698,9 @@
             flushing = false;
             state.syncing = false;
             renderAll();
+            // More may have arrived while this batch was in the air. Each pass
+            // removes what it sent, so this always moves forward.
+            if (ok && state.queue.length) return flushQueue();
             return ok;
         }
 
@@ -758,7 +756,9 @@
             /* dosing   - still getting doses          (red card, Treated tab)
                withhold - doses done, milk not clear   (red card, Treated tab)
                ready    - milk clear, waiting on Clear (green card, Treated tab)
-               done     - someone hit Clear            (Clearing tab until meat is clear) */
+               done     - someone hit Clear            (off the red list; stays in
+                                                        Meat Withhold until the meat
+                                                        is clear, then History only) */
             let stage;
             if (cleared) stage = 'done';
             else if (!dosingDone) stage = 'dosing';
@@ -786,7 +786,6 @@
         const TABS = [
             { id: 'new', label: 'New Treatment' },
             { id: 'treated', label: 'Treated Cows' },
-            { id: 'clearing', label: 'Clearing Cows' },
             { id: 'meat', label: 'Meat Withhold' },
             { id: 'history', label: 'History' },
             { id: 'config', label: '⚙ Config', manager: true }
@@ -811,7 +810,6 @@
             const dueToday = treated.filter(x => x.i.dueNow).length;
             return {
                 treated: { n: treated.length, hot: dueToday > 0 },
-                clearing: { n: all.filter(x => x.i.stage === 'done' && !x.i.meatOk).length },
                 meat: { n: all.filter(x => !x.i.meatOk).length, hot: false }
             };
         }
@@ -867,7 +865,6 @@
             if (rb) rb.textContent = state.syncing ? '⟳ …' : '⟳ Refresh';
             if (currentTab === 'new') renderSearch();
             if (currentTab === 'treated') renderTreated();
-            if (currentTab === 'clearing') renderClearing();
             if (currentTab === 'meat') renderMeat();
             if (currentTab === 'history') renderHistory();
             if (currentTab === 'config') renderConfig();
@@ -1013,17 +1010,53 @@
             return !(s === 'false' || s === 'no' || s === '0' || s === 'n');
         }
 
+        /* ---------- the condition ↔ drug link ----------
+           One condition can use several drugs, and one drug can be used for
+           several conditions. The link is stored once, in the drug's Conditions
+           column, as a comma separated list of condition names. It can be edited
+           from either side. Names are matched whole, so "Lame" is not "Lameness". */
+
+        function condList(d) {
+            return String(d.Conditions || '').split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        function drugHasCondition(d, name) {
+            const n = String(name || '').trim().toLowerCase();
+            return condList(d).some(c => c.toLowerCase() === n);
+        }
+
+        function drugsForCondition(name) {
+            return state.drugs.filter(d => drugHasCondition(d, name));
+        }
+
+        /** Add or remove one condition name on one drug. */
+        function setDrugCondition(d, name, on) {
+            const list = condList(d).filter(c => c.toLowerCase() !== String(name).trim().toLowerCase());
+            if (on) list.push(String(name).trim());
+            d.Conditions = list.join(', ');
+        }
+
+        /** Keep the drug links pointing at the right name when a condition is renamed. */
+        function renameConditionOnDrugs(oldName, newName) {
+            if (!oldName || oldName === newName) return;
+            state.drugs.forEach(d => {
+                if (!drugHasCondition(d, oldName)) return;
+                setDrugCondition(d, oldName, false);
+                setDrugCondition(d, newName, true);
+            });
+        }
+
         function pickCondition(id) {
             draft.condition = state.conditions.find(c => String(c.ID) === String(id)) || null;
             draft.drug = null;
             [...$('condition-list').children].forEach(b =>
                 b.classList.toggle('on', b.getAttribute('onclick').indexOf("'" + id + "'") !== -1));
 
-            const name = draft.condition ? String(draft.condition.Name).toLowerCase() : '';
+            const name = draft.condition ? draft.condition.Name : '';
             const all = state.drugs.filter(d => isActive(d.Active));
-            // A drug listed against this condition comes first. Everything else stays
+            // The drugs chosen for this condition come first. The rest stay
             // available, because the vet often changes the plan on the day.
-            const matched = all.filter(d => String(d.Conditions || '').toLowerCase().indexOf(name) !== -1);
+            const matched = all.filter(d => drugHasCondition(d, name));
             const others = all.filter(d => matched.indexOf(d) === -1);
             const ordered = matched.concat(others);
 
@@ -1250,48 +1283,6 @@
             toast('Treatment stopped');
         }
 
-        /* ---------- tab 3: clearing cows ---------- */
-
-        /**
-         * Cows that have been cleared for milk but are still inside the meat
-         * withhold. They drop off this list on their own once the meat is clear.
-         */
-        function renderClearing() {
-            const blocked = blockedPanel();
-            if (blocked) { $('clearing-body').innerHTML = blocked; return; }
-
-            const rows = state.treatments.map(t => ({ t, i: info(t) }))
-                .filter(x => x.i.stage === 'done' && !x.i.meatOk)
-                .sort((a, b) => a.i.meatClear - b.i.meatClear);
-
-            const head = listHeader(`
-                Milk is back in the vat. These cows are still inside the <b>meat withhold</b>.
-                They leave this list by themselves when the meat is clear.`);
-
-            $('clearing-body').innerHTML = head + (rows.length
-                ? rows.map(x => clearingCard(x.t, x.i)).join('')
-                : '<div class="empty">No cows are clearing right now.</div>');
-        }
-
-        function clearingCard(t, i) {
-            const q = quartersText(t);
-            return `<div class="tcard green">
-                <div class="top">
-                    <div class="num">${esc(byTag(t))}<small>MILK CLEARED</small></div>
-                    <div class="info">
-                        <b>${esc(t.Condition)}</b>${q ? `<span class="tag2">${esc(q)}</span>` : ''}<br>
-                        ${esc(t.Drug)} · ${i.given}/${i.total} doses${i.ended ? ' (stopped early)' : ''}<br>
-                        Cleared ${fmtDay(t.ClearedAt)} by ${esc(t.ClearedBy || '—')}<br>
-                        <b>Meat clear ${fmtDayTime(i.meatClear)}</b> (${relDay(i.meatClear)})
-                    </div>
-                </div>
-                <div class="acts">
-                    <button class="btn small ghost" onclick="openTreatment('${esc(t.ID)}')">Details</button>
-                    <button class="btn small ghost" onclick="unclearCow('${esc(t.ID)}')">Undo clear</button>
-                </div>
-            </div>`;
-        }
-
         /** Ask first. Clearing a cow puts her milk back in the vat. */
         function clearCow(id) {
             const t = state.treatments.find(x => String(x.ID) === String(id));
@@ -1312,8 +1303,8 @@
                     Her milk goes <b>back in the vat</b> from the next milking.
                     ${i.meatOk
                         ? 'She is out of the meat withhold too, so this finishes the treatment.'
-                        : `She stays in <b>Clearing Cows</b> until the meat is clear on
-                           <b>${fmtDayTime(i.meatClear)}</b>.`}
+                        : `She comes off the red list, but stays in <b>Meat Withhold</b>
+                           until the meat is clear on <b>${fmtDayTime(i.meatClear)}</b>.`}
                 </div>
                 <div class="row" style="margin-top:14px;">
                     <button class="btn grey" onclick="closeModal()">Cancel</button>
@@ -1337,7 +1328,8 @@
         function unclearCow(id) {
             const t = state.treatments.find(x => String(x.ID) === String(id));
             if (!t) return;
-            if (!confirm(`Undo the clear for cow ${byTag(t)}?\n\nShe goes back to the Treated Cows list.`)) return;
+            if (!confirm(`Undo the clear for cow ${byTag(t)}?\n\nShe goes back to the Treated Cows list and her milk is withheld again.`)) return;
+            closeModal();
             send({ type: 'unclear_cow', treatmentId: id });
             toast('Clear undone');
         }
@@ -1364,10 +1356,16 @@
                         <div class="info">
                             <b>Meat clear ${fmtDayTime(x.i.meatClear)}</b> (${relDay(x.i.meatClear)})<br>
                             ${esc(x.t.Condition)} · ${esc(x.t.Drug)}<br>
-                            Last dose ${fmtDayTime(x.i.lastDoseAt)} · withhold ${whText(x.t.MeatWithhold, x.t.MeatWithholdUnit)}
+                            Last dose ${fmtDayTime(x.i.lastDoseAt)} · withhold ${whText(x.t.MeatWithhold, x.t.MeatWithholdUnit)}<br>
+                            ${x.t.ClearedAt
+                        ? 'Milk cleared ' + fmtDay(x.t.ClearedAt) + ' by ' + esc(x.t.ClearedBy || '—')
+                        : '<b>Milk is still withheld.</b>'}
                         </div>
                     </div>
-                    <div class="acts"><button class="btn small ghost" onclick="openTreatment('${esc(x.t.ID)}')">Details</button></div>
+                    <div class="acts">
+                        <button class="btn small ghost" onclick="openTreatment('${esc(x.t.ID)}')">Details</button>
+                        ${x.t.ClearedAt ? `<button class="btn small ghost" onclick="unclearCow('${esc(x.t.ID)}')">Undo clear</button>` : ''}
+                    </div>
                   </div>`).join('')
                 : '<div class="empty">No cow is inside a meat withhold.</div>');
         }
@@ -1451,6 +1449,7 @@
                 ${doseLines}
                 <div class="row" style="margin-top:16px;">
                     <button class="btn grey" onclick="closeModal()">Close</button>
+                    ${t.ClearedAt ? `<button class="btn blue" onclick="unclearCow('${esc(t.ID)}')">Undo clear</button>` : ''}
                     ${isManager() ? `<button class="btn red" onclick="deleteTreatment('${esc(t.ID)}')">Delete</button>` : ''}
                 </div>
             `);
@@ -1471,14 +1470,19 @@
             if (!isManager()) { showTab('new'); return; }
 
             $('cfg-conditions').innerHTML = state.conditions.length
-                ? state.conditions.map((c, idx) => `<div class="cfg-item">
-                    <div class="grow">
-                        <div class="name">${esc(c.Name)}</div>
-                        <div class="det">${isActive(c.Active) ? 'in use' : 'hidden from the list'}</div>
-                    </div>
-                    <button class="iconbtn" onclick="editCondition(${idx})">✏️</button>
-                    <button class="iconbtn" onclick="removeCondition(${idx})">🗑</button>
-                  </div>`).join('')
+                ? state.conditions.map((c, idx) => {
+                    const used = drugsForCondition(c.Name);
+                    return `<div class="cfg-item">
+                        <div class="grow">
+                            <div class="name">${esc(c.Name)}${isActive(c.Active) ? '' : ' <span class="pill">hidden</span>'}</div>
+                            <div class="det">${used.length
+                            ? 'Drugs: ' + esc(used.map(d => d.Name).join(', '))
+                            : '<span style="color:var(--orange);">No drug chosen yet</span>'}</div>
+                        </div>
+                        <button class="iconbtn" onclick="editCondition(${idx})">✏️</button>
+                        <button class="iconbtn" onclick="removeCondition(${idx})">🗑</button>
+                      </div>`;
+                }).join('')
                 : '<p class="muted">No conditions yet.</p>';
 
             $('cfg-drugs').innerHTML = state.drugs.length
@@ -1486,7 +1490,9 @@
                     <div class="grow">
                         <div class="name">${esc(d.Name)}${isActive(d.Active) ? '' : ' <span class="pill">hidden</span>'}</div>
                         <div class="det">${esc(drugPlanText(d))}</div>
-                        <div class="det">${d.Conditions ? 'For: ' + esc(d.Conditions) : 'Not linked to a condition'}</div>
+                        <div class="det">${condList(d).length
+                        ? 'For: ' + esc(condList(d).join(', '))
+                        : '<span style="color:var(--orange);">Not linked to a condition</span>'}</div>
                     </div>
                     <button class="iconbtn" onclick="editDrug(${idx})">✏️</button>
                     <button class="iconbtn" onclick="removeDrug(${idx})">🗑</button>
@@ -1503,10 +1509,30 @@
 
         function editCondition(idx) {
             const c = idx === null ? { ID: '', Name: '', Active: 'yes' } : state.conditions[idx];
+
+            const drugBoxes = state.drugs.length
+                ? state.drugs.map((d, i) => `
+                    <label class="cfg-item" style="cursor:pointer; align-items:flex-start;">
+                        <input type="checkbox" class="m-cdrug" value="${i}"
+                            ${c.Name && drugHasCondition(d, c.Name) ? 'checked' : ''}
+                            style="width:20px; height:20px; margin-top:2px;">
+                        <div class="grow">
+                            <div class="name">${esc(d.Name)}${isActive(d.Active) ? '' : ' <span class="pill">hidden</span>'}</div>
+                            <div class="det">${esc(drugPlanText(d))}</div>
+                        </div>
+                    </label>`).join('')
+                : '<p class="muted">No drugs yet. Add them under Drugs first, then come back.</p>';
+
             openModal(`
                 <h3>${idx === null ? 'New condition' : 'Edit condition'}</h3>
                 <label class="lbl">Name</label>
                 <input type="text" id="m-cname" value="${esc(c.Name)}" placeholder="e.g. Mastitis">
+
+                <label class="lbl">Drugs used for this condition</label>
+                <p class="muted" style="margin:0 0 6px;">Tick as many as you use. They are
+                    shown first when someone picks this condition.</p>
+                <div>${drugBoxes}</div>
+
                 <label class="lbl" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
                     <input type="checkbox" id="m-cactive" ${isActive(c.Active) ? 'checked' : ''} style="width:20px; height:20px;">
                     Show in the list
@@ -1522,23 +1548,39 @@
             const name = ($('m-cname').value || '').trim();
             if (!name) { toast('Give it a name'); return; }
             const active = $('m-cactive').checked ? 'yes' : 'no';
+            const oldName = idx === null ? '' : String(state.conditions[idx].Name || '');
+
             if (idx === null) state.conditions.push({ ID: uid('c'), Name: name, Active: active });
             else Object.assign(state.conditions[idx], { Name: name, Active: active });
-            pushConditions();
+
+            // A rename must follow through to every drug that points at the old name.
+            renameConditionOnDrugs(oldName, name);
+
+            const ticked = {};
+            [...document.querySelectorAll('.m-cdrug')].forEach(b => { ticked[b.value] = b.checked; });
+            state.drugs.forEach((d, i) => {
+                if (ticked[i] !== undefined) setDrugCondition(d, name, ticked[i]);
+            });
+
             closeModal();
+            send({ type: 'save_conditions', conditions: state.conditions });
+            send({ type: 'save_drugs', drugs: state.drugs });
+            toast('Condition saved');
         }
 
         function removeCondition(idx) {
             const c = state.conditions[idx];
             if (!c) return;
-            if (!confirm(`Remove the condition "${c.Name}"?\n\nTreatments already recorded keep their condition name.`)) return;
-            state.conditions.splice(idx, 1);
-            pushConditions();
-        }
+            const used = drugsForCondition(c.Name).length;
+            if (!confirm(`Remove the condition "${c.Name}"?\n\n`
+                + (used ? `It is unticked from ${plural(used, 'drug')}.\n` : '')
+                + 'Treatments already recorded keep their condition name.')) return;
 
-        function pushConditions() {
+            state.drugs.forEach(d => setDrugCondition(d, c.Name, false));
+            state.conditions.splice(idx, 1);
             send({ type: 'save_conditions', conditions: state.conditions });
-            toast('Conditions saved');
+            send({ type: 'save_drugs', drugs: state.drugs });
+            toast('Condition removed');
         }
 
         /* ---------- drugs ---------- */
@@ -1555,12 +1597,12 @@
             const unitOptions = (sel) => ['hours', 'days']
                 .map(u => `<option value="${u}" ${whUnit(sel) === u ? 'selected' : ''}>${u}</option>`).join('');
 
-            const condBoxes = state.conditions.map(c => {
-                const on = String(d.Conditions || '').toLowerCase().indexOf(String(c.Name).toLowerCase()) !== -1;
-                return `<label style="display:inline-flex; align-items:center; gap:5px; margin:0 10px 6px 0; font-size:14px;">
-                    <input type="checkbox" class="m-cond" value="${esc(c.Name)}" ${on ? 'checked' : ''} style="width:18px; height:18px;">
-                    ${esc(c.Name)}</label>`;
-            }).join('') || '<span class="muted">Add some conditions first.</span>';
+            const condBoxes = state.conditions.map(c => `
+                <label style="display:inline-flex; align-items:center; gap:5px; margin:0 10px 6px 0; font-size:14px;">
+                    <input type="checkbox" class="m-cond" value="${esc(c.Name)}"
+                        ${drugHasCondition(d, c.Name) ? 'checked' : ''} style="width:18px; height:18px;">
+                    ${esc(c.Name)}</label>`).join('')
+                || '<span class="muted">Add some conditions first.</span>';
 
             openModal(`
                 <h3>${idx === null ? 'New drug' : 'Edit drug'}</h3>
