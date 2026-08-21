@@ -166,6 +166,16 @@
         .q.on { border-color: var(--red); background: #fdecea; color: var(--red-dark); }
         .udder-note { text-align: center; font-size: 11px; color: var(--muted); margin-top: 4px; }
 
+        /* one compact row of quarters per cow, for a batch */
+        .qrow { display: flex; align-items: center; gap: 5px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+        .qrow:last-child { border-bottom: none; }
+        .qrow .who { font-weight: 800; font-size: 18px; min-width: 58px; }
+        .qmini {
+            flex: 1; border: 2px solid var(--line); background: #fff; border-radius: 6px;
+            padding: 10px 2px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--text);
+        }
+        .qmini.on { border-color: var(--red); background: #fdecea; color: var(--red-dark); }
+
         /* ---------- treatment cards ---------- */
         .tcard {
             border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; color: #fff;
@@ -304,12 +314,7 @@
             <div class="card hidden" id="detail-card">
                 <h2>5. Details</h2>
                 <label class="lbl" id="quarter-label">Affected quarter (tap the ones treated)</label>
-                <div class="udder" id="udder">
-                    <button class="q" data-q="LF" onclick="toggleQuarter('LF')">Left Front</button>
-                    <button class="q" data-q="RF" onclick="toggleQuarter('RF')">Right Front</button>
-                    <button class="q" data-q="LR" onclick="toggleQuarter('LR')">Left Rear</button>
-                    <button class="q" data-q="RR" onclick="toggleQuarter('RR')">Right Rear</button>
-                </div>
+                <div id="quarter-box"></div>
                 <div class="udder-note">Leave all off if the quarter does not apply.</div>
 
                 <label class="lbl">Notes</label>
@@ -462,7 +467,7 @@
          * The New Treatment form as it is being filled in. `cows` is a list, so one
          * cow and a whole mob are the same thing — a batch is just a longer list.
          */
-        let draft = { cows: [], condition: null, drug: null, quarters: [] };
+        let draft = { cows: [], condition: null, drug: null, quarters: {} };
         let batchMode = false;
 
         /* ===================== SMALL HELPERS ===================== */
@@ -1037,7 +1042,7 @@
             $('find-hint').textContent = batchMode
                 ? '— tap each cow to add her to the list' : '';
             $('quarter-label').textContent = batchMode
-                ? 'Affected quarter — the same for every cow on the list'
+                ? 'Affected quarter — set each cow on her own'
                 : 'Affected quarter (tap the ones treated)';
             // Going back to one cow keeps the first one only, so the screen matches.
             if (!batchMode && draft.cows.length > 1) draft.cows = draft.cows.slice(0, 1);
@@ -1222,15 +1227,16 @@
                         ${batchMode ? 'Treat these ' + draft.cows.length + ' cows' : 'Give new treatment'}</button>
                 </div>`;
             updateDraftBar();
-            renderConfirm();   // the cow list on the confirm card must follow along
+            renderQuarters();  // a cow added or removed changes the quarter rows
+            renderConfirm();   // and the cow list on the confirm card
         }
 
         /** Everything chosen after the cow is dropped and the steps close up. */
         function clearStepsAfterCow() {
             draft.condition = null;
             draft.drug = null;
-            draft.quarters = [];
-            document.querySelectorAll('#udder .q').forEach(b => b.classList.remove('on'));
+            draft.quarters = {};
+            renderQuarters();
             ['condition-card', 'drug-card', 'detail-card', 'confirm-card']
                 .forEach(id => $(id).classList.add('hidden'));
         }
@@ -1348,16 +1354,64 @@
             [...$('drug-list').children].forEach(b =>
                 b.classList.toggle('on', b.getAttribute('onclick').indexOf("'" + id + "'") !== -1));
             $('detail-card').classList.remove('hidden');
+            renderQuarters();
             $('detail-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
             renderConfirm();
         }
 
-        function toggleQuarter(q) {
-            const at = draft.quarters.indexOf(q);
-            if (at === -1) draft.quarters.push(q); else draft.quarters.splice(at, 1);
-            document.querySelectorAll('#udder .q').forEach(b =>
-                b.classList.toggle('on', draft.quarters.indexOf(b.dataset.q) !== -1));
+        /* ---------- quarters, one set per cow ----------
+           draft.quarters is keyed by cow, so three mastitis cows treated together
+           can each have their own quarter. A single cow is just a map of one. */
+
+        function quartersOf(cow) {
+            return draft.quarters[cowKey(cow)] || [];
+        }
+
+        function toggleQuarterFor(key, q) {
+            const list = draft.quarters[key] || [];
+            const at = list.indexOf(q);
+            if (at === -1) list.push(q); else list.splice(at, 1);
+            draft.quarters[key] = list;
+            renderQuarters();
             renderConfirm();
+        }
+
+        /** Give every cow the same quarters. Handy for dry cow therapy. */
+        function setAllQuarters(list) {
+            draft.cows.forEach(c => { draft.quarters[cowKey(c)] = list.slice(); });
+            renderQuarters();
+            renderConfirm();
+        }
+
+        function renderQuarters() {
+            const box = $('quarter-box');
+            if (!box || !draft.cows.length) return;
+
+            if (!batchMode) {
+                const key = cowKey(draft.cows[0]);
+                const on = draft.quarters[key] || [];
+                box.innerHTML = '<div class="udder">' + Object.keys(QUARTER_NAMES).map(q =>
+                    `<button class="q${on.indexOf(q) !== -1 ? ' on' : ''}"
+                        onclick="toggleQuarterFor('${esc(key)}','${q}')">${QUARTER_NAMES[q]}</button>`
+                ).join('') + '</div>';
+                return;
+            }
+
+            box.innerHTML = `
+                <div class="row" style="margin-bottom:8px;">
+                    <button class="btn small grey" onclick="setAllQuarters(['LF','RF','LR','RR'])">All 4 on every cow</button>
+                    <button class="btn small grey" onclick="setAllQuarters([])">Clear all</button>
+                </div>
+                ${draft.cows.map(c => {
+                    const key = cowKey(c);
+                    const on = draft.quarters[key] || [];
+                    return `<div class="qrow">
+                        <div class="who">${esc(cowName(c))}</div>
+                        ${Object.keys(QUARTER_NAMES).map(q =>
+                        `<button class="qmini${on.indexOf(q) !== -1 ? ' on' : ''}"
+                            onclick="toggleQuarterFor('${esc(key)}','${q}')">${q}</button>`).join('')}
+                    </div>`;
+                }).join('')}`;
         }
 
         function renderConfirm() {
@@ -1374,11 +1428,18 @@
             $('confirm-card').classList.remove('hidden');
             $('confirm-body').innerHTML = `
                 <div><b style="font-size:26px;">${esc(names.join(', '))}</b></div>
-                ${names.length > 1 ? `<div class="muted">${plural(names.length, 'cow')}, all treated the same.</div>` : ''}
+                ${names.length > 1 ? `<div class="muted">${plural(names.length, 'cow')}, same condition and drug, own quarter each.</div>` : ''}
                 <div><span class="muted">Condition:</span> <b>${esc(draft.condition.Name)}</b></div>
                 <div><span class="muted">Drug:</span> <b>${esc(d.Name)}</b></div>
                 <div><span class="muted">Plan:</span> ${esc(drugPlanText(d))}</div>
-                <div><span class="muted">Quarter:</span> ${draft.quarters.length ? esc(draft.quarters.map(q => QUARTER_NAMES[q]).join(', ')) : 'not applicable'}</div>
+                ${names.length === 1
+                    ? `<div><span class="muted">Quarter:</span> ${quartersOf(draft.cows[0]).length
+                        ? esc(quartersOf(draft.cows[0]).map(q => QUARTER_NAMES[q]).join(', ')) : 'not applicable'}</div>`
+                    : `<div><span class="muted">Quarters:</span></div>
+                       <div style="font-size:13px; line-height:1.6; margin:2px 0 4px 10px;">
+                       ${draft.cows.map(c => `<b>${esc(cowName(c))}</b> — ${quartersOf(c).length
+                        ? esc(quartersOf(c).map(q => QUARTER_NAMES[q]).join(', ')) : 'not applicable'}`).join('<br>')}
+                       </div>`}
                 <hr style="border:none; border-top:1px solid var(--line); margin:8px 0;">
                 <div><span class="muted">Last dose due:</span> ${fmtDay(lastDoseDay)} (${relDay(lastDoseDay)})</div>
                 <div><span class="muted">Milk clear:</span> <b>${fmtDayTime(milkClear)}</b></div>
@@ -1408,7 +1469,12 @@
             const parts = [];
             if (draft.condition) parts.push(draft.condition.Name);
             if (draft.drug) parts.push(draft.drug.Name);
-            if (draft.quarters.length) parts.push(draft.quarters.join(' '));
+            const marked = draft.cows.filter(c => quartersOf(c).length).length;
+            if (marked) {
+                parts.push(draft.cows.length === 1
+                    ? quartersOf(draft.cows[0]).join(' ')
+                    : marked + ' of ' + draft.cows.length + ' with a quarter');
+            }
 
             const names = draft.cows.map(cowName);
             const title = names.length === 1
@@ -1422,7 +1488,8 @@
 
         /** Cancel from anywhere in the flow. Asks only if there is something to lose. */
         function cancelNewTreatment() {
-            const started = draft.condition || draft.drug || draft.quarters.length
+            const started = draft.condition || draft.drug
+                || draft.cows.some(c => quartersOf(c).length)
                 || ($('new-notes').value || '').trim();
             if (started && !confirm('Throw away this treatment and start again?')) return;
             resetNewTreatment();
@@ -1436,10 +1503,10 @@
         }
 
         function resetNewTreatment() {
-            draft = { cows: [], condition: null, drug: null, quarters: [] };
+            draft = { cows: [], condition: null, drug: null, quarters: {} };
             ['picked-card', 'condition-card', 'drug-card', 'detail-card', 'confirm-card']
                 .forEach(id => $(id).classList.add('hidden'));
-            document.querySelectorAll('#udder .q').forEach(b => b.classList.remove('on'));
+            $('quarter-box').innerHTML = '';
             $('cow-search').value = '';
             $('new-notes').value = '';
             updateDraftBar();
@@ -1474,7 +1541,7 @@
                 condition: draft.condition.Name,
                 drug: d.Name,
                 drugId: d.ID,
-                quarters: draft.quarters.join(','),
+                quarters: quartersOf(cow).join(","),
                 notes: notes,
                 totalDoses: Math.max(1, num(d.Doses, 1)),
                 intervalDays: num(d.IntervalDays, 1),
