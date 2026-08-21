@@ -70,16 +70,16 @@
             overflow-x: auto; -webkit-overflow-scrolling: touch;
         }
         nav::-webkit-scrollbar { display: none; }
-        .tabs { display: flex; gap: 2px; padding: 0 8px; max-width: 900px; margin: 0 auto; width: max-content; min-width: 100%; }
+        .tabs { display: flex; gap: 0; padding: 0 2px; max-width: 900px; margin: 0 auto; width: max-content; min-width: 100%; }
         .tab {
-            flex: 0 0 auto; background: none; border: none; padding: 12px 12px 10px;
-            font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer;
+            flex: 0 0 auto; background: none; border: none; padding: 11px 5px 8px;
+            font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer;
             border-bottom: 3px solid transparent; white-space: nowrap;
         }
         .tab.on { color: var(--accent-dark); border-bottom-color: var(--accent); }
         .tab .badge {
-            display: inline-block; min-width: 18px; padding: 1px 5px; margin-left: 4px;
-            background: var(--muted); color: #fff; border-radius: 9px; font-size: 11px;
+            display: inline-block; min-width: 15px; padding: 0 4px; margin-left: 2px;
+            background: var(--muted); color: #fff; border-radius: 8px; font-size: 10px;
         }
         .tab.on .badge { background: var(--accent-dark); }
         .tab .badge.hot { background: var(--red); }
@@ -359,11 +359,19 @@
 
         <!-- ============ DOSES TODAY ============ -->
         <section class="view" id="view-today">
+            <div class="card" style="padding:10px;">
+                <input type="search" id="today-search" placeholder="Find a cow — tag, birth ID or EID…"
+                       inputmode="numeric" autocomplete="off" oninput="renderToday()">
+            </div>
             <div id="today-body"></div>
         </section>
 
         <!-- ============ READY TO CLEAR ============ -->
         <section class="view" id="view-toclear">
+            <div class="card" style="padding:10px;">
+                <input type="search" id="toclear-search" placeholder="Find a cow — tag, birth ID or EID…"
+                       inputmode="numeric" autocomplete="off" oninput="renderToClear()">
+            </div>
             <div id="toclear-body"></div>
         </section>
 
@@ -378,6 +386,10 @@
 
         <!-- ============ MEAT WITHHOLD ============ -->
         <section class="view" id="view-meat">
+            <div class="card" style="padding:10px;">
+                <input type="search" id="meat-search" placeholder="Find a cow — tag, birth ID or EID…"
+                       inputmode="numeric" autocomplete="off" oninput="renderMeat()">
+            </div>
             <div id="meat-body"></div>
         </section>
 
@@ -1026,14 +1038,15 @@
 
         /* ===================== TABS ===================== */
 
+        // Short labels so all seven fit across a phone without scrolling.
         const TABS = [
-            { id: 'new', label: 'New Treatment' },
-            { id: 'today', label: '💉 Doses Today' },
-            { id: 'toclear', label: '✓ To Clear' },
-            { id: 'treated', label: 'Treated Cows' },
-            { id: 'meat', label: 'Meat Withhold' },
+            { id: 'new', label: 'New' },
+            { id: 'treated', label: 'Treated' },
+            { id: 'today', label: '💉 Today' },
+            { id: 'toclear', label: '✓ Clear' },
+            { id: 'meat', label: 'Meat' },
             { id: 'history', label: 'History' },
-            { id: 'config', label: '⚙ Config', manager: true }
+            { id: 'config', label: '⚙', manager: true }
         ];
 
         function buildTabs() {
@@ -1761,6 +1774,35 @@
         /* ---------- tab 2: treated cows ---------- */
 
         /**
+         * The search box on every list tab. It only ever looks at the cows already
+         * on that list, never at the herd list. Spaces are ignored so an EID
+         * pasted from the sheet still matches.
+         */
+        function searchTerm(boxId) {
+            const el = $(boxId);
+            return el ? (el.value || '').trim().toLowerCase().replace(/\s/g, '') : '';
+        }
+
+        function matchesCow(t, q) {
+            if (!q) return true;
+            return [t.Tag, t.BirthID, t.EID]
+                .map(v => String(v || '').toLowerCase().replace(/\s/g, ''))
+                .some(v => v && v.indexOf(q) !== -1);
+        }
+
+        /** The header line for a searched list: "2 cows matching "71", of 9". */
+        function searchHead(q, shown, all, plainText) {
+            return listHeader(q
+                ? `<b>${plural(shown, 'cow')}</b> matching “${esc(q)}”, of ${all}.`
+                : plainText);
+        }
+
+        function noMatch(q, empty) {
+            return `<div class="empty">${q
+                ? 'No cow on this list matches “' + esc(q) + '”.' : empty}</div>`;
+        }
+
+        /**
          * The morning job: every cow whose dose falls on today's date.
          * A dose whose day has gone is missed, so it is never on this list.
          */
@@ -1768,17 +1810,18 @@
             const blocked = blockedPanel();
             if (blocked) { $('today-body').innerHTML = blocked; return; }
 
-            const rows = state.treatments.map(t => ({ t, i: info(t) }))
-                .filter(x => x.i.dueSlot)
+            const all = state.treatments.map(t => ({ t, i: info(t) })).filter(x => x.i.dueSlot);
+            const q = searchTerm('today-search');
+            const rows = all.filter(x => matchesCow(x.t, q))
                 .sort((a, b) => String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true }));
 
-            const head = listHeader(rows.length
-                ? `<b>${plural(rows.length, 'cow')}</b> to dose today, ${fmtDay(new Date())}.`
+            const head = searchHead(q, rows.length, all.length, all.length
+                ? `<b>${plural(all.length, 'cow')}</b> to dose today, ${fmtDay(new Date())}.`
                 : `Nothing to dose today, ${fmtDay(new Date())}.`);
 
             $('today-body').innerHTML = head + (rows.length
                 ? rows.map(x => treatedCard(x.t, x.i)).join('')
-                : '<div class="empty">All doses are done for today. ✅</div>');
+                : noMatch(q, 'All doses are done for today. ✅'));
         }
 
         /** Milk withhold finished. Check her, then press Clear. */
@@ -1786,17 +1829,18 @@
             const blocked = blockedPanel();
             if (blocked) { $('toclear-body').innerHTML = blocked; return; }
 
-            const rows = state.treatments.map(t => ({ t, i: info(t) }))
-                .filter(x => x.i.stage === 'ready')
+            const all = state.treatments.map(t => ({ t, i: info(t) })).filter(x => x.i.stage === 'ready');
+            const q = searchTerm('toclear-search');
+            const rows = all.filter(x => matchesCow(x.t, q))
                 .sort((a, b) => (a.i.milkClear || 0) - (b.i.milkClear || 0));
 
-            const head = listHeader(rows.length
-                ? `<b>${plural(rows.length, 'cow')}</b> ready to go back in the vat.`
+            const head = searchHead(q, rows.length, all.length, all.length
+                ? `<b>${plural(all.length, 'cow')}</b> ready to go back in the vat.`
                 : 'No cow is ready to clear.');
 
             $('toclear-body').innerHTML = head + (rows.length
                 ? rows.map(x => treatedCard(x.t, x.i)).join('')
-                : '<div class="empty">Nobody is waiting to be cleared. ✅</div>');
+                : noMatch(q, 'Nobody is waiting to be cleared. ✅'));
         }
 
         function renderTreated() {
@@ -1808,13 +1852,8 @@
             const onList = rows.length;
 
             // Typing a cow number jumps straight to her instead of scrolling.
-            // Spaces are ignored so an EID copied from the sheet still matches.
-            const q = ($('treated-search').value || '').trim().toLowerCase().replace(/\s/g, '');
-            if (q) {
-                rows = rows.filter(x => [x.t.Tag, x.t.BirthID, x.t.EID]
-                    .map(v => String(v || '').toLowerCase().replace(/\s/g, ''))
-                    .some(v => v && v.indexOf(q) !== -1));
-            }
+            const q = searchTerm('treated-search');
+            rows = rows.filter(x => matchesCow(x.t, q));
 
             // Doses due today first, then cows ready to clear, then the rest.
             const rank = x => x.i.dueNow ? 0 : (x.i.stage === 'ready' ? 1 : 2);
@@ -1827,17 +1866,14 @@
             const due = rows.filter(x => x.i.dueNow).length;
             const ready = rows.filter(x => x.i.stage === 'ready').length;
 
-            const head = listHeader(q
-                ? `<b>${plural(rows.length, 'cow')}</b> matching “${esc(q)}”, of ${onList} on the list.`
-                : `<b>${plural(onList, 'cow')}</b> under treatment or milk withhold.
-                   ${due ? `<span style="color:var(--red-dark); font-weight:700;"> ${due} need${due === 1 ? 's' : ''} a dose today.</span>` : ' No doses due today.'}
-                   ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`);
+            const head = searchHead(q, rows.length, onList,
+                `<b>${plural(onList, 'cow')}</b> under treatment or milk withhold.
+                 ${due ? `<span style="color:var(--red-dark); font-weight:700;"> ${due} need${due === 1 ? 's' : ''} a dose today.</span>` : ' No doses due today.'}
+                 ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`);
 
             $('treated-body').innerHTML = head + (rows.length
                 ? rows.map(x => treatedCard(x.t, x.i)).join('')
-                : `<div class="empty">${q
-                    ? 'No cow under treatment matches “' + esc(q) + '”.'
-                    : 'No cows under treatment. 🎉'}</div>`);
+                : noMatch(q, 'No cows under treatment. 🎉'));
         }
 
         function treatedCard(t, i) {
@@ -1879,8 +1915,8 @@
                     ${i.dueSlot ? `<button class="btn dosebtn" onclick="giveDose('${esc(t.ID)}')">Give dose ${i.dueSlot.no}/${i.total}</button>` : ''}
                     <button class="btn small ghost" onclick="openTreatment('${esc(t.ID)}')">Details</button>
                     ${i.given ? `<button class="btn small ghost" onclick="undoDose('${esc(t.ID)}')">Undo last dose</button>` : ''}
-                    ${isManager() && !i.dosingDone && !i.dueSlot
-                        ? `<button class="btn small ghost" onclick="giveDoseEarlier('${esc(t.ID)}')">Record a dose</button>` : ''}
+                    ${isManager() && i.missed.length
+                        ? `<button class="btn small ghost" onclick="giveDoseEarlier('${esc(t.ID)}')">Record a missed dose</button>` : ''}
                     ${i.dosingDone ? '' : `<button class="btn small ghost" onclick="endTreatment('${esc(t.ID)}')">Stop treatment</button>`}
                 </div>
             </div>`;
@@ -2054,12 +2090,14 @@
             const blocked = blockedPanel();
             if (blocked) { $('meat-body').innerHTML = blocked; return; }
 
-            const rows = state.treatments.map(t => ({ t, i: info(t) }))
-                .filter(x => !x.i.meatOk && x.i.meatClear)
+            const all = state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => !x.i.meatOk && x.i.meatClear);
+            const q = searchTerm('meat-search');
+            const rows = all.filter(x => matchesCow(x.t, q))
                 .sort((a, b) => a.i.meatClear - b.i.meatClear);
 
-            const head = listHeader(`
-                <b>${plural(rows.length, 'cow')}</b> must not go for meat yet.
+            const head = searchHead(q, rows.length, all.length, `
+                <b>${plural(all.length, 'cow')}</b> must not go for meat yet.
                 This list holds every treated cow, red or cleared.
                 The date is counted from the last dose given.`);
 
@@ -2081,7 +2119,7 @@
                         ${x.t.ClearedAt ? `<button class="btn small ghost" onclick="unclearCow('${esc(x.t.ID)}')">Undo clear</button>` : ''}
                     </div>
                   </div>`).join('')
-                : '<div class="empty">No cow is inside a meat withhold.</div>');
+                : noMatch(q, 'No cow is inside a meat withhold.'));
         }
 
         /* ---------- tab 5: history ---------- */
