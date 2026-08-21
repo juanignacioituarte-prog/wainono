@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2ecc71">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="WN Treatments">
+    <title>Wainono | Cow Treatments</title>
+    <style>
+        :root {
+            --accent: #2ecc71;
+            --accent-dark: #27ae60;
+            --bg: #f4f7f6;
+            --card: #ffffff;
+            --text: #2c3e50;
+            --muted: #7f8c8d;
+            --line: #e1e6e5;
+            --red: #e74c3c;
+            --red-dark: #a5281a;
+            --orange: #e67e22;
+            --blue: #3498db;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 15px;
+            padding-bottom: 40px;
+        }
+
+        .wrap { max-width: 900px; margin: 0 auto; }
+
+        /* ---------- header ---------- */
+        header {
+            background: var(--accent);
+            color: #fff;
+            padding: 10px 14px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .15);
+        }
+
+        .head-row { display: flex; align-items: center; gap: 10px; max-width: 900px; margin: 0 auto; }
+        .head-row h1 { font-size: 17px; margin: 0; flex: 1; font-weight: 700; }
+        .head-btn {
+            background: rgba(255, 255, 255, .2); border: none; color: #fff;
+            border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+        }
+        .head-btn:active { background: rgba(255, 255, 255, .35); }
+
+        #sync-line {
+            max-width: 900px; margin: 4px auto 0; font-size: 11px;
+            color: rgba(255, 255, 255, .9); display: flex; gap: 6px; align-items: center;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; display: inline-block; }
+        .dot.busy { background: #f1c40f; }
+        .dot.bad { background: #c0392b; }
+
+        /* ---------- tabs ---------- */
+        nav {
+            background: var(--card); border-bottom: 1px solid var(--line);
+            position: sticky; top: 62px; z-index: 40;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+        }
+        nav::-webkit-scrollbar { display: none; }
+        .tabs { display: flex; gap: 2px; padding: 0 8px; max-width: 900px; margin: 0 auto; width: max-content; min-width: 100%; }
+        .tab {
+            flex: 0 0 auto; background: none; border: none; padding: 12px 12px 10px;
+            font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer;
+            border-bottom: 3px solid transparent; white-space: nowrap;
+        }
+        .tab.on { color: var(--accent-dark); border-bottom-color: var(--accent); }
+        .tab .badge {
+            display: inline-block; min-width: 18px; padding: 1px 5px; margin-left: 4px;
+            background: var(--muted); color: #fff; border-radius: 9px; font-size: 11px;
+        }
+        .tab.on .badge { background: var(--accent-dark); }
+        .tab .badge.hot { background: var(--red); }
+
+        /* ---------- generic ---------- */
+        .view { display: none; padding: 12px; }
+        .view.on { display: block; }
+
+        .card {
+            background: var(--card); border-radius: 10px; padding: 14px;
+            margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+        }
+        .card h2 { margin: 0 0 10px; font-size: 15px; }
+        .card h2 .step { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+        label.lbl { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; font-weight: 600; }
+
+        input[type=text], input[type=number], input[type=search], textarea, select {
+            width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+            font-size: 16px; font-family: inherit; background: #fff; color: var(--text);
+        }
+        textarea { min-height: 64px; resize: vertical; }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            border: none; border-radius: 8px; padding: 12px 16px; font-size: 15px;
+            font-weight: 700; cursor: pointer; background: var(--accent); color: #fff;
+        }
+        .btn:active { filter: brightness(.92); }
+        .btn.wide { width: 100%; }
+        .btn.grey { background: #95a5a6; }
+        .btn.red { background: var(--red); }
+        .btn.orange { background: var(--orange); }
+        .btn.blue { background: var(--blue); }
+        .btn.small { padding: 7px 11px; font-size: 13px; border-radius: 6px; }
+        .btn:disabled { opacity: .5; cursor: default; }
+
+        .row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .row > * { flex: 1 1 0; min-width: 0; }
+
+        .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+        .seg button {
+            flex: 1; border: none; background: #fff; padding: 10px 4px; font-size: 13px;
+            font-weight: 600; color: var(--muted); cursor: pointer;
+        }
+        .seg button.on { background: var(--accent); color: #fff; }
+
+        .muted { color: var(--muted); font-size: 13px; }
+        .empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: 14px; }
+        .hidden { display: none !important; }
+
+        .pill {
+            display: inline-block; padding: 2px 8px; border-radius: 10px;
+            font-size: 11px; font-weight: 700; background: #ecf0f1; color: var(--muted);
+        }
+
+        /* ---------- cow search results ---------- */
+        .cow-row {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            border-bottom: 1px solid var(--line); cursor: pointer; background: #fff;
+        }
+        .cow-row:active { background: #eefaf2; }
+        .cow-row .tag { font-size: 22px; font-weight: 800; min-width: 70px; }
+        .cow-row .sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
+        .cow-list { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; max-height: 340px; overflow-y: auto; }
+        .cow-list .cow-row:last-child { border-bottom: none; }
+
+        /* ---------- choice buttons ---------- */
+        .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+        .choice {
+            flex: 1 1 44%; border: 2px solid var(--line); background: #fff; border-radius: 10px;
+            padding: 12px 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+            color: var(--text); text-align: left;
+        }
+        .choice small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); margin-top: 3px; }
+        .choice.on { border-color: var(--accent); background: #eafaf1; }
+
+        /* ---------- udder ---------- */
+        .udder { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 260px; margin: 4px auto; }
+        .q {
+            border: 2px solid var(--line); background: #fff; border-radius: 10px;
+            padding: 18px 6px; font-weight: 700; font-size: 14px; cursor: pointer; color: var(--text);
+        }
+        .q.on { border-color: var(--red); background: #fdecea; color: var(--red-dark); }
+        .udder-note { text-align: center; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+        /* ---------- treatment cards ---------- */
+        .tcard {
+            border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, .15);
+        }
+        .tcard.red { background: var(--red); }
+        .tcard.reddark { background: var(--red-dark); }
+        .tcard.orange { background: var(--orange); }
+        .tcard.green { background: var(--accent-dark); }
+        .tcard.grey { background: #7f8c8d; }
+
+        .tcard .top { display: flex; align-items: flex-start; gap: 10px; }
+        .tcard .num { font-size: 42px; font-weight: 900; line-height: 1; letter-spacing: -1px; }
+        .tcard .num small { display: block; font-size: 11px; font-weight: 600; opacity: .85; letter-spacing: 0; margin-top: 3px; }
+        .tcard .info { flex: 1; font-size: 13px; line-height: 1.5; }
+        .tcard .info b { font-size: 15px; }
+        .tcard .tag2 {
+            display: inline-block; background: rgba(0, 0, 0, .2); border-radius: 5px;
+            padding: 1px 7px; font-size: 11px; font-weight: 700; margin-left: 6px;
+        }
+        .tcard .notes { font-style: italic; opacity: .9; }
+        .tcard .acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .tcard .acts .btn { background: rgba(255, 255, 255, .95); color: var(--text); }
+        .tcard .acts .btn.ghost { background: rgba(0, 0, 0, .18); color: #fff; }
+        .tcard .dosebtn { background: #fff !important; color: var(--red-dark) !important; font-size: 17px; padding: 14px 18px; flex: 1 1 100%; }
+        .tcard .warn { background: rgba(0, 0, 0, .25); border-radius: 6px; padding: 5px 8px; margin-top: 8px; font-size: 12px; font-weight: 700; }
+
+        /* ---------- history / tables ---------- */
+        .hrow {
+            background: #fff; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .07); font-size: 13px; line-height: 1.5;
+        }
+        .hrow .hd { display: flex; align-items: baseline; gap: 8px; }
+        .hrow .hd b { font-size: 20px; }
+
+        /* ---------- config ---------- */
+        .cfg-item {
+            display: flex; gap: 8px; align-items: center; padding: 8px 0;
+            border-bottom: 1px solid var(--line); font-size: 14px;
+        }
+        .cfg-item:last-child { border-bottom: none; }
+        .cfg-item .grow { flex: 1; min-width: 0; }
+        .cfg-item .name { font-weight: 700; }
+        .cfg-item .det { font-size: 12px; color: var(--muted); }
+        .iconbtn { background: none; border: none; font-size: 17px; cursor: pointer; padding: 4px 6px; color: var(--muted); }
+
+        /* ---------- modal ---------- */
+        .modal-bg {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, .55); z-index: 200;
+            display: flex; align-items: flex-end; justify-content: center; padding: 0;
+        }
+        .modal {
+            background: #fff; border-radius: 14px 14px 0 0; width: 100%; max-width: 900px;
+            max-height: 92vh; overflow-y: auto; padding: 16px;
+        }
+        .modal h3 { margin: 0 0 12px; font-size: 17px; }
+        @media (min-width: 700px) {
+            .modal-bg { align-items: center; padding: 20px; }
+            .modal { border-radius: 14px; max-width: 620px; }
+        }
+
+        #toast {
+            position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px;
+            background: #2c3e50; color: #fff; padding: 11px 16px; border-radius: 8px;
+            font-size: 14px; z-index: 500; opacity: 0; pointer-events: none;
+            transition: opacity .25s; max-width: 90%; text-align: center;
+        }
+        #toast.on { opacity: .96; }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="head-row">
+            <h1>🐄 Cow Treatments</h1>
+            <button class="head-btn" id="user-btn" onclick="openUserBox()">👤</button>
+            <button class="head-btn" id="refresh-btn" onclick="refreshAll(true)">⟳ Refresh</button>
+        </div>
+        <div id="sync-line"><span class="dot" id="sync-dot"></span><span id="sync-text">Loading…</span></div>
+    </header>
+
+    <nav>
+        <div class="tabs" id="tabs"></div>
+    </nav>
+
+    <div class="wrap">
+
+        <!-- ============ NEW TREATMENT ============ -->
+        <section class="view on" id="view-new">
+            <div class="card">
+                <h2>1. Find the cow</h2>
+                <div class="seg" id="search-mode">
+                    <button class="on" onclick="setSearchMode('Tag')">Tag number</button>
+                    <button onclick="setSearchMode('BirthID')">Birth ID</button>
+                    <button onclick="setSearchMode('EID')">EID</button>
+                </div>
+                <input type="search" id="cow-search" placeholder="Type the tag number…" inputmode="numeric"
+                       autocomplete="off" oninput="renderSearch()" style="margin-top:10px;">
+                <div id="search-results" style="margin-top:10px;"></div>
+            </div>
+
+            <div class="card hidden" id="picked-card">
+                <h2>2. Cow</h2>
+                <div id="picked-body"></div>
+            </div>
+
+            <div class="card hidden" id="condition-card">
+                <h2>3. Condition</h2>
+                <div class="choices" id="condition-list"></div>
+            </div>
+
+            <div class="card hidden" id="drug-card">
+                <h2>4. Drug</h2>
+                <div class="choices" id="drug-list"></div>
+                <div class="muted" id="drug-hint" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="card hidden" id="detail-card">
+                <h2>5. Details</h2>
+                <label class="lbl">Affected quarter (tap the ones treated)</label>
+                <div class="udder" id="udder">
+                    <button class="q" data-q="LF" onclick="toggleQuarter('LF')">Left Front</button>
+                    <button class="q" data-q="RF" onclick="toggleQuarter('RF')">Right Front</button>
+                    <button class="q" data-q="LR" onclick="toggleQuarter('LR')">Left Rear</button>
+                    <button class="q" data-q="RR" onclick="toggleQuarter('RR')">Right Rear</button>
+                </div>
+                <div class="udder-note">Leave all off if the quarter does not apply.</div>
+
+                <label class="lbl">Notes</label>
+                <textarea id="new-notes" placeholder="Anything the next person should know…"></textarea>
+
+                <label class="lbl" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
+                    <input type="checkbox" id="first-dose" checked style="width:20px; height:20px;">
+                    First dose given now
+                </label>
+            </div>
+
+            <div class="card hidden" id="confirm-card">
+                <h2>6. Confirm</h2>
+                <div id="confirm-body" style="font-size:14px; line-height:1.8;"></div>
+                <div class="row" style="margin-top:14px;">
+                    <button class="btn grey" onclick="resetNewTreatment()">Cancel</button>
+                    <button class="btn" id="save-btn" onclick="saveNewTreatment()">Save treatment</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ TREATED COWS ============ -->
+        <section class="view" id="view-treated">
+            <div id="treated-body"></div>
+        </section>
+
+        <!-- ============ CLEARING COWS ============ -->
+        <section class="view" id="view-clearing">
+            <div id="clearing-body"></div>
+        </section>
+
+        <!-- ============ MEAT WITHHOLD ============ -->
+        <section class="view" id="view-meat">
+            <div id="meat-body"></div>
+        </section>
+
+        <!-- ============ HISTORY ============ -->
+        <section class="view" id="view-history">
+            <div class="card">
+                <input type="search" id="hist-search" placeholder="Search tag, condition, drug, person…"
+                       oninput="renderHistory()" autocomplete="off">
+            </div>
+            <div id="history-body"></div>
+        </section>
+
+        <!-- ============ CONFIG (managers) ============ -->
+        <section class="view" id="view-config">
+            <div class="card">
+                <h2>Conditions</h2>
+                <div id="cfg-conditions"></div>
+                <button class="btn small wide" style="margin-top:10px;" onclick="editCondition(null)">+ Add condition</button>
+            </div>
+
+            <div class="card">
+                <h2>Drugs</h2>
+                <div id="cfg-drugs"></div>
+                <button class="btn small wide" style="margin-top:10px;" onclick="editDrug(null)">+ Add drug</button>
+            </div>
+
+            <div class="card">
+                <h2>Cow list</h2>
+                <p class="muted" id="cow-count"></p>
+                <label class="lbl">Paste or upload a CSV with columns: Tag, Birth ID, EID</label>
+                <input type="file" id="cow-file" accept=".csv,.txt" onchange="loadCowFile(event)" style="font-size:13px;">
+                <textarea id="cow-paste" placeholder="Tag,BirthID,EID&#10;123,AB-2021-123,982000123456789" style="margin-top:8px; min-height:110px;"></textarea>
+                <label class="lbl">How to load</label>
+                <div class="seg" id="import-mode">
+                    <button class="on" onclick="setImportMode('merge')">Merge (add / update)</button>
+                    <button onclick="setImportMode('replace')">Replace whole list</button>
+                </div>
+                <button class="btn wide" style="margin-top:10px;" onclick="importCows()">Load cows</button>
+            </div>
+
+            <div class="card">
+                <h2>Managers</h2>
+                <p class="muted">Only these emails can open this Config tab. One email per line.</p>
+                <textarea id="cfg-managers" style="min-height:90px;"></textarea>
+                <button class="btn wide" style="margin-top:10px;" onclick="saveManagers()">Save managers</button>
+            </div>
+        </section>
+
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        /* =====================================================================
+           SETTINGS - paste the Apps Script /exec URL here after you deploy it.
+           ===================================================================== */
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoWp8wkebmcbzZqyCRQiLyiU_2PU2TLEPBuLGnKRZU1JmQQIRlYMHi6CU4511dysR8/exec";
+
+        /** Always a manager, even before the Settings tab is filled in. */
+        const OWNER_EMAIL = "juanignacioituarte@gmail.com";
+
+        // Only unsent writes and the user's name live on the phone. Never the data.
+        const LS = {
+            queue: 'treat_queue_v1',
+            name: 'treat_user_name'
+        };
+
+        const QUARTER_NAMES = { LF: 'Left Front', RF: 'Right Front', LR: 'Left Rear', RR: 'Right Rear' };
+
+        /* ===================== STATE ===================== */
+
+        const state = {
+            cows: [], conditions: [], drugs: [], treatments: [], doses: [],
+            managers: '',
+            queue: [],
+            loaded: false,    // has the sheet answered at least once
+            loadedAt: 0,      // when it answered
+            syncing: false,
+            error: ''
+        };
+
+        let currentTab = 'new';
+        let searchMode = 'Tag';
+        let importMode = 'merge';
+
+        /** The New Treatment form as it is being filled in. */
+        let draft = { cow: null, condition: null, drug: null, quarters: [], };
+
+        /* ===================== SMALL HELPERS ===================== */
+
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s === undefined || s === null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        function toast(msg) {
+            const t = $('toast');
+            t.textContent = msg;
+            t.classList.add('on');
+            clearTimeout(t._h);
+            t._h = setTimeout(() => t.classList.remove('on'), 2600);
+        }
+
+        function uid(prefix) {
+            return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000);
+        }
+
+        function num(v, fb) {
+            const n = Number(v);
+            return isFinite(n) ? n : (fb === undefined ? 0 : fb);
+        }
+
+        const DAY = 86400000;
+        const HOUR = 3600000;
+
+        /** "hours" or "days". Anything else, including blank, means days. */
+        function whUnit(v) {
+            return String(v === undefined || v === null ? '' : v).trim().toLowerCase().indexOf('hour') === 0
+                ? 'hours' : 'days';
+        }
+
+        /** How long a withhold lasts, in milliseconds. */
+        function whMs(value, unit) {
+            return num(value, 0) * (whUnit(unit) === 'hours' ? HOUR : DAY);
+        }
+
+        /** "96 hours" / "4 days" */
+        function whText(value, unit) {
+            const u = whUnit(unit);
+            const n = num(value, 0);
+            return n + ' ' + (n === 1 ? u.slice(0, -1) : u);
+        }
+
+        function parseDate(v) {
+            if (!v) return null;
+            const d = new Date(v);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        function startOfDay(d) {
+            const x = new Date(d);
+            x.setHours(0, 0, 0, 0);
+            return x;
+        }
+
+        function addDays(d, days) {
+            return new Date(new Date(d).getTime() + days * DAY);
+        }
+
+        // Fixed to New Zealand English. The app text is English, so a phone set to
+        // another language must not end up showing month names in that language.
+        const LOCALE = 'en-NZ';
+
+        /** 21 Aug */
+        function fmtDay(v) {
+            const d = parseDate(v);
+            if (!d) return '—';
+            return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' });
+        }
+
+        /** 21 Aug, 6:10 am */
+        function fmtDayTime(v) {
+            const d = parseDate(v);
+            if (!d) return '—';
+            return d.toLocaleDateString(LOCALE, { day: 'numeric', month: 'short' }) + ', ' +
+                d.toLocaleTimeString(LOCALE, { hour: 'numeric', minute: '2-digit' });
+        }
+
+        /** "today", "tomorrow", "in 3 days", "2 days ago" */
+        function relDay(v) {
+            const d = parseDate(v);
+            if (!d) return '';
+            const diff = Math.round((startOfDay(d) - startOfDay(new Date())) / DAY);
+            if (diff === 0) return 'today';
+            if (diff === 1) return 'tomorrow';
+            if (diff === -1) return 'yesterday';
+            if (diff > 1) return 'in ' + diff + ' days';
+            return Math.abs(diff) + ' days ago';
+        }
+
+        function plural(n, word) {
+            return n + ' ' + word + (n === 1 ? '' : 's');
+        }
+
+        /* ===================== IDENTITY ===================== */
+
+        function userEmail() {
+            return (localStorage.getItem('auth_email') || '').toLowerCase().trim();
+        }
+
+        function userName() {
+            return (localStorage.getItem(LS.name) || localStorage.getItem('auth_name') || '').trim();
+        }
+
+        function whoAmI() {
+            return userName() || userEmail() || 'Unknown';
+        }
+
+        function isManager() {
+            const email = userEmail();
+            if (!email) return false;
+            if (email === OWNER_EMAIL) return true;
+            return String(state.managers || '')
+                .split(/[\n,;]+/)
+                .map(s => s.toLowerCase().trim())
+                .filter(Boolean)
+                .indexOf(email) !== -1;
+        }
+
+        function openUserBox() {
+            const email = userEmail();
+            openModal(`
+                <h3>Who is using the app?</h3>
+                <label class="lbl">Your name (goes on every record)</label>
+                <input type="text" id="m-name" value="${esc(userName())}" placeholder="e.g. Juani">
+                <p class="muted" style="margin-top:10px;">
+                    ${email
+                        ? 'Signed in as <b>' + esc(email) + '</b>.' + (isManager() ? ' You are a manager.' : '')
+                        : 'Not signed in. Open the main farm app first if you need the Config tab.'}
+                </p>
+                <button class="btn wide" style="margin-top:12px;" onclick="saveUserName()">Save</button>
+            `);
+        }
+
+        function saveUserName() {
+            const v = ($('m-name').value || '').trim();
+            if (v) localStorage.setItem(LS.name, v);
+            closeModal();
+            buildTabs();
+            toast('Saved');
+        }
+
+        /* ===================== STORAGE + SYNC ===================== */
+
+        /*
+         * The sheet is the only source of truth. The cow list, the treatments and
+         * the doses are NEVER cached on this phone, because two people dose cows at
+         * the same time and an old copy would show a cow as needing a dose she has
+         * already had. Every screen is drawn from the last answer the sheet gave.
+         *
+         * The one thing kept on the phone is the list of writes that have not
+         * reached the sheet yet. Losing a recorded dose is worse than a wait.
+         */
+
+        function loadQueue() {
+            try { state.queue = JSON.parse(localStorage.getItem(LS.queue) || '[]'); }
+            catch (e) { state.queue = []; }
+        }
+
+        function saveQueue() {
+            try { localStorage.setItem(LS.queue, JSON.stringify(state.queue)); } catch (e) { }
+        }
+
+        function setSync(text, kind) {
+            $('sync-text').textContent = text;
+            $('sync-dot').className = 'dot' + (kind ? ' ' + kind : '');
+        }
+
+        /** How long ago the sheet answered, for the line under the title. */
+        function freshness() {
+            if (!state.loadedAt) return '';
+            const mins = Math.floor((Date.now() - state.loadedAt) / 60000);
+            if (mins < 1) return 'just now';
+            if (mins === 1) return '1 minute ago';
+            if (mins < 60) return mins + ' minutes ago';
+            return fmtDayTime(state.loadedAt);
+        }
+
+        function applyServer(data) {
+            if (!data || data.status !== 'success') return false;
+            state.cows = data.cows || [];
+            state.conditions = data.conditions || [];
+            state.drugs = data.drugs || [];
+            state.treatments = data.treatments || [];
+            state.doses = data.doses || [];
+            state.managers = data.managers || '';
+            state.loaded = true;
+            state.loadedAt = Date.now();
+            state.error = '';
+            return true;
+        }
+
+        /** Read everything from the sheet again. Nothing is shown until it answers. */
+        async function refreshAll(manual) {
+            if (!SCRIPT_URL) {
+                state.error = 'No sheet connected. Paste the Apps Script URL into treatment.html.';
+                setSync(state.error, 'bad');
+                renderAll();
+                return false;
+            }
+            if (state.syncing) return false;
+
+            // Anything waiting goes first, so the read that follows includes it.
+            if (state.queue.length) return flushQueue();
+
+            state.syncing = true;
+            setSync(manual ? 'Refreshing…' : 'Reading the sheet…', 'busy');
+            renderAll();
+            let ok = false;
+            try {
+                const res = await fetch(SCRIPT_URL + '?type=all&t=' + Date.now(), { cache: 'no-store' });
+                const data = await res.json();
+                if (applyServer(data)) {
+                    setSync('Sheet read ' + freshness());
+                    ok = true;
+                } else {
+                    state.error = 'The sheet said: ' + ((data && data.message) || 'unknown error');
+                    setSync(state.error, 'bad');
+                }
+            } catch (err) {
+                state.error = 'Could not reach the sheet. Check the signal and press Refresh.';
+                setSync('No signal — nothing is being shown', 'bad');
+            }
+            state.syncing = false;
+            renderAll();
+            return ok;
+        }
+
+        /**
+         * Save one change. It goes to the sheet straight away and the screen is
+         * redrawn from the sheet's answer, never from a guess made on the phone.
+         * If there is no signal the change waits and is sent on the next try.
+         */
+        function send(item) {
+            item.clientId = item.clientId || uid('q');
+            item.user = item.user || whoAmI();
+            state.queue.push(item);
+            saveQueue();
+            renderAll();
+            return flushQueue();
+        }
+
+        let flushing = false;
+
+        async function flushQueue() {
+            if (flushing || state.queue.length === 0) return false;
+            if (!SCRIPT_URL) {
+                setSync(plural(state.queue.length, 'change') + ' waiting — no sheet connected', 'bad');
+                return false;
+            }
+            flushing = true;
+            state.syncing = true;
+            const batch = state.queue.slice();
+            setSync('Saving ' + plural(batch.length, 'change') + '…', 'busy');
+            renderAll();
+
+            let ok = false;
+            try {
+                const res = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'batch', items: batch })
+                });
+                const data = await res.json();
+                if (data && data.status === 'success') {
+                    const sent = {};
+                    batch.forEach(b => { sent[b.clientId] = true; });
+                    state.queue = state.queue.filter(q => !sent[q.clientId]);
+                    saveQueue();
+                    applyServer(data);
+                    const failed = (data.results || []).filter(r => !r.ok);
+                    if (failed.length) {
+                        state.error = failed.length + ' change(s) were rejected by the sheet. See the console.';
+                        setSync(state.error, 'bad');
+                        console.error('Rejected items:', failed);
+                    } else {
+                        setSync('Saved and re-read ' + freshness());
+                        ok = true;
+                    }
+                } else {
+                    state.error = 'The sheet said: ' + ((data && data.message) || 'unknown error');
+                    setSync(state.error, 'bad');
+                }
+            } catch (err) {
+                setSync(plural(state.queue.length, 'change') + ' waiting — no signal', 'bad');
+            }
+            flushing = false;
+            state.syncing = false;
+            renderAll();
+            return ok;
+        }
+
+        window.addEventListener('online', () => refreshAll(false));
+
+        /* ===================== DERIVED TREATMENT STATE ===================== */
+
+        /**
+         * Works out where a treatment is up to: how many doses are given,
+         * when the next one is due, and whether milk and meat are clear.
+         */
+        function info(t) {
+            const list = state.doses
+                .filter(d => String(d.TreatmentID) === String(t.ID))
+                .sort((a, b) => num(a.DoseNo) - num(b.DoseNo));
+
+            const total = Math.max(1, num(t.TotalDoses, 1));
+            const given = list.length;
+            const interval = num(t.IntervalDays, 1) > 0 ? num(t.IntervalDays, 1) : 1;
+            const last = list[list.length - 1] || null;
+
+            const ended = String(t.Status) === 'ended';
+            const cleared = String(t.Status) === 'cleared';
+            const dosingDone = ended || given >= total;
+
+            let nextDue = null;
+            if (!dosingDone) {
+                nextDue = given === 0
+                    ? parseDate(t.Started)
+                    : addDays(parseDate(last.GivenAt) || new Date(), interval);
+            }
+
+            const now = new Date();
+            let dueNow = false, overdue = false;
+            if (nextDue) {
+                if (interval >= 1) {
+                    dueNow = startOfDay(nextDue) <= startOfDay(now);
+                    overdue = startOfDay(nextDue) < startOfDay(now);
+                } else {
+                    dueNow = nextDue <= now;
+                    overdue = nextDue.getTime() < now.getTime() - DAY / 2;
+                }
+            }
+
+            const lastDoseAt = last ? parseDate(last.GivenAt) : parseDate(t.LastDoseAt);
+            const milkMs = whMs(t.MilkWithhold, t.MilkWithholdUnit);
+            const meatMs = whMs(t.MeatWithhold, t.MeatWithholdUnit);
+            const milkClear = lastDoseAt ? new Date(lastDoseAt.getTime() + milkMs) : null;
+            const meatClear = lastDoseAt ? new Date(lastDoseAt.getTime() + meatMs) : null;
+            const milkOk = !milkClear || now >= milkClear;
+            const meatOk = !meatClear || now >= meatClear;
+
+            /* dosing   - still getting doses          (red card, Treated tab)
+               withhold - doses done, milk not clear   (red card, Treated tab)
+               ready    - milk clear, waiting on Clear (green card, Treated tab)
+               done     - someone hit Clear            (Clearing tab until meat is clear) */
+            let stage;
+            if (cleared) stage = 'done';
+            else if (!dosingDone) stage = 'dosing';
+            else if (!milkOk) stage = 'withhold';
+            else stage = 'ready';
+
+            return {
+                list, total, given, interval, ended, cleared, dosingDone,
+                nextDue, dueNow, overdue, lastDoseAt, milkClear, meatClear, milkOk, meatOk, stage
+            };
+        }
+
+        function byTag(t) {
+            return String(t.Tag || t.BirthID || t.EID || '?');
+        }
+
+        function quartersText(t) {
+            const q = String(t.Quarters || '').split(',').map(s => s.trim()).filter(Boolean);
+            if (!q.length) return '';
+            return q.map(x => QUARTER_NAMES[x] || x).join(', ');
+        }
+
+        /* ===================== TABS ===================== */
+
+        const TABS = [
+            { id: 'new', label: 'New Treatment' },
+            { id: 'treated', label: 'Treated Cows' },
+            { id: 'clearing', label: 'Clearing Cows' },
+            { id: 'meat', label: 'Meat Withhold' },
+            { id: 'history', label: 'History' },
+            { id: 'config', label: '⚙ Config', manager: true }
+        ];
+
+        function buildTabs() {
+            const counts = tabCounts();
+            $('tabs').innerHTML = TABS
+                .filter(t => !t.manager || isManager())
+                .map(t => {
+                    const c = counts[t.id];
+                    const badge = c && c.n
+                        ? `<span class="badge${c.hot ? ' hot' : ''}">${c.n}</span>` : '';
+                    return `<button class="tab${currentTab === t.id ? ' on' : ''}"
+                              onclick="showTab('${t.id}')">${esc(t.label)}${badge}</button>`;
+                }).join('');
+        }
+
+        function tabCounts() {
+            const all = state.treatments.map(t => ({ t, i: info(t) }));
+            const treated = all.filter(x => x.i.stage !== 'done');
+            const dueToday = treated.filter(x => x.i.dueNow).length;
+            return {
+                treated: { n: treated.length, hot: dueToday > 0 },
+                clearing: { n: all.filter(x => x.i.stage === 'done' && !x.i.meatOk).length },
+                meat: { n: all.filter(x => !x.i.meatOk).length, hot: false }
+            };
+        }
+
+        function showTab(id) {
+            if (id === 'config' && !isManager()) return;
+            currentTab = id;
+            TABS.forEach(t => {
+                const el = $('view-' + t.id);
+                if (el) el.classList.toggle('on', t.id === id);
+            });
+            buildTabs();
+            renderAll();
+            window.scrollTo(0, 0);
+            maybeRefresh();
+        }
+
+        /* ===================== RENDER ===================== */
+
+        /**
+         * Nothing is drawn from an old copy. Until the sheet answers, every list
+         * says so and offers Refresh, rather than showing numbers that may be wrong.
+         */
+        function blockedPanel() {
+            if (state.loaded) return '';
+            if (state.syncing) return '<div class="empty">Reading the sheet…</div>';
+            return `<div class="card" style="border-left:5px solid var(--red);">
+                <b>Nothing loaded yet.</b><br>
+                <span class="muted">${esc(state.error || 'The sheet has not answered.')}</span>
+                <button class="btn wide" style="margin-top:10px;" onclick="refreshAll(true)">⟳ Try again</button>
+              </div>`;
+        }
+
+        /** The line every list starts with: how old the data is, and a Refresh button. */
+        function listHeader(inner) {
+            return `<div class="card" style="padding:10px 14px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="flex:1;">${inner}</div>
+                    <button class="btn small grey" onclick="refreshAll(true)"
+                        ${state.syncing ? 'disabled' : ''}>⟳</button>
+                </div>
+                <div class="muted" style="font-size:11px; margin-top:6px;">
+                    Sheet read ${esc(freshness() || 'never')}${state.queue.length
+                        ? ' · <b style="color:var(--red);">' + plural(state.queue.length, 'change') + ' not saved yet</b>'
+                        : ''}
+                </div>
+              </div>`;
+        }
+
+        function renderAll() {
+            buildTabs();
+            const rb = $('refresh-btn');
+            if (rb) rb.textContent = state.syncing ? '⟳ …' : '⟳ Refresh';
+            if (currentTab === 'new') renderSearch();
+            if (currentTab === 'treated') renderTreated();
+            if (currentTab === 'clearing') renderClearing();
+            if (currentTab === 'meat') renderMeat();
+            if (currentTab === 'history') renderHistory();
+            if (currentTab === 'config') renderConfig();
+        }
+
+        /* ---------- tab 1: new treatment ---------- */
+
+        function setSearchMode(mode) {
+            searchMode = mode;
+            [...$('search-mode').children].forEach((b, i) =>
+                b.classList.toggle('on', ['Tag', 'BirthID', 'EID'][i] === mode));
+            const box = $('cow-search');
+            box.placeholder = mode === 'Tag' ? 'Type the tag number…'
+                : mode === 'BirthID' ? 'Type the birth ID…' : 'Type the EID…';
+            box.inputMode = mode === 'BirthID' ? 'text' : 'numeric';
+            box.focus();
+            renderSearch();
+        }
+
+        function renderSearch() {
+            const q = ($('cow-search').value || '').trim().toLowerCase();
+            const box = $('search-results');
+
+            const blocked = blockedPanel();
+            if (blocked) { box.innerHTML = blocked; return; }
+
+            if (!state.cows.length) {
+                box.innerHTML = `<p class="muted">No cow list loaded yet. A manager can load it in the Config tab.
+                    You can still type a tag number and treat the cow.</p>` + freeTagButton(q);
+                return;
+            }
+            if (!q) { box.innerHTML = '<p class="muted">Start typing to find a cow.</p>'; return; }
+
+            const field = searchMode;
+            // EIDs are written with spaces in the sheet, so spaces are ignored on
+            // both sides. Tag 7 must come before tag 17, so exact matches rank first.
+            const flat = s => String(s === undefined || s === null ? '' : s).toLowerCase().replace(/\s/g, '');
+            const needle = flat(q);
+
+            const hits = state.cows
+                .map(c => {
+                    const v = flat(c[field]);
+                    if (!v || v.indexOf(needle) === -1) return null;
+                    return { c, rank: v === needle ? 0 : (v.indexOf(needle) === 0 ? 1 : 2) };
+                })
+                .filter(Boolean)
+                .sort((a, b) => a.rank - b.rank ||
+                    String(a.c.Tag).localeCompare(String(b.c.Tag), undefined, { numeric: true }))
+                .slice(0, 40)
+                .map(x => x.c);
+
+            if (!hits.length) {
+                box.innerHTML = `<p class="muted">No cow found for “${esc(q)}”.</p>` + freeTagButton(q);
+                return;
+            }
+
+            box.innerHTML = '<div class="cow-list">' + hits.map((c, idx) => {
+                const open = openTreatmentsFor(c);
+                return `<div class="cow-row" onclick="pickCowIndex(${state.cows.indexOf(c)})">
+                    <div class="tag">${esc(c.Tag || '—')}</div>
+                    <div class="grow" style="flex:1;">
+                        <div class="sub">Birth ID: ${esc(c.BirthID || '—')}</div>
+                        <div class="sub">EID: ${esc(c.EID || '—')}</div>
+                    </div>
+                    ${open.length ? '<span class="pill" style="background:var(--red); color:#fff;">under treatment</span>' : ''}
+                </div>`;
+            }).join('') + '</div>';
+        }
+
+        function freeTagButton(q) {
+            if (!q) return '';
+            return `<button class="btn wide small" style="margin-top:8px;"
+                onclick="pickFreeCow('${esc(q).replace(/'/g, "")}')">Treat cow “${esc(q)}” anyway</button>`;
+        }
+
+        function openTreatmentsFor(cow) {
+            return state.treatments.filter(t => {
+                const i = info(t);
+                if (i.stage === 'done') return false;
+                if (cow.Tag && String(t.Tag) === String(cow.Tag)) return true;
+                if (cow.EID && String(t.EID) === String(cow.EID)) return true;
+                return false;
+            });
+        }
+
+        function pickCowIndex(idx) {
+            const cow = state.cows[idx];
+            if (!cow) return;
+            pickCow({ Tag: cow.Tag, BirthID: cow.BirthID, EID: cow.EID });
+        }
+
+        function pickFreeCow(text) {
+            const val = String(text || '').trim();
+            if (!val) return;
+            const cow = { Tag: '', BirthID: '', EID: '' };
+            cow[searchMode] = val;
+            pickCow(cow);
+        }
+
+        function pickCow(cow) {
+            draft = { cow, condition: null, drug: null, quarters: [] };
+            $('new-notes').value = '';
+            $('first-dose').checked = true;
+
+            const open = openTreatmentsFor(cow);
+            $('picked-card').classList.remove('hidden');
+            $('picked-body').innerHTML = `
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="font-size:40px; font-weight:900; line-height:1;">${esc(cow.Tag || cow.BirthID || cow.EID)}</div>
+                    <div class="sub muted" style="flex:1;">
+                        Birth ID: ${esc(cow.BirthID || '—')}<br>EID: ${esc(cow.EID || '—')}
+                    </div>
+                </div>
+                ${open.length ? `<div style="background:#fdecea; border:1px solid var(--red); color:var(--red-dark);
+                    border-radius:8px; padding:10px; margin-top:10px; font-size:13px;">
+                    <b>Careful.</b> This cow already has ${plural(open.length, 'open treatment')}:<br>
+                    ${open.map(t => esc(t.Condition) + ' — ' + esc(t.Drug)).join('<br>')}
+                  </div>` : ''}
+                <button class="btn wide" style="margin-top:12px;" onclick="startTreatment()">Give new treatment</button>
+            `;
+            $('condition-card').classList.add('hidden');
+            $('drug-card').classList.add('hidden');
+            $('detail-card').classList.add('hidden');
+            $('confirm-card').classList.add('hidden');
+            $('picked-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function startTreatment() {
+            const active = state.conditions.filter(c => isActive(c.Active));
+            if (!active.length) {
+                toast('No conditions set up yet — ask a manager');
+                return;
+            }
+            $('condition-card').classList.remove('hidden');
+            $('condition-list').innerHTML = active.map(c =>
+                `<button class="choice" onclick="pickCondition('${esc(c.ID)}')">${esc(c.Name)}</button>`
+            ).join('');
+            $('condition-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function isActive(v) {
+            const s = String(v === undefined || v === null ? '' : v).trim().toLowerCase();
+            return !(s === 'false' || s === 'no' || s === '0' || s === 'n');
+        }
+
+        function pickCondition(id) {
+            draft.condition = state.conditions.find(c => String(c.ID) === String(id)) || null;
+            draft.drug = null;
+            [...$('condition-list').children].forEach(b =>
+                b.classList.toggle('on', b.getAttribute('onclick').indexOf("'" + id + "'") !== -1));
+
+            const name = draft.condition ? String(draft.condition.Name).toLowerCase() : '';
+            const all = state.drugs.filter(d => isActive(d.Active));
+            // A drug listed against this condition comes first. Everything else stays
+            // available, because the vet often changes the plan on the day.
+            const matched = all.filter(d => String(d.Conditions || '').toLowerCase().indexOf(name) !== -1);
+            const others = all.filter(d => matched.indexOf(d) === -1);
+            const ordered = matched.concat(others);
+
+            if (!ordered.length) {
+                $('drug-card').classList.remove('hidden');
+                $('drug-list').innerHTML = '<p class="muted">No drugs set up yet — ask a manager.</p>';
+                $('drug-hint').textContent = '';
+                return;
+            }
+
+            $('drug-card').classList.remove('hidden');
+            $('drug-list').innerHTML = ordered.map(d => `
+                <button class="choice" onclick="pickDrug('${esc(d.ID)}')">
+                    ${esc(d.Name)}${matched.indexOf(d) === -1 ? '' : ' <span class="pill" style="background:var(--accent); color:#fff;">for this</span>'}
+                    <small>${drugPlanText(d)}</small>
+                </button>`).join('');
+            $('drug-hint').textContent = matched.length
+                ? 'Drugs marked “for this” are the ones set up for ' + draft.condition.Name + '.'
+                : 'No drug is set up for this condition, so all drugs are shown.';
+            $('detail-card').classList.add('hidden');
+            $('confirm-card').classList.add('hidden');
+            $('drug-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function drugPlanText(d) {
+            const doses = Math.max(1, num(d.Doses, 1));
+            const amount = num(d.Amount, 0);
+            const unit = String(d.Unit || '').trim();
+            const iv = num(d.IntervalDays, 1);
+            const every = doses <= 1 ? 'single dose'
+                : iv === 1 ? 'once a day' : 'every ' + iv + ' days';
+            const dose = amount ? amount + (unit ? ' ' + unit : '') + ' per dose' : (unit || 'dose');
+            return `${doses} × ${dose}, ${every} · milk ${whText(d.MilkWithhold, d.MilkWithholdUnit)}`
+                + ` · meat ${whText(d.MeatWithhold, d.MeatWithholdUnit)}`;
+        }
+
+        function pickDrug(id) {
+            draft.drug = state.drugs.find(d => String(d.ID) === String(id)) || null;
+            [...$('drug-list').children].forEach(b =>
+                b.classList.toggle('on', b.getAttribute('onclick').indexOf("'" + id + "'") !== -1));
+            $('detail-card').classList.remove('hidden');
+            $('detail-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            renderConfirm();
+        }
+
+        function toggleQuarter(q) {
+            const at = draft.quarters.indexOf(q);
+            if (at === -1) draft.quarters.push(q); else draft.quarters.splice(at, 1);
+            document.querySelectorAll('#udder .q').forEach(b =>
+                b.classList.toggle('on', draft.quarters.indexOf(b.dataset.q) !== -1));
+            renderConfirm();
+        }
+
+        function renderConfirm() {
+            if (!draft.cow || !draft.condition || !draft.drug) return;
+            const d = draft.drug;
+            const doses = Math.max(1, num(d.Doses, 1));
+            const iv = num(d.IntervalDays, 1);
+            const lastDoseDay = addDays(new Date(), (doses - 1) * iv);
+            const milkClear = new Date(lastDoseDay.getTime() + whMs(d.MilkWithhold, d.MilkWithholdUnit));
+            const meatClear = new Date(lastDoseDay.getTime() + whMs(d.MeatWithhold, d.MeatWithholdUnit));
+
+            $('confirm-card').classList.remove('hidden');
+            $('confirm-body').innerHTML = `
+                <div><b style="font-size:26px;">${esc(draft.cow.Tag || draft.cow.BirthID || draft.cow.EID)}</b></div>
+                <div><span class="muted">Condition:</span> <b>${esc(draft.condition.Name)}</b></div>
+                <div><span class="muted">Drug:</span> <b>${esc(d.Name)}</b></div>
+                <div><span class="muted">Plan:</span> ${esc(drugPlanText(d))}</div>
+                <div><span class="muted">Quarter:</span> ${draft.quarters.length ? esc(draft.quarters.map(q => QUARTER_NAMES[q]).join(', ')) : 'not applicable'}</div>
+                <hr style="border:none; border-top:1px solid var(--line); margin:8px 0;">
+                <div><span class="muted">Last dose due:</span> ${fmtDay(lastDoseDay)} (${relDay(lastDoseDay)})</div>
+                <div><span class="muted">Milk clear:</span> <b>${fmtDayTime(milkClear)}</b></div>
+                <div><span class="muted">Meat clear:</span> <b>${fmtDayTime(meatClear)}</b></div>
+                <div class="muted" style="font-size:12px;">Clear dates move if a dose is given late. They always count from the real last dose.</div>
+            `;
+        }
+
+        function resetNewTreatment() {
+            draft = { cow: null, condition: null, drug: null, quarters: [] };
+            ['picked-card', 'condition-card', 'drug-card', 'detail-card', 'confirm-card']
+                .forEach(id => $(id).classList.add('hidden'));
+            document.querySelectorAll('#udder .q').forEach(b => b.classList.remove('on'));
+            $('cow-search').value = '';
+            $('new-notes').value = '';
+            renderSearch();
+            window.scrollTo(0, 0);
+        }
+
+        function saveNewTreatment() {
+            if (!draft.cow || !draft.condition || !draft.drug) { toast('Pick a cow, condition and drug'); return; }
+            const d = draft.drug;
+            const who = draft.cow.Tag || draft.cow.BirthID || draft.cow.EID;
+
+            // The drug settings are copied onto the treatment. Changing the drug
+            // later must not move the clear dates of a cow already treated.
+            send({
+                type: 'new_treatment',
+                id: uid('t'),
+                startedAt: new Date().toISOString(),
+                tag: draft.cow.Tag || '',
+                birthId: draft.cow.BirthID || '',
+                eid: draft.cow.EID || '',
+                condition: draft.condition.Name,
+                drug: d.Name,
+                drugId: d.ID,
+                quarters: draft.quarters.join(','),
+                notes: ($('new-notes').value || '').trim(),
+                totalDoses: Math.max(1, num(d.Doses, 1)),
+                intervalDays: num(d.IntervalDays, 1),
+                milkWithhold: num(d.MilkWithhold, 0),
+                milkWithholdUnit: whUnit(d.MilkWithholdUnit),
+                meatWithhold: num(d.MeatWithhold, 0),
+                meatWithholdUnit: whUnit(d.MeatWithholdUnit),
+                firstDose: $('first-dose').checked,
+                firstDoseId: uid('d')
+            });
+
+            toast('Treatment saved for ' + who);
+            resetNewTreatment();
+            showTab('treated');
+        }
+
+        /* ---------- tab 2: treated cows ---------- */
+
+        function renderTreated() {
+            const blocked = blockedPanel();
+            if (blocked) { $('treated-body').innerHTML = blocked; return; }
+
+            const rows = state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => x.i.stage !== 'done');
+
+            // Doses due today first, then cows ready to clear, then the rest.
+            const rank = x => x.i.dueNow ? 0 : (x.i.stage === 'ready' ? 1 : 2);
+            rows.sort((a, b) => {
+                if (rank(a) !== rank(b)) return rank(a) - rank(b);
+                if (a.i.overdue !== b.i.overdue) return a.i.overdue ? -1 : 1;
+                return String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true });
+            });
+
+            const due = rows.filter(x => x.i.dueNow).length;
+            const ready = rows.filter(x => x.i.stage === 'ready').length;
+
+            const head = listHeader(`
+                <b>${plural(rows.length, 'cow')}</b> under treatment or milk withhold.
+                ${due ? `<span style="color:var(--red-dark); font-weight:700;"> ${due} need${due === 1 ? 's' : ''} a dose today.</span>` : ' No doses due today.'}
+                ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`);
+
+            $('treated-body').innerHTML = head + (rows.length
+                ? rows.map(x => treatedCard(x.t, x.i)).join('')
+                : '<div class="empty">No cows under treatment. 🎉</div>');
+        }
+
+        function treatedCard(t, i) {
+            const q = quartersText(t);
+            const doseLabel = `Give dose ${Math.min(i.given + 1, i.total)}/${i.total}`;
+            const ready = i.stage === 'ready';
+            const colour = ready ? 'green' : (i.dueNow ? 'reddark' : 'red');
+
+            let when;
+            if (ready) {
+                when = `Milk withhold finished ${fmtDayTime(i.milkClear)} (${relDay(i.milkClear)}).`;
+            } else if (i.stage === 'withhold') {
+                when = `Dosing finished. Milk clear ${fmtDayTime(i.milkClear)} (${relDay(i.milkClear)}).`;
+            } else if (i.dueNow) {
+                when = i.overdue ? `Dose was due ${relDay(i.nextDue)}.` : 'Dose due today.';
+            } else {
+                when = `Next dose ${fmtDay(i.nextDue)} (${relDay(i.nextDue)}).`;
+            }
+
+            return `<div class="tcard ${colour}">
+                <div class="top">
+                    <div class="num">${esc(byTag(t))}<small>${ready ? 'MILK IS CLEAR' : esc(t.Tag ? 'TAG' : (t.BirthID ? 'BIRTH ID' : 'EID'))}</small></div>
+                    <div class="info">
+                        <b>${esc(t.Condition)}</b>${q ? `<span class="tag2">${esc(q)}</span>` : ''}<br>
+                        ${esc(t.Drug)} · dose ${i.given}/${i.total}${i.ended ? ' (stopped early)' : ''}<br>
+                        ${when}
+                        ${ready && !i.meatOk ? `<br>Meat withhold runs to <b>${fmtDayTime(i.meatClear)}</b>.` : ''}
+                        ${t.Notes ? `<div class="notes">“${esc(t.Notes)}”</div>` : ''}
+                    </div>
+                </div>
+                ${i.overdue ? '<div class="warn">⚠ OVERDUE — a dose was missed</div>' : ''}
+                <div class="acts">
+                    ${ready ? `<button class="btn dosebtn" style="color:var(--accent-dark) !important;" onclick="clearCow('${esc(t.ID)}')">✓ Clear</button>` : ''}
+                    ${(!ready && !i.dosingDone) ? `<button class="btn dosebtn" onclick="giveDose('${esc(t.ID)}')">${doseLabel}</button>` : ''}
+                    <button class="btn small ghost" onclick="openTreatment('${esc(t.ID)}')">Details</button>
+                    ${i.given ? `<button class="btn small ghost" onclick="undoDose('${esc(t.ID)}')">Undo last dose</button>` : ''}
+                    ${i.dosingDone ? '' : `<button class="btn small ghost" onclick="endTreatment('${esc(t.ID)}')">Stop treatment</button>`}
+                </div>
+            </div>`;
+        }
+
+        function giveDose(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            const i = info(t);
+            if (i.dosingDone) { toast('All doses are already given'); return; }
+
+            const doseNo = i.given + 1;
+            send({
+                type: 'give_dose', id: uid('d'), treatmentId: id,
+                doseNo: doseNo, givenAt: new Date().toISOString()
+            });
+            toast(`Dose ${doseNo}/${i.total} recorded for ${byTag(t)}`);
+        }
+
+        function undoDose(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            const i = info(t);
+            if (!i.given) return;
+            if (!confirm(`Undo dose ${i.given}/${i.total} for cow ${byTag(t)}?`)) return;
+
+            const last = i.list[i.list.length - 1];
+            send({ type: 'undo_dose', treatmentId: id, doseId: last.ID });
+            toast('Dose removed');
+        }
+
+        function endTreatment(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            const i = info(t);
+            if (!confirm(`Stop the treatment for cow ${byTag(t)} after ${i.given} of ${i.total} doses?\n\nThe withhold still counts from the last dose given.`)) return;
+            send({ type: 'end_treatment', treatmentId: id });
+            toast('Treatment stopped');
+        }
+
+        /* ---------- tab 3: clearing cows ---------- */
+
+        /**
+         * Cows that have been cleared for milk but are still inside the meat
+         * withhold. They drop off this list on their own once the meat is clear.
+         */
+        function renderClearing() {
+            const blocked = blockedPanel();
+            if (blocked) { $('clearing-body').innerHTML = blocked; return; }
+
+            const rows = state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => x.i.stage === 'done' && !x.i.meatOk)
+                .sort((a, b) => a.i.meatClear - b.i.meatClear);
+
+            const head = listHeader(`
+                Milk is back in the vat. These cows are still inside the <b>meat withhold</b>.
+                They leave this list by themselves when the meat is clear.`);
+
+            $('clearing-body').innerHTML = head + (rows.length
+                ? rows.map(x => clearingCard(x.t, x.i)).join('')
+                : '<div class="empty">No cows are clearing right now.</div>');
+        }
+
+        function clearingCard(t, i) {
+            const q = quartersText(t);
+            return `<div class="tcard green">
+                <div class="top">
+                    <div class="num">${esc(byTag(t))}<small>MILK CLEARED</small></div>
+                    <div class="info">
+                        <b>${esc(t.Condition)}</b>${q ? `<span class="tag2">${esc(q)}</span>` : ''}<br>
+                        ${esc(t.Drug)} · ${i.given}/${i.total} doses${i.ended ? ' (stopped early)' : ''}<br>
+                        Cleared ${fmtDay(t.ClearedAt)} by ${esc(t.ClearedBy || '—')}<br>
+                        <b>Meat clear ${fmtDayTime(i.meatClear)}</b> (${relDay(i.meatClear)})
+                    </div>
+                </div>
+                <div class="acts">
+                    <button class="btn small ghost" onclick="openTreatment('${esc(t.ID)}')">Details</button>
+                    <button class="btn small ghost" onclick="unclearCow('${esc(t.ID)}')">Undo clear</button>
+                </div>
+            </div>`;
+        }
+
+        /** Ask first. Clearing a cow puts her milk back in the vat. */
+        function clearCow(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            const i = info(t);
+
+            openModal(`
+                <h3>Clear cow ${esc(byTag(t))}?</h3>
+                <div style="font-size:14px; line-height:1.8;">
+                    <div><span class="muted">Condition:</span> <b>${esc(t.Condition)}</b></div>
+                    <div><span class="muted">Drug:</span> ${esc(t.Drug)} · ${i.given}/${i.total} doses</div>
+                    <div><span class="muted">Last dose:</span> ${fmtDayTime(i.lastDoseAt)}</div>
+                    <div><span class="muted">Milk withhold:</span> ${whText(t.MilkWithhold, t.MilkWithholdUnit)},
+                        finished ${fmtDayTime(i.milkClear)}</div>
+                </div>
+                <div style="background:#eafaf1; border:1px solid var(--accent); border-radius:8px;
+                            padding:10px; margin-top:12px; font-size:14px;">
+                    Her milk goes <b>back in the vat</b> from the next milking.
+                    ${i.meatOk
+                        ? 'She is out of the meat withhold too, so this finishes the treatment.'
+                        : `She stays in <b>Clearing Cows</b> until the meat is clear on
+                           <b>${fmtDayTime(i.meatClear)}</b>.`}
+                </div>
+                <div class="row" style="margin-top:14px;">
+                    <button class="btn grey" onclick="closeModal()">Cancel</button>
+                    <button class="btn" onclick="confirmClearCow('${esc(id)}')">Yes, clear her</button>
+                </div>
+            `);
+        }
+
+        function confirmClearCow(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            const i = info(t);
+            closeModal();
+            send({ type: 'clear_cow', treatmentId: id, clearedAt: new Date().toISOString() });
+            toast(i.meatOk
+                ? 'Cow ' + byTag(t) + ' cleared and finished'
+                : 'Cow ' + byTag(t) + ' cleared — meat withhold to ' + fmtDay(i.meatClear));
+        }
+
+        /** Put a cow back on the red list if someone hit Clear by mistake. */
+        function unclearCow(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            if (!confirm(`Undo the clear for cow ${byTag(t)}?\n\nShe goes back to the Treated Cows list.`)) return;
+            send({ type: 'unclear_cow', treatmentId: id });
+            toast('Clear undone');
+        }
+
+        /* ---------- tab 4: meat withhold ---------- */
+
+        function renderMeat() {
+            const blocked = blockedPanel();
+            if (blocked) { $('meat-body').innerHTML = blocked; return; }
+
+            const rows = state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => !x.i.meatOk && x.i.meatClear)
+                .sort((a, b) => a.i.meatClear - b.i.meatClear);
+
+            const head = listHeader(`
+                <b>${plural(rows.length, 'cow')}</b> must not go for meat yet.
+                This list holds every treated cow, red or cleared.
+                The date is counted from the last dose given.`);
+
+            $('meat-body').innerHTML = head + (rows.length
+                ? rows.map(x => `<div class="tcard orange">
+                    <div class="top">
+                        <div class="num">${esc(byTag(x.t))}<small>DO NOT CULL</small></div>
+                        <div class="info">
+                            <b>Meat clear ${fmtDayTime(x.i.meatClear)}</b> (${relDay(x.i.meatClear)})<br>
+                            ${esc(x.t.Condition)} · ${esc(x.t.Drug)}<br>
+                            Last dose ${fmtDayTime(x.i.lastDoseAt)} · withhold ${whText(x.t.MeatWithhold, x.t.MeatWithholdUnit)}
+                        </div>
+                    </div>
+                    <div class="acts"><button class="btn small ghost" onclick="openTreatment('${esc(x.t.ID)}')">Details</button></div>
+                  </div>`).join('')
+                : '<div class="empty">No cow is inside a meat withhold.</div>');
+        }
+
+        /* ---------- tab 5: history ---------- */
+
+        function renderHistory() {
+            const blocked = blockedPanel();
+            if (blocked) { $('history-body').innerHTML = blocked; return; }
+
+            const q = ($('hist-search').value || '').trim().toLowerCase();
+            let rows = state.treatments.map(t => ({ t, i: info(t) }));
+
+            if (q) {
+                rows = rows.filter(x => {
+                    const t = x.t;
+                    return [t.Tag, t.BirthID, t.EID, t.Condition, t.Drug, t.Notes, t.CreatedBy]
+                        .map(v => String(v || '').toLowerCase()).join(' ').indexOf(q) !== -1;
+                });
+            }
+            rows.sort((a, b) => (parseDate(b.t.Started) || 0) - (parseDate(a.t.Started) || 0));
+
+            const head = listHeader(`${plural(rows.length, 'treatment')}${q ? ' found' : ' recorded'}, newest first.`);
+
+            $('history-body').innerHTML = head + (rows.length
+                ? rows.slice(0, 400).map(x => historyRow(x.t, x.i)).join('')
+                : '<div class="empty">Nothing recorded yet.</div>');
+        }
+
+        function historyRow(t, i) {
+            const stage = i.stage === 'done'
+                ? (i.meatOk ? 'finished' : 'meat withhold')
+                : { dosing: 'under treatment', withhold: 'milk withhold', ready: 'ready to clear' }[i.stage];
+            const colour = i.stage === 'done'
+                ? (i.meatOk ? 'var(--muted)' : 'var(--orange)')
+                : { dosing: 'var(--red)', withhold: 'var(--red)', ready: 'var(--accent-dark)' }[i.stage];
+            const q = quartersText(t);
+            return `<div class="hrow" onclick="openTreatment('${esc(t.ID)}')" style="cursor:pointer;">
+                <div class="hd">
+                    <b>${esc(byTag(t))}</b>
+                    <span class="pill" style="background:${colour}; color:#fff;">${stage}</span>
+                    <span class="muted" style="margin-left:auto;">${fmtDay(t.Started)}</span>
+                </div>
+                <div>${esc(t.Condition)} · ${esc(t.Drug)} · ${i.given}/${i.total} doses${q ? ' · ' + esc(q) : ''}</div>
+                <div class="muted">Treated by ${esc(t.CreatedBy || '—')}${i.lastDoseAt ? ' · last dose ' + fmtDay(i.lastDoseAt) : ''}</div>
+                <div class="muted">${t.ClearedAt
+                    ? 'Cleared ' + fmtDay(t.ClearedAt) + ' by ' + esc(t.ClearedBy || '—')
+                    : 'Not cleared yet'}${i.meatClear ? ' · meat clear ' + fmtDayTime(i.meatClear) : ''}</div>
+            </div>`;
+        }
+
+        /* ---------- treatment detail sheet ---------- */
+
+        function openTreatment(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            const i = info(t);
+            const q = quartersText(t);
+
+            const doseLines = i.list.length
+                ? i.list.map(d => `<div class="cfg-item"><div class="grow">
+                        <div class="name">Dose ${esc(d.DoseNo)}/${i.total}</div>
+                        <div class="det">${fmtDayTime(d.GivenAt)} · ${esc(d.GivenBy || '—')}</div>
+                    </div></div>`).join('')
+                : '<p class="muted">No dose recorded yet.</p>';
+
+            openModal(`
+                <h3>Cow ${esc(byTag(t))}</h3>
+                <div style="font-size:14px; line-height:1.8;">
+                    <div><span class="muted">Condition:</span> <b>${esc(t.Condition)}</b></div>
+                    <div><span class="muted">Drug:</span> <b>${esc(t.Drug)}</b></div>
+                    <div><span class="muted">Quarter:</span> ${q || 'not applicable'}</div>
+                    <div><span class="muted">Started:</span> ${fmtDayTime(t.Started)} by ${esc(t.CreatedBy || '—')}</div>
+                    <div><span class="muted">Plan:</span> ${i.total} dose(s), every ${num(t.IntervalDays, 1)} day(s)</div>
+                    <div><span class="muted">Milk withhold:</span> ${whText(t.MilkWithhold, t.MilkWithholdUnit)} → ${i.milkClear ? fmtDayTime(i.milkClear) : '—'}</div>
+                    <div><span class="muted">Meat withhold:</span> ${whText(t.MeatWithhold, t.MeatWithholdUnit)} → ${i.meatClear ? fmtDayTime(i.meatClear) : '—'}</div>
+                    ${t.Notes ? `<div><span class="muted">Notes:</span> ${esc(t.Notes)}</div>` : ''}
+                    ${t.ClearedAt ? `<div><span class="muted">Cleared:</span> ${fmtDayTime(t.ClearedAt)} by ${esc(t.ClearedBy || '—')}</div>` : ''}
+                </div>
+                <h3 style="margin-top:16px;">Doses given</h3>
+                ${doseLines}
+                <div class="row" style="margin-top:16px;">
+                    <button class="btn grey" onclick="closeModal()">Close</button>
+                    ${isManager() ? `<button class="btn red" onclick="deleteTreatment('${esc(t.ID)}')">Delete</button>` : ''}
+                </div>
+            `);
+        }
+
+        function deleteTreatment(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            if (!confirm(`Delete the whole treatment record for cow ${byTag(t)}?\n\nThis cannot be undone.`)) return;
+            send({ type: 'delete_treatment', treatmentId: id });
+            closeModal();
+            toast('Treatment deleted');
+        }
+
+        /* ===================== CONFIG TAB ===================== */
+
+        function renderConfig() {
+            if (!isManager()) { showTab('new'); return; }
+
+            $('cfg-conditions').innerHTML = state.conditions.length
+                ? state.conditions.map((c, idx) => `<div class="cfg-item">
+                    <div class="grow">
+                        <div class="name">${esc(c.Name)}</div>
+                        <div class="det">${isActive(c.Active) ? 'in use' : 'hidden from the list'}</div>
+                    </div>
+                    <button class="iconbtn" onclick="editCondition(${idx})">✏️</button>
+                    <button class="iconbtn" onclick="removeCondition(${idx})">🗑</button>
+                  </div>`).join('')
+                : '<p class="muted">No conditions yet.</p>';
+
+            $('cfg-drugs').innerHTML = state.drugs.length
+                ? state.drugs.map((d, idx) => `<div class="cfg-item">
+                    <div class="grow">
+                        <div class="name">${esc(d.Name)}${isActive(d.Active) ? '' : ' <span class="pill">hidden</span>'}</div>
+                        <div class="det">${esc(drugPlanText(d))}</div>
+                        <div class="det">${d.Conditions ? 'For: ' + esc(d.Conditions) : 'Not linked to a condition'}</div>
+                    </div>
+                    <button class="iconbtn" onclick="editDrug(${idx})">✏️</button>
+                    <button class="iconbtn" onclick="removeDrug(${idx})">🗑</button>
+                  </div>`).join('')
+                : '<p class="muted">No drugs yet.</p>';
+
+            $('cow-count').textContent = state.cows.length
+                ? state.cows.length + ' cows in the list.'
+                : 'No cows loaded yet.';
+            $('cfg-managers').value = String(state.managers || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).join('\n');
+        }
+
+        /* ---------- conditions ---------- */
+
+        function editCondition(idx) {
+            const c = idx === null ? { ID: '', Name: '', Active: 'yes' } : state.conditions[idx];
+            openModal(`
+                <h3>${idx === null ? 'New condition' : 'Edit condition'}</h3>
+                <label class="lbl">Name</label>
+                <input type="text" id="m-cname" value="${esc(c.Name)}" placeholder="e.g. Mastitis">
+                <label class="lbl" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
+                    <input type="checkbox" id="m-cactive" ${isActive(c.Active) ? 'checked' : ''} style="width:20px; height:20px;">
+                    Show in the list
+                </label>
+                <div class="row" style="margin-top:14px;">
+                    <button class="btn grey" onclick="closeModal()">Cancel</button>
+                    <button class="btn" onclick="saveCondition(${idx === null ? 'null' : idx})">Save</button>
+                </div>
+            `);
+        }
+
+        function saveCondition(idx) {
+            const name = ($('m-cname').value || '').trim();
+            if (!name) { toast('Give it a name'); return; }
+            const active = $('m-cactive').checked ? 'yes' : 'no';
+            if (idx === null) state.conditions.push({ ID: uid('c'), Name: name, Active: active });
+            else Object.assign(state.conditions[idx], { Name: name, Active: active });
+            pushConditions();
+            closeModal();
+        }
+
+        function removeCondition(idx) {
+            const c = state.conditions[idx];
+            if (!c) return;
+            if (!confirm(`Remove the condition "${c.Name}"?\n\nTreatments already recorded keep their condition name.`)) return;
+            state.conditions.splice(idx, 1);
+            pushConditions();
+        }
+
+        function pushConditions() {
+            send({ type: 'save_conditions', conditions: state.conditions });
+            toast('Conditions saved');
+        }
+
+        /* ---------- drugs ---------- */
+
+        function editDrug(idx) {
+            const d = idx === null
+                ? {
+                    ID: '', Name: '', Form: 'Injection', Doses: 3, Amount: 10, Unit: 'ml', IntervalDays: 1,
+                    MilkWithhold: 96, MilkWithholdUnit: 'hours', MeatWithhold: 14, MeatWithholdUnit: 'days',
+                    Conditions: '', Active: 'yes', Notes: ''
+                }
+                : state.drugs[idx];
+
+            const unitOptions = (sel) => ['hours', 'days']
+                .map(u => `<option value="${u}" ${whUnit(sel) === u ? 'selected' : ''}>${u}</option>`).join('');
+
+            const condBoxes = state.conditions.map(c => {
+                const on = String(d.Conditions || '').toLowerCase().indexOf(String(c.Name).toLowerCase()) !== -1;
+                return `<label style="display:inline-flex; align-items:center; gap:5px; margin:0 10px 6px 0; font-size:14px;">
+                    <input type="checkbox" class="m-cond" value="${esc(c.Name)}" ${on ? 'checked' : ''} style="width:18px; height:18px;">
+                    ${esc(c.Name)}</label>`;
+            }).join('') || '<span class="muted">Add some conditions first.</span>';
+
+            openModal(`
+                <h3>${idx === null ? 'New drug' : 'Edit drug'}</h3>
+                <label class="lbl">Name</label>
+                <input type="text" id="m-dname" value="${esc(d.Name)}" placeholder="e.g. Mastalone">
+
+                <label class="lbl">Form</label>
+                <select id="m-dform">
+                    ${['Injection', 'Intramammary tube', 'Oral', 'Pour-on', 'Other']
+                    .map(f => `<option ${String(d.Form) === f ? 'selected' : ''}>${f}</option>`).join('')}
+                </select>
+
+                <div class="row">
+                    <div><label class="lbl">Number of doses</label>
+                        <input type="number" id="m-ddoses" min="1" step="1" value="${num(d.Doses, 1)}"></div>
+                    <div><label class="lbl">Days between doses</label>
+                        <input type="number" id="m-dinterval" min="0.5" step="0.5" value="${num(d.IntervalDays, 1)}"></div>
+                </div>
+
+                <div class="row">
+                    <div><label class="lbl">Amount per dose</label>
+                        <input type="number" id="m-damount" min="0" step="0.5" value="${num(d.Amount, 0)}"></div>
+                    <div><label class="lbl">Unit</label>
+                        <select id="m-dunit">
+                            ${['ml', 'tube', 'g', 'sachet', 'bolus']
+                    .map(u => `<option ${String(d.Unit) === u ? 'selected' : ''}>${u}</option>`).join('')}
+                        </select></div>
+                </div>
+
+                <label class="lbl">Milk withhold</label>
+                <div class="row">
+                    <div style="flex:2 1 0;"><input type="number" id="m-dmilk" min="0" step="1" value="${num(d.MilkWithhold, 0)}"></div>
+                    <div style="flex:1 1 0;"><select id="m-dmilkunit">${unitOptions(d.MilkWithholdUnit)}</select></div>
+                </div>
+
+                <label class="lbl">Meat withhold</label>
+                <div class="row">
+                    <div style="flex:2 1 0;"><input type="number" id="m-dmeat" min="0" step="1" value="${num(d.MeatWithhold, 0)}"></div>
+                    <div style="flex:1 1 0;"><select id="m-dmeatunit">${unitOptions(d.MeatWithholdUnit)}</select></div>
+                </div>
+                <p class="muted" style="margin:6px 0 0;">
+                    Use whatever the label says — <b>hours</b> or <b>days</b>. Both are counted
+                    from the <b>last dose given</b>, to the hour.
+                </p>
+
+                <label class="lbl">Used for these conditions</label>
+                <div>${condBoxes}</div>
+
+                <label class="lbl">Notes</label>
+                <textarea id="m-dnotes" placeholder="Vet instructions, storage, anything useful">${esc(d.Notes)}</textarea>
+
+                <label class="lbl" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
+                    <input type="checkbox" id="m-dactive" ${isActive(d.Active) ? 'checked' : ''} style="width:20px; height:20px;">
+                    Show in the list
+                </label>
+
+                <div class="row" style="margin-top:14px;">
+                    <button class="btn grey" onclick="closeModal()">Cancel</button>
+                    <button class="btn" onclick="saveDrug(${idx === null ? 'null' : idx})">Save</button>
+                </div>
+            `);
+        }
+
+        function saveDrug(idx) {
+            const name = ($('m-dname').value || '').trim();
+            if (!name) { toast('Give it a name'); return; }
+            const conds = [...document.querySelectorAll('.m-cond')].filter(b => b.checked).map(b => b.value);
+            const row = {
+                Name: name,
+                Form: $('m-dform').value,
+                Doses: Math.max(1, num($('m-ddoses').value, 1)),
+                Amount: num($('m-damount').value, 0),
+                Unit: $('m-dunit').value,
+                IntervalDays: num($('m-dinterval').value, 1),
+                MilkWithhold: num($('m-dmilk').value, 0),
+                MilkWithholdUnit: $('m-dmilkunit').value,
+                MeatWithhold: num($('m-dmeat').value, 0),
+                MeatWithholdUnit: $('m-dmeatunit').value,
+                Conditions: conds.join(', '),
+                Active: $('m-dactive').checked ? 'yes' : 'no',
+                Notes: ($('m-dnotes').value || '').trim()
+            };
+            if (idx === null) state.drugs.push(Object.assign({ ID: uid('g') }, row));
+            else Object.assign(state.drugs[idx], row);
+            pushDrugs();
+            closeModal();
+        }
+
+        function removeDrug(idx) {
+            const d = state.drugs[idx];
+            if (!d) return;
+            if (!confirm(`Remove the drug "${d.Name}"?\n\nTreatments already recorded keep their drug name and withhold days.`)) return;
+            state.drugs.splice(idx, 1);
+            pushDrugs();
+        }
+
+        function pushDrugs() {
+            send({ type: 'save_drugs', drugs: state.drugs });
+            toast('Drugs saved');
+        }
+
+        /* ---------- cow list ---------- */
+
+        function setImportMode(mode) {
+            importMode = mode;
+            [...$('import-mode').children].forEach((b, i) =>
+                b.classList.toggle('on', ['merge', 'replace'][i] === mode));
+        }
+
+        function loadCowFile(ev) {
+            const file = ev.target.files && ev.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => { $('cow-paste').value = e.target.result; toast('File loaded — now tap Load cows'); };
+            reader.readAsText(file);
+        }
+
+        /** Small CSV reader. Handles quoted fields and commas, tabs or semicolons. */
+        function parseCsv(text) {
+            const rows = [];
+            let row = [], field = '', inQuotes = false;
+            const sep = (text.split('\t').length > text.split(',').length) ? '\t'
+                : (text.split(';').length > text.split(',').length) ? ';' : ',';
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                if (inQuotes) {
+                    if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+                    else if (ch === '"') inQuotes = false;
+                    else field += ch;
+                } else if (ch === '"') inQuotes = true;
+                else if (ch === sep) { row.push(field); field = ''; }
+                else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+                else if (ch !== '\r') field += ch;
+            }
+            row.push(field);
+            if (row.some(f => f !== '')) rows.push(row);
+            return rows;
+        }
+
+        function importCows() {
+            const text = ($('cow-paste').value || '').trim();
+            if (!text) { toast('Paste the cow list first'); return; }
+
+            const rows = parseCsv(text).filter(r => r.some(f => String(f).trim() !== ''));
+            if (!rows.length) { toast('Nothing to read'); return; }
+
+            // Work out which column is which. A header row is used if it is there.
+            // "Animal ID", "Cow number" and "Tag" all mean the same column here.
+            let head = rows[0].map(h => String(h).toLowerCase().replace(/[^a-z]/g, ''));
+            let idxTag = head.findIndex(h => /tag|animal|cownumber|cowno|number/.test(h) && !/birth/.test(h));
+            let idxBirth = head.findIndex(h => h.indexOf('birth') !== -1 || h === 'id');
+            let idxEid = head.findIndex(h => h.indexOf('eid') !== -1 || h.indexOf('rfid') !== -1);
+            let start = 1;
+
+            if (idxTag === -1 && idxBirth === -1 && idxEid === -1) {
+                idxTag = 0; idxBirth = 1; idxEid = 2; start = 0; // no header: assume the given order
+            }
+
+            const cows = [];
+            for (let r = start; r < rows.length; r++) {
+                const row = rows[r];
+                const cow = {
+                    Tag: idxTag >= 0 ? String(row[idxTag] || '').trim() : '',
+                    BirthID: idxBirth >= 0 ? String(row[idxBirth] || '').trim() : '',
+                    EID: idxEid >= 0 ? String(row[idxEid] || '').trim() : ''
+                };
+                if (cow.Tag || cow.BirthID || cow.EID) cows.push(cow);
+            }
+            if (!cows.length) { toast('No cows found in that text'); return; }
+
+            const word = importMode === 'replace' ? 'REPLACE the whole cow list with' : 'add or update';
+            if (!confirm(`Read ${cows.length} cows.\n\nThis will ${word} them. Carry on?`)) return;
+
+            send({ type: 'import_cows', mode: importMode, cows: cows });
+            $('cow-paste').value = '';
+            toast('Sending ' + cows.length + ' cows to the sheet…');
+        }
+
+        function saveManagers() {
+            const list = ($('cfg-managers').value || '').split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+            send({ type: 'save_managers', managers: list.join(', ') });
+            toast('Managers saved');
+        }
+
+        /* ===================== MODAL ===================== */
+
+        function openModal(html) {
+            closeModal();
+            const bg = document.createElement('div');
+            bg.className = 'modal-bg';
+            bg.id = 'modal-bg';
+            bg.innerHTML = `<div class="modal" onclick="event.stopPropagation()">${html}</div>`;
+            bg.onclick = closeModal;
+            document.body.appendChild(bg);
+        }
+
+        function closeModal() {
+            const bg = $('modal-bg');
+            if (bg) bg.remove();
+        }
+
+        /* ===================== BOOT ===================== */
+
+        loadQueue();
+        setSearchMode('Tag');
+        buildTabs();
+        renderAll();
+        refreshAll(false);
+
+        /** Read the sheet again if the copy on screen is older than this. */
+        const STALE_MS = 20000;
+
+        function maybeRefresh() {
+            if (state.syncing) return;
+            if (!state.loaded || Date.now() - state.loadedAt > STALE_MS) refreshAll(false);
+        }
+
+        // Two people dose cows at the same time, so the screen is re-read often.
+        setInterval(() => { if (document.visibilityState === 'visible') refreshAll(false); }, 60000);
+
+        // Coming back to the app, or switching tabs, always re-reads the sheet.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') refreshAll(false);
+        });
+    </script>
+</body>
+
+</html>
