@@ -461,7 +461,17 @@
                 .finally(() => clearTimeout(timer));
         }
 
-        const QUARTER_NAMES = { LF: 'Left Front', RF: 'Right Front', LR: 'Left Rear', RR: 'Right Rear' };
+        // The order here is the order of the buttons: front row, then back row.
+        const QUARTER_NAMES = { FL: 'Front Left', FR: 'Front Right', BL: 'Back Left', BR: 'Back Right' };
+        const ALL_QUARTERS = Object.keys(QUARTER_NAMES);
+
+        // The first version used LF/RF/LR/RR. Anything saved with those still reads.
+        const OLD_QUARTERS = { LF: 'FL', RF: 'FR', LR: 'BL', RR: 'BR' };
+
+        function quarterCode(q) {
+            const c = String(q || '').trim().toUpperCase();
+            return OLD_QUARTERS[c] || c;
+        }
 
         /* ===================== STATE ===================== */
 
@@ -961,7 +971,7 @@
         function quartersText(t) {
             const q = String(t.Quarters || '').split(',').map(s => s.trim()).filter(Boolean);
             if (!q.length) return '';
-            return q.map(x => QUARTER_NAMES[x] || x).join(', ');
+            return q.map(x => QUARTER_NAMES[quarterCode(x)] || x).join(', ');
         }
 
         /* ===================== TABS ===================== */
@@ -1500,7 +1510,7 @@
             if (!batchMode) {
                 const key = cowKey(draft.cows[0]);
                 const on = draft.quarters[key] || [];
-                box.innerHTML = '<div class="udder">' + Object.keys(QUARTER_NAMES).map(q =>
+                box.innerHTML = '<div class="udder">' + ALL_QUARTERS.map(q =>
                     `<button class="q${on.indexOf(q) !== -1 ? ' on' : ''}"
                         onclick="toggleQuarterFor('${esc(key)}','${q}')">${QUARTER_NAMES[q]}</button>`
                 ).join('') + '</div>';
@@ -1509,7 +1519,7 @@
 
             box.innerHTML = `
                 <div class="row" style="margin-bottom:8px;">
-                    <button class="btn small grey" onclick="setAllQuarters(['LF','RF','LR','RR'])">All 4 on every cow</button>
+                    <button class="btn small grey" onclick="setAllQuarters(ALL_QUARTERS.slice())">All 4 on every cow</button>
                     <button class="btn small grey" onclick="setAllQuarters([])">Clear all</button>
                 </div>
                 ${draft.cows.map(c => {
@@ -1517,7 +1527,7 @@
                     const on = draft.quarters[key] || [];
                     return `<div class="qrow">
                         <div class="who">${esc(cowName(c))}</div>
-                        ${Object.keys(QUARTER_NAMES).map(q =>
+                        ${ALL_QUARTERS.map(q =>
                         `<button class="qmini${on.indexOf(q) !== -1 ? ' on' : ''}"
                             onclick="toggleQuarterFor('${esc(key)}','${q}')">${q}</button>`).join('')}
                     </div>`;
@@ -1546,7 +1556,7 @@
                 <div><span class="muted">Plan:</span> ${esc(drugPlanText(d))}</div>
                 ${names.length === 1
                     ? `<div><span class="muted">Quarter:</span> ${quartersOf(draft.cows[0]).length
-                        ? esc(quartersOf(draft.cows[0]).map(q => QUARTER_NAMES[q]).join(', ')) : 'not applicable'}</div>`
+                        ? esc(quartersOf(draft.cows[0]).map(q => QUARTER_NAMES[q]).join(", ")) : 'not applicable'}</div>`
                     : `<div><span class="muted">Quarters:</span></div>
                        <div style="font-size:13px; line-height:1.6; margin:2px 0 4px 10px;">
                        ${draft.cows.map(c => `<b>${esc(cowName(c))}</b> — ${quartersOf(c).length
