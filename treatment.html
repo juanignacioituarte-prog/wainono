@@ -357,8 +357,22 @@
             </div>
         </section>
 
+        <!-- ============ DOSES TODAY ============ -->
+        <section class="view" id="view-today">
+            <div id="today-body"></div>
+        </section>
+
+        <!-- ============ READY TO CLEAR ============ -->
+        <section class="view" id="view-toclear">
+            <div id="toclear-body"></div>
+        </section>
+
         <!-- ============ TREATED COWS ============ -->
         <section class="view" id="view-treated">
+            <div class="card" style="padding:10px;">
+                <input type="search" id="treated-search" placeholder="Find a cow — tag, birth ID or EID…"
+                       inputmode="numeric" autocomplete="off" oninput="renderTreated()">
+            </div>
             <div id="treated-body"></div>
         </section>
 
@@ -1014,6 +1028,8 @@
 
         const TABS = [
             { id: 'new', label: 'New Treatment' },
+            { id: 'today', label: '💉 Doses Today' },
+            { id: 'toclear', label: '✓ To Clear' },
             { id: 'treated', label: 'Treated Cows' },
             { id: 'meat', label: 'Meat Withhold' },
             { id: 'history', label: 'History' },
@@ -1038,6 +1054,8 @@
             const treated = all.filter(x => x.i.stage !== 'done');
             const dueToday = treated.filter(x => x.i.dueNow).length;
             return {
+                today: { n: dueToday, hot: dueToday > 0 },
+                toclear: { n: treated.filter(x => x.i.stage === 'ready').length },
                 treated: { n: treated.length, hot: dueToday > 0 },
                 meat: { n: all.filter(x => !x.i.meatOk).length, hot: false }
             };
@@ -1094,6 +1112,8 @@
             if (rb) rb.textContent = state.syncing ? '⟳ …' : '⟳ Refresh';
             updateDraftBar();
             if (currentTab === 'new') renderSearch();
+            if (currentTab === 'today') renderToday();
+            if (currentTab === 'toclear') renderToClear();
             if (currentTab === 'treated') renderTreated();
             if (currentTab === 'meat') renderMeat();
             if (currentTab === 'history') renderHistory();
@@ -1740,12 +1760,61 @@
 
         /* ---------- tab 2: treated cows ---------- */
 
+        /**
+         * The morning job: every cow whose dose falls on today's date.
+         * A dose whose day has gone is missed, so it is never on this list.
+         */
+        function renderToday() {
+            const blocked = blockedPanel();
+            if (blocked) { $('today-body').innerHTML = blocked; return; }
+
+            const rows = state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => x.i.dueSlot)
+                .sort((a, b) => String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true }));
+
+            const head = listHeader(rows.length
+                ? `<b>${plural(rows.length, 'cow')}</b> to dose today, ${fmtDay(new Date())}.`
+                : `Nothing to dose today, ${fmtDay(new Date())}.`);
+
+            $('today-body').innerHTML = head + (rows.length
+                ? rows.map(x => treatedCard(x.t, x.i)).join('')
+                : '<div class="empty">All doses are done for today. ✅</div>');
+        }
+
+        /** Milk withhold finished. Check her, then press Clear. */
+        function renderToClear() {
+            const blocked = blockedPanel();
+            if (blocked) { $('toclear-body').innerHTML = blocked; return; }
+
+            const rows = state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => x.i.stage === 'ready')
+                .sort((a, b) => (a.i.milkClear || 0) - (b.i.milkClear || 0));
+
+            const head = listHeader(rows.length
+                ? `<b>${plural(rows.length, 'cow')}</b> ready to go back in the vat.`
+                : 'No cow is ready to clear.');
+
+            $('toclear-body').innerHTML = head + (rows.length
+                ? rows.map(x => treatedCard(x.t, x.i)).join('')
+                : '<div class="empty">Nobody is waiting to be cleared. ✅</div>');
+        }
+
         function renderTreated() {
             const blocked = blockedPanel();
             if (blocked) { $('treated-body').innerHTML = blocked; return; }
 
-            const rows = state.treatments.map(t => ({ t, i: info(t) }))
+            let rows = state.treatments.map(t => ({ t, i: info(t) }))
                 .filter(x => x.i.stage !== 'done');
+            const onList = rows.length;
+
+            // Typing a cow number jumps straight to her instead of scrolling.
+            // Spaces are ignored so an EID copied from the sheet still matches.
+            const q = ($('treated-search').value || '').trim().toLowerCase().replace(/\s/g, '');
+            if (q) {
+                rows = rows.filter(x => [x.t.Tag, x.t.BirthID, x.t.EID]
+                    .map(v => String(v || '').toLowerCase().replace(/\s/g, ''))
+                    .some(v => v && v.indexOf(q) !== -1));
+            }
 
             // Doses due today first, then cows ready to clear, then the rest.
             const rank = x => x.i.dueNow ? 0 : (x.i.stage === 'ready' ? 1 : 2);
@@ -1758,14 +1827,17 @@
             const due = rows.filter(x => x.i.dueNow).length;
             const ready = rows.filter(x => x.i.stage === 'ready').length;
 
-            const head = listHeader(`
-                <b>${plural(rows.length, 'cow')}</b> under treatment or milk withhold.
-                ${due ? `<span style="color:var(--red-dark); font-weight:700;"> ${due} need${due === 1 ? 's' : ''} a dose today.</span>` : ' No doses due today.'}
-                ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`);
+            const head = listHeader(q
+                ? `<b>${plural(rows.length, 'cow')}</b> matching “${esc(q)}”, of ${onList} on the list.`
+                : `<b>${plural(onList, 'cow')}</b> under treatment or milk withhold.
+                   ${due ? `<span style="color:var(--red-dark); font-weight:700;"> ${due} need${due === 1 ? 's' : ''} a dose today.</span>` : ' No doses due today.'}
+                   ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`);
 
             $('treated-body').innerHTML = head + (rows.length
                 ? rows.map(x => treatedCard(x.t, x.i)).join('')
-                : '<div class="empty">No cows under treatment. 🎉</div>');
+                : `<div class="empty">${q
+                    ? 'No cow under treatment matches “' + esc(q) + '”.'
+                    : 'No cows under treatment. 🎉'}</div>`);
         }
 
         function treatedCard(t, i) {
