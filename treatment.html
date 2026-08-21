@@ -1917,6 +1917,8 @@
                     ${i.given ? `<button class="btn small ghost" onclick="undoDose('${esc(t.ID)}')">Undo last dose</button>` : ''}
                     ${isManager() && i.missed.length
                         ? `<button class="btn small ghost" onclick="giveDoseEarlier('${esc(t.ID)}')">Record a missed dose</button>` : ''}
+                    ${isManager()
+                        ? `<button class="btn small ghost" onclick="replaceTreatment('${esc(t.ID)}')">Change treatment</button>` : ''}
                     ${i.dosingDone ? '' : `<button class="btn small ghost" onclick="endTreatment('${esc(t.ID)}')">Stop treatment</button>`}
                 </div>
             </div>`;
@@ -2250,18 +2252,69 @@
                 <div class="row" style="margin-top:16px;">
                     <button class="btn grey" onclick="closeModal()">Close</button>
                     ${t.ClearedAt ? `<button class="btn blue" onclick="unclearCow('${esc(t.ID)}')">Undo clear</button>` : ''}
-                    ${isManager() ? `<button class="btn red" onclick="deleteTreatment('${esc(t.ID)}')">Delete</button>` : ''}
                 </div>
+                ${isManager() ? `
+                    <div style="margin-top:14px; border-top:1px solid var(--line); padding-top:12px;">
+                        <div class="lbl" style="margin-top:0;">Manager</div>
+                        <p class="muted" style="margin:0 0 8px;">
+                            The wrong drug or the wrong cow? Delete this record and write the
+                            right one. There is no way to edit a treatment: the withhold dates
+                            come from the doses, so a half-changed record would be worse than none.
+                        </p>
+                        <div class="row">
+                            <button class="btn blue" onclick="replaceTreatment('${esc(t.ID)}')">Delete &amp; start again</button>
+                            <button class="btn red" onclick="deleteTreatment('${esc(t.ID)}')">Delete</button>
+                        </div>
+                    </div>` : ''}
             `);
+        }
+
+        /** What deleting this record throws away, in words. */
+        function deleteWarning(t, i) {
+            const bits = [];
+            bits.push(i.given ? plural(i.given, 'recorded dose') : 'no recorded doses');
+            if (t.ClearedAt) bits.push('the clearing on ' + fmtDay(t.ClearedAt));
+            if (!i.milkOk) bits.push('her milk withhold to ' + fmtDayTime(i.milkClear));
+            if (!i.meatOk) bits.push('her meat withhold to ' + fmtDay(i.meatClear));
+            return bits.join(', ');
         }
 
         function deleteTreatment(id) {
             const t = state.treatments.find(x => String(x.ID) === String(id));
-            if (!t) return;
-            if (!confirm(`Delete the whole treatment record for cow ${byTag(t)}?\n\nThis cannot be undone.`)) return;
+            if (!t || !isManager()) return;
+            const i = info(t);
+            if (!confirm(`Delete the treatment for cow ${byTag(t)}?\n\n`
+                + `${t.Condition} — ${t.Drug}\n`
+                + `This throws away ${deleteWarning(t, i)}.\n\n`
+                + 'It cannot be undone.')) return;
             send({ type: 'delete_treatment', treatmentId: id });
             closeModal();
             toast('Treatment deleted');
+        }
+
+        /**
+         * Delete this record and go straight to a new one for the same cow.
+         * This is how a treatment gets "changed": the old record goes, a correct
+         * one is written. Nothing is ever half-edited.
+         */
+        function replaceTreatment(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t || !isManager()) return;
+            const i = info(t);
+            if (!confirm(`Replace the treatment for cow ${byTag(t)}?\n\n`
+                + `The old record goes: ${t.Condition} — ${t.Drug}, ${deleteWarning(t, i)}.\n\n`
+                + 'You will then write the new one for the same cow.')) return;
+
+            send({ type: 'delete_treatment', treatmentId: id });
+            closeModal();
+
+            // Straight into New Treatment with this cow already picked.
+            showTab('new');
+            setBatchMode(false);
+            resetNewTreatment();
+            pickCow({ Tag: t.Tag || '', BirthID: t.BirthID || '', EID: t.EID || '' });
+            startTreatment();
+            toast('Old record deleted — now write the new one');
         }
 
         /* ===================== CONFIG TAB ===================== */
