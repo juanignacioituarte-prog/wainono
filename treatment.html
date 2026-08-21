@@ -320,10 +320,31 @@
                 <label class="lbl">Notes</label>
                 <textarea id="new-notes" placeholder="Anything the next person should know…"></textarea>
 
-                <label class="lbl" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
+                <label class="lbl hidden" id="first-dose-label"
+                       style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
                     <input type="checkbox" id="first-dose" checked style="width:20px; height:20px;">
                     First dose given now
                 </label>
+
+                <!-- managers only: record a treatment that started days ago -->
+                <div id="backdate-box" class="hidden" style="margin-top:12px; border-top:1px solid var(--line); padding-top:10px;">
+                    <label class="lbl" style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
+                        <input type="checkbox" id="backdate-on" onchange="renderBackdate()" style="width:20px; height:20px;">
+                        Set the start date and time myself
+                        <span class="pill" style="background:var(--blue); color:#fff;">manager</span>
+                    </label>
+                    <div id="backdate-fields" class="hidden">
+                        <label class="lbl">When was she treated? (date and time)</label>
+                        <input type="datetime-local" id="backdate-when" onchange="renderBackdate()">
+                        <p class="muted" style="margin:4px 0 0;">The withholds count from here, to the hour.</p>
+                        <label class="lbl">Doses already given</label>
+                        <div class="seg" id="backdate-doses">
+                            <button class="on" onclick="setBackdateDoses(true)">Followed the plan</button>
+                            <button onclick="setBackdateDoses(false)">None yet</button>
+                        </div>
+                        <div class="muted" id="backdate-preview" style="margin-top:8px;"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="card hidden" id="confirm-card">
@@ -1173,6 +1194,9 @@
                 clearStepsAfterCow();
                 $('new-notes').value = '';
                 $('first-dose').checked = true;
+                $('backdate-on').checked = false;
+                $('backdate-when').value = '';
+                renderBackdate();
             }
             renderPickedCard();
             if (!batchMode) $('picked-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1355,7 +1379,93 @@
                 b.classList.toggle('on', b.getAttribute('onclick').indexOf("'" + id + "'") !== -1));
             $('detail-card').classList.remove('hidden');
             renderQuarters();
+            renderBackdate();   // the dose dates depend on the drug's plan
             $('detail-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            renderConfirm();
+        }
+
+        /* ---------- backdating, managers only ----------
+           A cow treated on Monday and only written up on Thursday must count her
+           withhold from Monday, not from Thursday. A manager can set the real
+           start, and let the app fill in the doses the plan says were given. */
+
+        /** The moment this treatment starts: the backdated time, or now. */
+        function draftStart() {
+            if (!isManager() || !$('backdate-on') || !$('backdate-on').checked) return new Date();
+            const v = $('backdate-when').value;
+            const d = v ? new Date(v) : null;
+            if (!d || isNaN(d.getTime())) return new Date();
+            return d > new Date() ? new Date() : d;   // never start in the future
+        }
+
+        function backdating() {
+            return isManager() && $('backdate-on') && $('backdate-on').checked;
+        }
+
+        let backdateFollowsPlan = true;
+
+        function setBackdateDoses(on) {
+            backdateFollowsPlan = !!on;
+            [...$('backdate-doses').children].forEach((b, i) =>
+                b.classList.toggle('on', (i === 0) === backdateFollowsPlan));
+            renderBackdate();
+        }
+
+        /**
+         * The doses the plan says were already given between the start and now.
+         * Dose 1 on the start date, then one every IntervalDays after it.
+         */
+        function backdatedDoses() {
+            if (!backdating() || !backdateFollowsPlan || !draft.drug) return [];
+            const d = draft.drug;
+            const total = Math.max(1, num(d.Doses, 1));
+            const iv = num(d.IntervalDays, 1) > 0 ? num(d.IntervalDays, 1) : 1;
+            const start = draftStart();
+            const now = new Date();
+            const out = [];
+            for (let k = 1; k <= total; k++) {
+                const at = new Date(start.getTime() + (k - 1) * iv * DAY);
+                if (at > now) break;
+                out.push({ doseNo: k, givenAt: at.toISOString() });
+            }
+            return out;
+        }
+
+        function renderBackdate() {
+            const box = $('backdate-box');
+            if (!box) return;
+            box.classList.toggle('hidden', !isManager());
+
+            const on = backdating();
+            $('backdate-fields').classList.toggle('hidden', !on);
+            // Backdating replaces the "first dose given now" question.
+            $('first-dose-label').classList.toggle('hidden', on);
+
+            // Prefilled with today at 9:00 am, which is when most cows get treated.
+            // Change either half; the date is what usually needs changing.
+            if (on && !$('backdate-when').value) {
+                const d = new Date();
+                d.setHours(9, 0, 0, 0);
+                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                $('backdate-when').value = d.toISOString().slice(0, 16);
+            }
+
+            if (on) {
+                const list = backdatedDoses();
+                const total = draft.drug ? Math.max(1, num(draft.drug.Doses, 1)) : 0;
+                $('backdate-preview').innerHTML = !draft.drug
+                    ? 'Pick a drug first.'
+                    : (backdateFollowsPlan
+                        ? (list.length
+                            ? `<b>${list.length} of ${total} doses</b> will be recorded:<br>`
+                              + list.map(x => 'Dose ' + x.doseNo + ' — ' + fmtDayTime(x.givenAt)).join('<br>')
+                              + (list.length < total
+                                  ? `<br><span style="color:var(--red);">${plural(total - list.length, 'dose')} still to give.</span>`
+                                  : '')
+                            : 'No dose was due yet on that date.')
+                        : `No dose will be recorded. All ${total} are still to give, `
+                          + 'and she will show as overdue until someone gives one.');
+            }
             renderConfirm();
         }
 
@@ -1420,10 +1530,12 @@
             const d = draft.drug;
             const doses = Math.max(1, num(d.Doses, 1));
             const iv = num(d.IntervalDays, 1);
-            const lastDoseDay = addDays(new Date(), (doses - 1) * iv);
+            const start = draftStart();
+            const lastDoseDay = addDays(start, (doses - 1) * iv);
             const milkClear = new Date(lastDoseDay.getTime() + whMs(d.MilkWithhold, d.MilkWithholdUnit));
             const meatClear = new Date(lastDoseDay.getTime() + whMs(d.MeatWithhold, d.MeatWithholdUnit));
             const names = draft.cows.map(cowName);
+            const back = backdating();
 
             $('confirm-card').classList.remove('hidden');
             $('confirm-body').innerHTML = `
@@ -1441,6 +1553,9 @@
                         ? esc(quartersOf(c).map(q => QUARTER_NAMES[q]).join(', ')) : 'not applicable'}`).join('<br>')}
                        </div>`}
                 <hr style="border:none; border-top:1px solid var(--line); margin:8px 0;">
+                <div><span class="muted">Started:</span> <b>${fmtDayTime(start)}</b>${back ? ' (' + relDay(start) + ')' : ''}</div>
+                ${back ? `<div><span class="muted">Doses recorded now:</span>
+                    ${backdateFollowsPlan ? backdatedDoses().length : 0} of ${doses}</div>` : ''}
                 <div><span class="muted">Last dose due:</span> ${fmtDay(lastDoseDay)} (${relDay(lastDoseDay)})</div>
                 <div><span class="muted">Milk clear:</span> <b>${fmtDayTime(milkClear)}</b></div>
                 <div><span class="muted">Meat clear:</span> <b>${fmtDayTime(meatClear)}</b></div>
@@ -1507,6 +1622,11 @@
             ['picked-card', 'condition-card', 'drug-card', 'detail-card', 'confirm-card']
                 .forEach(id => $(id).classList.add('hidden'));
             $('quarter-box').innerHTML = '';
+            $('backdate-on').checked = false;
+            $('backdate-when').value = '';
+            $('first-dose').checked = true;
+            setBackdateDoses(true);
+            renderBackdate();
             $('cow-search').value = '';
             $('new-notes').value = '';
             updateDraftBar();
@@ -1520,9 +1640,18 @@
                 return;
             }
             const d = draft.drug;
-            const startedAt = new Date().toISOString();
+            const start = draftStart();
+            const startedAt = start.toISOString();
             const notes = ($('new-notes').value || '').trim();
-            const firstDose = $('first-dose').checked;
+            const back = backdating();
+            const firstDose = back ? false : $('first-dose').checked;
+            const planDoses = back ? backdatedDoses() : [];
+
+            if (back && !confirm(`Record this treatment as starting ${fmtDayTime(start)}?\n\n`
+                + (planDoses.length
+                    ? planDoses.length + ' dose(s) will be recorded on the plan dates.'
+                    : 'No dose will be recorded.')
+                + '\n\nThe milk and meat withholds count from the last dose.')) return;
 
             if (draft.cows.length > 1 &&
                 !confirm(`Save this treatment for all ${draft.cows.length} cows?\n\n`
@@ -1550,7 +1679,10 @@
                 meatWithhold: num(d.MeatWithhold, 0),
                 meatWithholdUnit: whUnit(d.MeatWithholdUnit),
                 firstDose: firstDose,
-                firstDoseId: uid('d')
+                firstDoseId: uid('d'),
+                // A backdated treatment carries the doses that were already given,
+                // each on its own date, so the withholds count from the real last one.
+                doses: planDoses.map(x => ({ doseNo: x.doseNo, givenAt: x.givenAt, id: uid('d') }))
             })));
 
             toast(draft.cows.length === 1
