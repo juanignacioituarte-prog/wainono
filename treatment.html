@@ -367,6 +367,8 @@
             <div class="card">
                 <h2>Cow list</h2>
                 <p class="muted" id="cow-count"></p>
+                <button class="btn small wide grey" onclick="refreshCowsIfChanged(true)"
+                        style="margin-bottom:10px;">⟳ Reload the cow list from the sheet</button>
                 <label class="lbl">Paste or upload a CSV with columns: Tag, Birth ID, EID</label>
                 <input type="file" id="cow-file" accept=".csv,.txt" onchange="loadCowFile(event)" style="font-size:13px;">
                 <textarea id="cow-paste" placeholder="Tag,BirthID,EID&#10;123,AB-2021-123,982000123456789" style="margin-top:8px; min-height:110px;"></textarea>
@@ -406,11 +408,32 @@
         /** Always a manager, even before the Settings tab is filled in. */
         const OWNER_EMAIL = "juanignacioituarte@gmail.com";
 
-        // Only unsent writes and the user's name live on the phone. Never the data.
+        /*
+         * What is allowed to live on the phone:
+         *   queue - writes that have not reached the sheet yet
+         *   name  - who is using the app
+         *   cows  - the cow list, and only the cow list
+         *
+         * The cow list is thousands of rows and the same all season. Sending it on
+         * every refresh made each read take seconds. Treatments and doses are never
+         * cached: those are what two people change at the same time.
+         */
         const LS = {
             queue: 'treat_queue_v1',
-            name: 'treat_user_name'
+            name: 'treat_user_name',
+            cows: 'treat_cows_v1'
         };
+
+        /** A read that never answers must not leave the app stuck on "Reading…". */
+        const FETCH_TIMEOUT_MS = 30000;
+
+        function fetchJson(url, options) {
+            const ctl = new AbortController();
+            const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+            return fetch(url, Object.assign({ signal: ctl.signal }, options || {}))
+                .then(res => res.json())
+                .finally(() => clearTimeout(timer));
+        }
 
         const QUARTER_NAMES = { LF: 'Left Front', RF: 'Right Front', LR: 'Left Rear', RR: 'Right Rear' };
 
@@ -423,7 +446,11 @@
             loaded: false,    // has the sheet answered at least once
             loadedAt: 0,      // when it answered
             syncing: false,
-            error: ''
+            error: '',
+            cowsVersion: '',       // the version of the cow list held on this phone
+            serverCowsVersion: '', // what the sheet last said the version was
+            serverCowCount: -1,    // how many cows the sheet says it has
+            loadingCows: false
         };
 
         let currentTab = 'new';
@@ -598,6 +625,24 @@
             catch (e) { state.queue = []; }
         }
 
+        function loadCachedCows() {
+            try {
+                const raw = JSON.parse(localStorage.getItem(LS.cows) || 'null');
+                if (raw && Array.isArray(raw.cows)) {
+                    state.cows = raw.cows;
+                    state.cowsVersion = String(raw.version || '');
+                }
+            } catch (e) { /* a broken cache just means we fetch the list again */ }
+        }
+
+        function saveCachedCows() {
+            try {
+                localStorage.setItem(LS.cows, JSON.stringify({
+                    version: state.cowsVersion, cows: state.cows
+                }));
+            } catch (e) { /* too big for storage: it is refetched each time instead */ }
+        }
+
         function saveQueue() {
             try { localStorage.setItem(LS.queue, JSON.stringify(state.queue)); } catch (e) { }
         }
@@ -635,9 +680,19 @@
             return row;
         }
 
+        /**
+         * A reply with no `cows` key is the small one. It leaves the cached cow
+         * list alone. Only a reply that actually carries cows replaces it.
+         */
         function applyServer(data) {
             if (!data || data.status !== 'success') return false;
-            state.cows = data.cows || [];
+            if (Array.isArray(data.cows)) {
+                state.cows = data.cows;
+                state.cowsVersion = String(data.cowsVersion || '');
+                saveCachedCows();
+            }
+            if (data.cowCount !== undefined) state.serverCowCount = num(data.cowCount, -1);
+            if (data.cowsVersion !== undefined) state.serverCowsVersion = String(data.cowsVersion || '');
             state.conditions = data.conditions || [];
             state.drugs = (data.drugs || []).map(fillOldWithholds);
             state.treatments = (data.treatments || []).map(fillOldWithholds);
@@ -649,7 +704,11 @@
             return true;
         }
 
-        /** Read everything from the sheet again. Nothing is shown until it answers. */
+        /**
+         * Read the sheet again. This asks for the small reply — conditions, drugs,
+         * treatments and doses — which is a few kilobytes and comes back quickly.
+         * The cow list is only fetched when the sheet says it has changed.
+         */
         async function refreshAll(manual) {
             if (!SCRIPT_URL) {
                 state.error = 'No sheet connected. Paste the Apps Script URL into treatment.html.';
@@ -660,15 +719,14 @@
             if (state.syncing) return false;
 
             // Anything waiting goes first, so the read that follows includes it.
-            if (state.queue.length) return flushQueue();
+            if (state.queue.length && !flushing) return flushQueue();
 
             state.syncing = true;
             setSync(manual ? 'Refreshing…' : 'Reading the sheet…', 'busy');
             renderAll();
             let ok = false;
             try {
-                const res = await fetch(SCRIPT_URL + '?type=all&t=' + Date.now(), { cache: 'no-store' });
-                const data = await res.json();
+                const data = await fetchJson(SCRIPT_URL + '?type=live&t=' + Date.now(), { cache: 'no-store' });
                 if (applyServer(data)) {
                     setSync('Sheet read ' + freshness());
                     ok = true;
@@ -677,12 +735,55 @@
                     setSync(state.error, 'bad');
                 }
             } catch (err) {
-                state.error = 'Could not reach the sheet. Check the signal and press Refresh.';
-                setSync('No signal — nothing is being shown', 'bad');
+                state.error = err && err.name === 'AbortError'
+                    ? 'The sheet took too long to answer. Press Refresh to try again.'
+                    : 'Could not reach the sheet. Check the signal and press Refresh.';
+                setSync(err && err.name === 'AbortError' ? 'Timed out — press Refresh' : 'No signal', 'bad');
+            } finally {
+                // Whatever went wrong, the app must never be left stuck on "Reading…".
+                state.syncing = false;
             }
-            state.syncing = false;
             renderAll();
+            if (ok) await refreshCowsIfChanged(false);
             return ok;
+        }
+
+        /**
+         * Fetch the cow list only when it is worth fetching: the phone has none,
+         * the sheet reports a different number of cows, or someone has loaded a new
+         * list since. Otherwise the cached copy is used and nothing is downloaded.
+         */
+        async function refreshCowsIfChanged(force) {
+            if (!SCRIPT_URL || state.loadingCows) return false;
+
+            const needed = force
+                || state.cows.length === 0
+                || (state.serverCowCount >= 0 && state.serverCowCount !== state.cows.length)
+                || (state.serverCowsVersion && state.serverCowsVersion !== state.cowsVersion);
+            if (!needed) return false;
+
+            state.loadingCows = true;
+            setSync('Loading the cow list…', 'busy');
+            renderAll();
+            try {
+                const data = await fetchJson(SCRIPT_URL + '?type=cows&t=' + Date.now(), { cache: 'no-store' });
+                if (data && data.status === 'success' && Array.isArray(data.cows)) {
+                    state.cows = data.cows;
+                    state.cowsVersion = String(data.cowsVersion || '');
+                    state.serverCowCount = num(data.cowCount, state.cows.length);
+                    state.serverCowsVersion = state.cowsVersion;
+                    saveCachedCows();
+                    setSync(plural(state.cows.length, 'cow') + ' loaded · sheet read ' + freshness());
+                } else {
+                    setSync('The sheet said: ' + ((data && data.message) || 'unknown error'), 'bad');
+                }
+            } catch (err) {
+                setSync('Could not load the cow list — press Refresh', 'bad');
+            } finally {
+                state.loadingCows = false;
+            }
+            renderAll();
+            return true;
         }
 
         /**
@@ -722,11 +823,10 @@
 
             let ok = false;
             try {
-                const res = await fetch(SCRIPT_URL, {
+                const data = await fetchJson(SCRIPT_URL, {
                     method: 'POST',
                     body: JSON.stringify({ type: 'batch', items: batch })
                 });
-                const data = await res.json();
                 if (data && data.status === 'success') {
                     const sent = {};
                     batch.forEach(b => { sent[b.clientId] = true; });
@@ -747,10 +847,13 @@
                     setSync(state.error, 'bad');
                 }
             } catch (err) {
-                setSync(plural(state.queue.length, 'change') + ' waiting — no signal', 'bad');
+                setSync(plural(state.queue.length, 'change') + ' waiting — '
+                    + (err && err.name === 'AbortError' ? 'the sheet timed out' : 'no signal'), 'bad');
+            } finally {
+                // A failed save must never leave the app stuck on "Saving…".
+                flushing = false;
+                state.syncing = false;
             }
-            flushing = false;
-            state.syncing = false;
             renderAll();
             // More may have arrived while this batch was in the air. Each pass
             // removes what it sent, so this always moves forward.
@@ -1746,7 +1849,7 @@
                 : '<p class="muted">No drugs yet.</p>';
 
             $('cow-count').textContent = state.cows.length
-                ? state.cows.length + ' cows in the list.'
+                ? state.cows.length + ' cows, kept on this phone so every refresh stays fast.'
                 : 'No cows loaded yet.';
             $('cfg-managers').value = String(state.managers || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).join('\n');
         }
@@ -2053,6 +2156,7 @@
         /* ===================== BOOT ===================== */
 
         loadQueue();
+        loadCachedCows();
         setBatchMode(false);
         setSearchMode('Tag');
         buildTabs();
