@@ -227,6 +227,19 @@
             .modal { border-radius: 14px; max-width: 620px; }
         }
 
+        /* ---------- the bar that sits at the bottom while a treatment is being filled in ---------- */
+        #draft-bar {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+            background: #2c3e50; color: #fff; padding: 10px 14px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, .3);
+        }
+        #draft-bar .inner {
+            max-width: 900px; margin: 0 auto; display: flex; align-items: center; gap: 10px;
+        }
+        #draft-bar .info { flex: 1; min-width: 0; font-size: 12px; line-height: 1.4; opacity: .9; }
+        #draft-bar .info b { font-size: 16px; display: block; opacity: 1; }
+        body.drafting { padding-bottom: 84px; }
+
         #toast {
             position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px;
             background: #2c3e50; color: #fff; padding: 11px 16px; border-radius: 8px;
@@ -257,8 +270,12 @@
         <!-- ============ NEW TREATMENT ============ -->
         <section class="view on" id="view-new">
             <div class="card">
-                <h2>1. Find the cow</h2>
-                <div class="seg" id="search-mode">
+                <h2>1. Find the cow <span class="step" id="find-hint"></span></h2>
+                <div class="seg" id="batch-mode">
+                    <button class="on" onclick="setBatchMode(false)">One cow</button>
+                    <button onclick="setBatchMode(true)">Several cows</button>
+                </div>
+                <div class="seg" id="search-mode" style="margin-top:8px;">
                     <button class="on" onclick="setSearchMode('Tag')">Tag number</button>
                     <button onclick="setSearchMode('BirthID')">Birth ID</button>
                     <button onclick="setSearchMode('EID')">EID</button>
@@ -269,7 +286,7 @@
             </div>
 
             <div class="card hidden" id="picked-card">
-                <h2>2. Cow</h2>
+                <h2 id="picked-title">2. Cow</h2>
                 <div id="picked-body"></div>
             </div>
 
@@ -286,7 +303,7 @@
 
             <div class="card hidden" id="detail-card">
                 <h2>5. Details</h2>
-                <label class="lbl">Affected quarter (tap the ones treated)</label>
+                <label class="lbl" id="quarter-label">Affected quarter (tap the ones treated)</label>
                 <div class="udder" id="udder">
                     <button class="q" data-q="LF" onclick="toggleQuarter('LF')">Left Front</button>
                     <button class="q" data-q="RF" onclick="toggleQuarter('RF')">Right Front</button>
@@ -371,6 +388,13 @@
 
     </div>
 
+    <div id="draft-bar" class="hidden">
+        <div class="inner">
+            <div class="info" id="draft-info"></div>
+            <button class="btn red small" onclick="cancelNewTreatment()">✕ Cancel</button>
+        </div>
+    </div>
+
     <div id="toast"></div>
 
     <script>
@@ -407,7 +431,12 @@
         let importMode = 'merge';
 
         /** The New Treatment form as it is being filled in. */
-        let draft = { cow: null, condition: null, drug: null, quarters: [], };
+        /**
+         * The New Treatment form as it is being filled in. `cows` is a list, so one
+         * cow and a whole mob are the same thing — a batch is just a longer list.
+         */
+        let draft = { cows: [], condition: null, drug: null, quarters: [] };
+        let batchMode = false;
 
         /* ===================== SMALL HELPERS ===================== */
 
@@ -644,9 +673,16 @@
          * If there is no signal the change waits and is sent on the next try.
          */
         function send(item) {
-            item.clientId = item.clientId || uid('q');
-            item.user = item.user || whoAmI();
-            state.queue.push(item);
+            return sendMany([item]);
+        }
+
+        /** Several changes at once — a whole mob treated together is one request. */
+        function sendMany(items) {
+            items.forEach(item => {
+                item.clientId = item.clientId || uid('q');
+                item.user = item.user || whoAmI();
+                state.queue.push(item);
+            });
             saveQueue();
             renderAll();
             return flushQueue();
@@ -863,6 +899,7 @@
             buildTabs();
             const rb = $('refresh-btn');
             if (rb) rb.textContent = state.syncing ? '⟳ …' : '⟳ Refresh';
+            updateDraftBar();
             if (currentTab === 'new') renderSearch();
             if (currentTab === 'treated') renderTreated();
             if (currentTab === 'meat') renderMeat();
@@ -871,6 +908,21 @@
         }
 
         /* ---------- tab 1: new treatment ---------- */
+
+        /** "One cow" or "Several cows". Switching keeps the cows already picked. */
+        function setBatchMode(on) {
+            batchMode = !!on;
+            [...$('batch-mode').children].forEach((b, i) => b.classList.toggle('on', (i === 1) === batchMode));
+            $('find-hint').textContent = batchMode
+                ? '— tap each cow to add her to the list' : '';
+            $('quarter-label').textContent = batchMode
+                ? 'Affected quarter — the same for every cow on the list'
+                : 'Affected quarter (tap the ones treated)';
+            // Going back to one cow keeps the first one only, so the screen matches.
+            if (!batchMode && draft.cows.length > 1) draft.cows = draft.cows.slice(0, 1);
+            renderPickedCard();
+            renderSearch();
+        }
 
         function setSearchMode(mode) {
             searchMode = mode;
@@ -921,14 +973,16 @@
                 return;
             }
 
-            box.innerHTML = '<div class="cow-list">' + hits.map((c, idx) => {
+            box.innerHTML = '<div class="cow-list">' + hits.map(c => {
                 const open = openTreatmentsFor(c);
+                const onList = draft.cows.some(x => cowKey(x) === cowKey(c));
                 return `<div class="cow-row" onclick="pickCowIndex(${state.cows.indexOf(c)})">
                     <div class="tag">${esc(c.Tag || '—')}</div>
                     <div class="grow" style="flex:1;">
                         <div class="sub">Birth ID: ${esc(c.BirthID || '—')}</div>
                         <div class="sub">EID: ${esc(c.EID || '—')}</div>
                     </div>
+                    ${onList ? '<span class="pill" style="background:var(--accent-dark); color:#fff;">on the list</span>' : ''}
                     ${open.length ? '<span class="pill" style="background:var(--red); color:#fff;">under treatment</span>' : ''}
                 </div>`;
             }).join('') + '</div>';
@@ -964,32 +1018,100 @@
             pickCow(cow);
         }
 
-        function pickCow(cow) {
-            draft = { cow, condition: null, drug: null, quarters: [] };
-            $('new-notes').value = '';
-            $('first-dose').checked = true;
+        function cowKey(c) {
+            return [c.Tag || '', c.BirthID || '', c.EID || ''].join('|');
+        }
 
-            const open = openTreatmentsFor(cow);
+        function cowName(c) {
+            return c.Tag || c.BirthID || c.EID || '?';
+        }
+
+        /**
+         * In "One cow" mode this replaces the pick. In "Several cows" mode it adds
+         * to the list and leaves the search box ready for the next tag.
+         */
+        function pickCow(cow) {
+            if (batchMode) {
+                const key = cowKey(cow);
+                if (draft.cows.some(c => cowKey(c) === key)) {
+                    toast('Cow ' + cowName(cow) + ' is already on the list');
+                } else {
+                    draft.cows.push(cow);
+                    toast('Added ' + cowName(cow) + ' · ' + plural(draft.cows.length, 'cow'));
+                }
+                $('cow-search').value = '';
+                renderSearch();
+                $('cow-search').focus();
+            } else {
+                draft.cows = [cow];
+                clearStepsAfterCow();
+                $('new-notes').value = '';
+                $('first-dose').checked = true;
+            }
+            renderPickedCard();
+            if (!batchMode) $('picked-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function removeDraftCow(key) {
+            draft.cows = draft.cows.filter(c => cowKey(c) !== key);
+            if (!draft.cows.length) { resetNewTreatment(); return; }
+            renderPickedCard();
+        }
+
+        function renderPickedCard() {
+            if (!draft.cows.length) { $('picked-card').classList.add('hidden'); updateDraftBar(); return; }
+
             $('picked-card').classList.remove('hidden');
-            $('picked-body').innerHTML = `
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <div style="font-size:40px; font-weight:900; line-height:1;">${esc(cow.Tag || cow.BirthID || cow.EID)}</div>
+            $('picked-title').textContent = batchMode
+                ? '2. Cows (' + draft.cows.length + ')' : '2. Cow';
+
+            // Warn about any cow already on a treatment. In a batch this is the
+            // most useful check there is, so it names them.
+            const busy = draft.cows
+                .map(c => ({ c, open: openTreatmentsFor(c) }))
+                .filter(x => x.open.length);
+
+            const warn = busy.length ? `<div style="background:#fdecea; border:1px solid var(--red);
+                color:var(--red-dark); border-radius:8px; padding:10px; margin-top:10px; font-size:13px;">
+                <b>Careful.</b> ${busy.length === 1
+                    ? 'This cow already has ' + plural(busy[0].open.length, 'open treatment') + ':'
+                    : plural(busy.length, 'cow') + ' already have an open treatment:'}<br>
+                ${busy.map(x => '<b>' + esc(cowName(x.c)) + '</b> — '
+                    + esc(x.open.map(t => t.Condition + ' / ' + t.Drug).join('; '))).join('<br>')}
+              </div>` : '';
+
+            const body = batchMode
+                ? `<div class="choices" style="gap:6px;">
+                    ${draft.cows.map(c => `<button class="choice" style="flex:0 0 auto; padding:8px 10px;"
+                        onclick="removeDraftCow('${esc(cowKey(c))}')">${esc(cowName(c))} ✕</button>`).join('')}
+                   </div>
+                   <p class="muted" style="margin:8px 0 0;">Tap a cow to take her off the list.
+                      Keep searching to add more.</p>`
+                : `<div style="display:flex; align-items:center; gap:12px;">
+                    <div style="font-size:40px; font-weight:900; line-height:1;">${esc(cowName(draft.cows[0]))}</div>
                     <div class="sub muted" style="flex:1;">
-                        Birth ID: ${esc(cow.BirthID || '—')}<br>EID: ${esc(cow.EID || '—')}
+                        Birth ID: ${esc(draft.cows[0].BirthID || '—')}<br>EID: ${esc(draft.cows[0].EID || '—')}
                     </div>
-                </div>
-                ${open.length ? `<div style="background:#fdecea; border:1px solid var(--red); color:var(--red-dark);
-                    border-radius:8px; padding:10px; margin-top:10px; font-size:13px;">
-                    <b>Careful.</b> This cow already has ${plural(open.length, 'open treatment')}:<br>
-                    ${open.map(t => esc(t.Condition) + ' — ' + esc(t.Drug)).join('<br>')}
-                  </div>` : ''}
-                <button class="btn wide" style="margin-top:12px;" onclick="startTreatment()">Give new treatment</button>
-            `;
-            $('condition-card').classList.add('hidden');
-            $('drug-card').classList.add('hidden');
-            $('detail-card').classList.add('hidden');
-            $('confirm-card').classList.add('hidden');
-            $('picked-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                   </div>`;
+
+            $('picked-body').innerHTML = body + warn + `
+                <div class="row" style="margin-top:12px;">
+                    <button class="btn grey" style="flex:0 0 auto;" onclick="cancelNewTreatment()">✕ Cancel</button>
+                    <button class="btn" style="flex:1 1 0;" onclick="startTreatment()">
+                        ${batchMode ? 'Treat these ' + draft.cows.length + ' cows' : 'Give new treatment'}</button>
+                </div>`;
+            updateDraftBar();
+            renderConfirm();   // the cow list on the confirm card must follow along
+        }
+
+        /** Everything chosen after the cow is dropped and the steps close up. */
+        function clearStepsAfterCow() {
+            draft.condition = null;
+            draft.drug = null;
+            draft.quarters = [];
+            document.querySelectorAll('#udder .q').forEach(b => b.classList.remove('on'));
+            ['condition-card', 'drug-card', 'detail-card', 'confirm-card']
+                .forEach(id => $(id).classList.add('hidden'));
         }
 
         function startTreatment() {
@@ -1078,6 +1200,7 @@
                 : 'No drug is set up for this condition, so all drugs are shown.';
             $('detail-card').classList.add('hidden');
             $('confirm-card').classList.add('hidden');
+            updateDraftBar();
             $('drug-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
@@ -1111,17 +1234,20 @@
         }
 
         function renderConfirm() {
-            if (!draft.cow || !draft.condition || !draft.drug) return;
+            updateDraftBar();
+            if (!draft.cows.length || !draft.condition || !draft.drug) return;
             const d = draft.drug;
             const doses = Math.max(1, num(d.Doses, 1));
             const iv = num(d.IntervalDays, 1);
             const lastDoseDay = addDays(new Date(), (doses - 1) * iv);
             const milkClear = new Date(lastDoseDay.getTime() + whMs(d.MilkWithhold, d.MilkWithholdUnit));
             const meatClear = new Date(lastDoseDay.getTime() + whMs(d.MeatWithhold, d.MeatWithholdUnit));
+            const names = draft.cows.map(cowName);
 
             $('confirm-card').classList.remove('hidden');
             $('confirm-body').innerHTML = `
-                <div><b style="font-size:26px;">${esc(draft.cow.Tag || draft.cow.BirthID || draft.cow.EID)}</b></div>
+                <div><b style="font-size:26px;">${esc(names.join(', '))}</b></div>
+                ${names.length > 1 ? `<div class="muted">${plural(names.length, 'cow')}, all treated the same.</div>` : ''}
                 <div><span class="muted">Condition:</span> <b>${esc(draft.condition.Name)}</b></div>
                 <div><span class="muted">Drug:</span> <b>${esc(d.Name)}</b></div>
                 <div><span class="muted">Plan:</span> ${esc(drugPlanText(d))}</div>
@@ -1134,47 +1260,102 @@
             `;
         }
 
+        /**
+         * The bar at the bottom of the screen. It appears as soon as a cow is
+         * picked and stays there for the whole flow, so Cancel is always one tap
+         * away no matter how far down the page you have scrolled.
+         */
+        function updateDraftBar() {
+            const bar = $('draft-bar');
+            const on = currentTab === 'new' && draft.cows.length > 0;
+            bar.classList.toggle('hidden', !on);
+            document.body.classList.toggle('drafting', on);
+            if (!on) return;
+
+            const parts = [];
+            if (draft.condition) parts.push(draft.condition.Name);
+            if (draft.drug) parts.push(draft.drug.Name);
+            if (draft.quarters.length) parts.push(draft.quarters.join(' '));
+
+            const names = draft.cows.map(cowName);
+            const title = names.length === 1
+                ? 'Cow ' + names[0]
+                : plural(names.length, 'cow') + ': ' + names.slice(0, 6).join(', ')
+                  + (names.length > 6 ? '…' : '');
+
+            $('draft-info').innerHTML = `<b>${esc(title)}</b>`
+                + esc(parts.length ? parts.join(' · ') : 'nothing chosen yet');
+        }
+
+        /** Cancel from anywhere in the flow. Asks only if there is something to lose. */
+        function cancelNewTreatment() {
+            const started = draft.condition || draft.drug || draft.quarters.length
+                || ($('new-notes').value || '').trim();
+            if (started && !confirm('Throw away this treatment and start again?')) return;
+            resetNewTreatment();
+            toast('Cancelled');
+        }
+
+        /** Keep the cow, drop everything chosen after her. */
+        function changeCow() {
+            resetNewTreatment();
+            $('cow-search').focus();
+        }
+
         function resetNewTreatment() {
-            draft = { cow: null, condition: null, drug: null, quarters: [] };
+            draft = { cows: [], condition: null, drug: null, quarters: [] };
             ['picked-card', 'condition-card', 'drug-card', 'detail-card', 'confirm-card']
                 .forEach(id => $(id).classList.add('hidden'));
             document.querySelectorAll('#udder .q').forEach(b => b.classList.remove('on'));
             $('cow-search').value = '';
             $('new-notes').value = '';
+            updateDraftBar();
             renderSearch();
             window.scrollTo(0, 0);
         }
 
         function saveNewTreatment() {
-            if (!draft.cow || !draft.condition || !draft.drug) { toast('Pick a cow, condition and drug'); return; }
+            if (!draft.cows.length || !draft.condition || !draft.drug) {
+                toast('Pick a cow, condition and drug');
+                return;
+            }
             const d = draft.drug;
-            const who = draft.cow.Tag || draft.cow.BirthID || draft.cow.EID;
+            const startedAt = new Date().toISOString();
+            const notes = ($('new-notes').value || '').trim();
+            const firstDose = $('first-dose').checked;
 
-            // The drug settings are copied onto the treatment. Changing the drug
-            // later must not move the clear dates of a cow already treated.
-            send({
+            if (draft.cows.length > 1 &&
+                !confirm(`Save this treatment for all ${draft.cows.length} cows?\n\n`
+                    + draft.cows.map(cowName).join(', '))) return;
+
+            // One record per cow. The drug settings are copied onto each one, so
+            // changing the drug later never moves the clear dates of a cow already
+            // treated. All of them go to the sheet in one request.
+            sendMany(draft.cows.map(cow => ({
                 type: 'new_treatment',
                 id: uid('t'),
-                startedAt: new Date().toISOString(),
-                tag: draft.cow.Tag || '',
-                birthId: draft.cow.BirthID || '',
-                eid: draft.cow.EID || '',
+                startedAt: startedAt,
+                tag: cow.Tag || '',
+                birthId: cow.BirthID || '',
+                eid: cow.EID || '',
                 condition: draft.condition.Name,
                 drug: d.Name,
                 drugId: d.ID,
                 quarters: draft.quarters.join(','),
-                notes: ($('new-notes').value || '').trim(),
+                notes: notes,
                 totalDoses: Math.max(1, num(d.Doses, 1)),
                 intervalDays: num(d.IntervalDays, 1),
                 milkWithhold: num(d.MilkWithhold, 0),
                 milkWithholdUnit: whUnit(d.MilkWithholdUnit),
                 meatWithhold: num(d.MeatWithhold, 0),
                 meatWithholdUnit: whUnit(d.MeatWithholdUnit),
-                firstDose: $('first-dose').checked,
+                firstDose: firstDose,
                 firstDoseId: uid('d')
-            });
+            })));
 
-            toast('Treatment saved for ' + who);
+            toast(draft.cows.length === 1
+                ? 'Treatment saved for ' + cowName(draft.cows[0])
+                : plural(draft.cows.length, 'treatment') + ' saved');
             resetNewTreatment();
             showTab('treated');
         }
@@ -1232,7 +1413,9 @@
                     <div class="info">
                         <b>${esc(t.Condition)}</b>${q ? `<span class="tag2">${esc(q)}</span>` : ''}<br>
                         ${esc(t.Drug)} · dose ${i.given}/${i.total}${i.ended ? ' (stopped early)' : ''}<br>
-                        ${when}
+                        ${when}<br>
+                        <span style="opacity:.85;">Started by ${esc(t.CreatedBy || '—')}${i.given
+                            ? ' · last dose by ' + esc(i.list[i.list.length - 1].GivenBy || '—') : ''}</span>
                         ${ready && !i.meatOk ? `<br>Meat withhold runs to <b>${fmtDayTime(i.meatClear)}</b>.` : ''}
                         ${t.Notes ? `<div class="notes">“${esc(t.Notes)}”</div>` : ''}
                     </div>
@@ -1410,11 +1593,22 @@
                     <span class="muted" style="margin-left:auto;">${fmtDay(t.Started)}</span>
                 </div>
                 <div>${esc(t.Condition)} · ${esc(t.Drug)} · ${i.given}/${i.total} doses${q ? ' · ' + esc(q) : ''}</div>
-                <div class="muted">Treated by ${esc(t.CreatedBy || '—')}${i.lastDoseAt ? ' · last dose ' + fmtDay(i.lastDoseAt) : ''}</div>
+                <div class="muted">Started by <b>${esc(t.CreatedBy || '—')}</b>
+                    · doses by <b>${esc(dosedBy(i) || '—')}</b></div>
                 <div class="muted">${t.ClearedAt
-                    ? 'Cleared ' + fmtDay(t.ClearedAt) + ' by ' + esc(t.ClearedBy || '—')
+                    ? 'Cleared ' + fmtDay(t.ClearedAt) + ' by <b>' + esc(t.ClearedBy || '—') + '</b>'
                     : 'Not cleared yet'}${i.meatClear ? ' · meat clear ' + fmtDayTime(i.meatClear) : ''}</div>
             </div>`;
+        }
+
+        /** Everyone who gave a dose on this treatment, each named once. */
+        function dosedBy(i) {
+            const seen = [];
+            i.list.forEach(d => {
+                const who = String(d.GivenBy || '').trim();
+                if (who && seen.indexOf(who) === -1) seen.push(who);
+            });
+            return seen.join(', ');
         }
 
         /* ---------- treatment detail sheet ---------- */
@@ -1425,12 +1619,31 @@
             const i = info(t);
             const q = quartersText(t);
 
-            const doseLines = i.list.length
-                ? i.list.map(d => `<div class="cfg-item"><div class="grow">
-                        <div class="name">Dose ${esc(d.DoseNo)}/${i.total}</div>
-                        <div class="det">${fmtDayTime(d.GivenAt)} · ${esc(d.GivenBy || '—')}</div>
-                    </div></div>`).join('')
-                : '<p class="muted">No dose recorded yet.</p>';
+            // Everything that happened to this cow, in order, with the name of
+            // the person who did it. This is the record if anyone ever asks.
+            const events = [];
+            events.push({
+                at: parseDate(t.Started), what: 'Treatment started',
+                det: esc(t.Condition) + ' · ' + esc(t.Drug), who: t.CreatedBy
+            });
+            i.list.forEach(d => events.push({
+                at: parseDate(d.GivenAt),
+                what: 'Dose ' + esc(d.DoseNo) + '/' + i.total + ' given',
+                det: esc(d.Notes || ''), who: d.GivenBy
+            }));
+            if (i.ended) events.push({ at: null, what: 'Treatment stopped early', det: '', who: '' });
+            if (t.ClearedAt) events.push({
+                at: parseDate(t.ClearedAt), what: 'Cleared — milk back in the vat',
+                det: '', who: t.ClearedBy
+            });
+            events.sort((a, b) => (a.at || 0) - (b.at || 0));
+
+            const trail = events.map(e => `<div class="cfg-item"><div class="grow">
+                    <div class="name">${e.what}</div>
+                    <div class="det">${e.at ? fmtDayTime(e.at) : '—'}
+                        ${e.who ? ' · by <b>' + esc(e.who) + '</b>' : ' · by —'}
+                        ${e.det ? '<br>' + e.det : ''}</div>
+                </div></div>`).join('');
 
             openModal(`
                 <h3>Cow ${esc(byTag(t))}</h3>
@@ -1438,15 +1651,17 @@
                     <div><span class="muted">Condition:</span> <b>${esc(t.Condition)}</b></div>
                     <div><span class="muted">Drug:</span> <b>${esc(t.Drug)}</b></div>
                     <div><span class="muted">Quarter:</span> ${q || 'not applicable'}</div>
-                    <div><span class="muted">Started:</span> ${fmtDayTime(t.Started)} by ${esc(t.CreatedBy || '—')}</div>
                     <div><span class="muted">Plan:</span> ${i.total} dose(s), every ${num(t.IntervalDays, 1)} day(s)</div>
                     <div><span class="muted">Milk withhold:</span> ${whText(t.MilkWithhold, t.MilkWithholdUnit)} → ${i.milkClear ? fmtDayTime(i.milkClear) : '—'}</div>
                     <div><span class="muted">Meat withhold:</span> ${whText(t.MeatWithhold, t.MeatWithholdUnit)} → ${i.meatClear ? fmtDayTime(i.meatClear) : '—'}</div>
                     ${t.Notes ? `<div><span class="muted">Notes:</span> ${esc(t.Notes)}</div>` : ''}
-                    ${t.ClearedAt ? `<div><span class="muted">Cleared:</span> ${fmtDayTime(t.ClearedAt)} by ${esc(t.ClearedBy || '—')}</div>` : ''}
                 </div>
-                <h3 style="margin-top:16px;">Doses given</h3>
-                ${doseLines}
+
+                <h3 style="margin-top:16px;">Who did what</h3>
+                ${trail}
+                ${i.given < i.total && !i.ended
+                    ? `<p class="muted">${plural(i.total - i.given, 'dose')} still to give.</p>` : ''}
+                ${!t.ClearedAt ? '<p class="muted">Not cleared yet.</p>' : ''}
                 <div class="row" style="margin-top:16px;">
                     <button class="btn grey" onclick="closeModal()">Close</button>
                     ${t.ClearedAt ? `<button class="btn blue" onclick="unclearCow('${esc(t.ID)}')">Undo clear</button>` : ''}
@@ -1807,6 +2022,7 @@
         /* ===================== BOOT ===================== */
 
         loadQueue();
+        setBatchMode(false);
         setSearchMode('Tag');
         buildTabs();
         renderAll();
