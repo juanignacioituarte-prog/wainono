@@ -617,12 +617,30 @@
             return fmtDayTime(state.loadedAt);
         }
 
+        /**
+         * Older sheets stored the withholds as "MilkWithholdDays", days only.
+         * Fill the new fields from the old ones on the way in, so a sheet whose
+         * Apps Script has not been updated yet still shows the right numbers
+         * instead of silently showing zero.
+         */
+        function fillOldWithholds(row) {
+            [['Milk', 'MilkWithholdDays'], ['Meat', 'MeatWithholdDays']].forEach(pair => {
+                const key = pair[0] + 'Withhold';
+                const blank = row[key] === undefined || row[key] === null || row[key] === '';
+                if (blank && row[pair[1]] !== undefined && row[pair[1]] !== '') {
+                    row[key] = row[pair[1]];
+                    row[key + 'Unit'] = 'days';
+                }
+            });
+            return row;
+        }
+
         function applyServer(data) {
             if (!data || data.status !== 'success') return false;
             state.cows = data.cows || [];
             state.conditions = data.conditions || [];
-            state.drugs = data.drugs || [];
-            state.treatments = data.treatments || [];
+            state.drugs = (data.drugs || []).map(fillOldWithholds);
+            state.treatments = (data.treatments || []).map(fillOldWithholds);
             state.doses = data.doses || [];
             state.managers = data.managers || '';
             state.loaded = true;
@@ -1194,6 +1212,7 @@
                 <button class="choice" onclick="pickDrug('${esc(d.ID)}')">
                     ${esc(d.Name)}${matched.indexOf(d) === -1 ? '' : ' <span class="pill" style="background:var(--accent); color:#fff;">for this</span>'}
                     <small>${drugPlanText(d)}</small>
+                    ${noWithhold(d) ? '<small style="color:var(--red); font-weight:700;">⚠ No withhold set for this drug</small>' : ''}
                 </button>`).join('');
             $('drug-hint').textContent = matched.length
                 ? 'Drugs marked “for this” are the ones set up for ' + draft.condition.Name + '.'
@@ -1214,6 +1233,11 @@
             const dose = amount ? amount + (unit ? ' ' + unit : '') + ' per dose' : (unit || 'dose');
             return `${doses} × ${dose}, ${every} · milk ${whText(d.MilkWithhold, d.MilkWithholdUnit)}`
                 + ` · meat ${whText(d.MeatWithhold, d.MeatWithholdUnit)}`;
+        }
+
+        /** A withhold of zero means the cow is clear the moment she is dosed. */
+        function noWithhold(d) {
+            return num(d.MilkWithhold, 0) === 0 && num(d.MeatWithhold, 0) === 0;
         }
 
         function pickDrug(id) {
@@ -1257,6 +1281,12 @@
                 <div><span class="muted">Milk clear:</span> <b>${fmtDayTime(milkClear)}</b></div>
                 <div><span class="muted">Meat clear:</span> <b>${fmtDayTime(meatClear)}</b></div>
                 <div class="muted" style="font-size:12px;">Clear dates move if a dose is given late. They always count from the real last dose.</div>
+                ${noWithhold(d) ? `<div style="background:#fdecea; border:1px solid var(--red);
+                    color:var(--red-dark); border-radius:8px; padding:10px; margin-top:10px; font-size:13px;">
+                    <b>⚠ This drug has no withhold set.</b><br>
+                    Her milk and meat count as clear straight away. If that is wrong,
+                    cancel and ask a manager to set the withhold in Config first.
+                  </div>` : ''}
             `;
         }
 
@@ -1705,6 +1735,7 @@
                     <div class="grow">
                         <div class="name">${esc(d.Name)}${isActive(d.Active) ? '' : ' <span class="pill">hidden</span>'}</div>
                         <div class="det">${esc(drugPlanText(d))}</div>
+                        ${noWithhold(d) ? '<div class="det" style="color:var(--red); font-weight:700;">⚠ No withhold set</div>' : ''}
                         <div class="det">${condList(d).length
                         ? 'For: ' + esc(condList(d).join(', '))
                         : '<span style="color:var(--orange);">Not linked to a condition</span>'}</div>
