@@ -911,34 +911,60 @@
                 .sort((a, b) => num(a.DoseNo) - num(b.DoseNo));
 
             const total = Math.max(1, num(t.TotalDoses, 1));
-            const given = list.length;
             const interval = num(t.IntervalDays, 1) > 0 ? num(t.IntervalDays, 1) : 1;
-            const last = list[list.length - 1] || null;
+            const start = parseDate(t.Started);
+            const now = new Date();
 
             const ended = String(t.Status) === 'ended';
             const cleared = String(t.Status) === 'cleared';
-            const dosingDone = ended || given >= total;
 
-            let nextDue = null;
-            if (!dosingDone) {
-                nextDue = given === 0
-                    ? parseDate(t.Started)
-                    : addDays(parseDate(last.GivenAt) || new Date(), interval);
-            }
+            /*
+             * THE PLAN IS FIXED WHEN THE TREATMENT IS CREATED.
+             *
+             * Dose 1 is due at the start, dose 2 one interval later, and so on.
+             * Those dates never move. A dose given late does NOT push the rest of
+             * the plan out, and a dose whose day has passed is MISSED - it is not
+             * offered any more. The cow simply got fewer doses than planned, and
+             * the app says so.
+             */
+            const byNo = {};
+            list.forEach(d => { byNo[num(d.DoseNo, 0)] = d; });
 
-            const now = new Date();
-            let dueNow = false, overdue = false;
-            if (nextDue) {
-                if (interval >= 1) {
-                    dueNow = startOfDay(nextDue) <= startOfDay(now);
-                    overdue = startOfDay(nextDue) < startOfDay(now);
+            const byDay = interval >= 1;   // sub-day plans compare by the clock
+            const slots = [];
+            for (let k = 1; k <= total; k++) {
+                const dueAt = start ? new Date(start.getTime() + (k - 1) * interval * DAY) : null;
+                const dose = byNo[k] || null;
+                let status;
+                if (dose) status = 'given';
+                else if (!dueAt) status = 'pending';
+                else if (byDay) {
+                    status = startOfDay(dueAt) < startOfDay(now) ? 'missed'
+                        : (startOfDay(dueAt) <= startOfDay(now) ? 'due' : 'pending');
                 } else {
-                    dueNow = nextDue <= now;
-                    overdue = nextDue.getTime() < now.getTime() - DAY / 2;
+                    status = dueAt.getTime() < now.getTime() - DAY / 2 ? 'missed'
+                        : (dueAt <= now ? 'due' : 'pending');
                 }
+                slots.push({ no: k, dueAt: dueAt, dose: dose, status: status });
             }
 
-            const lastDoseAt = last ? parseDate(last.GivenAt) : parseDate(t.LastDoseAt);
+            const given = slots.filter(s => s.status === 'given').length;
+            const missed = slots.filter(s => s.status === 'missed');
+            const dueSlot = (ended || cleared) ? null : (slots.find(s => s.status === 'due') || null);
+            const pending = slots.filter(s => s.status === 'pending');
+
+            // Nothing is left to give once every slot is given or missed.
+            const dosingDone = ended || (!dueSlot && pending.length === 0);
+            const dueNow = !!dueSlot;
+            const nextDue = dueSlot ? dueSlot.dueAt : (pending.length ? pending[0].dueAt : null);
+
+            // The withhold counts from the last dose SHE ACTUALLY GOT.
+            let latest = null;
+            list.forEach(d => {
+                const at = parseDate(d.GivenAt);
+                if (at && (!latest || at > latest)) latest = at;
+            });
+            const lastDoseAt = latest || parseDate(t.LastDoseAt);
             const milkMs = whMs(t.MilkWithhold, t.MilkWithholdUnit);
             const meatMs = whMs(t.MeatWithhold, t.MeatWithholdUnit);
             const milkClear = lastDoseAt ? new Date(lastDoseAt.getTime() + milkMs) : null;
@@ -959,9 +985,19 @@
             else stage = 'ready';
 
             return {
-                list, total, given, interval, ended, cleared, dosingDone,
-                nextDue, dueNow, overdue, lastDoseAt, milkClear, meatClear, milkOk, meatOk, stage
+                list, slots, total, given, missed, dueSlot, interval,
+                ended, cleared, dosingDone, nextDue, dueNow,
+                lastDoseAt, milkClear, meatClear, milkOk, meatOk, stage
             };
+        }
+
+        /** "missed dose 2 on 14 Aug" — the note that goes on the card and the record. */
+        function missedText(i) {
+            if (!i.missed.length) return '';
+            return i.missed.length === 1
+                ? 'Missed dose ' + i.missed[0].no + '/' + i.total + ' on ' + fmtDay(i.missed[0].dueAt)
+                : 'Missed ' + i.missed.length + ' doses: '
+                  + i.missed.map(s => s.no + '/' + i.total + ' on ' + fmtDay(s.dueAt)).join(', ');
         }
 
         function byTag(t) {
@@ -1715,7 +1751,7 @@
             const rank = x => x.i.dueNow ? 0 : (x.i.stage === 'ready' ? 1 : 2);
             rows.sort((a, b) => {
                 if (rank(a) !== rank(b)) return rank(a) - rank(b);
-                if (a.i.overdue !== b.i.overdue) return a.i.overdue ? -1 : 1;
+                if (!!a.i.missed.length !== !!b.i.missed.length) return a.i.missed.length ? -1 : 1;
                 return String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true });
             });
 
@@ -1734,7 +1770,6 @@
 
         function treatedCard(t, i) {
             const q = quartersText(t);
-            const doseLabel = `Give dose ${Math.min(i.given + 1, i.total)}/${i.total}`;
             const ready = i.stage === 'ready';
             const colour = ready ? 'green' : (i.dueNow ? 'reddark' : 'red');
 
@@ -1743,11 +1778,15 @@
                 when = `Milk withhold finished ${fmtDayTime(i.milkClear)} (${relDay(i.milkClear)}).`;
             } else if (i.stage === 'withhold') {
                 when = `Dosing finished. Milk clear ${fmtDayTime(i.milkClear)} (${relDay(i.milkClear)}).`;
-            } else if (i.dueNow) {
-                when = i.overdue ? `Dose was due ${relDay(i.nextDue)}.` : 'Dose due today.';
-            } else {
+            } else if (i.dueSlot) {
+                when = `Dose ${i.dueSlot.no}/${i.total} due today.`;
+            } else if (i.nextDue) {
                 when = `Next dose ${fmtDay(i.nextDue)} (${relDay(i.nextDue)}).`;
+            } else {
+                when = 'Nothing left to give.';
             }
+
+            const miss = missedText(i);
 
             return `<div class="tcard ${colour}">
                 <div class="top">
@@ -1762,12 +1801,14 @@
                         ${t.Notes ? `<div class="notes">“${esc(t.Notes)}”</div>` : ''}
                     </div>
                 </div>
-                ${i.overdue ? '<div class="warn">⚠ OVERDUE — a dose was missed</div>' : ''}
+                ${miss ? `<div class="warn">⚠ ${esc(miss)}</div>` : ''}
                 <div class="acts">
                     ${ready ? `<button class="btn dosebtn" style="color:var(--accent-dark) !important;" onclick="clearCow('${esc(t.ID)}')">✓ Clear</button>` : ''}
-                    ${(!ready && !i.dosingDone) ? `<button class="btn dosebtn" onclick="giveDose('${esc(t.ID)}')">${doseLabel}</button>` : ''}
+                    ${i.dueSlot ? `<button class="btn dosebtn" onclick="giveDose('${esc(t.ID)}')">Give dose ${i.dueSlot.no}/${i.total}</button>` : ''}
                     <button class="btn small ghost" onclick="openTreatment('${esc(t.ID)}')">Details</button>
                     ${i.given ? `<button class="btn small ghost" onclick="undoDose('${esc(t.ID)}')">Undo last dose</button>` : ''}
+                    ${isManager() && !i.dosingDone && !i.dueSlot
+                        ? `<button class="btn small ghost" onclick="giveDoseEarlier('${esc(t.ID)}')">Record a dose</button>` : ''}
                     ${i.dosingDone ? '' : `<button class="btn small ghost" onclick="endTreatment('${esc(t.ID)}')">Stop treatment</button>`}
                 </div>
             </div>`;
@@ -1777,14 +1818,90 @@
             const t = state.treatments.find(x => String(x.ID) === String(id));
             if (!t) return;
             const i = info(t);
-            if (i.dosingDone) { toast('All doses are already given'); return; }
+            if (!i.dueSlot) { toast('No dose is due today'); return; }
 
-            const doseNo = i.given + 1;
+            const doseNo = i.dueSlot.no;
             send({
                 type: 'give_dose', id: uid('d'), treatmentId: id,
                 doseNo: doseNo, givenAt: new Date().toISOString()
             });
             toast(`Dose ${doseNo}/${i.total} recorded for ${byTag(t)}`);
+        }
+
+        /**
+         * The dose was given, but nobody pressed the button until later. Recording
+         * it now would push both withholds out by however long the delay was, and
+         * shift the rest of the plan with it. This records the real time instead.
+         *
+         * Managers only, for the same reason backdating a treatment is: moving a
+         * dose earlier makes a withhold END EARLIER, and that is the one mistake
+         * on this app that puts milk in the vat before it should be there.
+         */
+        function giveDoseEarlier(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t || !isManager()) return;
+            const i = info(t);
+
+            // Only slots nobody has filled: the ones showing as missed.
+            const open = i.slots.filter(s => s.status === 'missed');
+            if (!open.length) { toast('No missed dose to record'); return; }
+
+            const now = new Date();
+            const local = d => {
+                const x = new Date(d);
+                x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+                return x.toISOString().slice(0, 16);
+            };
+
+            openModal(`
+                <h3>Record a dose for cow ${esc(byTag(t))}</h3>
+                <p class="muted">Use this only when the dose <b>was given</b> but nobody
+                   pressed the button at the time.</p>
+
+                <label class="lbl">Which dose?</label>
+                <select id="dose-no">
+                    ${open.map(s => `<option value="${s.no}">Dose ${s.no}/${i.total} — was due ${fmtDay(s.dueAt)}</option>`).join('')}
+                </select>
+
+                <label class="lbl">When was it actually given?</label>
+                <input type="datetime-local" id="dose-when"
+                       value="${local(open[0].dueAt)}" max="${local(now)}">
+
+                <div style="font-size:13px; line-height:1.7; margin-top:10px;">
+                    <div><span class="muted">Milk withhold:</span>
+                        ${whText(t.MilkWithhold, t.MilkWithholdUnit)} from the last dose given</div>
+                </div>
+                <div style="background:#fdecea; border:1px solid var(--red); color:var(--red-dark);
+                            border-radius:8px; padding:10px; margin-top:10px; font-size:13px;">
+                    <b>Only put the real time here.</b> An earlier time can make her milk
+                    clear sooner than it should. If the dose was never given, leave it
+                    missed.
+                </div>
+                <div class="row" style="margin-top:14px;">
+                    <button class="btn grey" onclick="closeModal()">Cancel</button>
+                    <button class="btn" onclick="confirmDoseEarlier('${esc(id)}')">Record it</button>
+                </div>
+            `);
+        }
+
+        function confirmDoseEarlier(id) {
+            const t = state.treatments.find(x => String(x.ID) === String(id));
+            if (!t) return;
+            const i = info(t);
+            const doseNo = num($('dose-no').value, 0);
+            const v = $('dose-when').value;
+            const when = v ? new Date(v) : null;
+
+            if (!doseNo) { toast('Pick which dose'); return; }
+            if (!when || isNaN(when.getTime())) { toast('Pick a date and time'); return; }
+            if (when > new Date()) { toast('That is in the future'); return; }
+
+            closeModal();
+            send({
+                type: 'give_dose', id: uid('d'), treatmentId: id,
+                doseNo: doseNo, givenAt: when.toISOString()
+            });
+            toast(`Dose ${doseNo}/${i.total} recorded as ${fmtDayTime(when)}`);
         }
 
         function undoDose(id) {
@@ -1935,6 +2052,7 @@
                     <span class="muted" style="margin-left:auto;">${fmtDay(t.Started)}</span>
                 </div>
                 <div>${esc(t.Condition)} · ${esc(t.Drug)} · ${i.given}/${i.total} doses${q ? ' · ' + esc(q) : ''}</div>
+                ${i.missed.length ? `<div style="color:var(--red); font-weight:700;">⚠ ${esc(missedText(i))}</div>` : ''}
                 <div class="muted">Started by <b>${esc(t.CreatedBy || '—')}</b>
                     · doses by <b>${esc(dosedBy(i) || '—')}</b></div>
                 <div class="muted">${t.ClearedAt
@@ -1968,11 +2086,21 @@
                 at: parseDate(t.Started), what: 'Treatment started',
                 det: esc(t.Condition) + ' · ' + esc(t.Drug), who: t.CreatedBy
             });
-            i.list.forEach(d => events.push({
-                at: parseDate(d.GivenAt),
-                what: 'Dose ' + esc(d.DoseNo) + '/' + i.total + ' given',
-                det: esc(d.Notes || ''), who: d.GivenBy
-            }));
+            i.slots.forEach(s => {
+                if (s.status === 'given') {
+                    events.push({
+                        at: parseDate(s.dose.GivenAt),
+                        what: 'Dose ' + s.no + '/' + i.total + ' given',
+                        det: esc(s.dose.Notes || ''), who: s.dose.GivenBy
+                    });
+                } else if (s.status === 'missed') {
+                    events.push({
+                        at: s.dueAt, missed: true,
+                        what: '⚠ Dose ' + s.no + '/' + i.total + ' MISSED',
+                        det: 'It was due ' + fmtDay(s.dueAt) + ' and was never given.', who: ''
+                    });
+                }
+            });
             if (i.ended) events.push({ at: null, what: 'Treatment stopped early', det: '', who: '' });
             if (t.ClearedAt) events.push({
                 at: parseDate(t.ClearedAt), what: 'Cleared — milk back in the vat',
@@ -1981,10 +2109,12 @@
             events.sort((a, b) => (a.at || 0) - (b.at || 0));
 
             const trail = events.map(e => `<div class="cfg-item"><div class="grow">
-                    <div class="name">${e.what}</div>
-                    <div class="det">${e.at ? fmtDayTime(e.at) : '—'}
-                        ${e.who ? ' · by <b>' + esc(e.who) + '</b>' : ' · by —'}
-                        ${e.det ? '<br>' + e.det : ''}</div>
+                    <div class="name"${e.missed ? ' style="color:var(--red);"' : ''}>${e.what}</div>
+                    <div class="det">${e.missed
+                        ? esc(e.det)
+                        : (e.at ? fmtDayTime(e.at) : '—')
+                          + (e.who ? ' · by <b>' + esc(e.who) + '</b>' : ' · by —')
+                          + (e.det ? '<br>' + e.det : '')}</div>
                 </div></div>`).join('');
 
             openModal(`
@@ -1996,6 +2126,9 @@
                     <div><span class="muted">Plan:</span> ${i.total} dose(s), every ${num(t.IntervalDays, 1)} day(s)</div>
                     <div><span class="muted">Milk withhold:</span> ${whText(t.MilkWithhold, t.MilkWithholdUnit)} → ${i.milkClear ? fmtDayTime(i.milkClear) : '—'}</div>
                     <div><span class="muted">Meat withhold:</span> ${whText(t.MeatWithhold, t.MeatWithholdUnit)} → ${i.meatClear ? fmtDayTime(i.meatClear) : '—'}</div>
+                    ${!i.dosingDone && i.given ? `<div class="muted" style="font-size:12px;">
+                        Those two dates count from the last dose given so far. They move
+                        later every time another dose is given.</div>` : ''}
                     ${t.Notes ? `<div><span class="muted">Notes:</span> ${esc(t.Notes)}</div>` : ''}
                 </div>
 
