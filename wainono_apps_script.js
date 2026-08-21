@@ -42,6 +42,8 @@ function doGet(e) {
     return getOut();
   } else if (type === 'herd_log') {
     return getHerdLog();
+  } else if (type === 'paddocks') {
+    return getPaddocks();
   } else {
     return getFeedSettings();
   }
@@ -77,6 +79,8 @@ function doPost(e) {
       return appendHerdLog(payload.entries);
     } else if (type === 'herd_cows') {
       return applyHerdCows(payload);
+    } else if (type === 'paddocks') {
+      return savePaddocks(payload);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -740,6 +744,126 @@ function appendHerdLog(entries) {
   if (!Array.isArray(entries)) return errorResponse("Payload entries must be array");
   if (entries.length === 0) return jsonResponse({ status: "success", added: 0 });
   return jsonResponse({ status: "success", added: appendHerdLogRows(entries) });
+}
+
+/* ================== PADDOCK BOUNDARIES ================== */
+// Sheet "Paddock Boundaries":
+//   paddockId | name | farmId | calcArea | geometryType | geometryJson
+//
+// paddockId is the real key and never changes. name is only a label, so a
+// paddock can be renamed without touching anything that points at it.
+// geometryJson holds MultiPolygon coordinates: [[[[lng,lat], ...]]]
+//
+// Same rules as the herds, for the same reasons: a row is only removed when
+// the app names its id, and a paddock the sender has never heard of is left
+// exactly as it is.
+
+var PADDOCK_SHEET = "Paddock Boundaries";
+var PADDOCK_HEADERS = ["paddockId", "name", "farmId", "calcArea", "geometryType", "geometryJson"];
+
+function getPaddockSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  return ss.getSheetByName(PADDOCK_SHEET);   // never created blind - it holds the farm
+}
+
+function getPaddocks() {
+  var sheet = getPaddockSheet();
+  if (!sheet) return errorResponse("No '" + PADDOCK_SHEET + "' tab in this spreadsheet");
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResponse({ status: "success", paddocks: [] });
+
+  var data = sheet.getRange(2, 1, lastRow - 1, PADDOCK_HEADERS.length).getValues();
+  var paddocks = [];
+  data.forEach(function(row) {
+    var id = String(row[0] || "").trim();
+    if (!id) return;
+    var geom = null;
+    try { geom = JSON.parse(row[5] || "null"); } catch (e) { geom = null; }
+    paddocks.push({
+      paddockId: id,
+      name: String(row[1] || "").trim(),
+      farmId: String(row[2] || ""),
+      calcArea: Number(row[3]) || 0,
+      geometryType: String(row[4] || "MultiPolygon"),
+      geometry: geom
+    });
+  });
+  return jsonResponse({ status: "success", paddocks: paddocks });
+}
+
+/**
+ * Upsert by paddockId.
+ *
+ * Anything not mentioned is left alone, so a device with an old list cannot
+ * wipe the farm. Rows go only when their id is in deletePaddocks.
+ */
+function savePaddocks(payload) {
+  var sheet = getPaddockSheet();
+  if (!sheet) return errorResponse("No '" + PADDOCK_SHEET + "' tab in this spreadsheet");
+  if (!Array.isArray(payload.paddocks)) return errorResponse("Payload paddocks must be array");
+
+  var lastRow = sheet.getLastRow();
+  var existing = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, PADDOCK_HEADERS.length).getValues()
+    : [];
+
+  var doomed = {};
+  if (Array.isArray(payload.deletePaddocks)) {
+    payload.deletePaddocks.forEach(function(id) { if (id) doomed[String(id).trim()] = true; });
+  }
+
+  var incoming = {};
+  payload.paddocks.forEach(function(p) {
+    if (p && p.paddockId) incoming[String(p.paddockId).trim()] = p;
+  });
+
+  var rows = [];
+  var kept = {};
+  existing.forEach(function(row) {
+    var id = String(row[0] || "").trim();
+    if (!id) return;
+    if (doomed[id]) return;                       // named for deletion
+    kept[id] = true;
+    var p = incoming[id];
+    if (!p) { rows.push(row); return; }           // sender did not mention it
+    rows.push(paddockRow(p, row));
+  });
+
+  // paddocks the sheet has never seen (a split makes these)
+  payload.paddocks.forEach(function(p) {
+    var id = p && p.paddockId ? String(p.paddockId).trim() : "";
+    if (!id || kept[id] || doomed[id]) return;
+    kept[id] = true;
+    rows.push(paddockRow(p, null));
+  });
+
+  sheet.clearContents();
+  sheet.appendRow(PADDOCK_HEADERS);
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, PADDOCK_HEADERS.length).setValues(rows);
+  }
+
+  return jsonResponse({ status: "success", count: rows.length });
+}
+
+// Build a row, keeping whatever the caller did not send.
+function paddockRow(p, old) {
+  var geom = p.geometry;
+  var geomText;
+  if (geom === undefined || geom === null) {
+    geomText = old ? old[5] : "";
+  } else {
+    geomText = (typeof geom === 'string') ? geom : JSON.stringify(geom);
+  }
+  return [
+    String(p.paddockId).trim(),
+    p.name !== undefined && p.name !== null ? String(p.name) : (old ? old[1] : ""),
+    p.farmId !== undefined && p.farmId !== null ? String(p.farmId) : (old ? old[2] : ""),
+    p.calcArea !== undefined && p.calcArea !== null ? Number(p.calcArea) : (old ? old[3] : 0),
+    p.geometryType || (old ? old[4] : "MultiPolygon"),
+    geomText
+  ];
 }
 
 function saveUnits(unitsList) {

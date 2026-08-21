@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.71</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.72</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.71</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.72</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4781,10 +4781,62 @@
             }, 1000);
         }
 
+        /* Paddock boundaries come from the "Paddock Boundaries" tab of the feed
+         * sync sheet. Each row has a paddockId that never changes, so a paddock
+         * can be renamed without breaking anything that points at it.
+         *
+         * The Google Cloud geojson is kept as a fallback only. If the sheet
+         * cannot be read the map still draws, rather than showing an empty farm.
+         */
+        let PADDOCK_ROWS = [];          // raw rows from the sheet, keyed work uses these
+        let paddockIdByName = {};
+        let paddockSource = 'geojson';
+
+        async function fetchPaddocksFromSheet() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return null;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + "?type=paddocks&t=" + Date.now(), { cache: 'no-store' });
+                const d = await res.json();
+                if (!d || d.status !== 'success' || !Array.isArray(d.paddocks)) return null;
+
+                const features = [];
+                d.paddocks.forEach(p => {
+                    if (!p || !p.geometry || !p.name) return;
+                    features.push({
+                        type: 'Feature',
+                        properties: {
+                            name: p.name,
+                            calcArea: p.calcArea || 0,
+                            paddockId: p.paddockId,
+                            farmId: p.farmId
+                        },
+                        geometry: { type: p.geometryType || 'MultiPolygon', coordinates: p.geometry }
+                    });
+                });
+                if (features.length === 0) return null;   // never blank the map
+
+                PADDOCK_ROWS = d.paddocks;
+                paddockIdByName = {};
+                d.paddocks.forEach(p => { if (p.name) paddockIdByName[p.name] = p.paddockId; });
+                return { type: 'FeatureCollection', features: features };
+            } catch (e) {
+                console.log("Paddock boundaries unavailable from the sheet:", e);
+                return null;
+            }
+        }
+
         async function loadGeoJSON() {
             try {
-                const response = await fetch(GEOJSON_URL + "?t=" + Date.now());
-                const data = await response.json();
+                let data = await fetchPaddocksFromSheet();
+                if (data) {
+                    paddockSource = 'sheet';
+                    console.log(`Paddocks: ${data.features.length} from the Paddock Boundaries tab`);
+                } else {
+                    paddockSource = 'geojson';
+                    console.warn("Paddocks: falling back to the Cloud geojson");
+                    const response = await fetch(GEOJSON_URL + "?t=" + Date.now());
+                    data = await response.json();
+                }
                 data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
                 geoLayer = L.geoJSON(data, {
                     style: { color: 'white', weight: 1.5, fillOpacity: 0.1 },
