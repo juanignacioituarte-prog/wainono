@@ -1674,7 +1674,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.79</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.80</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1685,7 +1685,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.79</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.80</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -5695,7 +5695,11 @@
         }
 
         function getCurrentModeData() {
-            return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed') ? manualModeData : satellitePaddockData;
+            // PLAN was split out of FEED and never added here, so it was reading
+            // satellite covers while its own wedge was drawn from the farmwalk.
+            // Planning is done off the farmwalk, the same as FEED.
+            return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentDashboardMode === 'plan')
+                ? manualModeData : satellitePaddockData;
         }
 
         /* Satellite Logic */
@@ -6041,8 +6045,11 @@
          * things.
          */
         function growthIsComparable(p, info) {
-            if (!info || !info.maxTs || !info.prevWalkTs) return false;
-            if (!p || p.isOut || !p.latest || !p.previous) return false;
+            if (!p || p.isOut || !p.latest) return false;
+            // Satellite readings carry no timestamps, so there are no walk dates
+            // to line up. Nothing to rule out there - use whatever growth it has.
+            if (!info || !info.maxTs || !info.prevWalkTs) return true;
+            if (!p.previous) return false;
             return p.latest.ts === info.maxTs && p.previous.ts === info.prevWalkTs;
         }
 
@@ -6082,6 +6089,9 @@
         function setPlanScope(unitId) {
             planUnitId = unitId || null;
             renderPlanScope();
+            // updateFarmStats writes the area, cover and growth that
+            // calculateFeedLogic then reads, so it has to run first.
+            updateFarmStats();
             saveAndRecalc(true);      // recalculate, do not push settings up
         }
 
