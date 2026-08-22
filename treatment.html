@@ -433,6 +433,15 @@
             </div>
 
             <div class="card">
+                <h2>Maintenance</h2>
+                <p class="muted">The clear dates are stored in the sheet and only written
+                    when a dose is given. After the Apps Script is updated, run this once so
+                    every treatment written by the old version is worked out again with the
+                    current rules. It changes no doses and deletes nothing.</p>
+                <button class="btn wide grey" onclick="recalcAll()">Recalculate all clear dates</button>
+            </div>
+
+            <div class="card">
                 <h2>Managers</h2>
                 <p class="muted">Only these emails can open this Config tab. One email per line.</p>
                 <textarea id="cfg-managers" style="min-height:90px;"></textarea>
@@ -2803,6 +2812,16 @@
             send({ type: 'import_cows', mode: importMode, cows: cows });
             $('cow-paste').value = '';
             toast('Sending ' + cows.length + ' cows to the sheet…');
+        }
+
+        /** Rewrite every stored clear date using the current rules. */
+        function recalcAll() {
+            if (!isManager()) return;
+            if (!confirm('Work out the clear dates again for every treatment?\n\n'
+                + 'This is safe: no dose is changed and nothing is deleted. '
+                + 'Only the stored clear dates and statuses are rewritten.')) return;
+            send({ type: 'recalc_all' });
+            toast('Recalculating…');
         }
 
         function saveManagers() {
