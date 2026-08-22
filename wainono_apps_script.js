@@ -44,6 +44,8 @@ function doGet(e) {
     return getHerdLog();
   } else if (type === 'paddocks') {
     return getPaddocks();
+  } else if (type === 'tabs') {
+    return listTabs();
   } else {
     return getFeedSettings();
   }
@@ -81,6 +83,8 @@ function doPost(e) {
       return applyHerdCows(payload);
     } else if (type === 'paddocks') {
       return savePaddocks(payload);
+    } else if (type === 'farmwalk_load') {
+      return loadFarmwalk(payload);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -744,6 +748,96 @@ function appendHerdLog(entries) {
   if (!Array.isArray(entries)) return errorResponse("Payload entries must be array");
   if (entries.length === 0) return jsonResponse({ status: "success", added: 0 });
   return jsonResponse({ status: "success", added: appendHerdLogRows(entries) });
+}
+
+/* ================== DIAGNOSTICS ================== */
+// Read only. Says which tabs this script can actually see, so nobody has to
+// guess where the data lives again.
+function listTabs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var out = [];
+  ss.getSheets().forEach(function(sh) {
+    var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+    var header = [];
+    if (lastRow > 0 && lastCol > 0) header = sh.getRange(1, 1, 1, Math.min(lastCol, 12)).getValues()[0];
+    out.push({ name: sh.getName(), gid: sh.getSheetId(), rows: lastRow, cols: lastCol, header: header });
+  });
+  return jsonResponse({ status: "success", spreadsheet: ss.getName(), tabs: out });
+}
+
+/* ================== FARMWALK LOADING ================== */
+/**
+ * Put one whole farmwalk into the Farmwalks tab.
+ *
+ * Rows for that same date are cleared first, so running it twice cannot
+ * double up. Every other date is left exactly as it is - the older walks are
+ * what the growth figures are worked out from.
+ *
+ * The tab is written in whatever shape it already has: three columns here
+ * (Date, paddock, cover), not the four the batch saver uses.
+ */
+function loadFarmwalk(payload) {
+  var name = payload.sheetName || "Farmwalks";
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) return errorResponse("No '" + name + "' tab in this spreadsheet");
+  if (!Array.isArray(payload.entries)) return errorResponse("Payload entries must be array");
+
+  var date = String(payload.date || "").trim();
+  if (!date) return errorResponse("Missing date");
+
+  var lastRow = sheet.getLastRow();
+  var lastCol = Math.max(3, sheet.getLastColumn());
+  var header = lastRow > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : ["Date", "paddock", "cover"];
+
+  var keep = [];
+  var removed = 0;
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, lastCol).getValues().forEach(function(row) {
+      if (!row[0] && !row[1]) return;                 // blank line
+      if (sameFarmwalkDate(row[0], date)) { removed++; return; }
+      keep.push(row);
+    });
+  }
+
+  payload.entries.forEach(function(e) {
+    if (!e || !e.paddock) return;
+    var row = new Array(lastCol).fill("");
+    row[0] = date;
+    row[1] = String(e.paddock);
+    row[2] = Number(e.cover) || 0;
+    if (lastCol > 3 && e.reason) row[3] = String(e.reason);
+    keep.push(row);
+  });
+
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, header.length).setValues([header]);
+  if (keep.length > 0) sheet.getRange(2, 1, keep.length, lastCol).setValues(keep);
+
+  return jsonResponse({
+    status: "success", date: date,
+    added: payload.entries.length, replaced: removed, totalRows: keep.length
+  });
+}
+
+// Cells come back as a Date or as text depending on how the column is
+// formatted, so compare on day/month/year rather than on the raw value.
+function sameFarmwalkDate(cell, wanted) {
+  var a = farmwalkDateParts(cell), b = farmwalkDateParts(wanted);
+  if (!a || !b) return false;
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+}
+
+function farmwalkDateParts(v) {
+  if (v && typeof v.getDate === 'function' && !isNaN(v.getTime())) {
+    return [v.getDate(), v.getMonth() + 1, v.getFullYear()];
+  }
+  var s = String(v || "").trim();
+  var m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return [Number(m[3]), Number(m[2]), Number(m[1])];
+  return null;
 }
 
 /* ================== PADDOCK BOUNDARIES ================== */
