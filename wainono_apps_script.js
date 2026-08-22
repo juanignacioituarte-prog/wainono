@@ -22,6 +22,10 @@
  * Everything else is byte-identical to what you had.
  */
 
+// Bump this whenever the script changes. ?type=version says what is actually
+// deployed, so "did the paste take?" is a question with an answer.
+var SCRIPT_VERSION = "2026-08-22-a";
+
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
                        .setMimeType(ContentService.MimeType.JSON);
@@ -46,6 +50,8 @@ function doGet(e) {
     return getPaddocks();
   } else if (type === 'tabs') {
     return listTabs();
+  } else if (type === 'version') {
+    return jsonResponse({ status: "success", version: SCRIPT_VERSION });
   } else {
     return getFeedSettings();
   }
