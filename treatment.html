@@ -1110,7 +1110,9 @@
             });
 
             return [...map.values()].map(g => {
-                g.list.sort((a, b) => (parseDate(a.t.Started) || 0) - (parseDate(b.t.Started) || 0));
+                // Newest first: the thing she was treated for most recently is the
+                // one you are looking for when you open her card.
+                g.list.sort((a, b) => (parseDate(b.t.Started) || 0) - (parseDate(a.t.Started) || 0));
                 g.t = g.list[0].t;                       // for the tag / birth ID / EID
                 g.many = g.list.length > 1;
 
@@ -1991,14 +1993,23 @@
         }
 
         /** One line of "where this treatment is up to", inside a cow's card. */
-        function treatmentLine(x) {
+        function treatmentLine(x, many) {
             const t = x.t, i = x.i;
             const q = quartersText(t);
+
+            /*
+             * With more than one treatment on the cow, each line shows only where
+             * ITS dosing is up to. The clear date is left off, because only one
+             * date matters to whoever is holding her milk: the last one. Showing
+             * an earlier date next to it is how someone lets a cow into the vat
+             * four days early.
+             */
             let when;
-            if (i.stage === 'ready') when = `milk clear ${fmtClear(i.milkClear)}`;
-            else if (i.stage === 'withhold') when = `milk clear ${fmtClear(i.milkClear)} (${relDay(i.milkClear)})`;
-            else if (i.dueSlot) when = `<b>dose ${i.dueSlot.no}/${i.total} due today</b>`;
+            if (i.dueSlot) when = `<b>dose ${i.dueSlot.no}/${i.total} due today</b>`;
             else if (i.nextDue) when = `next dose ${fmtDay(i.nextDue)} (${relDay(i.nextDue)})`;
+            else if (many) when = 'dosing finished';
+            else if (i.stage === 'ready') when = `milk clear ${fmtClear(i.milkClear)}`;
+            else if (i.stage === 'withhold') when = `milk clear ${fmtClear(i.milkClear)} (${relDay(i.milkClear)})`;
             else when = 'nothing left to give';
 
             const miss = missedText(i);
@@ -2022,12 +2033,14 @@
             const label = ready ? 'MILK IS CLEAR' : (t.Tag ? 'TAG' : (t.BirthID ? 'BIRTH ID' : 'EID'));
             const rule = '<div style="border-top:1px solid rgba(255,255,255,.25); margin:6px 0;"></div>';
 
+            // The one date that matters for the whole cow: the longest withhold.
             const combined = g.many
                 ? `<div style="border-top:1px solid rgba(255,255,255,.4); margin-top:7px; padding-top:6px;">
-                     <b>${plural(g.list.length, 'treatment')} running.</b>
+                     <b>${plural(g.list.length, 'treatment')} on this cow.</b><br>
                      ${g.milkOk
-                        ? 'Both milk withholds are finished.'
-                        : 'Held until the last one finishes: <b>' + fmtClear(g.milkClear) + '</b> (' + relDay(g.milkClear) + ').'}
+                        ? 'All milk withholds finished — <b>' + fmtClear(g.milkClear) + '</b>.'
+                        : 'Milk clear <b>' + fmtClear(g.milkClear) + '</b> (' + relDay(g.milkClear)
+                          + '), the longest of the ' + g.list.length + '.'}
                    </div>`
                 : '';
 
@@ -2035,7 +2048,7 @@
                 <div class="top">
                     <div class="num">${esc(g.key)}<small>${label}</small></div>
                     <div class="info">
-                        ${g.list.map(treatmentLine).join(g.many ? rule : '')}
+                        ${g.list.map(x => treatmentLine(x, g.many)).join(g.many ? rule : '')}
                         ${combined}
                         ${ready && !g.meatOk ? `<div>Meat withhold runs to <b>${fmtDayTime(g.meatClear)}</b>.</div>` : ''}
                     </div>
