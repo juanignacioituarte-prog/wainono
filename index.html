@@ -1674,7 +1674,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.84</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.85</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1685,7 +1685,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.84</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.85</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4458,12 +4458,18 @@
                     ? Math.round(withCover.reduce((s, c) => s + c.cover * (areaLookup[c.name] || 0), 0) /
                                  Math.max(0.0001, withCover.reduce((s, c) => s + (areaLookup[c.name] || 0), 0)))
                     : 0;
-                return `<div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                        <div>
+                const toDo = Math.max(0, activePaddockCount() - covers.filter(c => c.cover > 0).length);
+                return `<div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
                             <div style="font-weight:bold; font-size:14px;">${d.label}</div>
                             <div style="font-size:11px; color:#7f8c8d;">${d.count} paddock${d.count === 1 ? '' : 's'}${avg ? ` &middot; avg ${avg} kgDM` : ''}</div>
                         </div>
-                        <button onclick="openFarmwalkHistoryEdit('${d.key}')" style="background:#2980b9; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">✏️ EDIT</button>
+                        ${toDo > 0 ? `<div style="font-size:11px; color:#e67e22; font-weight:bold; margin-bottom:8px;">${toDo} paddock${toDo === 1 ? '' : 's'} still to walk</div>` : ''}
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="continueFarmwalk('${d.key}')" style="flex:1; background:#27ae60; color:#fff; border:none; padding:8px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">▶ CONTINUE</button>
+                            <button onclick="openFarmwalkHistoryEdit('${d.key}')" style="flex:1; background:#2980b9; color:#fff; border:none; padding:8px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">✏️ EDIT</button>
+                            <button onclick="deleteFarmwalk('${d.key}')" style="flex:0 0 auto; background:#fdeceb; color:#c0392b; border:1px solid #f5c6c2; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">🗑</button>
+                        </div>
                     </div>`;
             }).join('');
         }
@@ -4481,6 +4487,54 @@
         function openFarmwalkHistoryEdit(key) {
             fwHistoryEditKey = key;
             renderFarmwalkHistory();
+        }
+
+        function activePaddockCount() {
+            return manualModeData.filter(p => !p.isOut).length;
+        }
+
+        /* Pick a walk back up.
+         *
+         * Sets the entry date to that day and opens entry mode, which fills in
+         * the covers already recorded for it. The blanks are what is left. */
+        function continueFarmwalk(key) {
+            const d = new Date(key);
+            fwHistoryEditKey = null;
+            clearFarmwalkDraft();                     // start from what the sheet has
+            switchDashboardMode('manual');
+            const dateInp = document.getElementById('farmwalk-entry-date');
+            if (dateInp) dateInp.value = d.toISOString().split('T')[0];
+            if (!isFarmwalkEntryActive) toggleFarmwalkEntryMode();
+            else { renderDashboard(); updateFarmwalkProgress(); }
+        }
+
+        async function deleteFarmwalk(key) {
+            const d = new Date(key);
+            const count = (FARMWALK_ORDER_BY_DATE[key] || []).length;
+            const nzDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+
+            if (!confirm(`Delete the whole walk of ${fmtNZ(d)}?\n\n` +
+                         `${count} cover${count === 1 ? '' : 's'} will be removed from the sheet.\n\n` +
+                         `Other walks are not touched. This cannot be undone from the app.`)) return;
+
+            setFwHistoryStatus('Deleting...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'farmwalk_load', sheetName: 'Farmwalks', date: nzDate, entries: [] })
+                });
+                const out = await res.json();
+                if (!out || out.status !== 'success') {
+                    setFwHistoryStatus('⚠ Not deleted - ' + ((out && out.message) || 'the sheet refused it'), '#e74c3c');
+                    return;
+                }
+                setFwHistoryStatus(`✓ ${fmtNZ(d)} removed - ${out.replaced} cover${out.replaced === 1 ? '' : 's'} deleted.`, '#27ae60');
+                await loadManualRankCSV();
+                renderFarmwalkHistory();
+            } catch (e) {
+                console.error("Farmwalk delete failed:", e);
+                setFwHistoryStatus('⚠ Not deleted - could not reach the sheet.', '#e74c3c');
+            }
         }
 
         function renderFarmwalkHistoryEdit() {
