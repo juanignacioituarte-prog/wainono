@@ -1674,7 +1674,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.83</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.84</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1685,7 +1685,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.83</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.84</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1868,6 +1868,20 @@
             </div>
             
             <button onclick="switchDashboardMode('breaks')" style="background:#2ecc71; color:white; border:none; padding:10px 15px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">Done</button>
+        </div>
+
+        <div id="farmwalk-history-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <h3 style="margin:0;">Farmwalk History</h3>
+                <button onclick="closeFarmwalkHistory()" style="background:#2ecc71; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">Done</button>
+            </div>
+            <p style="font-size:12px; color:#666; margin:0 0 12px;">
+                Every walk, newest first. Open one to change the covers recorded that day.
+                Paddocks are listed in the order they were walked.
+            </p>
+            <div id="fw-history-list"></div>
+            <div id="fw-history-edit" style="display:none;"></div>
+            <div id="fw-history-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
         </div>
 
         <div id="weekly-report-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
@@ -4402,6 +4416,136 @@
             el.textContent = `${done} of ${total} walked`;
         }
 
+        /* ===== FARMWALK HISTORY =====
+         * Every past walk, and a way to correct one. Saving rewrites only that
+         * date's rows through farmwalk_load, so a correction to May cannot
+         * disturb August.
+         */
+        let fwHistoryEditKey = null;
+
+        function setFwHistoryStatus(text, color) {
+            const el = document.getElementById('fw-history-status');
+            if (!el) return;
+            el.textContent = text || '';
+            el.style.color = color || '#7f8c8d';
+        }
+
+        function closeFarmwalkHistory() {
+            fwHistoryEditKey = null;
+            switchDashboardMode('manual');
+        }
+
+        function renderFarmwalkHistory() {
+            const list = document.getElementById('fw-history-list');
+            const edit = document.getElementById('fw-history-edit');
+            if (!list || !edit) return;
+            setFwHistoryStatus('');
+
+            if (fwHistoryEditKey) { list.style.display = 'none'; edit.style.display = 'block'; renderFarmwalkHistoryEdit(); return; }
+            list.style.display = 'block';
+            edit.style.display = 'none';
+
+            const dates = farmwalkDates();
+            if (dates.length === 0) {
+                list.innerHTML = '<div class="muted" style="font-size:12px;">No farmwalks recorded yet.</div>';
+                return;
+            }
+
+            list.innerHTML = dates.map(d => {
+                const covers = coversForWalk(d.key);
+                const withCover = covers.filter(c => c.cover > 0);
+                const avg = withCover.length
+                    ? Math.round(withCover.reduce((s, c) => s + c.cover * (areaLookup[c.name] || 0), 0) /
+                                 Math.max(0.0001, withCover.reduce((s, c) => s + (areaLookup[c.name] || 0), 0)))
+                    : 0;
+                return `<div style="background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                        <div>
+                            <div style="font-weight:bold; font-size:14px;">${d.label}</div>
+                            <div style="font-size:11px; color:#7f8c8d;">${d.count} paddock${d.count === 1 ? '' : 's'}${avg ? ` &middot; avg ${avg} kgDM` : ''}</div>
+                        </div>
+                        <button onclick="openFarmwalkHistoryEdit('${d.key}')" style="background:#2980b9; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">✏️ EDIT</button>
+                    </div>`;
+            }).join('');
+        }
+
+        // The covers recorded on one walk, in the order they were walked.
+        function coversForWalk(key) {
+            const order = FARMWALK_ORDER_BY_DATE[key] || [];
+            return order.map(name => {
+                const p = manualModeData.find(x => normName(x.name) === normName(name));
+                const e = p && (p.entries || []).find(x => x.dateObj && x.dateObj.toDateString() === key);
+                return { name: p ? p.name : name, cover: e ? e.cover : 0, reason: e ? (e.reason || '') : '' };
+            });
+        }
+
+        function openFarmwalkHistoryEdit(key) {
+            fwHistoryEditKey = key;
+            renderFarmwalkHistory();
+        }
+
+        function renderFarmwalkHistoryEdit() {
+            const box = document.getElementById('fw-history-edit');
+            const key = fwHistoryEditKey;
+            const rows = coversForWalk(key);
+            const label = fmtNZ(new Date(key));
+
+            box.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
+                    <button onclick="fwHistoryEditKey=null; renderFarmwalkHistory();" style="background:#ecf0f1; color:#2c3e50; border:none; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">◀ BACK</button>
+                    <div style="font-weight:bold; font-size:14px;">${label}</div>
+                    <button onclick="saveFarmwalkHistoryEdit()" style="background:#27ae60; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">💾 SAVE</button>
+                </div>
+                <p style="font-size:11px; color:#7f8c8d; margin:0 0 10px;">
+                    In the order they were walked. Clear a box to remove that paddock from this walk.
+                </p>
+                ${rows.map((r, i) => `
+                    <div style="display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #eee; border-radius:6px; padding:8px 10px; margin-bottom:6px;">
+                        <span style="font-size:10px; color:#bdc3c7; width:22px;">${i + 1}</span>
+                        <span style="flex:1; font-weight:bold; font-size:13px;">${r.name}</span>
+                        <input type="number" inputmode="numeric" id="fwh-${i}" data-paddock="${r.name}" value="${r.cover || ''}"
+                            style="width:90px; padding:7px; border:1px solid #ccc; border-radius:5px; font-size:14px; font-weight:bold; text-align:center;">
+                    </div>`).join('')}
+            `;
+        }
+
+        async function saveFarmwalkHistoryEdit() {
+            const key = fwHistoryEditKey;
+            if (!key) return;
+            const d = new Date(key);
+            const nzDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+
+            const entries = [];
+            document.querySelectorAll('#fw-history-edit input[data-paddock]').forEach(inp => {
+                const v = inp.value.trim();
+                if (v === '') return;                       // cleared: drop it from this walk
+                const n = parseFloat(v);
+                if (!isFinite(n)) return;
+                entries.push({ paddock: inp.dataset.paddock, cover: n, reason: '' });
+            });
+
+            if (!confirm(`Save ${entries.length} covers for ${fmtNZ(d)}?\n\nThis replaces that day only. Other walks are untouched.`)) return;
+
+            setFwHistoryStatus('Saving...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'farmwalk_load', sheetName: 'Farmwalks', date: nzDate, entries: entries })
+                });
+                const out = await res.json();
+                if (!out || out.status !== 'success') {
+                    setFwHistoryStatus('⚠ Not saved - ' + ((out && out.message) || 'the sheet refused it'), '#e74c3c');
+                    return;
+                }
+                setFwHistoryStatus(`✓ Saved. ${out.added} covers on ${fmtNZ(d)}.`, '#27ae60');
+                await loadManualRankCSV();                  // pull the sheet back in
+                fwHistoryEditKey = null;
+                renderFarmwalkHistory();
+            } catch (e) {
+                console.error("Farmwalk history save failed:", e);
+                setFwHistoryStatus('⚠ Not saved - could not reach the sheet.', '#e74c3c');
+            }
+        }
+
         function farmwalkEntryDateObj() {
             const v = document.getElementById('farmwalk-entry-date')?.value;
             return v ? new Date(v + 'T12:00:00') : new Date();
@@ -5672,6 +5816,7 @@
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
+                if (document.getElementById('farmwalk-history-view')) document.getElementById('farmwalk-history-view').style.display = 'none';
                 
                 const sidebar = document.getElementById('sidebar');
                 if (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') {
@@ -5777,6 +5922,7 @@
                     document.getElementById('admin-view').style.display = 'none';
                     if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                     if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
+                    if (document.getElementById('farmwalk-history-view')) document.getElementById('farmwalk-history-view').style.display = 'none';
                     document.getElementById('farm-config-view').style.display = 'block';
 
                     const sidebarFc = document.getElementById('sidebar');
@@ -5796,6 +5942,17 @@
                     document.getElementById('legend').style.display = 'none';
                     if (ndviLayer) map.removeLayer(ndviLayer);
                     showFarmConfigSection(farmConfigSection);
+                    return;
+                } else if (mode === 'farmwalk_history') {
+                    document.getElementById('map').style.display = 'none';
+                    document.getElementById('list').style.display = 'none';
+                    document.getElementById('admin-view').style.display = 'none';
+                    if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
+                    document.getElementById('farmwalk-history-view').style.display = 'block';
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    document.getElementById('legend').style.display = 'none';
+                    if (window.innerWidth <= 768) document.getElementById('sidebar').style.height = 'auto';
+                    renderFarmwalkHistory();
                     return;
                 } else if (mode === 'weekly_report') {
                     document.getElementById('map').style.display = 'block';
@@ -5835,6 +5992,7 @@
             document.getElementById('admin-view').style.display = 'none';
             if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
             if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
+            if (document.getElementById('farmwalk-history-view')) document.getElementById('farmwalk-history-view').style.display = 'none';
             renderDashboard();
             updateGeoStyles();
         }
