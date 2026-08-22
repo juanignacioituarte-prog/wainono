@@ -24,7 +24,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-08-22-a";
+var SCRIPT_VERSION = "2026-08-22-b";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -794,6 +794,24 @@ function loadFarmwalk(payload) {
 
   var lastCol = Math.max(3, sheet.getLastColumn());
 
+  /* mode 'merge' touches only the paddocks named in this message.
+   *
+   * Two people can walk the same day at once. Replacing the whole date would
+   * mean whoever saved last wiped the other's paddocks, so a walk saved from
+   * a phone only ever rewrites the paddocks that phone walked.
+   *
+   * The default, full replace, is what the history screen needs: clearing a
+   * box there must actually remove that paddock from the walk, and deleting a
+   * walk sends no paddocks at all.
+   */
+  var merge = (payload.mode === 'merge');
+  var mine = {};
+  if (merge) {
+    payload.entries.forEach(function(e) {
+      if (e && e.paddock) mine[normalisePaddockKey(e.paddock)] = true;
+    });
+  }
+
   // Only the rows for this date are touched. An earlier version read the whole
   // tab, cleared it and wrote it back, which lost a row when the row count it
   // read was one behind the sheet. Deleting and appending never rewrites a row
@@ -801,9 +819,12 @@ function loadFarmwalk(payload) {
   var removed = 0;
   var lastRow = sheet.getLastRow();
   if (lastRow > 1) {
-    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (var i = dates.length - 1; i >= 0; i--) {          // bottom up, so row numbers hold
-      if (sameFarmwalkDate(dates[i][0], date)) { sheet.deleteRow(i + 2); removed++; }
+    var existing = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (var i = existing.length - 1; i >= 0; i--) {       // bottom up, so row numbers hold
+      if (!sameFarmwalkDate(existing[i][0], date)) continue;
+      if (merge && !mine[normalisePaddockKey(existing[i][1])]) continue;   // someone else's paddock
+      sheet.deleteRow(i + 2);
+      removed++;
     }
   }
 
@@ -828,6 +849,12 @@ function loadFarmwalk(payload) {
     status: "success", date: date,
     added: rows.length, replaced: removed, totalRows: sheet.getLastRow() - 1
   });
+}
+
+// Paddock names are matched loosely: "W4 " and "w4" are the same paddock, and
+// a name like 21 arrives as a number.
+function normalisePaddockKey(v) {
+  return String(v == null ? "" : v).trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 // Cells come back as a Date or as text depending on how the column is

@@ -1674,7 +1674,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.85</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.86</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1685,7 +1685,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.85</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.86</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1726,6 +1726,20 @@
                         <div class="avg-item"><small>GROWTH</small>
                             <div id="avg-growth" style="font-size: 22px; font-weight: bold;">0</div>
                             <small>kg/day</small>
+                        </div>
+                    </div>
+                    <div class="avg-row" style="margin-top:6px; border-top:1px solid rgba(255,255,255,0.25); padding-top:6px;">
+                        <div class="avg-item"><small>TOTAL AREA</small>
+                            <div id="area-total-all" style="font-size: 17px; font-weight: bold;">0</div>
+                            <small>ha</small>
+                        </div>
+                        <div class="avg-item"><small>IN ROTATION</small>
+                            <div id="area-in-rotation" style="font-size: 17px; font-weight: bold;">0</div>
+                            <small>ha</small>
+                        </div>
+                        <div class="avg-item"><small>OUT</small>
+                            <div id="area-out-rotation" style="font-size: 17px; font-weight: bold;">0</div>
+                            <small>ha</small>
                         </div>
                     </div>
                 </div>
@@ -4960,6 +4974,10 @@
                             type: 'farmwalk_load',
                             sheetName: 'Farmwalks',
                             date: nzDate,
+                            // merge: rewrite only the paddocks this phone walked,
+                            // so two people walking the same day cannot wipe
+                            // each other's work.
+                            mode: 'merge',
                             entries: entriesToSave.map(e => ({ paddock: e.paddock, cover: e.cover, reason: e.reason || '' }))
                         })
                     });
@@ -6577,6 +6595,26 @@
 
             if (elTotalAvg) elTotalAvg.innerText = avgCoverVal.toLocaleString();
             if (elAvgGrowth) elAvgGrowth.innerText = "+" + avgGrowthVal;
+
+            /* Area, split into what is grazing and what is not.
+             *
+             * Scoped the same way as the averages: with a unit selected these
+             * are that unit's paddocks only, so a paddock out of rotation
+             * counts against a unit only when it belongs to that unit.
+             */
+            let haAll = 0, haOut = 0;
+            scoped.forEach(p => {
+                const a = p.area || 0;
+                if (a <= 0) return;
+                haAll += a;
+                if (p.isOut) haOut += a;
+            });
+            const elAreaAll = document.getElementById('area-total-all');
+            const elAreaIn = document.getElementById('area-in-rotation');
+            const elAreaOut = document.getElementById('area-out-rotation');
+            if (elAreaAll) elAreaAll.innerText = haAll.toFixed(1);
+            if (elAreaIn) elAreaIn.innerText = (haAll - haOut).toFixed(1);
+            if (elAreaOut) elAreaOut.innerText = haOut.toFixed(1);
             if (elSyncTime) elSyncTime.innerText = new Date().toLocaleTimeString();
 
             if (elFeedAreaTotal) elFeedAreaTotal.innerText = wholeAreaC.toFixed(1);
