@@ -564,6 +564,33 @@
             return num(value, 0) * (whUnit(unit) === 'hours' ? HOUR : DAY);
         }
 
+        /*
+         * A withhold that ends part way through a day is no use as a time. Milk
+         * only leaves the cow at a milking, so what matters is the first milking
+         * her milk may go in the vat.
+         *
+         *   ends in the MORNING  -> she is clear THAT day. Her milk goes in the
+         *                           vat at the afternoon milking, and anyone
+         *                           checking that morning should already see green.
+         *   ends in the AFTERNOON -> not until the NEXT morning.
+         *
+         * Either way the app treats her as clear from the start of that day, so
+         * checking at 8 am shows a cow whose withhold ends at 9 am as green.
+         */
+        const MORNING_ENDS_HOUR = 12;
+
+        function clearDayOf(moment) {
+            if (!moment) return null;
+            const d = new Date(moment);
+            const day = startOfDay(d);
+            return d.getHours() < MORNING_ENDS_HOUR ? day : new Date(day.getTime() + DAY);
+        }
+
+        /** "25 Aug morning" */
+        function fmtClear(d) {
+            return d ? fmtDay(d) + ' morning' : '—';
+        }
+
         /** "96 hours" / "4 days" */
         function whText(value, unit) {
             const u = whUnit(unit);
@@ -984,17 +1011,35 @@
             const dueNow = !!dueSlot;
             const nextDue = dueSlot ? dueSlot.dueAt : (pending.length ? pending[0].dueAt : null);
 
-            // The withhold counts from the last dose SHE ACTUALLY GOT.
             let latest = null;
             list.forEach(d => {
                 const at = parseDate(d.GivenAt);
                 if (at && (!latest || at > latest)) latest = at;
             });
             const lastDoseAt = latest || parseDate(t.LastDoseAt);
-            const milkMs = whMs(t.MilkWithhold, t.MilkWithholdUnit);
-            const meatMs = whMs(t.MeatWithhold, t.MeatWithholdUnit);
-            const milkClear = lastDoseAt ? new Date(lastDoseAt.getTime() + milkMs) : null;
-            const meatClear = lastDoseAt ? new Date(lastDoseAt.getTime() + meatMs) : null;
+
+            /*
+             * THE WITHHOLD IS PART OF THE PLAN, SET WHEN THE TREATMENT IS CREATED.
+             *
+             * It counts from the LAST PLANNED DOSE, not from the last dose she
+             * actually got. So the clear date is known on day one and never moves:
+             * not when a dose is given late, not when one is missed, not when the
+             * treatment is stopped early. A missed dose means less drug in the cow,
+             * so holding to the planned date is the safe side.
+             */
+            const plannedLastDose = start
+                ? new Date(start.getTime() + (total - 1) * interval * DAY)
+                : lastDoseAt;
+
+            const milkEnds = plannedLastDose
+                ? new Date(plannedLastDose.getTime() + whMs(t.MilkWithhold, t.MilkWithholdUnit)) : null;
+            const meatEnds = plannedLastDose
+                ? new Date(plannedLastDose.getTime() + whMs(t.MeatWithhold, t.MeatWithholdUnit)) : null;
+
+            // Milk is rounded to the milking round. Meat is not: a works truck can
+            // come at any hour, so that one stays exact.
+            const milkClear = clearDayOf(milkEnds);
+            const meatClear = meatEnds;
             const milkOk = !milkClear || now >= milkClear;
             const meatOk = !meatClear || now >= meatClear;
 
@@ -1013,7 +1058,8 @@
             return {
                 list, slots, total, given, missed, dueSlot, interval,
                 ended, cleared, dosingDone, nextDue, dueNow,
-                lastDoseAt, milkClear, meatClear, milkOk, meatOk, stage
+                lastDoseAt, plannedLastDose, milkEnds, meatEnds,
+                milkClear, meatClear, milkOk, meatOk, stage
             };
         }
 
@@ -1636,9 +1682,12 @@
                 ${back ? `<div><span class="muted">Doses recorded now:</span>
                     ${backdateFollowsPlan ? backdatedDoses().length : 0} of ${doses}</div>` : ''}
                 <div><span class="muted">Last dose due:</span> ${fmtDay(lastDoseDay)} (${relDay(lastDoseDay)})</div>
-                <div><span class="muted">Milk clear:</span> <b>${fmtDayTime(milkClear)}</b></div>
+                <div><span class="muted">Milk clear:</span> <b>${fmtClear(clearDayOf(milkClear))}</b></div>
                 <div><span class="muted">Meat clear:</span> <b>${fmtDayTime(meatClear)}</b></div>
-                <div class="muted" style="font-size:12px;">Clear dates move if a dose is given late. They always count from the real last dose.</div>
+                <div class="muted" style="font-size:12px;">
+                    These are set now and never move. They count from the last planned dose,
+                    so a dose given late or missed does not change them.
+                </div>
                 ${noWithhold(d) ? `<div style="background:#fdecea; border:1px solid var(--red);
                     color:var(--red-dark); border-radius:8px; padding:10px; margin-top:10px; font-size:13px;">
                     <b>⚠ This drug has no withhold set.</b><br>
@@ -1883,9 +1932,9 @@
 
             let when;
             if (ready) {
-                when = `Milk withhold finished ${fmtDayTime(i.milkClear)} (${relDay(i.milkClear)}).`;
+                when = `Milk cleared ${fmtClear(i.milkClear)} (${relDay(i.milkClear)}).`;
             } else if (i.stage === 'withhold') {
-                when = `Dosing finished. Milk clear ${fmtDayTime(i.milkClear)} (${relDay(i.milkClear)}).`;
+                when = `Milk clear ${fmtClear(i.milkClear)} (${relDay(i.milkClear)}).`;
             } else if (i.dueSlot) {
                 when = `Dose ${i.dueSlot.no}/${i.total} due today.`;
             } else if (i.nextDue) {
@@ -2048,7 +2097,7 @@
                     <div><span class="muted">Drug:</span> ${esc(t.Drug)} · ${i.given}/${i.total} doses</div>
                     <div><span class="muted">Last dose:</span> ${fmtDayTime(i.lastDoseAt)}</div>
                     <div><span class="muted">Milk withhold:</span> ${whText(t.MilkWithhold, t.MilkWithholdUnit)},
-                        finished ${fmtDayTime(i.milkClear)}</div>
+                        finished ${fmtClear(i.milkClear)}</div>
                 </div>
                 <div style="background:#eafaf1; border:1px solid var(--accent); border-radius:8px;
                             padding:10px; margin-top:12px; font-size:14px;">
@@ -2236,11 +2285,17 @@
                     <div><span class="muted">Drug:</span> <b>${esc(t.Drug)}</b></div>
                     <div><span class="muted">Quarter:</span> ${q || 'not applicable'}</div>
                     <div><span class="muted">Plan:</span> ${i.total} dose(s), every ${num(t.IntervalDays, 1)} day(s)</div>
-                    <div><span class="muted">Milk withhold:</span> ${whText(t.MilkWithhold, t.MilkWithholdUnit)} → ${i.milkClear ? fmtDayTime(i.milkClear) : '—'}</div>
-                    <div><span class="muted">Meat withhold:</span> ${whText(t.MeatWithhold, t.MeatWithholdUnit)} → ${i.meatClear ? fmtDayTime(i.meatClear) : '—'}</div>
-                    ${!i.dosingDone && i.given ? `<div class="muted" style="font-size:12px;">
-                        Those two dates count from the last dose given so far. They move
-                        later every time another dose is given.</div>` : ''}
+                    <div><span class="muted">Last planned dose:</span> ${fmtDayTime(i.plannedLastDose)}</div>
+                    <div><span class="muted">Milk withhold:</span> ${whText(t.MilkWithhold, t.MilkWithholdUnit)}
+                        → clear <b>${fmtClear(i.milkClear)}</b></div>
+                    <div><span class="muted">Meat withhold:</span> ${whText(t.MeatWithhold, t.MeatWithholdUnit)}
+                        → clear <b>${i.meatClear ? fmtDayTime(i.meatClear) : '—'}</b></div>
+                    <div class="muted" style="font-size:12px;">
+                        Both count from the last <b>planned</b> dose, so they were set the day
+                        the treatment was written and never move.
+                        ${i.milkEnds ? 'The milk withhold runs out ' + fmtDayTime(i.milkEnds)
+                            + ', so she is clear from the ' + fmtDay(i.milkClear) + ' morning.' : ''}
+                    </div>
                     ${t.Notes ? `<div><span class="muted">Notes:</span> ${esc(t.Notes)}</div>` : ''}
                 </div>
 
@@ -2274,7 +2329,7 @@
             const bits = [];
             bits.push(i.given ? plural(i.given, 'recorded dose') : 'no recorded doses');
             if (t.ClearedAt) bits.push('the clearing on ' + fmtDay(t.ClearedAt));
-            if (!i.milkOk) bits.push('her milk withhold to ' + fmtDayTime(i.milkClear));
+            if (!i.milkOk) bits.push('her milk withhold to ' + fmtClear(i.milkClear));
             if (!i.meatOk) bits.push('her meat withhold to ' + fmtDay(i.meatClear));
             return bits.join(', ');
         }
