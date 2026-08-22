@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.77</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.78</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.77</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.78</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2855,6 +2855,7 @@
             areaLookup = {};
             data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
             buildPaddockLayer(data);
+            applyAreasToLoadedData();   // a merge or split changes the areas
             selectedPaddockIds = selectedPaddockIds.filter(paddockById);
             renderPaddockPanel();
             updateGeoStyles();
@@ -5263,9 +5264,44 @@
                 }
                 data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
                 buildPaddockLayer(data, true);
+                applyAreasToLoadedData();
             } catch (e) {
                 console.error("Error in loadGeoJSON:", e);
             }
+        }
+
+        /* The farmwalk CSV is parsed the moment the app opens, straight from the
+         * cached copy, which is before the boundaries have arrived. Every paddock
+         * therefore starts with an area of 0, and an average weighted by zero is
+         * zero. Reading boundaries from the sheet made that load slower, so this
+         * race stopped being occasional and became certain.
+         *
+         * Once the areas are known they have to be put back onto the data that is
+         * already parsed. */
+        function applyAreasToLoadedData() {
+            const fix = list => {
+                if (!Array.isArray(list)) return 0;
+                let n = 0;
+                list.forEach(p => { p.area = areaLookup[p.name] || 0; if (p.area > 0) n++; });
+                return n;
+            };
+            const m = fix(typeof manualModeData !== 'undefined' ? manualModeData : null);
+            fix(typeof satellitePaddockData !== 'undefined' ? satellitePaddockData : null);
+
+            // the farmwalk growth figure is weighted by area too
+            if (typeof manualModeData !== 'undefined' && Array.isArray(manualModeData)) {
+                const mWalk = latestWalkInfo(manualModeData);
+                let w = 0, a = 0;
+                manualModeData.forEach(p => {
+                    if (!p.isOut && p.area > 0 && p.growthRate > 0 && growthIsComparable(p, mWalk)) { w += p.growthRate * p.area; a += p.area; }
+                });
+                manualFarmGrowthRate = a > 0 ? Math.round(w / a) : 0;
+            }
+
+            console.log(`Areas applied to ${m} paddocks`);
+            if (typeof renderDashboard === 'function') renderDashboard();
+            updateFarmStats();
+            updateGeoStyles();
         }
 
         // Draws the farm. Split out from loadGeoJSON so a boundary change can
