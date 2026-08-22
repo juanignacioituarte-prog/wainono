@@ -1674,7 +1674,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.82</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.83</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1685,7 +1685,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.82</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.83</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1739,8 +1739,12 @@
                     <button id="btn-save-farmwalk-all" onclick="saveEntireFarmwalk()" style="display:none; background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; transition:0.2s;">
                         💾 SAVE FARMWALK
                     </button>
+                    <span id="farmwalk-progress" style="display:none; font-size:12px; font-weight:bold; color:#27ae60;"></span>
                     <button id="btn-plan" onclick="switchDashboardMode('plan')" style="background:#8e44ad; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         📊 PLAN
+                    </button>
+                    <button id="btn-farmwalk-history" onclick="switchDashboardMode('farmwalk_history')" style="background:#16a085; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                        🕘 HISTORY
                     </button>
                     <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
                 </div>
@@ -4204,6 +4208,10 @@
                     const paddockMap = {};
                     const startIdx = (rows[0][0] && rows[0][0].toLowerCase().includes('date')) ? 1 : 0;
 
+                    // The rows sit in the sheet in the order they were walked, so
+                    // keeping that order lets the next walk follow the same route.
+                    FARMWALK_ORDER_BY_DATE = {};
+
                     for (let i = startIdx; i < rows.length; i++) {
                         const r = rows[i];
                         if (!r || r.length < 3) continue;
@@ -4212,6 +4220,12 @@
                         const cover = safeNum(r[2]);
                         const reason = (r[3] || "").trim();
                         if (!name) continue;
+
+                        if (dObj) {
+                            const key = dObj.toDateString();
+                            if (!FARMWALK_ORDER_BY_DATE[key]) FARMWALK_ORDER_BY_DATE[key] = [];
+                            FARMWALK_ORDER_BY_DATE[key].push(name);
+                        }
 
                         const norm = normName(name);
                         if (!paddockMap[norm]) {
@@ -4326,6 +4340,96 @@
         }
 
         let isFarmwalkEntryActive = false;
+
+        /* ===== FARMWALK ROUTE =====
+         * Filled by the CSV parser: every walk date, and the paddocks in the
+         * order their rows sit in the sheet, which is the order they were
+         * walked. A new walk follows the last one's route so the cards come up
+         * in the order you drive them.
+         */
+        let FARMWALK_ORDER_BY_DATE = {};
+
+        /* What has been typed so far, kept on the phone as it is typed.
+         *
+         * A walk takes an hour on a bike. If the app is closed, the battery
+         * goes, or the page reloads before Save, nothing typed should be lost.
+         * Cleared once the walk is saved to the sheet. */
+        let farmwalkDraft = {};
+        try { farmwalkDraft = JSON.parse(localStorage.getItem('wn_farmwalk_draft') || '{}') || {}; } catch (e) { farmwalkDraft = {}; }
+
+        function rememberFarmwalkDraft(name, value) {
+            if (value === '' || value === null || value === undefined) delete farmwalkDraft[name];
+            else farmwalkDraft[name] = value;
+            try { localStorage.setItem('wn_farmwalk_draft', JSON.stringify(farmwalkDraft)); } catch (e) {}
+            updateFarmwalkProgress();
+        }
+
+        function clearFarmwalkDraft() {
+            farmwalkDraft = {};
+            try { localStorage.removeItem('wn_farmwalk_draft'); } catch (e) {}
+        }
+
+        // The cards on screen, in the order they are shown.
+        function farmwalkCardOrder() {
+            return [...document.querySelectorAll('#list .card')]
+                .map(c => c.id.replace(/^card-/, ''))
+                .filter(Boolean);
+        }
+
+        // Move to the card before or after this one and put the cursor in it.
+        function farmwalkStep(fromName, dir) {
+            const ids = farmwalkCardOrder();
+            const key = fromName.replace(/\s+/g, '-');
+            const at = ids.indexOf(key);
+            const next = ids[at + dir];
+            if (at === -1 || next === undefined) {
+                const el = document.getElementById(`card-${key}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            const card = document.getElementById(`card-${next}`);
+            if (!card) return;
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const inp = card.querySelector('input[id^="inp-cover-"]');
+            if (inp) { inp.focus(); inp.select(); }
+        }
+
+        function updateFarmwalkProgress() {
+            const el = document.getElementById('farmwalk-progress');
+            if (!el || !isFarmwalkEntryActive) return;
+            const total = manualModeData.filter(p => !p.isOut).length;
+            const done = Object.keys(farmwalkDraft).filter(n => String(farmwalkDraft[n]).trim() !== '').length;
+            el.textContent = `${done} of ${total} walked`;
+        }
+
+        function farmwalkEntryDateObj() {
+            const v = document.getElementById('farmwalk-entry-date')?.value;
+            return v ? new Date(v + 'T12:00:00') : new Date();
+        }
+
+        // Walk dates, newest first, as { key, ts, label, count }.
+        function farmwalkDates() {
+            return Object.keys(FARMWALK_ORDER_BY_DATE).map(key => {
+                const d = new Date(key);
+                return { key: key, ts: d.getTime(), label: fmtNZ(d), count: FARMWALK_ORDER_BY_DATE[key].length };
+            }).filter(d => isFinite(d.ts)).sort((a, b) => b.ts - a.ts);
+        }
+
+        /* The route to follow while entering a walk.
+         *
+         * The most recent walk that is not the one being entered - continuing
+         * today's half-done walk should still follow the route, not the order
+         * the done ones happen to be in. Anything that route never mentions
+         * goes on the end, so a new paddock is never lost off the list. */
+        function farmwalkRoute(entryDateObj) {
+            const skip = entryDateObj ? entryDateObj.toDateString() : null;
+            const source = farmwalkDates().find(d => d.key !== skip) || farmwalkDates()[0];
+            const order = source ? FARMWALK_ORDER_BY_DATE[source.key] : [];
+
+            const rank = {};
+            (order || []).forEach((n, i) => { if (rank[normName(n)] === undefined) rank[normName(n)] = i; });
+            return rank;
+        }
 
         const editingPrevPaddocks = new Set();
 
@@ -4544,7 +4648,22 @@
                     }
                 }
                 if (btnSaveAll) btnSaveAll.style.display = 'inline-block';
+                const prog = document.getElementById('farmwalk-progress');
+                if (prog) prog.style.display = 'inline-block';
+
+                // Continuing a walk: show what is already on the sheet for this
+                // date, so the blanks are the paddocks still to do.
+                const dObj = farmwalkEntryDateObj();
+                const key = dObj.toDateString();
+                manualModeData.forEach(p => {
+                    if (farmwalkDraft[p.name] !== undefined) return;   // typed here wins
+                    const e = (p.entries || []).find(x => x.dateObj && x.dateObj.toDateString() === key);
+                    if (e && e.cover > 0) farmwalkDraft[p.name] = String(e.cover);
+                });
+                try { localStorage.setItem('wn_farmwalk_draft', JSON.stringify(farmwalkDraft)); } catch (e) {}
             } else {
+                const prog = document.getElementById('farmwalk-progress');
+                if (prog) prog.style.display = 'none';
                 if (btn) {
                     btn.innerHTML = '<span>+</span> Farmwalk';
                     btn.style.background = '#27ae60';
@@ -4553,6 +4672,7 @@
                 if (btnSaveAll) btnSaveAll.style.display = 'none';
             }
             renderDashboard();
+            updateFarmwalkProgress();
         }
 
         async function saveEntireFarmwalk() {
@@ -4625,28 +4745,44 @@
             renderDashboard();
             updateGeoStyles();
 
+            /* Replace this date's rows rather than adding to them.
+             *
+             * A walk can be saved halfway, carried on later and saved again.
+             * Appending would put a second row in for every paddock done before
+             * the first save. farmwalk_load clears the date first and leaves
+             * every other walk alone. */
+            let saveOk = false;
             if (entriesToSave.length > 0 && GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                const parts = dateVal.split('-');
+                const nzDate = parts.length === 3 ? `${Number(parts[2])}/${Number(parts[1])}/${parts[0]}` : dateVal;
                 try {
-                    // Send batch payload
-                    await fetch(GOOGLE_SCRIPT_URL, {
+                    const res = await fetch(GOOGLE_SCRIPT_URL, {
                         method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({
-                            type: 'farmwalk_batch',
-                            entries: entriesToSave
+                            type: 'farmwalk_load',
+                            sheetName: 'Farmwalks',
+                            date: nzDate,
+                            entries: entriesToSave.map(e => ({ paddock: e.paddock, cover: e.cover, reason: e.reason || '' }))
                         })
                     });
-                } catch(e) {
+                    const d = await res.json();
+                    saveOk = !!(d && d.status === 'success');
+                    if (!saveOk) console.error("Farmwalk save rejected:", d && d.message);
+                } catch (e) {
                     console.error("Cloud save error:", e);
                 }
             }
 
+            if (saveOk) clearFarmwalkDraft();
+
             setTimeout(() => {
                 if (btnSave) {
                     btnSave.disabled = false;
-                    btnSave.innerText = "✓ SAVED!";
+                    btnSave.innerText = saveOk ? "✓ SAVED!" : "⚠ NOT SAVED";
                     setTimeout(() => { btnSave.innerText = "💾 SAVE FARMWALK"; }, 2500);
+                }
+                if (!saveOk && entriesToSave.length > 0) {
+                    alert("The walk was NOT saved to the sheet.\n\nWhat you typed is still on this phone, so press Save again when you have signal.");
                 }
             }, 600);
         }
@@ -6251,10 +6387,25 @@
             const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
             const scoped = activeUnit ? data.filter(p => unitHasPaddock(activeUnit, p.name)) : data;
 
-            const sorted = [...scoped].sort((a, b) => {
-                if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
-                return b.latest.cover - a.latest.cover;
-            });
+            /* Entering a walk follows the route, not the cover. Ranking by cover
+             * reshuffles the list as soon as a number is typed, which moves the
+             * card you are standing in front of. Everywhere else still ranks by
+             * cover, which is what the wedge and the grazing order want. */
+            const entryDateObj = isFarmwalkEntryActive ? farmwalkEntryDateObj() : null;
+            const sorted = [...scoped];
+            if (isFarmwalkEntryActive && currentDashboardMode === 'manual') {
+                const rank = farmwalkRoute(entryDateObj);
+                const far = Number.MAX_SAFE_INTEGER;
+                sorted.sort((a, b) => {
+                    const ra = rank[normName(a.name)], rb = rank[normName(b.name)];
+                    return (ra === undefined ? far : ra) - (rb === undefined ? far : rb);
+                });
+            } else {
+                sorted.sort((a, b) => {
+                    if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
+                    return b.latest.cover - a.latest.cover;
+                });
+            }
 
             const walkInfo = latestWalkInfo(scoped);
             const maxTs = walkInfo.maxTs;
@@ -6290,7 +6441,19 @@
                     if (!p.isOut) {
                         entryControlsHtml = `
                             <div class="farmwalk-card-controls" style="margin-top:10px; padding-top:8px; border-top:1px dashed #ddd; display:flex; flex-direction:column; gap:8px;" onclick="event.stopPropagation();">
-                                <input type="number" id="inp-cover-${p.name}" placeholder="Cover kgDM" value="" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:5px; font-size:12px; font-weight:bold;" />
+                                <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:11px; color:#7f8c8d;">
+                                    <span>Last walk</span>
+                                    <span><b style="color:#2c3e50; font-size:13px;">${p.previous ? p.previous.cover : (p.latest ? p.latest.cover : '--')}</b>
+                                        <span style="font-size:10px;"> kgDM &middot; ${p.previous ? p.previous.formattedDate : (p.latest ? p.latest.formattedDate : '--')}</span></span>
+                                </div>
+                                <input type="number" inputmode="numeric" id="inp-cover-${p.name}" placeholder="New cover kgDM" value="${farmwalkDraft[p.name] !== undefined ? farmwalkDraft[p.name] : ''}"
+                                    oninput="rememberFarmwalkDraft('${p.name}', this.value)"
+                                    onkeydown="if(event.key==='Enter'){event.preventDefault(); farmwalkStep('${p.name}', 1);}"
+                                    style="width:100%; padding:10px 8px; border:1px solid #ccc; border-radius:5px; font-size:16px; font-weight:bold; text-align:center;" />
+                                <div style="display:flex; gap:6px;">
+                                    <button onclick="farmwalkStep('${p.name}', -1)" style="flex:1; background:#ecf0f1; color:#2c3e50; border:none; padding:9px 0; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">◀ PREVIOUS</button>
+                                    <button onclick="farmwalkStep('${p.name}', 1)" style="flex:1; background:#27ae60; color:#fff; border:none; padding:9px 0; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">NEXT ▶</button>
+                                </div>
                                 <div style="display:flex; flex-direction:column; gap:4px;">
                                     <button onclick="toggleOutRotationMenu('${p.name}')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Take out of rotation ▾</button>
                                     <div id="out-menu-${p.name}" style="display:none; gap:6px; margin-top:4px;">
@@ -6346,7 +6509,6 @@
             </div>
             <div style="position:absolute; top:14px; right:60px; text-align:right; display:flex; flex-direction:column; align-items:flex-end;">
                 ${(p.growthRate && growthIsComparable(p, walkInfo)) ? `<div><span style="color:var(--growth); font-weight:bold">${p.growthRate > 0 ? '+' : ''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
-                ${isFarmwalkEntryActive ? `<button onclick="event.stopPropagation(); toggleEditPrevious('${p.name}')" title="Modify Latest & Previous Covers" style="margin-top:4px; background:#eef6fc; color:#2980b9; border:1px solid #a9cce3; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">✏️ Edit</button>` : ''}
             </div>
             ${entryControlsHtml}
             ${editPrevHtml}
