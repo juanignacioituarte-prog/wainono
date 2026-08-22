@@ -1576,6 +1576,12 @@
 
     <div id="plan-view">
         <div class="feed-container">
+            <div class="feed-card" id="plan-scope-card" style="display:none;">
+                <div class="feed-title">Showing</div>
+                <div id="plan-scope-chips" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+                <div id="plan-scope-note" style="font-size:11px; color:#7f8c8d; margin-top:8px;"></div>
+            </div>
+
             <div class="feed-card">
                 <div class="feed-title">Feed Wedge & Demand</div>
                 <div class="chart-box">
@@ -1668,7 +1674,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.78</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.79</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1685,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.78</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.79</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -3189,8 +3195,54 @@
                             ${isEditing ? '✓ DONE SELECTING' : '✎ SELECT PADDOCKS ON MAP'}</button>
                         <span style="font-size:11px; color:#7f8c8d; white-space:nowrap;">${u.paddocks.length} paddock${u.paddocks.length === 1 ? '' : 's'}</span>
                     </div>
+                    ${renderUnitHerdPicker(u)}
                 </div>`;
             }).join('');
+        }
+
+        /* Which herds graze this unit.
+         *
+         * A herd grazes one unit, so ticking it here takes it out of whichever
+         * unit had it. Herds left unticked everywhere are whole-farm, which is
+         * how every herd starts. */
+        function renderUnitHerdPicker(u) {
+            const herds = BREAK_GROUPS.filter(g => g.id !== 'all');
+            if (herds.length === 0) return '';
+            const cows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+            const mine = herds.filter(g => g.unit_id === u.id);
+            const total = mine.reduce((s, g) => s + (Number(cows[g.id]) || 0), 0);
+
+            return `<div style="margin-top:8px; border-top:1px solid #eee; padding-top:8px;">
+                <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:bold; color:#95a5a6; text-transform:uppercase; margin-bottom:6px;">
+                    <span>Herds in this unit</span>
+                    <span>${mine.length ? total + ' cows' : 'none'}</span>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    ${herds.map(g => {
+                        const here = g.unit_id === u.id;
+                        const elsewhere = g.unit_id && g.unit_id !== u.id;
+                        const other = elsewhere ? FARM_UNITS.find(x => x.id === g.unit_id) : null;
+                        return `<label title="${elsewhere ? 'Currently in ' + escUnit(other ? other.name : '?') : ''}"
+                            style="display:flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
+                                   padding:3px 7px; border-radius:12px; cursor:pointer;
+                                   background:${here ? g.color : '#f4f4f4'}; color:${here ? '#fff' : (elsewhere ? '#aaa' : '#555')};
+                                   border:1px solid ${here ? g.color : '#ddd'};">
+                            <input type="checkbox" ${here ? 'checked' : ''}
+                                onchange="setHerdUnit('${g.id}', '${escUnit(u.id)}', this.checked)"
+                                style="margin:0;">
+                            ${g.name}${(Number(cows[g.id]) || 0) ? ` <span style="opacity:.75;">${cows[g.id]}</span>` : ''}
+                        </label>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
+
+        function setHerdUnit(herdId, unitId, on) {
+            const g = BREAK_GROUPS.find(h => h.id === herdId);
+            if (!g) return;
+            g.unit_id = on ? unitId : null;
+            saveHerdSettings();      // flags a deliberate herd edit and syncs
+            renderFarmConfig();
         }
 
         function addUnit() {
@@ -6011,6 +6063,77 @@
             return Math.round((latestCover - prevCover) / days);
         }
 
+        /* ===== PLAN SCOPE =====
+         * The PLAN screen shows the whole farm, or one unit. Picking a unit
+         * narrows the paddocks, the cows and the wedge to that unit, so a farm
+         * run as two blocks can be planned as two blocks.
+         *
+         * Units keep the shared settings - residual, intake, round length - so
+         * this is a way of looking at the farm, not a second set of numbers to
+         * keep in step.
+         */
+        let planUnitId = null;
+
+        function planUnit() {
+            if (!planUnitId) return null;
+            return FARM_UNITS.find(u => u.id === planUnitId) || null;
+        }
+
+        function setPlanScope(unitId) {
+            planUnitId = unitId || null;
+            renderPlanScope();
+            saveAndRecalc(true);      // recalculate, do not push settings up
+        }
+
+        // Paddocks in the current plan scope.
+        function planScopedPaddocks(data) {
+            const u = planUnit();
+            return u ? (data || []).filter(p => unitHasPaddock(u, p.name)) : (data || []);
+        }
+
+        // Herds grazing the current plan scope. Herds with no unit are whole farm.
+        function planScopedHerds() {
+            const u = planUnit();
+            return BREAK_GROUPS.filter(g => g.id !== 'all' && (!u || g.unit_id === u.id));
+        }
+
+        function renderPlanScope() {
+            const card = document.getElementById('plan-scope-card');
+            const chips = document.getElementById('plan-scope-chips');
+            const note = document.getElementById('plan-scope-note');
+            if (!card || !chips) return;
+
+            if (!FARM_UNITS || FARM_UNITS.length === 0) { card.style.display = 'none'; return; }
+            card.style.display = 'block';
+
+            if (planUnitId && !FARM_UNITS.some(u => u.id === planUnitId)) planUnitId = null;
+
+            const chip = (id, name, color) => {
+                const on = (planUnitId || null) === (id || null);
+                return `<button onclick="setPlanScope(${id ? `'${escUnit(id)}'` : 'null'})" style="
+                    padding:7px 12px; border-radius:14px; font-size:12px; font-weight:bold; cursor:pointer;
+                    background:${on ? color : '#fff'}; color:${on ? '#fff' : color};
+                    border:1.5px solid ${color};">${escUnit(name)}</button>`;
+            };
+            chips.innerHTML = chip(null, 'Whole Farm', '#2c3e50') +
+                FARM_UNITS.map(u => chip(u.id, u.name, u.color)).join('');
+
+            if (note) {
+                const u = planUnit();
+                if (!u) {
+                    note.textContent = 'Every paddock and every herd.';
+                } else {
+                    const herds = planScopedHerds();
+                    const cows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
+                    const n = herds.reduce((s, g) => s + (Number(cows[g.id]) || 0), 0);
+                    note.innerHTML = herds.length
+                        ? `${u.paddocks.length} paddocks, ${herds.length} herd${herds.length === 1 ? '' : 's'}, ${n} cows.`
+                        : `${u.paddocks.length} paddocks, but no herds are assigned to this unit yet. ` +
+                          `<span style="color:#e67e22;">Assign them in Farm Configuration.</span>`;
+                }
+            }
+        }
+
         /* Weighted cover and growth over a set of paddocks.
          *
          * Skipped paddocks stay out of cover, and growth only counts when the
@@ -6045,29 +6168,38 @@
             let tWGrowth = shown.wGrowth, tAreaG = shown.areaG;
 
             // --- SUBTRACT CROP BREAK AREAS ---
-            let totalCropBreakArea = 0;
+            // Counted per scope: a crop break only comes off the area of the unit
+            // whose paddock it sits in.
             const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 21;
             const daysAgoTs = Date.now() - filterDays * 24 * 60 * 60 * 1000;
-            savedBreaks.forEach(b => {
-                if (b.isCropBreak && b.createdAt && new Date(b.createdAt).getTime() >= daysAgoTs) {
-                    // Only subtract if it's not already in an 'OUT' paddock (to avoid double-counting)
+            const cropBreakArea = (inScope) => {
+                let total = 0;
+                savedBreaks.forEach(b => {
+                    if (!b.isCropBreak || !b.createdAt) return;
+                    if (new Date(b.createdAt).getTime() < daysAgoTs) return;
+                    // Skip if the paddock is already OUT, to avoid counting it twice
                     const pStatus = b.paddock ? excludedPaddocks.get(String(b.paddock).toLowerCase()) : null;
-                    if (!pStatus || pStatus === 'IN' || pStatus === 'PARTIAL') {
-                        totalCropBreakArea += (b.areaHa || 0);
-                    }
-                }
-            });
-            tAreaC = Math.max(0, tAreaC - totalCropBreakArea);
-            const wholeAreaC = Math.max(0, whole.areaC - totalCropBreakArea);
+                    if (pStatus && pStatus !== 'IN' && pStatus !== 'PARTIAL') return;
+                    if (inScope && !inScope(b.paddock)) return;
+                    total += (b.areaHa || 0);
+                });
+                return total;
+            };
+
+            tAreaC = Math.max(0, tAreaC - cropBreakArea(activeUnit ? (n => n && unitHasPaddock(activeUnit, n)) : null));
 
             const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
             const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
 
-            // The feed wedge is always the whole farm. Picking a unit in FARMWALK
-            // is a way of looking at part of it, not a change to how the farm is
-            // fed, and break sizes come off these numbers.
-            const wholeCoverVal = wholeAreaC > 0 ? Math.round(whole.wCover / wholeAreaC) : 0;
-            const wholeGrowthVal = whole.areaG > 0 ? Math.round(whole.wGrowth / whole.areaG) : 0;
+            // The PLAN screen has its own scope: whole farm, or one unit. Its
+            // numbers drive the wedge and the rotation, so they are worked out
+            // from whatever PLAN is showing, not from what FARMWALK is showing.
+            const pUnit = planUnit();
+            const planStats = pUnit ? weightedFarmStats(planScopedPaddocks(data), walk) : whole;
+            const planAreaC = Math.max(0, planStats.areaC - cropBreakArea(pUnit ? (n => n && unitHasPaddock(pUnit, n)) : null));
+            const wholeAreaC = planAreaC;
+            const wholeCoverVal = planAreaC > 0 ? Math.round(planStats.wCover / planAreaC) : 0;
+            const wholeGrowthVal = planStats.areaG > 0 ? Math.round(planStats.wGrowth / planStats.areaG) : 0;
 
             const elTotalAvg = document.getElementById('total-avg');
             const elAvgGrowth = document.getElementById('avg-growth');
@@ -6704,7 +6836,9 @@
                     const val = parseFloat(el.value) || 0;
                     herdCows[g.id] = val;
                     totalCows += val;
-                    if (g.on_grass) totalCowsOnGrass += val;
+                    // Only herds grazing what PLAN is showing feed its rotation.
+                    const inPlanScope = !planUnitId || g.unit_id === planUnitId;
+                    if (g.on_grass && inPlanScope) totalCowsOnGrass += val;
                 }
                 const tg = document.getElementById(`crop-toggle-${g.id}`);
                 if (tg && tg.checked) {
@@ -6803,12 +6937,16 @@
             const globalFreq = document.querySelector('input[name="milking_freq"]:checked').value;
             let herdLockedCache = {};
 
+            // Only the herds grazing what PLAN is showing share its daily area.
+            const planHerdIds = {};
+            planScopedHerds().forEach(g => { planHerdIds[g.id] = true; });
+
             BREAK_GROUPS.forEach(g => {
-                if (g.id === 'all') return;
+                if (g.id === 'all' || !planHerdIds[g.id]) return;
                 const hCows = savedHerdCows[g.id] || 0;
                 if (hCows > 0 && g.on_grass) {
                     totalCowsAllHerds += hCows;
-                    
+
                     const overrides = manualBreakOverrides[g.id] || {};
                     let lockedDailyArea = 0;
                     let isLocked = false;
@@ -6904,7 +7042,7 @@
                 const hCows = savedHerdCows[g.id] || 0;
 
                 // Grass Math
-                if (hCows > 0 && g.on_grass) {
+                if (hCows > 0 && g.on_grass && planHerdIds[g.id]) {
                     const cache = herdLockedCache[g.id];
                     const hAreaHa = cache.isLocked ? cache.lockedDailyArea : ((remainingAreaPerCow * hCows) / 10000);
                     
@@ -7050,7 +7188,8 @@
                 });
             }
 
-            renderFeedWedge(manualModeData, preGrazeTarget, residual);
+            renderPlanScope();
+            renderFeedWedge(planScopedPaddocks(manualModeData), preGrazeTarget, residual);
         }
 
         function renderFeedWedge(paddockData, targetPre, targetRes) {
