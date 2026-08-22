@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.74</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.75</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.74</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.75</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1785,10 +1785,12 @@
                 <div id="pb-selection" style="margin-bottom:10px;"></div>
 
                 <div id="pb-actions" style="display:none; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-                    <button onclick="renameSelectedPaddock()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#2980b9; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">✏️ RENAME</button>
-                    <button onclick="mergeSelectedPaddocks()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#8e44ad; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">🔗 MERGE</button>
-                    <button onclick="startPaddockSplit()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#d35400; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">✂️ SPLIT</button>
-                    <button onclick="startPaddockReshape()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#27ae60; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">📐 RESHAPE</button>
+                    <button id="pb-btn-rename"  onclick="renameSelectedPaddock()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#2980b9; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">✏️ RENAME</button>
+                    <button id="pb-btn-merge"   onclick="mergeSelectedPaddocks()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#8e44ad; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">🔗 MERGE</button>
+                    <button id="pb-btn-split"   onclick="startPaddockSplit()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#d35400; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">✂️ SPLIT</button>
+                    <button id="pb-btn-reshape" onclick="startPaddockReshape()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#27ae60; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">📐 RESHAPE</button>
+                    <button id="pb-btn-add"     onclick="startAddPaddock()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#16a085; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">➕ ADD PADDOCK</button>
+                    <button id="pb-btn-delete"  onclick="deleteSelectedPaddocks()" style="flex:1 1 46%; padding:10px 4px; border:none; border-radius:6px; background:#c0392b; color:#fff; font-size:12px; font-weight:bold; cursor:pointer;">🗑 DELETE</button>
                 </div>
 
                 <div id="pb-status" style="font-size:11px; font-weight:bold; line-height:1.4;"></div>
@@ -2739,11 +2741,26 @@
             }
 
             const sel = selectedPaddocks();
+
+            // ADD needs no selection, so the row stays up even with nothing picked.
+            actions.style.display = 'flex';
+            const setEnabled = (id, on) => {
+                const b = document.getElementById(id);
+                if (!b) return;
+                b.disabled = !on;
+                b.style.opacity = on ? 1 : 0.4;
+            };
+            setEnabled('pb-btn-add', true);
+            setEnabled('pb-btn-rename', sel.length === 1);
+            setEnabled('pb-btn-split', sel.length === 1);
+            setEnabled('pb-btn-reshape', sel.length === 1);
+            setEnabled('pb-btn-merge', sel.length > 1);
+            setEnabled('pb-btn-delete', sel.length >= 1);
+
             if (sel.length === 0) {
                 box.innerHTML = paddockSelectMode
                     ? `<div style="font-size:12px; color:#16a085; font-weight:bold;">Tap paddocks on the map.</div>`
                     : `<div style="font-size:12px; color:#777;">${PADDOCK_ROWS.length} paddocks in the sheet.</div>`;
-                actions.style.display = 'none';
                 return;
             }
 
@@ -2758,13 +2775,6 @@
                             <span>${sel.length} paddocks</span><span>${total.toFixed(2)} ha</span></div>` : ''}
                 </div>`;
 
-            actions.style.display = 'flex';
-            const one = sel.length === 1;
-            actions.children[0].disabled = !one;                 // rename
-            actions.children[1].disabled = sel.length < 2;       // merge
-            actions.children[2].disabled = !one;                 // split
-            actions.children[3].disabled = !one;                 // reshape
-            [...actions.children].forEach(b => { b.style.opacity = b.disabled ? 0.4 : 1; });
         }
 
         /* ---- geometry helpers ---- */
@@ -2947,6 +2957,65 @@
                 { paddockId: p.paddockId, name: nameA, geometry: parts[0], calcArea: areaA, geometryType: 'MultiPolygon' },
                 { paddockId: newId, name: nameB, farmId: p.farmId, geometry: parts[1], calcArea: areaB, geometryType: 'MultiPolygon' }
             ]);
+        }
+
+        async function deleteSelectedPaddocks() {
+            const sel = selectedPaddocks();
+            if (sel.length === 0) return;
+
+            const names = sel.map(p => p.name).join(', ');
+            const area = sel.reduce((s, p) => s + (Number(p.calcArea) || 0), 0);
+            if (!confirm(`Remove ${names} from the farm?\n\n` +
+                         `${area.toFixed(2)} ha will come off the total.\n\n` +
+                         `Past farmwalk covers and breaks stay in the sheet, but the paddock ` +
+                         `will not appear on the map or in the feed wedge.`)) return;
+
+            await savePaddockChanges([], sel.map(p => p.paddockId));
+            selectedPaddockIds = [];
+            renderPaddockPanel();
+            updateGeoStyles();
+        }
+
+        /* ---- adding a paddock ----
+         * Reuses the polygon drawing the breaks already use, so there is one
+         * set of map controls to learn. drawingNewPaddock tells finishBreak to
+         * make a paddock instead of a break.
+         */
+        let drawingNewPaddock = false;
+
+        function startAddPaddock() {
+            if (paddockSource !== 'sheet') return;
+            if (paddockSplitPoints) cancelPaddockSplit();
+            drawingNewPaddock = true;
+            setPaddockStatus('Tap around the new paddock, then press Finish.', '#16a085');
+            startDrawingBreak('polygon');
+        }
+
+        async function finishNewPaddock() {
+            const verts = drawingVertices.slice();
+            cleanupDrawing();
+            drawingNewPaddock = false;
+            if (verts.length < 3) { setPaddockStatus('A paddock needs at least three points.', '#e74c3c'); return; }
+
+            const name = (prompt("Name for the new paddock:") || '').trim();
+            if (!name) { setPaddockStatus('Cancelled.', '#7f8c8d'); return; }
+            const clash = PADDOCK_ROWS.find(p => String(p.name).trim().toLowerCase() === name.toLowerCase());
+            if (clash && !confirm(`There is already a paddock called ${clash.name}. Use the name anyway?`)) return;
+
+            const ring = verts.map(v => [v.lng, v.lat]);
+            ring.push([ring[0][0], ring[0][1]]);              // close it
+            const coords = [[ring]];
+            const areaHa = multiPolygonAreaHa(coords);
+
+            const farmId = (PADDOCK_ROWS[0] && PADDOCK_ROWS[0].farmId) || '';
+            const id = 'PD_' + (farmId || 'NEW') + '_' + Date.now();
+
+            if (!confirm(`${name} will be ${areaHa.toFixed(2)} ha.\n\nAdd it to the farm?`)) return;
+
+            await savePaddockChanges([{
+                paddockId: id, name: name, farmId: farmId,
+                geometry: coords, calcArea: areaHa, geometryType: 'MultiPolygon'
+            }]);
         }
 
         function startPaddockReshape() {
@@ -7687,6 +7756,7 @@
         }
 
         function finishBreak() {
+            if (drawingNewPaddock) { finishNewPaddock(); return; }
             try {
                 const isLineMode = currentDrawingMode === 'line';
                 const isCropBreak = currentDrawingMode === 'crop_break';
@@ -7865,6 +7935,7 @@
 
         function cleanupDrawing() {
             isDrawingBreak = false;
+            drawingNewPaddock = false;   // cancelling must not leave the mode armed
             drawingMarkers.forEach(m => map.removeLayer(m));
             drawingMarkers = [];
             if (drawingPolyline) { map.removeLayer(drawingPolyline); drawingPolyline = null; }

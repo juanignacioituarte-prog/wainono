@@ -786,37 +786,41 @@ function loadFarmwalk(payload) {
   var date = String(payload.date || "").trim();
   if (!date) return errorResponse("Missing date");
 
-  var lastRow = sheet.getLastRow();
   var lastCol = Math.max(3, sheet.getLastColumn());
-  var header = lastRow > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : ["Date", "paddock", "cover"];
 
-  var keep = [];
+  // Only the rows for this date are touched. An earlier version read the whole
+  // tab, cleared it and wrote it back, which lost a row when the row count it
+  // read was one behind the sheet. Deleting and appending never rewrites a row
+  // that belongs to another walk, so that cannot happen again.
   var removed = 0;
+  var lastRow = sheet.getLastRow();
   if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, lastCol).getValues().forEach(function(row) {
-      if (!row[0] && !row[1]) return;                 // blank line
-      if (sameFarmwalkDate(row[0], date)) { removed++; return; }
-      keep.push(row);
-    });
+    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = dates.length - 1; i >= 0; i--) {          // bottom up, so row numbers hold
+      if (sameFarmwalkDate(dates[i][0], date)) { sheet.deleteRow(i + 2); removed++; }
+    }
   }
 
+  var rows = [];
   payload.entries.forEach(function(e) {
     if (!e || !e.paddock) return;
-    var row = new Array(lastCol).fill("");
+    var row = [];
+    for (var c = 0; c < lastCol; c++) row.push("");
     row[0] = date;
     row[1] = String(e.paddock);
     row[2] = Number(e.cover) || 0;
     if (lastCol > 3 && e.reason) row[3] = String(e.reason);
-    keep.push(row);
+    rows.push(row);
   });
 
-  sheet.clearContents();
-  sheet.getRange(1, 1, 1, header.length).setValues([header]);
-  if (keep.length > 0) sheet.getRange(2, 1, keep.length, lastCol).setValues(keep);
+  // appendRow, not a range write at getLastRow()+1. That was how the row was
+  // lost: the sheet reported one row fewer than it held, so the write landed
+  // on top of the last real row. appendRow always goes after existing content.
+  rows.forEach(function(row) { sheet.appendRow(row); });
 
   return jsonResponse({
     status: "success", date: date,
-    added: payload.entries.length, replaced: removed, totalRows: keep.length
+    added: rows.length, replaced: removed, totalRows: sheet.getLastRow() - 1
   });
 }
 
