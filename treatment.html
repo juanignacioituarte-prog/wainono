@@ -1076,6 +1076,60 @@
             return String(t.Tag || t.BirthID || t.EID || '?');
         }
 
+        /* ================= ONE CARD PER COW =================
+         * A cow can pick up a second thing while she is still under treatment for
+         * the first. She is one cow in the shed, so she gets one card, and she
+         * must not go green until the LAST of her withholds is finished.
+         */
+
+        function cowKeyOf(t) {
+            return String(t.Tag || t.BirthID || t.EID || '?');
+        }
+
+        function maxDate(dates) {
+            const d = dates.filter(Boolean);
+            return d.length ? new Date(Math.max.apply(null, d.map(x => x.getTime()))) : null;
+        }
+
+        /** Group {t,i} entries by cow and work out the combined state. */
+        function groupByCow(entries) {
+            const map = new Map();
+            entries.forEach(x => {
+                const k = cowKeyOf(x.t);
+                if (!map.has(k)) map.set(k, { key: k, t: x.t, list: [] });
+                map.get(k).list.push(x);
+            });
+
+            return [...map.values()].map(g => {
+                g.list.sort((a, b) => (parseDate(a.t.Started) || 0) - (parseDate(b.t.Started) || 0));
+                g.t = g.list[0].t;                       // for the tag / birth ID / EID
+                g.many = g.list.length > 1;
+
+                // The latest of everything. One late withhold holds the whole cow.
+                g.milkClear = maxDate(g.list.map(x => x.i.milkClear));
+                g.meatClear = maxDate(g.list.map(x => x.i.meatClear));
+                g.milkOk = g.list.every(x => x.i.milkOk);
+                g.meatOk = g.list.every(x => x.i.meatOk);
+                g.dosingDone = g.list.every(x => x.i.dosingDone);
+
+                g.due = g.list.filter(x => x.i.dueSlot);
+                g.missed = g.list.filter(x => x.i.missed.length);
+                g.stage = (g.dosingDone && g.milkOk) ? 'ready' : (g.dosingDone ? 'withhold' : 'dosing');
+                return g;
+            });
+        }
+
+        /** Every cow with at least one treatment that is not finished. */
+        function openCows() {
+            return groupByCow(state.treatments
+                .map(t => ({ t, i: info(t) }))
+                .filter(x => x.i.stage !== 'done'));
+        }
+
+        function sortByTag(a, b) {
+            return String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true });
+        }
+
         function quartersText(t) {
             const q = String(t.Quarters || '').split(',').map(s => s.trim()).filter(Boolean);
             if (!q.length) return '';
@@ -1109,14 +1163,16 @@
         }
 
         function tabCounts() {
-            const all = state.treatments.map(t => ({ t, i: info(t) }));
-            const treated = all.filter(x => x.i.stage !== 'done');
-            const dueToday = treated.filter(x => x.i.dueNow).length;
+            // Counted in cows, not treatments: one cow on two drugs is one cow.
+            const open = openCows();
+            const dueToday = open.filter(g => g.due.length).length;
+            const meat = groupByCow(state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => !x.i.meatOk && x.i.meatClear)).length;
             return {
                 today: { n: dueToday, hot: dueToday > 0 },
-                toclear: { n: treated.filter(x => x.i.stage === 'ready').length },
-                treated: { n: treated.length, hot: dueToday > 0 },
-                meat: { n: all.filter(x => !x.i.meatOk).length, hot: false }
+                toclear: { n: open.filter(g => g.stage === 'ready').length },
+                treated: { n: open.length, hot: dueToday > 0 },
+                meat: { n: meat, hot: false }
             };
         }
 
@@ -1859,17 +1915,18 @@
             const blocked = blockedPanel();
             if (blocked) { $('today-body').innerHTML = blocked; return; }
 
-            const all = state.treatments.map(t => ({ t, i: info(t) })).filter(x => x.i.dueSlot);
+            const all = openCows().filter(g => g.due.length);
             const q = searchTerm('today-search');
-            const rows = all.filter(x => matchesCow(x.t, q))
-                .sort((a, b) => String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true }));
+            const rows = all.filter(g => matchesCow(g.t, q)).sort(sortByTag);
 
+            const doses = all.reduce((n, g) => n + g.due.length, 0);
             const head = searchHead(q, rows.length, all.length, all.length
-                ? `<b>${plural(all.length, 'cow')}</b> to dose today, ${fmtDay(new Date())}.`
+                ? `<b>${plural(all.length, 'cow')}</b> to dose today, ${fmtDay(new Date())}`
+                  + (doses > all.length ? ` (${doses} doses).` : '.')
                 : `Nothing to dose today, ${fmtDay(new Date())}.`);
 
             $('today-body').innerHTML = head + (rows.length
-                ? rows.map(x => treatedCard(x.t, x.i)).join('')
+                ? rows.map(cowCard).join('')
                 : noMatch(q, 'All doses are done for today. ✅'));
         }
 
@@ -1878,17 +1935,17 @@
             const blocked = blockedPanel();
             if (blocked) { $('toclear-body').innerHTML = blocked; return; }
 
-            const all = state.treatments.map(t => ({ t, i: info(t) })).filter(x => x.i.stage === 'ready');
+            const all = openCows().filter(g => g.stage === 'ready');
             const q = searchTerm('toclear-search');
-            const rows = all.filter(x => matchesCow(x.t, q))
-                .sort((a, b) => (a.i.milkClear || 0) - (b.i.milkClear || 0));
+            const rows = all.filter(g => matchesCow(g.t, q))
+                .sort((a, b) => (a.milkClear || 0) - (b.milkClear || 0));
 
             const head = searchHead(q, rows.length, all.length, all.length
                 ? `<b>${plural(all.length, 'cow')}</b> ready to go back in the vat.`
                 : 'No cow is ready to clear.');
 
             $('toclear-body').innerHTML = head + (rows.length
-                ? rows.map(x => treatedCard(x.t, x.i)).join('')
+                ? rows.map(cowCard).join('')
                 : noMatch(q, 'Nobody is waiting to be cleared. ✅'));
         }
 
@@ -1896,24 +1953,23 @@
             const blocked = blockedPanel();
             if (blocked) { $('treated-body').innerHTML = blocked; return; }
 
-            let rows = state.treatments.map(t => ({ t, i: info(t) }))
-                .filter(x => x.i.stage !== 'done');
-            const onList = rows.length;
+            const all = openCows();
+            const onList = all.length;
 
             // Typing a cow number jumps straight to her instead of scrolling.
             const q = searchTerm('treated-search');
-            rows = rows.filter(x => matchesCow(x.t, q));
+            const rows = all.filter(g => matchesCow(g.t, q));
 
             // Doses due today first, then cows ready to clear, then the rest.
-            const rank = x => x.i.dueNow ? 0 : (x.i.stage === 'ready' ? 1 : 2);
+            const rank = g => g.due.length ? 0 : (g.stage === 'ready' ? 1 : 2);
             rows.sort((a, b) => {
                 if (rank(a) !== rank(b)) return rank(a) - rank(b);
-                if (!!a.i.missed.length !== !!b.i.missed.length) return a.i.missed.length ? -1 : 1;
-                return String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true });
+                if (!!a.missed.length !== !!b.missed.length) return a.missed.length ? -1 : 1;
+                return sortByTag(a, b);
             });
 
-            const due = rows.filter(x => x.i.dueNow).length;
-            const ready = rows.filter(x => x.i.stage === 'ready').length;
+            const due = all.filter(g => g.due.length).length;
+            const ready = all.filter(g => g.stage === 'ready').length;
 
             const head = searchHead(q, rows.length, onList,
                 `<b>${plural(onList, 'cow')}</b> under treatment or milk withhold.
@@ -1921,56 +1977,112 @@
                  ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`);
 
             $('treated-body').innerHTML = head + (rows.length
-                ? rows.map(x => treatedCard(x.t, x.i)).join('')
+                ? rows.map(cowCard).join('')
                 : noMatch(q, 'No cows under treatment. 🎉'));
         }
 
-        function treatedCard(t, i) {
+        /** One line of "where this treatment is up to", inside a cow's card. */
+        function treatmentLine(x) {
+            const t = x.t, i = x.i;
             const q = quartersText(t);
-            const ready = i.stage === 'ready';
-            const colour = ready ? 'green' : (i.dueNow ? 'reddark' : 'red');
-
             let when;
-            if (ready) {
-                when = `Milk cleared ${fmtClear(i.milkClear)} (${relDay(i.milkClear)}).`;
-            } else if (i.stage === 'withhold') {
-                when = `Milk clear ${fmtClear(i.milkClear)} (${relDay(i.milkClear)}).`;
-            } else if (i.dueSlot) {
-                when = `Dose ${i.dueSlot.no}/${i.total} due today.`;
-            } else if (i.nextDue) {
-                when = `Next dose ${fmtDay(i.nextDue)} (${relDay(i.nextDue)}).`;
-            } else {
-                when = 'Nothing left to give.';
-            }
+            if (i.stage === 'ready') when = `milk clear ${fmtClear(i.milkClear)}`;
+            else if (i.stage === 'withhold') when = `milk clear ${fmtClear(i.milkClear)} (${relDay(i.milkClear)})`;
+            else if (i.dueSlot) when = `<b>dose ${i.dueSlot.no}/${i.total} due today</b>`;
+            else if (i.nextDue) when = `next dose ${fmtDay(i.nextDue)} (${relDay(i.nextDue)})`;
+            else when = 'nothing left to give';
 
             const miss = missedText(i);
+            return `<div>
+                <b>${esc(t.Condition)}</b>${q ? `<span class="tag2">${esc(q)}</span>` : ''}<br>
+                ${esc(t.Drug)} &middot; dose ${i.given}/${i.total}${i.ended ? ' (stopped early)' : ''} &middot; ${when}
+                ${miss ? `<br><span style="font-weight:700;">&#9888; ${esc(miss)}</span>` : ''}
+                ${t.Notes ? `<div class="notes">&ldquo;${esc(t.Notes)}&rdquo;</div>` : ''}
+            </div>`;
+        }
+
+        /**
+         * One card for one cow, however many treatments she is on. She is held by
+         * whichever withhold finishes LAST, so she cannot go green early just
+         * because the first treatment is done.
+         */
+        function cowCard(g) {
+            const ready = g.stage === 'ready';
+            const colour = g.due.length ? 'reddark' : (ready ? 'green' : 'red');
+            const t = g.t;
+            const label = ready ? 'MILK IS CLEAR' : (t.Tag ? 'TAG' : (t.BirthID ? 'BIRTH ID' : 'EID'));
+            const rule = '<div style="border-top:1px solid rgba(255,255,255,.25); margin:6px 0;"></div>';
+
+            const combined = g.many
+                ? `<div style="border-top:1px solid rgba(255,255,255,.4); margin-top:7px; padding-top:6px;">
+                     <b>${plural(g.list.length, 'treatment')} running.</b>
+                     ${g.milkOk
+                        ? 'Both milk withholds are finished.'
+                        : 'Held until the last one finishes: <b>' + fmtClear(g.milkClear) + '</b> (' + relDay(g.milkClear) + ').'}
+                   </div>`
+                : '';
 
             return `<div class="tcard ${colour}">
                 <div class="top">
-                    <div class="num">${esc(byTag(t))}<small>${ready ? 'MILK IS CLEAR' : esc(t.Tag ? 'TAG' : (t.BirthID ? 'BIRTH ID' : 'EID'))}</small></div>
+                    <div class="num">${esc(g.key)}<small>${label}</small></div>
                     <div class="info">
-                        <b>${esc(t.Condition)}</b>${q ? `<span class="tag2">${esc(q)}</span>` : ''}<br>
-                        ${esc(t.Drug)} · dose ${i.given}/${i.total}${i.ended ? ' (stopped early)' : ''}<br>
-                        ${when}<br>
-                        <span style="opacity:.85;">Started by ${esc(t.CreatedBy || '—')}${i.given
-                            ? ' · last dose by ' + esc(i.list[i.list.length - 1].GivenBy || '—') : ''}</span>
-                        ${ready && !i.meatOk ? `<br>Meat withhold runs to <b>${fmtDayTime(i.meatClear)}</b>.` : ''}
-                        ${t.Notes ? `<div class="notes">“${esc(t.Notes)}”</div>` : ''}
+                        ${g.list.map(treatmentLine).join(g.many ? rule : '')}
+                        ${combined}
+                        ${ready && !g.meatOk ? `<div>Meat withhold runs to <b>${fmtDayTime(g.meatClear)}</b>.</div>` : ''}
                     </div>
                 </div>
-                ${miss ? `<div class="warn">⚠ ${esc(miss)}</div>` : ''}
                 <div class="acts">
-                    ${ready ? `<button class="btn dosebtn" style="color:var(--accent-dark) !important;" onclick="clearCow('${esc(t.ID)}')">✓ Clear</button>` : ''}
-                    ${i.dueSlot ? `<button class="btn dosebtn" onclick="giveDose('${esc(t.ID)}')">Give dose ${i.dueSlot.no}/${i.total}</button>` : ''}
-                    <button class="btn small ghost" onclick="openTreatment('${esc(t.ID)}')">Details</button>
-                    ${i.given ? `<button class="btn small ghost" onclick="undoDose('${esc(t.ID)}')">Undo last dose</button>` : ''}
-                    ${isManager() && i.missed.length
-                        ? `<button class="btn small ghost" onclick="giveDoseEarlier('${esc(t.ID)}')">Record a missed dose</button>` : ''}
-                    ${isManager()
-                        ? `<button class="btn small ghost" onclick="replaceTreatment('${esc(t.ID)}')">Change treatment</button>` : ''}
-                    ${i.dosingDone ? '' : `<button class="btn small ghost" onclick="endTreatment('${esc(t.ID)}')">Stop treatment</button>`}
+                    ${ready ? `<button class="btn dosebtn" style="color:var(--accent-dark) !important;"
+                        onclick="clearCowGroup('${esc(g.key)}')">&#10003; Clear${g.many ? ' all ' + g.list.length : ''}</button>` : ''}
+                    ${g.due.map(x => `<button class="btn dosebtn" onclick="giveDose('${esc(x.t.ID)}')">
+                        Give dose ${x.i.dueSlot.no}/${x.i.total}${g.many ? ' &mdash; ' + esc(x.t.Drug) : ''}</button>`).join('')}
+                    ${g.list.map(x => `
+                        <button class="btn small ghost" onclick="openTreatment('${esc(x.t.ID)}')">Details${g.many ? ': ' + esc(x.t.Drug) : ''}</button>
+                        ${x.i.given ? `<button class="btn small ghost" onclick="undoDose('${esc(x.t.ID)}')">Undo last dose</button>` : ''}
+                        ${isManager() && x.i.missed.length
+                            ? `<button class="btn small ghost" onclick="giveDoseEarlier('${esc(x.t.ID)}')">Record a missed dose</button>` : ''}
+                        ${isManager() ? `<button class="btn small ghost" onclick="replaceTreatment('${esc(x.t.ID)}')">Change</button>` : ''}
+                        ${x.i.dosingDone ? '' : `<button class="btn small ghost" onclick="endTreatment('${esc(x.t.ID)}')">Stop</button>`}
+                    `).join('')}
                 </div>
             </div>`;
+        }
+
+        /** Clearing a cow clears every open treatment she has, together. */
+        function clearCowGroup(key) {
+            const g = openCows().find(x => x.key === String(key));
+            if (!g) return;
+            if (!g.milkOk) { toast('One of her withholds has not finished'); return; }
+
+            openModal(`
+                <h3>Clear cow ${esc(g.key)}?</h3>
+                <div style="font-size:14px; line-height:1.8;">
+                    ${g.list.map(x => `<div><b>${esc(x.t.Condition)}</b> &mdash; ${esc(x.t.Drug)},
+                        ${x.i.given}/${x.i.total} doses, milk clear ${fmtClear(x.i.milkClear)}</div>`).join('')}
+                </div>
+                <div style="background:#eafaf1; border:1px solid var(--accent); border-radius:8px;
+                            padding:10px; margin-top:12px; font-size:14px;">
+                    ${g.many ? `All <b>${g.list.length}</b> of her treatments are cleared together.<br>` : ''}
+                    Her milk goes <b>back in the vat</b> from the next milking.
+                    ${g.meatOk ? 'She is out of the meat withhold too.'
+                        : `She stays in <b>Meat Withhold</b> until <b>${fmtDayTime(g.meatClear)}</b>.`}
+                </div>
+                <div class="row" style="margin-top:14px;">
+                    <button class="btn grey" onclick="closeModal()">Cancel</button>
+                    <button class="btn" onclick="confirmClearGroup('${esc(g.key)}')">Yes, clear her</button>
+                </div>
+            `);
+        }
+
+        function confirmClearGroup(key) {
+            const g = openCows().find(x => x.key === String(key));
+            if (!g) return;
+            closeModal();
+            const now = new Date().toISOString();
+            sendMany(g.list.map(x => ({ type: 'clear_cow', treatmentId: x.t.ID, clearedAt: now })));
+            toast(g.meatOk
+                ? 'Cow ' + g.key + ' cleared and finished'
+                : 'Cow ' + g.key + ' cleared — meat withhold to ' + fmtDay(g.meatClear));
         }
 
         function giveDose(id) {
@@ -2141,33 +2253,36 @@
             const blocked = blockedPanel();
             if (blocked) { $('meat-body').innerHTML = blocked; return; }
 
-            const all = state.treatments.map(t => ({ t, i: info(t) }))
-                .filter(x => !x.i.meatOk && x.i.meatClear);
+            const all = groupByCow(state.treatments.map(t => ({ t, i: info(t) }))
+                .filter(x => !x.i.meatOk && x.i.meatClear));
             const q = searchTerm('meat-search');
-            const rows = all.filter(x => matchesCow(x.t, q))
-                .sort((a, b) => a.i.meatClear - b.i.meatClear);
+            const rows = all.filter(g => matchesCow(g.t, q))
+                .sort((a, b) => a.meatClear - b.meatClear);
 
             const head = searchHead(q, rows.length, all.length, `
                 <b>${plural(all.length, 'cow')}</b> must not go for meat yet.
                 This list holds every treated cow, red or cleared.
-                The date is counted from the last dose given.`);
+                The date counts from the last planned dose.`);
 
             $('meat-body').innerHTML = head + (rows.length
-                ? rows.map(x => `<div class="tcard orange">
+                ? rows.map(g => `<div class="tcard orange">
                     <div class="top">
-                        <div class="num">${esc(byTag(x.t))}<small>DO NOT CULL</small></div>
+                        <div class="num">${esc(g.key)}<small>DO NOT CULL</small></div>
                         <div class="info">
-                            <b>Meat clear ${fmtDayTime(x.i.meatClear)}</b> (${relDay(x.i.meatClear)})<br>
-                            ${esc(x.t.Condition)} · ${esc(x.t.Drug)}<br>
-                            Last dose ${fmtDayTime(x.i.lastDoseAt)} · withhold ${whText(x.t.MeatWithhold, x.t.MeatWithholdUnit)}<br>
-                            ${x.t.ClearedAt
-                        ? 'Milk cleared ' + fmtDay(x.t.ClearedAt) + ' by ' + esc(x.t.ClearedBy || '—')
-                        : '<b>Milk is still withheld.</b>'}
+                            <b>Meat clear ${fmtDayTime(g.meatClear)}</b> (${relDay(g.meatClear)})
+                            ${g.many ? ' — the latest of ' + plural(g.list.length, 'treatment') : ''}<br>
+                            ${g.list.map(x => `${esc(x.t.Condition)} · ${esc(x.t.Drug)} · withhold
+                                ${whText(x.t.MeatWithhold, x.t.MeatWithholdUnit)} to ${fmtDay(x.i.meatClear)}
+                                · ${x.t.ClearedAt
+                                    ? 'milk cleared ' + fmtDay(x.t.ClearedAt) + ' by ' + esc(x.t.ClearedBy || '—')
+                                    : '<b>milk still withheld</b>'}`).join('<br>')}
                         </div>
                     </div>
                     <div class="acts">
-                        <button class="btn small ghost" onclick="openTreatment('${esc(x.t.ID)}')">Details</button>
-                        ${x.t.ClearedAt ? `<button class="btn small ghost" onclick="unclearCow('${esc(x.t.ID)}')">Undo clear</button>` : ''}
+                        ${g.list.map(x => `
+                            <button class="btn small ghost" onclick="openTreatment('${esc(x.t.ID)}')">Details${g.many ? ': ' + esc(x.t.Drug) : ''}</button>
+                            ${x.t.ClearedAt ? `<button class="btn small ghost" onclick="unclearCow('${esc(x.t.ID)}')">Undo clear</button>` : ''}
+                        `).join('')}
                     </div>
                   </div>`).join('')
                 : noMatch(q, 'No cow is inside a meat withhold.'));
