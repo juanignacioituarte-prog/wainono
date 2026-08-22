@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.73</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.74</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.73</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.74</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4166,8 +4166,8 @@
                         }
 
                         const isOut = (latestCover === 0);
-                        const dDiff = (lDate && pDate) ? Math.max(1, (lDate - pDate) / 86400000) : 1;
-                        const growth = isOut ? 0 : Math.round((latestCover - prevCover) / dDiff);
+                        const growth = coverGrowthRate(latestCover, prevCover,
+                            lDate ? lDate.getTime() : null, pDate ? pDate.getTime() : null, isOut);
 
                         parsedData.push({
                             name: p.name,
@@ -4235,11 +4235,9 @@
                     }
                 }
 
-                if (!p.isOut && p.latest && p.previous && p.latest.ts && p.previous.ts) {
-                    const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
-                    p.growthRate = Math.round((p.latest.cover - p.previous.cover) / dDiff);
-                } else if (p.isOut) {
-                    p.growthRate = 0;
+                if (p.latest) {
+                    p.growthRate = coverGrowthRate(p.latest.cover, p.previous ? p.previous.cover : null,
+                        p.latest.ts, p.previous ? p.previous.ts : null, p.isOut);
                 }
             }
             editingPrevPaddocks.delete(pName);
@@ -4287,12 +4285,10 @@
                 }
             }
 
-            if (!p.isOut && p.latest && p.previous && p.latest.ts && p.previous.ts) {
-                const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
-                p.growthRate = Math.round((p.latest.cover - p.previous.cover) / dDiff);
-            } else {
-                p.growthRate = 0;
-            }
+            p.growthRate = p.latest
+                ? coverGrowthRate(p.latest.cover, p.previous ? p.previous.cover : null,
+                                  p.latest.ts, p.previous ? p.previous.ts : null, p.isOut)
+                : null;
 
             updateFarmStats();
             renderDashboard();
@@ -4472,12 +4468,8 @@
                             p.entries.unshift({ dateObj: dateObj, cover: coverVal, reason: p.reason || '' });
                         }
 
-                        if (!p.isOut && p.previous && p.latest.ts && p.previous.ts) {
-                            const dDiff = Math.max(1, (p.latest.ts - p.previous.ts) / 86400000);
-                            p.growthRate = Math.round((p.latest.cover - p.previous.cover) / dDiff);
-                        } else if (p.isOut) {
-                            p.growthRate = 0;
-                        }
+                        p.growthRate = coverGrowthRate(p.latest.cover, p.previous ? p.previous.cover : null,
+                            p.latest.ts, p.previous ? p.previous.ts : null, p.isOut);
 
                         entriesToSave.push({
                             date: dateVal,
@@ -4590,12 +4582,8 @@
                 item.entries.unshift({ dateObj: dateObj, cover: coverVal, reason: item.reason || '' });
             }
 
-            if (!item.isOut && item.previous && item.latest.ts && item.previous.ts) {
-                const dDiff = Math.max(1, (item.latest.ts - item.previous.ts) / 86400000);
-                item.growthRate = Math.round((item.latest.cover - item.previous.cover) / dDiff);
-            } else if (item.isOut) {
-                item.growthRate = 0;
-            }
+            item.growthRate = coverGrowthRate(item.latest.cover, item.previous ? item.previous.cover : null,
+                item.latest.ts, item.previous ? item.previous.ts : null, item.isOut);
 
             manualModeData.sort((a, b) => {
                 if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
@@ -5807,7 +5795,8 @@
                 let growthRate = null;
                 if (previous && latest.dateObj && previous.dateObj) {
                     const dayDiff = (latest.dateObj - previous.dateObj) / 86400000;
-                    if (dayDiff > 0 && latest.cover > previous.cover) growthRate = Math.round((latest.cover - previous.cover) / dayDiff);
+                    // previous.cover must be a real reading, not a 0 standing in for "not walked"
+                    if (dayDiff > 0 && previous.cover > 0 && latest.cover > previous.cover) growthRate = Math.round((latest.cover - previous.cover) / dayDiff);
                 }
                 const manual = findBestManualForPaddock(name);
                 return { name, latest, previous, growthRate, area, isOut, reason: excludedPaddocks.get(lowerName), manual, mStatus: manual ? manualCalibratorStatus(manual, latest.cover_raw, lowerName) : { ok: false, reason: "", className: "" } };
@@ -5837,6 +5826,23 @@
                 if (gapDays < bestAbs) { bestAbs = gapDays; best = { ...m, gapDays, signedGap }; }
             }
             return best;
+        }
+
+        /**
+         * Growth for one paddock, in kgDM per day.
+         *
+         * A paddock only counts if it was really measured before. No previous
+         * reading, or one recorded as 0, is not a measurement - and treating it
+         * as one turns a first cover into a huge false growth that drags the
+         * whole farm average up with it. Those return null, which every average
+         * below already skips.
+         */
+        function coverGrowthRate(latestCover, prevCover, latestTs, prevTs, isOut) {
+            if (isOut) return 0;
+            if (!latestTs || !prevTs) return null;      // never walked twice
+            if (!(prevCover > 0)) return null;          // last walk had no cover on it
+            const days = Math.max(1, (latestTs - prevTs) / 86400000);
+            return Math.round((latestCover - prevCover) / days);
         }
 
         function updateFarmStats() {
