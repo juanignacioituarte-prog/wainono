@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.76</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.77</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.76</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.77</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4252,9 +4252,10 @@
 
                     manualModeData = parsedData;
 
+                    const mWalk = latestWalkInfo(manualModeData);
                     let tWGrowth = 0, tAreaG = 0;
                     manualModeData.forEach(p => {
-                        if (!p.isOut && p.area > 0 && p.growthRate && p.growthRate > 0) {
+                        if (!p.isOut && p.area > 0 && p.growthRate && p.growthRate > 0 && growthIsComparable(p, mWalk)) {
                             tWGrowth += p.growthRate * p.area;
                             tAreaG += p.area;
                         }
@@ -5908,11 +5909,29 @@
          */
         function latestWalkInfo(data) {
             const active = (data || []).filter(p => !p.isOut);
-            const tsList = active.map(p => (p.latest ? p.latest.ts : 0)).filter(t => t > 0);
-            const maxTs = tsList.length > 0 ? Math.max(...tsList) : 0;
+
+            // Every walk date the farm has, newest first. Taken from the whole
+            // farm, not one paddock, so "the walk before" means the same thing
+            // for everybody.
+            const tsSet = {};
+            active.forEach(p => {
+                if (Array.isArray(p.entries) && p.entries.length > 0) {
+                    p.entries.forEach(e => {
+                        const t = e.dateObj ? e.dateObj.getTime() : (e.ts || 0);
+                        if (t) tsSet[t] = true;
+                    });
+                } else {
+                    if (p.latest && p.latest.ts) tsSet[p.latest.ts] = true;
+                    if (p.previous && p.previous.ts) tsSet[p.previous.ts] = true;
+                }
+            });
+            const dates = Object.keys(tsSet).map(Number).sort((a, b) => b - a);
+
+            const maxTs = dates[0] || 0;
             const measured = active.filter(p => p.latest && p.latest.ts === maxTs);
             return {
                 maxTs: maxTs,
+                prevWalkTs: dates[1] || 0,
                 measuredCount: measured.length,
                 activeCount: active.length,
                 isPartial: maxTs > 0 && measured.length > 0 && measured.length < active.length
@@ -5922,6 +5941,21 @@
         // A paddock whose newest cover is older than the newest walk was skipped.
         function skippedInLatestWalk(p, info) {
             return !!(info && info.maxTs > 0 && p && !p.isOut && p.latest && p.latest.ts < info.maxTs);
+        }
+
+        /**
+         * Is this paddock's growth worth using?
+         *
+         * Only if it was walked this time AND the time before. A paddock walked
+         * on 21/08 and 20/05 is fine. One walked on 21/08 and 11/05 skipped the
+         * 20/05 walk, so its two readings are three months apart while everyone
+         * else's are three weeks - averaging that in is comparing two different
+         * things.
+         */
+        function growthIsComparable(p, info) {
+            if (!info || !info.maxTs || !info.prevWalkTs) return false;
+            if (!p || p.isOut || !p.latest || !p.previous) return false;
+            return p.latest.ts === info.maxTs && p.previous.ts === info.prevWalkTs;
         }
 
         /**
@@ -5941,22 +5975,38 @@
             return Math.round((latestCover - prevCover) / days);
         }
 
+        /* Weighted cover and growth over a set of paddocks.
+         *
+         * Skipped paddocks stay out of cover, and growth only counts when the
+         * paddock was walked this time and the time before. The walk dates come
+         * from the whole farm, so picking a unit changes which paddocks are
+         * counted, never what "the previous walk" means. */
+        function weightedFarmStats(paddocks, walk) {
+            let wCover = 0, areaC = 0, wGrowth = 0, areaG = 0;
+            paddocks.forEach(p => {
+                const areaNum = p.area || 0;
+                if (areaNum <= 0 || p.isOut) return;
+                if (!skippedInLatestWalk(p, walk)) { wCover += (p.latest.cover * areaNum); areaC += areaNum; }
+                if (p.growthRate && p.growthRate > 0 && growthIsComparable(p, walk)) {
+                    wGrowth += (p.growthRate * areaNum); areaG += areaNum;
+                }
+            });
+            return { wCover: wCover, areaC: areaC, wGrowth: wGrowth, areaG: areaG };
+        }
+
         function updateFarmStats() {
             const data = getCurrentModeData();
             const walk = latestWalkInfo(data);
-            let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
-            data.forEach(p => {
-                const areaNum = p.area || 0;
-                if (areaNum > 0 && !p.isOut) {
-                    // A paddock skipped on the latest walk is carrying an old
-                    // number. Averaging it in reports a cover the farm does not
-                    // have, so it sits out until it is walked again.
-                    if (!skippedInLatestWalk(p, walk)) {
-                        tWCover += (p.latest.cover * areaNum); tAreaC += areaNum;
-                    }
-                    if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * areaNum); tAreaG += areaNum; }
-                }
-            });
+
+            // The header follows what is selected. A unit shows that unit.
+            const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
+            const scoped = activeUnit ? data.filter(p => unitHasPaddock(activeUnit, p.name)) : data;
+
+            const whole = weightedFarmStats(data, walk);
+            const shown = activeUnit ? weightedFarmStats(scoped, walk) : whole;
+
+            let tWCover = shown.wCover, tAreaC = shown.areaC;
+            let tWGrowth = shown.wGrowth, tAreaG = shown.areaG;
 
             // --- SUBTRACT CROP BREAK AREAS ---
             let totalCropBreakArea = 0;
@@ -5972,9 +6022,16 @@
                 }
             });
             tAreaC = Math.max(0, tAreaC - totalCropBreakArea);
+            const wholeAreaC = Math.max(0, whole.areaC - totalCropBreakArea);
 
             const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
             const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
+
+            // The feed wedge is always the whole farm. Picking a unit in FARMWALK
+            // is a way of looking at part of it, not a change to how the farm is
+            // fed, and break sizes come off these numbers.
+            const wholeCoverVal = wholeAreaC > 0 ? Math.round(whole.wCover / wholeAreaC) : 0;
+            const wholeGrowthVal = whole.areaG > 0 ? Math.round(whole.wGrowth / whole.areaG) : 0;
 
             const elTotalAvg = document.getElementById('total-avg');
             const elAvgGrowth = document.getElementById('avg-growth');
@@ -5987,11 +6044,11 @@
             if (elAvgGrowth) elAvgGrowth.innerText = "+" + avgGrowthVal;
             if (elSyncTime) elSyncTime.innerText = new Date().toLocaleTimeString();
 
-            if (elFeedAreaTotal) elFeedAreaTotal.innerText = tAreaC.toFixed(1);
-            if (elFeedAvgCover) elFeedAvgCover.innerText = avgCoverVal;
-            if (elFeedAvgGrowth) elFeedAvgGrowth.innerText = avgGrowthVal;
-            
-            return { tAreaC, avgCoverVal, avgGrowthVal };
+            if (elFeedAreaTotal) elFeedAreaTotal.innerText = wholeAreaC.toFixed(1);
+            if (elFeedAvgCover) elFeedAvgCover.innerText = wholeCoverVal;
+            if (elFeedAvgGrowth) elFeedAvgGrowth.innerText = wholeGrowthVal;
+
+            return { tAreaC: wholeAreaC, avgCoverVal: wholeCoverVal, avgGrowthVal: wholeGrowthVal };
         }
 
         /* Rendering */
@@ -6101,7 +6158,7 @@
                 ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
             </div>
             <div style="position:absolute; top:14px; right:60px; text-align:right; display:flex; flex-direction:column; align-items:flex-end;">
-                ${(p.growthRate && !p.isOut) ? `<div><span style="color:var(--growth); font-weight:bold">${p.growthRate > 0 ? '+' : ''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
+                ${(p.growthRate && growthIsComparable(p, walkInfo)) ? `<div><span style="color:var(--growth); font-weight:bold">${p.growthRate > 0 ? '+' : ''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
                 ${isFarmwalkEntryActive ? `<button onclick="event.stopPropagation(); toggleEditPrevious('${p.name}')" title="Modify Latest & Previous Covers" style="margin-top:4px; background:#eef6fc; color:#2980b9; border:1px solid #a9cce3; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">✏️ Edit</button>` : ''}
             </div>
             ${entryControlsHtml}
