@@ -1668,7 +1668,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.75</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.76</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1679,7 +1679,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.75</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.76</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -5897,6 +5897,33 @@
             return best;
         }
 
+        const SKIPPED_WALK_COLOR = '#f1c40f';   // yellow: not walked this time
+
+        /**
+         * The most recent walk, and whether it covered the whole farm.
+         *
+         * The averages, the map colours and the card badges all have to agree on
+         * this, so it is worked out once from the same data rather than three
+         * times in three places.
+         */
+        function latestWalkInfo(data) {
+            const active = (data || []).filter(p => !p.isOut);
+            const tsList = active.map(p => (p.latest ? p.latest.ts : 0)).filter(t => t > 0);
+            const maxTs = tsList.length > 0 ? Math.max(...tsList) : 0;
+            const measured = active.filter(p => p.latest && p.latest.ts === maxTs);
+            return {
+                maxTs: maxTs,
+                measuredCount: measured.length,
+                activeCount: active.length,
+                isPartial: maxTs > 0 && measured.length > 0 && measured.length < active.length
+            };
+        }
+
+        // A paddock whose newest cover is older than the newest walk was skipped.
+        function skippedInLatestWalk(p, info) {
+            return !!(info && info.maxTs > 0 && p && !p.isOut && p.latest && p.latest.ts < info.maxTs);
+        }
+
         /**
          * Growth for one paddock, in kgDM per day.
          *
@@ -5916,11 +5943,17 @@
 
         function updateFarmStats() {
             const data = getCurrentModeData();
+            const walk = latestWalkInfo(data);
             let tWCover = 0, tAreaC = 0, tWGrowth = 0, tAreaG = 0;
             data.forEach(p => {
                 const areaNum = p.area || 0;
                 if (areaNum > 0 && !p.isOut) {
-                    tWCover += (p.latest.cover * areaNum); tAreaC += areaNum;
+                    // A paddock skipped on the latest walk is carrying an old
+                    // number. Averaging it in reports a cover the farm does not
+                    // have, so it sits out until it is walked again.
+                    if (!skippedInLatestWalk(p, walk)) {
+                        tWCover += (p.latest.cover * areaNum); tAreaC += areaNum;
+                    }
                     if (p.growthRate && p.growthRate > 0) { tWGrowth += (p.growthRate * areaNum); tAreaG += areaNum; }
                 }
             });
@@ -5979,11 +6012,9 @@
                 return b.latest.cover - a.latest.cover;
             });
 
-            const activePaddocks = scoped.filter(p => !p.isOut);
-            const activeTsList = activePaddocks.map(p => p.latest ? p.latest.ts : 0).filter(t => t > 0);
-            const maxTs = activeTsList.length > 0 ? Math.max(...activeTsList) : 0;
-            const measuredInLatest = activePaddocks.filter(p => p.latest && p.latest.ts === maxTs);
-            const isPartialWalk = (currentDashboardMode === 'manual' && maxTs > 0 && measuredInLatest.length > 0 && measuredInLatest.length < activePaddocks.length);
+            const walkInfo = latestWalkInfo(scoped);
+            const maxTs = walkInfo.maxTs;
+            const isPartialWalk = (currentDashboardMode === 'manual' && walkInfo.isPartial);
 
             const list = document.getElementById('list'); list.innerHTML = "";
 
@@ -6099,6 +6130,7 @@
         function updateGeoStyles() {
             if (!geoLayer) return;
             const currentData = getCurrentModeData();
+            const walk = latestWalkInfo(currentData);
             const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
             geoLayer.eachLayer(layer => {
                 const pName = layer.feature.properties.name;
@@ -6138,7 +6170,9 @@
                     // A unit is selected: everything outside it goes flat blue and recedes.
                     layer.setStyle({ fillColor: OUT_OF_UNIT_COLOR, fillOpacity: 0.5, color: 'white', opacity: 1, weight: 1 });
                 } else if ((currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentViewMode === 'cover') && p && p.latest) {
-                    let color = getCoverColor(p.latest.cover);
+                    // Yellow means "not walked this time". Colouring it by the old
+                    // cover makes the map look measured when it is not.
+                    let color = skippedInLatestWalk(p, walk) ? SKIPPED_WALK_COLOR : getCoverColor(p.latest.cover);
                     if (p.isOut) color = '#ff7675';
                     layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', opacity: 1, weight: 1 });
                 } else {
