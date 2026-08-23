@@ -1517,35 +1517,58 @@
             [...$('condition-list').children].forEach(b =>
                 b.classList.toggle('on', b.getAttribute('onclick').indexOf("'" + id + "'") !== -1));
 
-            const name = draft.condition ? draft.condition.Name : '';
-            const all = state.drugs.filter(d => isActive(d.Active));
-            // The drugs chosen for this condition come first. The rest stay
-            // available, because the vet often changes the plan on the day.
-            const matched = all.filter(d => drugHasCondition(d, name));
-            const others = all.filter(d => matched.indexOf(d) === -1);
-            const ordered = matched.concat(others);
-
-            if (!ordered.length) {
-                $('drug-card').classList.remove('hidden');
-                $('drug-list').innerHTML = '<p class="muted">No drugs set up yet — ask a manager.</p>';
-                $('drug-hint').textContent = '';
-                return;
-            }
-
-            $('drug-card').classList.remove('hidden');
-            $('drug-list').innerHTML = ordered.map(d => `
-                <button class="choice" onclick="pickDrug('${esc(d.ID)}')">
-                    ${esc(d.Name)}${matched.indexOf(d) === -1 ? '' : ' <span class="pill" style="background:var(--accent); color:#fff;">for this</span>'}
-                    <small>${drugPlanText(d)}</small>
-                    ${noWithhold(d) ? '<small style="color:var(--red); font-weight:700;">⚠ No withhold set for this drug</small>' : ''}
-                </button>`).join('');
-            $('drug-hint').textContent = matched.length
-                ? 'Drugs marked “for this” are the ones set up for ' + draft.condition.Name + '.'
-                : 'No drug is set up for this condition, so all drugs are shown.';
+            renderDrugChoices(false);
             $('detail-card').classList.add('hidden');
             $('confirm-card').classList.add('hidden');
             updateDraftBar();
             $('drug-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        /**
+         * Only the drugs set up for this condition. Nothing else is offered, so
+         * nobody can reach for the wrong bottle from a list of everything on the
+         * farm. A manager sets which drugs go with which condition in Config.
+         *
+         * showAll is a manager-only escape hatch for the case where a condition
+         * has no drug linked yet and a cow needs treating now.
+         */
+        function renderDrugChoices(showAll) {
+            const name = draft.condition ? draft.condition.Name : '';
+            const active = state.drugs.filter(d => isActive(d.Active));
+            const forThis = active.filter(d => drugHasCondition(d, name));
+            const list = showAll ? active : forThis;
+
+            $('drug-card').classList.remove('hidden');
+
+            if (!list.length) {
+                $('drug-list').innerHTML = `<p class="muted">
+                    ${active.length
+                        ? 'No drug is set up for <b>' + esc(name) + '</b>.'
+                        : 'No drugs are set up yet.'}
+                    ${isManager()
+                        ? 'Add one under ⚙ Config, or show them all for this one treatment.'
+                        : 'Ask a manager to add one under Config.'}
+                  </p>`;
+                $('drug-hint').innerHTML = isManager() && active.length
+                    ? `<button class="btn small grey" onclick="renderDrugChoices(true)">Show all drugs anyway</button>`
+                    : '';
+                return;
+            }
+
+            $('drug-list').innerHTML = list.map(d => `
+                <button class="choice" onclick="pickDrug('${esc(d.ID)}')">
+                    ${esc(d.Name)}${showAll && !drugHasCondition(d, name)
+                        ? ' <span class="pill" style="background:var(--orange); color:#fff;">not for this</span>' : ''}
+                    <small>${drugPlanText(d)}</small>
+                    ${noWithhold(d) ? '<small style="color:var(--red); font-weight:700;">⚠ No withhold set for this drug</small>' : ''}
+                </button>`).join('');
+
+            $('drug-hint').innerHTML = showAll
+                ? 'Showing every drug, not just the ones for ' + esc(name) + '.'
+                : `The ${plural(list.length, 'drug')} set up for <b>${esc(name)}</b>.`
+                  + (isManager() && forThis.length < active.length
+                      ? ` <button class="btn small grey" style="margin-left:6px;"
+                            onclick="renderDrugChoices(true)">Show all drugs</button>` : '');
         }
 
         function drugPlanText(d) {
