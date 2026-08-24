@@ -322,9 +322,10 @@
 
                 <label class="lbl hidden" id="first-dose-label"
                        style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--text);">
-                    <input type="checkbox" id="first-dose" checked style="width:20px; height:20px;">
+                    <input type="checkbox" id="first-dose" onchange="renderFirstDoseHint()" style="width:20px; height:20px;">
                     First dose given now
                 </label>
+                <p class="muted" id="first-dose-hint" style="margin:2px 0 0;"></p>
 
                 <!-- managers only: record a treatment that started days ago -->
                 <div id="backdate-box" class="hidden" style="margin-top:12px; border-top:1px solid var(--line); padding-top:10px;">
@@ -1058,14 +1059,23 @@
                done     - someone hit Clear            (off the red list; stays in
                                                         Meat Withhold until the meat
                                                         is clear, then History only) */
+            /*
+             * A treatment with NO withhold at all - the "No drug" record, or
+             * anything else with both withholds at zero - holds nothing back.
+             * There is no milk to keep out of the vat and nothing to clear, so it
+             * is finished the moment it is written and belongs in History only.
+             */
+            const noHold = whMs(t.MilkWithhold, t.MilkWithholdUnit) === 0
+                && whMs(t.MeatWithhold, t.MeatWithholdUnit) === 0;
+
             let stage;
-            if (cleared) stage = 'done';
+            if (cleared || noHold) stage = 'done';
             else if (!dosingDone) stage = 'dosing';
             else if (!milkOk) stage = 'withhold';
             else stage = 'ready';
 
             return {
-                list, slots, total, given, missed, dueSlot, interval,
+                list, slots, total, given, missed, dueSlot, interval, noHold,
                 ended, cleared, dosingDone, nextDue, dueNow,
                 lastDoseAt, plannedLastDose, milkEnds, meatEnds,
                 milkClear, meatClear, milkOk, meatOk, stage
@@ -1385,7 +1395,7 @@
                 draft.cows = [cow];
                 clearStepsAfterCow();
                 $('new-notes').value = '';
-                $('first-dose').checked = true;
+                $('first-dose').checked = false;
                 $('backdate-on').checked = false;
                 $('backdate-when').value = '';
                 renderBackdate();
@@ -1594,7 +1604,8 @@
                 b.classList.toggle('on', b.getAttribute('onclick').indexOf("'" + id + "'") !== -1));
             $('detail-card').classList.remove('hidden');
             renderQuarters();
-            renderBackdate();   // the dose dates depend on the drug's plan
+            renderBackdate();        // the dose dates depend on the drug's plan
+            renderFirstDoseHint();
             $('detail-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
             renderConfirm();
         }
@@ -1644,6 +1655,21 @@
                 out.push({ doseNo: k, givenAt: at.toISOString() });
             }
             return out;
+        }
+
+        /**
+         * The box starts UNTICKED. Writing the treatment up and giving the dose
+         * are two separate jobs, and a dose recorded that was not given is the
+         * mistake that matters: it starts the withhold clock too early.
+         */
+        function renderFirstDoseHint() {
+            const el = $('first-dose-hint');
+            if (!el) return;
+            const on = $('first-dose').checked;
+            el.innerHTML = on
+                ? 'Dose 1 is recorded as given now.'
+                : 'No dose is recorded. She goes on <b>Doses Today</b> until someone gives it.';
+            renderConfirm();
         }
 
         function renderBackdate() {
@@ -1842,7 +1868,7 @@
             $('quarter-box').innerHTML = '';
             $('backdate-on').checked = false;
             $('backdate-when').value = '';
-            $('first-dose').checked = true;
+            $('first-dose').checked = false;
             setBackdateDoses(true);
             renderBackdate();
             $('cow-search').value = '';
@@ -2359,12 +2385,14 @@
         }
 
         function historyRow(t, i) {
-            const stage = i.stage === 'done'
-                ? (i.meatOk ? 'finished' : 'meat withhold')
-                : { dosing: 'under treatment', withhold: 'milk withhold', ready: 'ready to clear' }[i.stage];
-            const colour = i.stage === 'done'
-                ? (i.meatOk ? 'var(--muted)' : 'var(--orange)')
-                : { dosing: 'var(--red)', withhold: 'var(--red)', ready: 'var(--accent-dark)' }[i.stage];
+            const stage = i.noHold ? 'record only'
+                : i.stage === 'done'
+                    ? (i.meatOk ? 'finished' : 'meat withhold')
+                    : { dosing: 'under treatment', withhold: 'milk withhold', ready: 'ready to clear' }[i.stage];
+            const colour = i.noHold ? 'var(--blue)'
+                : i.stage === 'done'
+                    ? (i.meatOk ? 'var(--muted)' : 'var(--orange)')
+                    : { dosing: 'var(--red)', withhold: 'var(--red)', ready: 'var(--accent-dark)' }[i.stage];
             const q = quartersText(t);
             return `<div class="hrow" onclick="openTreatment('${esc(t.ID)}')" style="cursor:pointer;">
                 <div class="hd">
