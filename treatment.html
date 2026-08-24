@@ -203,6 +203,22 @@
         .tcard .dosebtn { background: #fff !important; color: var(--red-dark) !important; font-size: 17px; padding: 14px 18px; flex: 1 1 100%; }
         .tcard .warn { background: rgba(0, 0, 0, .25); border-radius: 6px; padding: 5px 8px; margin-top: 8px; font-size: 12px; font-weight: 700; }
 
+        /* the daily "she came to the shed" tick */
+        .seen {
+            display: flex; align-items: center; gap: 9px; margin-top: 9px; cursor: pointer;
+            background: rgba(0, 0, 0, .18); border: none; border-radius: 8px;
+            padding: 10px 12px; width: 100%; color: #fff; font-size: 14px; font-weight: 700;
+            font-family: inherit; text-align: left;
+        }
+        .seen .box {
+            width: 24px; height: 24px; flex: 0 0 auto; border-radius: 5px;
+            border: 2px solid rgba(255, 255, 255, .8); display: flex;
+            align-items: center; justify-content: center; font-size: 16px;
+        }
+        .seen.on { background: rgba(255, 255, 255, .95); color: var(--text); }
+        .seen.on .box { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+        .seen small { display: block; font-weight: 400; font-size: 11px; opacity: .8; }
+
         /* ---------- history / tables ---------- */
         .hrow {
             background: #fff; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
@@ -512,7 +528,7 @@
         /* ===================== STATE ===================== */
 
         const state = {
-            cows: [], conditions: [], drugs: [], treatments: [], doses: [],
+            cows: [], conditions: [], drugs: [], treatments: [], doses: [], seen: [],
             managers: '',
             queue: [],
             loaded: false,    // has the sheet answered at least once
@@ -796,6 +812,7 @@
             state.drugs = (data.drugs || []).map(fillOldWithholds);
             state.treatments = (data.treatments || []).map(fillOldWithholds);
             state.doses = data.doses || [];
+            state.seen = data.seen || [];
             state.managers = data.managers || '';
             state.loaded = true;
             state.loadedAt = Date.now();
@@ -1149,6 +1166,59 @@
 
         function sortByTag(a, b) {
             return String(a.t.Tag).localeCompare(String(b.t.Tag), undefined, { numeric: true });
+        }
+
+        /* ================= SEEN IN THE SHED TODAY =================
+         * A cow on withhold has to walk into the shed to be milked separately.
+         * Ticking her off means somebody laid eyes on her today. What matters at
+         * the end of milking is the ones NOT ticked: those are the cows to go and
+         * look for. It is per cow, not per treatment, and it starts again each day.
+         */
+
+        function todayKey(d) {
+            const x = d ? new Date(d) : new Date();
+            return x.getFullYear() + '-' + pad2(x.getMonth() + 1) + '-' + pad2(x.getDate());
+        }
+
+        function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+        function seenRow(cowKey, dayKey) {
+            const id = 'seen-' + (dayKey || todayKey()) + '-' + cowKey;
+            return state.seen.find(s => String(s.ID) === id) || null;
+        }
+
+        function isSeenToday(cowKey) {
+            return !!seenRow(cowKey);
+        }
+
+        function toggleSeen(cowKey) {
+            const now = isSeenToday(cowKey);
+            const day = todayKey();
+
+            // Show it straight away; the sheet answer replaces this a moment later.
+            if (now) {
+                state.seen = state.seen.filter(s => String(s.ID) !== 'seen-' + day + '-' + cowKey);
+            } else {
+                state.seen.push({
+                    ID: 'seen-' + day + '-' + cowKey, Date: day, Cow: cowKey,
+                    SeenBy: whoAmI(), At: new Date().toISOString()
+                });
+            }
+            renderAll();
+            send({ type: 'set_seen', date: day, cow: String(cowKey), seen: !now });
+        }
+
+        /** "12 of 16 seen in the shed today · 4 still to find" */
+        function seenSummary(groups) {
+            if (!groups.length) return '';
+            const seen = groups.filter(g => isSeenToday(g.key)).length;
+            const left = groups.length - seen;
+            return `<div style="margin-top:6px; font-size:13px;">
+                <b>${seen} of ${groups.length}</b> seen in the shed today.
+                ${left
+                    ? `<span style="color:var(--red-dark); font-weight:700;">${left} still to find.</span>`
+                    : '<span style="color:var(--accent-dark); font-weight:700;">All accounted for. ✅</span>'}
+              </div>`;
         }
 
         function quartersText(t) {
@@ -2021,9 +2091,12 @@
             const rows = all.filter(g => matchesCow(g.t, q));
 
             // Doses due today first, then cows ready to clear, then the rest.
+            // Within each, the ones not yet seen come first: those are the job.
             const rank = g => g.due.length ? 0 : (g.stage === 'ready' ? 1 : 2);
             rows.sort((a, b) => {
                 if (rank(a) !== rank(b)) return rank(a) - rank(b);
+                const sa = isSeenToday(a.key), sb = isSeenToday(b.key);
+                if (sa !== sb) return sa ? 1 : -1;
                 if (!!a.missed.length !== !!b.missed.length) return a.missed.length ? -1 : 1;
                 return sortByTag(a, b);
             });
@@ -2034,7 +2107,8 @@
             const head = searchHead(q, rows.length, onList,
                 `<b>${plural(onList, 'cow')}</b> under treatment or milk withhold.
                  ${due ? `<span style="color:var(--red-dark); font-weight:700;"> ${due} need${due === 1 ? 's' : ''} a dose today.</span>` : ' No doses due today.'}
-                 ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`);
+                 ${ready ? `<span style="color:var(--accent-dark); font-weight:700;"> ${ready} ready to clear.</span>` : ''}`
+                + seenSummary(all));
 
             $('treated-body').innerHTML = head + (rows.length
                 ? rows.map(cowCard).join('')
@@ -2075,6 +2149,17 @@
          * whichever withhold finishes LAST, so she cannot go green early just
          * because the first treatment is done.
          */
+        function seenBox(cowKey) {
+            const row = seenRow(cowKey);
+            return `<button class="seen${row ? ' on' : ''}" onclick="toggleSeen('${esc(cowKey)}')">
+                <span class="box">${row ? '✓' : ''}</span>
+                <span>${row ? 'Seen in the shed today' : 'Not seen yet today'}
+                    <small>${row
+                        ? 'ticked ' + fmtDayTime(row.At) + ' by ' + esc(row.SeenBy || '—')
+                        : 'tap when she comes in'}</small></span>
+            </button>`;
+        }
+
         function cowCard(g) {
             const ready = g.stage === 'ready';
             const colour = g.due.length ? 'reddark' : (ready ? 'green' : 'red');
@@ -2102,6 +2187,7 @@
                         ${ready && !g.meatOk ? `<div>Meat withhold runs to <b>${fmtDayTime(g.meatClear)}</b>.</div>` : ''}
                     </div>
                 </div>
+                ${seenBox(g.key)}
                 <div class="acts">
                     ${ready ? `<button class="btn dosebtn" style="color:var(--accent-dark) !important;"
                         onclick="clearCowGroup('${esc(g.key)}')">&#10003; Clear${g.many ? ' all ' + g.list.length : ''}</button>` : ''}
