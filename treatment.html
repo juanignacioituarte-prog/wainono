@@ -217,7 +217,6 @@
         }
         .seen.on { background: rgba(255, 255, 255, .95); color: var(--text); }
         .seen.on .box { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
-        .seen small { display: block; font-weight: 400; font-size: 11px; opacity: .8; }
 
         /* ---------- history / tables ---------- */
         .hrow {
@@ -2153,10 +2152,7 @@
             const row = seenRow(cowKey);
             return `<button class="seen${row ? ' on' : ''}" onclick="toggleSeen('${esc(cowKey)}')">
                 <span class="box">${row ? '✓' : ''}</span>
-                <span>${row ? 'Seen in the shed today' : 'Not seen yet today'}
-                    <small>${row
-                        ? 'ticked ' + fmtDayTime(row.At) + ' by ' + esc(row.SeenBy || '—')
-                        : 'tap when she comes in'}</small></span>
+                <span>${row ? 'Seen today' : 'Not seen yet today'}</span>
             </button>`;
         }
 
