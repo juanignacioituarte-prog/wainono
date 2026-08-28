@@ -2098,10 +2098,65 @@
         }
 
         function matchesCow(t, q) {
-            if (!q) return true;
-            return [t.Tag, t.BirthID, t.EID]
-                .map(v => String(v || '').toLowerCase().replace(/\s/g, ''))
-                .some(v => v && v.indexOf(q) !== -1);
+            return matchRank(t, q, false) >= 0;
+        }
+
+        /*
+         * How close a match this is. Lower is better, -1 is no match.
+         *
+         *   0  the cow number is exactly what was typed
+         *   1  a cow number starts with it
+         *   2  a cow number contains it
+         *   3  it turns up in the condition, drug, notes or a person's name
+         *
+         * Typing 49 used to bring back cow 149, cow 490 and every cow whose EID
+         * happens to contain 49. Now an exact cow number wins outright and the
+         * rest are dropped.
+         */
+        function matchRank(t, q, includeText) {
+            const typed = String(q || '').toLowerCase().trim();
+            if (!typed) return 0;
+
+            // Cow numbers are compared with spaces removed, so a pasted EID like
+            // "942 000048921276" matches. Words keep their spaces, so a search for
+            // "retained membranes" still works.
+            const num = typed.replace(/\s/g, '');
+            const flat = v => String(v === undefined || v === null ? '' : v)
+                .toLowerCase().replace(/\s/g, '');
+
+            let best = -1;
+            const keep = r => { if (best === -1 || r < best) best = r; };
+
+            if (num) {
+                [t.Tag, t.BirthID, t.EID].forEach(v => {
+                    const s = flat(v);
+                    if (!s) return;
+                    if (s === num) keep(0);
+                    else if (s.indexOf(num) === 0) keep(1);
+                    else if (s.indexOf(num) !== -1) keep(2);
+                });
+            }
+
+            if (best === -1 && includeText) {
+                const text = [t.Condition, t.Drug, t.Notes, t.CreatedBy, t._farm]
+                    .map(v => String(v || '').toLowerCase()).join(' ');
+                if (text.indexOf(typed) !== -1) keep(3);
+            }
+            return best;
+        }
+
+        /**
+         * Keep only the closest kind of match. If cow 49 exists, searching "49"
+         * returns her alone, not every cow with 49 somewhere in her numbers.
+         */
+        function bestMatches(rows, q, includeText) {
+            if (!q) return rows;
+            const scored = rows
+                .map(x => ({ x: x, r: matchRank(x.t, q, includeText) }))
+                .filter(s => s.r >= 0);
+            if (!scored.length) return [];
+            const best = Math.min.apply(null, scored.map(s => s.r));
+            return scored.filter(s => s.r === best).map(s => s.x);
         }
 
         /** The header line for a searched list: "2 cows matching "71", of 9". */
@@ -2126,7 +2181,7 @@
 
             const all = openCows().filter(g => g.due.length);
             const q = searchTerm('today-search');
-            const rows = all.filter(g => matchesCow(g.t, q)).sort(sortByTag);
+            const rows = bestMatches(all, q, false).sort(sortByTag);
 
             const doses = all.reduce((n, g) => n + g.due.length, 0);
             const head = searchHead(q, rows.length, all.length, all.length
@@ -2146,7 +2201,7 @@
 
             const all = openCows().filter(g => g.stage === 'ready');
             const q = searchTerm('toclear-search');
-            const rows = all.filter(g => matchesCow(g.t, q))
+            const rows = bestMatches(all, q, false)
                 .sort((a, b) => (a.milkClear || 0) - (b.milkClear || 0));
 
             const head = searchHead(q, rows.length, all.length, all.length
@@ -2167,7 +2222,7 @@
 
             // Typing a cow number jumps straight to her instead of scrolling.
             const q = searchTerm('treated-search');
-            const rows = all.filter(g => matchesCow(g.t, q));
+            const rows = bestMatches(all, q, false);
 
             // Doses due today first, then cows ready to clear, then the rest.
             // Within each, the ones not yet seen come first: those are the job.
@@ -2489,7 +2544,7 @@
             const all = groupByCow(state.treatments.map(t => ({ t, i: info(t) }))
                 .filter(x => !x.i.meatOk && x.i.meatClear));
             const q = searchTerm('meat-search');
-            const rows = all.filter(g => matchesCow(g.t, q))
+            const rows = bestMatches(all, q, false)
                 .sort((a, b) => a.meatClear - b.meatClear);
 
             const head = searchHead(q, rows.length, all.length, `
@@ -2538,13 +2593,9 @@
             let rows = state.treatments.concat(state.otherTreatments)
                 .map(t => ({ t, i: info(t) }));
 
-            if (q) {
-                rows = rows.filter(x => {
-                    const t = x.t;
-                    return [t.Tag, t.BirthID, t.EID, t.Condition, t.Drug, t.Notes, t.CreatedBy, t._farm]
-                        .map(v => String(v || '').toLowerCase()).join(' ').indexOf(q) !== -1;
-                });
-            }
+            // Spaces ignored so a pasted EID matches; text fields searched too, but
+            // only when nothing matches on a cow number.
+            rows = bestMatches(rows, q, true);
             rows.sort((a, b) => (parseDate(b.t.Started) || 0) - (parseDate(a.t.Started) || 0));
 
             const fromOthers = rows.filter(x => x.t._farm).length;
