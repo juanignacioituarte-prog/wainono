@@ -1570,6 +1570,7 @@
                     </div>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:10px;" id="herd-inputs"></div>
+                <div id="herd-total"></div>
             </div>
         </div>
     </div>
@@ -1678,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.88</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.89</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1689,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.88</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.89</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -3374,6 +3375,56 @@
         let pendingHerdDeletes = [];
         let herdListEdited = false;
 
+        /* The cow total under the herd cards.
+         *
+         * Read from the boxes themselves so it moves as soon as a number is
+         * changed. Split by grass and crop, because only the grass cows drive
+         * the rotation - the total on its own does not explain the cow number
+         * on the PLAN screen.
+         */
+        function renderHerdTotal() {
+            const box = document.getElementById('herd-total');
+            if (!box) return;
+
+            let all = 0, grass = 0, crop = 0, milking = 0, dry = 0, herds = 0;
+            BREAK_GROUPS.forEach(g => {
+                if (g.id === 'all') return;
+                const el = document.getElementById(`herd-cows-${g.id}`);
+                if (!el) return;
+                const n = parseFloat(el.value) || 0;
+                herds++;
+                all += n;
+                if (g.on_grass) grass += n;
+                if (g.on_crop && !g.on_grass) crop += n;
+                if (g.is_dry) dry += n; else milking += n;
+            });
+
+            if (herds === 0) { box.innerHTML = ''; return; }
+
+            box.innerHTML = `
+                <div style="margin-top:12px; background:#2c3e50; color:#fff; border-radius:8px; padding:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                        <span style="font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; opacity:.75;">Total cows</span>
+                        <span style="font-size:24px; font-weight:bold;">${all.toLocaleString()}</span>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:10px;">
+                        <div style="flex:1; background:rgba(39,174,96,0.22); border:1px solid rgba(39,174,96,0.55); border-radius:6px; padding:7px 8px;">
+                            <div style="font-size:10px; text-transform:uppercase; opacity:.8;">In milk</div>
+                            <div style="font-size:18px; font-weight:bold;">${milking.toLocaleString()}</div>
+                        </div>
+                        <div style="flex:1; background:rgba(230,126,34,0.22); border:1px solid rgba(230,126,34,0.55); border-radius:6px; padding:7px 8px;">
+                            <div style="font-size:10px; text-transform:uppercase; opacity:.8;">Dry</div>
+                            <div style="font-size:18px; font-weight:bold;">${dry.toLocaleString()}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.2); font-size:12px;">
+                        <span>On grass <b>${grass.toLocaleString()}</b></span>
+                        <span style="opacity:.85;">On crop <b>${crop.toLocaleString()}</b></span>
+                        <span style="opacity:.6;">${herds} herd${herds === 1 ? '' : 's'}</span>
+                    </div>
+                </div>`;
+        }
+
         function saveHerdSettings() {
             herdListEdited = true;
             localStorage.setItem('custom_herds', JSON.stringify(BREAK_GROUPS));
@@ -3831,6 +3882,7 @@
                 custom_crop_feed: 4,
                 custom_crop_paddock: null,
                 is_oad: false,
+                is_dry: false,
                 m2_per_cow: null,
                 mag_on: false,
                 mag_g: null,
@@ -5353,7 +5405,12 @@
                             <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
                                 <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crop
                             </label>
-                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer; margin-left:auto; background:#fff; padding:2px 6px; border:1px solid #ddd; border-radius:4px;">
+                            <select onchange="updateCustomHerd('${g.id}', 'is_dry', this.value === 'dry')"
+                                style="margin-left:auto; padding:3px 6px; border:1px solid ${g.is_dry ? '#e67e22' : '#27ae60'}; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer; background:#fff; color:${g.is_dry ? '#e67e22' : '#27ae60'};">
+                                <option value="milk" ${g.is_dry ? '' : 'selected'}>In milk</option>
+                                <option value="dry" ${g.is_dry ? 'selected' : ''}>Dry</option>
+                            </select>
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer; background:#fff; padding:2px 6px; border:1px solid #ddd; border-radius:4px;">
                                 <input type="checkbox" ${g.is_oad ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'is_oad', this.checked)"> OAD
                             </label>
                         </div>
@@ -5415,6 +5472,7 @@
                 });
             }
             updateEditGroupSelect();
+            renderHerdTotal();
             renderSilage();
             calculateFeedLogic();
         }
@@ -7290,6 +7348,7 @@
                 localStorage.setItem('herd_cow_numbers', JSON.stringify(herdCows));
                 localStorage.setItem('herd_in_crops', JSON.stringify(cropHerds));
             }
+            renderHerdTotal();
             calculateFeedLogic();
             if (!quiet) triggerAutoSave();
         }
