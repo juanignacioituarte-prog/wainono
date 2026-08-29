@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.89</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.90</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.89</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.90</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -5405,11 +5405,14 @@
                             <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer;">
                                 <input type="checkbox" ${g.on_crop ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'on_crop', this.checked)"> On Crop
                             </label>
-                            <select onchange="updateCustomHerd('${g.id}', 'is_dry', this.value === 'dry')"
-                                style="margin-left:auto; padding:3px 6px; border:1px solid ${g.is_dry ? '#e67e22' : '#27ae60'}; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer; background:#fff; color:${g.is_dry ? '#e67e22' : '#27ae60'};">
-                                <option value="milk" ${g.is_dry ? '' : 'selected'}>In milk</option>
-                                <option value="dry" ${g.is_dry ? 'selected' : ''}>Dry</option>
-                            </select>
+                            <!-- One or the other, never both: each box writes the
+                                 value outright, and the redraw unticks the other. -->
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; cursor:pointer; margin-left:auto; background:#fff; padding:2px 6px; border:1px solid ${g.is_dry ? '#ddd' : '#27ae60'}; border-radius:4px; color:${g.is_dry ? '#555' : '#27ae60'};">
+                                <input type="checkbox" ${g.is_dry ? '' : 'checked'} onchange="updateCustomHerd('${g.id}', 'is_dry', false)"> In milk
+                            </label>
+                            <label style="display:flex; align-items:center; gap:4px; font-weight:600; cursor:pointer; background:#fff; padding:2px 6px; border:1px solid ${g.is_dry ? '#e67e22' : '#ddd'}; border-radius:4px; color:${g.is_dry ? '#e67e22' : '#555'};">
+                                <input type="checkbox" ${g.is_dry ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'is_dry', true)"> Dry
+                            </label>
                             <label style="display:flex; align-items:center; gap:4px; font-weight:600; color:#555; cursor:pointer; background:#fff; padding:2px 6px; border:1px solid #ddd; border-radius:4px;">
                                 <input type="checkbox" ${g.is_oad ? 'checked' : ''} onchange="updateCustomHerd('${g.id}', 'is_oad', this.checked)"> OAD
                             </label>
