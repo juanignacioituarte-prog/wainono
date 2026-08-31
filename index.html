@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.90</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.91</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.90</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.91</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1934,6 +1934,14 @@
                     <option value="6">Sat - Fri</option>
                 </select>
             </div>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#2c3e50; margin-bottom:4px; cursor:pointer;">
+                <input type="checkbox" id="report-count-once" checked onchange="renderWeeklyReport()">
+                Count ground grazed twice only once
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:#2c3e50; margin-bottom:6px; cursor:pointer;">
+                <input type="checkbox" id="report-skip-crop" checked onchange="renderWeeklyReport()">
+                Leave out crop breaks
+            </label>
             <p style="font-size:10px; color:#95a5a6; margin-top:0; margin-bottom:10px;">Tap any week to isolate its breaks on the map.</p>
             <div id="weekly-report-content"></div>
         </div>
@@ -9629,6 +9637,33 @@
             list.innerHTML = html;
         }
 
+        /* The ground a set of breaks covers, counting overlap once.
+         *
+         * Returns null if the map tool did not load, so the caller falls back
+         * to plain adding rather than showing a wrong number.
+         */
+        function unionBreakAreaHa(breaks) {
+            if (!hasClipper()) return null;
+            const polys = [];
+            (breaks || []).forEach(b => {
+                const v = b.vertices || [];
+                if (v.length < 3) return;
+                const ring = v.map(pt => [pt.lng, pt.lat]);
+                ring.push([ring[0][0], ring[0][1]]);
+                polys.push([ring]);
+            });
+            if (polys.length === 0) return 0;
+            try {
+                const joined = polys.length === 1
+                    ? [polys[0]]
+                    : polygonClipping.union(polys[0], ...polys.slice(1));
+                return multiPolygonAreaHa(joined);
+            } catch (e) {
+                console.error("Could not join the breaks, adding them instead:", e);
+                return null;
+            }
+        }
+
         function renderWeeklyReport() {
             const container = document.getElementById('weekly-report-content');
             if (!container) return;
@@ -9652,9 +9687,14 @@
             
             const weeks = {};
             
+            // Crop breaks are fed, not grazed off the rotation, so they are left
+            // out of the area walked unless asked for.
+            const skipCrop = document.getElementById('report-skip-crop')?.checked !== false;
+
             savedBreaks.forEach(b => {
                 if (b.group === 'crops' || !b.createdAt || b.isDeleted) return;
-                
+                if (skipCrop && b.isCropBreak) return;
+
                 const d = new Date(b.createdAt);
                 
                 // Find most recent target day
@@ -9672,12 +9712,33 @@
                         start: weekStart,
                         end: weekEnd,
                         totalArea: 0,
-                        breakCount: 0
+                        breakCount: 0,
+                        breaks: [],
+                        overlapHa: 0
                     };
                 }
                 weeks[key].totalArea += b.areaHa;
                 weeks[key].breakCount++;
+                weeks[key].breaks.push(b);
             });
+
+            /* Ground grazed twice should count once.
+             *
+             * A mob tidying up after another covers the same ground again, and
+             * adding both breaks makes the week look bigger than the farm. The
+             * shapes are joined into one and that is measured, so overlap is
+             * counted once and strip grazing down a paddock still adds up
+             * normally, because those breaks do not overlap. */
+            const countOnce = document.getElementById('report-count-once')?.checked !== false;
+            if (countOnce) {
+                Object.keys(weeks).forEach(k => {
+                    const joined = unionBreakAreaHa(weeks[k].breaks);
+                    if (joined !== null) {
+                        weeks[k].overlapHa = Math.max(0, weeks[k].totalArea - joined);
+                        weeks[k].totalArea = joined;
+                    }
+                });
+            }
             
             const sortedKeys = Object.keys(weeks).map(Number).sort((a,b) => b - a);
             
@@ -9705,7 +9766,7 @@
                     html += `<div style="background:${bg}; display:flex; justify-content:space-between; align-items:center; padding:${pad}; border-bottom:${border}; cursor:pointer; transition:background 0.2s;" onclick="viewWeeklyReportBreaks(${w.start.getTime()}, ${w.end.getTime()})">
                         <div>
                             <div style="font-weight:bold; color:#2c3e50; font-size:14px;">${p1} - ${p2}</div>
-                            <div style="font-size:11px; color:#95a5a6; margin-top:3px;">${w.breakCount} break${w.breakCount!==1?'s':''}</div>
+                            <div style="font-size:11px; color:#95a5a6; margin-top:3px;">${w.breakCount} break${w.breakCount!==1?'s':''}${w.overlapHa > 0.005 ? ` &middot; <span style="color:#e67e22;">${w.overlapHa.toFixed(2)} ha grazed twice</span>` : ''}</div>
                         </div>
                         <div style="text-align:right;">
                             <div style="font-weight:bold; color:var(--accent); font-size:18px;">${w.totalArea.toFixed(2)} <span style="font-size:11px; font-weight:normal; color:#7f8c8d;">ha</span></div>
