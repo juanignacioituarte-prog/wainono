@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.91</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.92</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.91</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.92</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1943,6 +1943,7 @@
                 Leave out crop breaks
             </label>
             <p style="font-size:10px; color:#95a5a6; margin-top:0; margin-bottom:10px;">Tap any week to isolate its breaks on the map.</p>
+            <div id="report-range-summary"></div>
             <div id="weekly-report-content"></div>
         </div>
         <!-- Health & Safety Panel -->
@@ -9664,6 +9665,46 @@
             }
         }
 
+        /* Totals for whichever period is showing on the map.
+         *
+         * Joined over the whole period, not week by week, so a paddock grazed
+         * on the 10th and tidied up on the 19th counts once. That is the case
+         * the weekly rows cannot catch, because those two dates fall in
+         * different weeks.
+         */
+        function renderRangeSummary(skipCrop, countOnce) {
+            const box = document.getElementById('report-range-summary');
+            if (!box) return;
+            if (!weeklyFilterRange) { box.innerHTML = ''; return; }
+
+            const list = savedBreaks.filter(b => {
+                if (b.group === 'crops' || !b.createdAt || b.isDeleted) return false;
+                if (skipCrop && b.isCropBreak) return false;
+                const t = new Date(b.createdAt).getTime();
+                return t >= weeklyFilterRange.start && t < weeklyFilterRange.end;
+            });
+
+            const added = list.reduce((s, b) => s + (b.areaHa || 0), 0);
+            const joined = countOnce ? unionBreakAreaHa(list) : null;
+            const twice = (joined === null) ? 0 : Math.max(0, added - joined);
+            const shown = (joined === null) ? added : joined;
+
+            const s = new Date(weeklyFilterRange.start).toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' });
+            const e = new Date(weeklyFilterRange.end - 86400000).toLocaleDateString('en-NZ', { month: 'short', day: 'numeric' });
+
+            box.innerHTML = `
+                <div style="background:#fff3e0; border:1px solid #ffb74d; border-radius:8px; padding:12px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                        <span style="font-size:12px; font-weight:bold; color:#e67e22;">${s} to ${e}</span>
+                        <span style="font-size:20px; font-weight:bold; color:#2c3e50;">${shown.toFixed(2)} <span style="font-size:11px; font-weight:normal; color:#7f8c8d;">ha</span></span>
+                    </div>
+                    <div style="font-size:11px; color:#7f8c8d; margin-top:4px;">
+                        ${list.length} break${list.length === 1 ? '' : 's'}
+                        ${twice > 0.005 ? ` &middot; <b style="color:#e67e22;">${twice.toFixed(2)} ha grazed twice, counted once</b>` : ''}
+                    </div>
+                </div>`;
+        }
+
         function renderWeeklyReport() {
             const container = document.getElementById('weekly-report-content');
             if (!container) return;
@@ -9740,6 +9781,15 @@
                 });
             }
             
+            /* The chosen period, joined across the whole of it.
+             *
+             * The weekly rows join each week on its own, so a paddock grazed on
+             * the 10th and again on the 19th counts in both - two different
+             * weeks, each correct for itself. Over a period the same ground
+             * should count once, and that is what this shows.
+             */
+            renderRangeSummary(skipCrop, countOnce);
+
             const sortedKeys = Object.keys(weeks).map(Number).sort((a,b) => b - a);
             
             if (sortedKeys.length === 0) {
