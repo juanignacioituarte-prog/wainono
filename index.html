@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.94</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.95</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.94</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.95</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4365,46 +4365,36 @@
                             }
                         }
 
-                        // Merge locally saved entry if newer
+                        /* The sheet is the record. This cache is only a safety net.
+                         *
+                         * wn_cached_manual_data holds a snapshot of the whole
+                         * farm taken whenever this device last saved, and it is
+                         * never cleared. It used to be merged over the sheet on
+                         * every load, so each device kept showing its own old
+                         * snapshot: two phones and the computer all disagreed
+                         * about the same paddock, one missing a latest cover,
+                         * another missing the growth.
+                         *
+                         * It is now used for one thing only - a reading typed on
+                         * this device that has not reached the sheet yet. The
+                         * moment the sheet has that day for that paddock, the
+                         * cached copy is ignored.
+                         */
                         const localItem = localSavedData[norm];
                         if (localItem && localItem.latest && localItem.latest.ts) {
-                            if (!lDate || localItem.latest.ts >= lDate.getTime()) {
-                                if (lDate && (!pDate || lDate.getTime() > (pDate ? pDate.getTime() : 0))) {
-                                    pDate = lDate;
-                                    prevCover = latestCover;
-                                }
+                            const localDay = new Date(localItem.latest.ts).toDateString();
+                            const sheetHasThatDay = (p.entries || [])
+                                .some(e => e.dateObj && e.dateObj.toDateString() === localDay);
+                            const newerThanSheet = !lDate || localItem.latest.ts > lDate.getTime();
+
+                            if (!sheetHasThatDay && newerThanSheet) {
+                                // today's reading, still only on this phone
+                                if (lDate) { pDate = lDate; prevCover = latestCover; }
                                 latestCover = localItem.latest.cover;
-                                /* Use the timestamp, never the printed date.
-                                 *
-                                 * formattedDate is display text with no year -
-                                 * "3 Sept" - and parsing that back gives 3
-                                 * September 2001. Every paddock then looked
-                                 * older than the newest walk, so the whole farm
-                                 * read as not walked: yellow map, average 0,
-                                 * growth 0. */
                                 lDate = new Date(localItem.latest.ts);
                                 if (localItem.reason !== undefined) reason = localItem.reason;
                             }
-                            /* A cover and its date have to move together.
-                             *
-                             * This used to take the previous cover from the
-                             * phone's cache and leave the date alone, so a
-                             * paddock showed a previous cover from three weeks
-                             * back dated the same day as the latest one. It also
-                             * ran even when the cached copy was older than the
-                             * sheet, letting a stale phone overwrite the real
-                             * number. Now it is only used when it is dated and
-                             * genuinely newer than what the sheet has. */
-                            if (localItem.previous && localItem.previous.cover !== undefined) {
-                                const lp = localItem.previous;
-                                // Only the timestamp, for the same reason as above.
-                                const lpDate = lp.ts ? new Date(lp.ts) : null;
-                                if (lpDate && !isNaN(lpDate.getTime()) &&
-                                    (!pDate || lpDate.getTime() > pDate.getTime())) {
-                                    pDate = lpDate;
-                                    prevCover = lp.cover;
-                                }
-                            }
+                            // The previous cover always comes from the sheet.
                         }
 
                         const isOut = (latestCover === 0);
