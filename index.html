@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.92</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.93</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.92</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.93</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4562,15 +4562,45 @@
          *
          * Sets the entry date to that day and opens entry mode, which fills in
          * the covers already recorded for it. The blanks are what is left. */
+        /* yyyy-mm-dd for a date input, in local time.
+         *
+         * toISOString would do this in UTC, and New Zealand is twelve hours
+         * ahead, so local midnight on the 21st comes back as the 20th. That put
+         * the wrong day in the box and the prefill then found no covers. */
+        function toDateInputValue(d) {
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
+
         function continueFarmwalk(key) {
             const d = new Date(key);
             fwHistoryEditKey = null;
             clearFarmwalkDraft();                     // start from what the sheet has
             switchDashboardMode('manual');
             const dateInp = document.getElementById('farmwalk-entry-date');
-            if (dateInp) dateInp.value = d.toISOString().split('T')[0];
-            if (!isFarmwalkEntryActive) toggleFarmwalkEntryMode();
-            else { renderDashboard(); updateFarmwalkProgress(); }
+            if (dateInp) dateInp.value = toDateInputValue(d);
+
+            if (!isFarmwalkEntryActive) {
+                toggleFarmwalkEntryMode();            // prefills on the way in
+            } else {
+                prefillFarmwalkFromSheet();           // already open: fill it here
+                renderDashboard();
+                updateFarmwalkProgress();
+            }
+        }
+
+        /* Fill the boxes with the covers already on the sheet for this date, so
+         * the blanks are the paddocks still to walk. */
+        function prefillFarmwalkFromSheet() {
+            const key = farmwalkEntryDateObj().toDateString();
+            let found = 0;
+            manualModeData.forEach(p => {
+                if (farmwalkDraft[p.name] !== undefined) return;   // typed here wins
+                const e = (p.entries || []).find(x => x.dateObj && x.dateObj.toDateString() === key);
+                if (e && e.cover > 0) { farmwalkDraft[p.name] = String(e.cover); found++; }
+            });
+            try { localStorage.setItem('wn_farmwalk_draft', JSON.stringify(farmwalkDraft)); } catch (e) {}
+            return found;
         }
 
         async function deleteFarmwalk(key) {
@@ -4907,7 +4937,7 @@
                 if (dateInp) {
                     dateInp.style.display = 'inline-block';
                     if (!dateInp.value) {
-                        dateInp.value = new Date().toISOString().split('T')[0];
+                        dateInp.value = toDateInputValue(new Date());
                     }
                 }
                 if (btnSaveAll) btnSaveAll.style.display = 'inline-block';
@@ -4916,14 +4946,7 @@
 
                 // Continuing a walk: show what is already on the sheet for this
                 // date, so the blanks are the paddocks still to do.
-                const dObj = farmwalkEntryDateObj();
-                const key = dObj.toDateString();
-                manualModeData.forEach(p => {
-                    if (farmwalkDraft[p.name] !== undefined) return;   // typed here wins
-                    const e = (p.entries || []).find(x => x.dateObj && x.dateObj.toDateString() === key);
-                    if (e && e.cover > 0) farmwalkDraft[p.name] = String(e.cover);
-                });
-                try { localStorage.setItem('wn_farmwalk_draft', JSON.stringify(farmwalkDraft)); } catch (e) {}
+                prefillFarmwalkFromSheet();
             } else {
                 const prog = document.getElementById('farmwalk-progress');
                 if (prog) prog.style.display = 'none';
@@ -4940,7 +4963,7 @@
 
         async function saveEntireFarmwalk() {
             const btnSave = document.getElementById('btn-save-farmwalk-all');
-            const dateVal = document.getElementById('farmwalk-entry-date')?.value || new Date().toISOString().split('T')[0];
+            const dateVal = document.getElementById('farmwalk-entry-date')?.value || toDateInputValue(new Date());
             const dateObj = new Date(dateVal + 'T12:00:00');
 
             const entriesToSave = [];
@@ -5076,7 +5099,7 @@
         }
 
         async function savePaddockCover(pName, coverOverride, reasonOverride) {
-            const dateVal = document.getElementById('farmwalk-entry-date')?.value || new Date().toISOString().split('T')[0];
+            const dateVal = document.getElementById('farmwalk-entry-date')?.value || toDateInputValue(new Date());
             let coverVal = (coverOverride !== undefined) ? coverOverride : parseFloat(document.getElementById(`inp-cover-${pName}`)?.value);
             if (isNaN(coverVal)) coverVal = 0;
 
@@ -10626,7 +10649,7 @@
                     document.getElementById('hs-staff-phone').value = s.phone || '';
                     document.getElementById('hs-staff-emergency').value = s.emergencyContact || '';
                     document.getElementById('hs-staff-allergies').value = s.allergies || '';
-                    document.getElementById('hs-staff-induction').value = s.inductionDate || new Date().toISOString().split('T')[0];
+                    document.getElementById('hs-staff-induction').value = s.inductionDate || toDateInputValue(new Date());
                     
                     // Parse training summary string back to temp list
                     tempStaffTrainings = [];
@@ -10642,7 +10665,7 @@
                             } else if (p.trim() !== "") {
                                 tempStaffTrainings.push({
                                     course: p.trim(),
-                                    date: new Date().toISOString().split('T')[0]
+                                    date: toDateInputValue(new Date())
                                 });
                             }
                         });
@@ -10678,7 +10701,7 @@
                     document.getElementById('hs-staff-phone').value = '';
                     document.getElementById('hs-staff-emergency').value = '';
                     document.getElementById('hs-staff-allergies').value = '';
-                    document.getElementById('hs-staff-induction').value = new Date().toISOString().split('T')[0];
+                    document.getElementById('hs-staff-induction').value = toDateInputValue(new Date());
                     
                     tempStaffTrainings = [];
                     renderTempTrainings();
@@ -10727,7 +10750,7 @@
                     s.phone = phone || '';
                     s.emergencyContact = emergency || '';
                     s.allergies = allergies || '';
-                    s.inductionDate = induction || new Date().toISOString().split('T')[0];
+                    s.inductionDate = induction || toDateInputValue(new Date());
                     s.training = tempStaffTrainings.map(t => `${t.course} (${t.date})`).join(', ');
                 } else {
                     // Standard user editing their own profile: update only basic info
@@ -10752,7 +10775,7 @@
                     emergencyContact: emergency || '',
                     allergies: allergies || '',
                     training: trainingSummary,
-                    inductionDate: induction || new Date().toISOString().split('T')[0],
+                    inductionDate: induction || toDateInputValue(new Date()),
                     status: 'active'
                 };
                 hsStaff.push(newStaff);
@@ -11378,7 +11401,7 @@
             }
             
             if (form.style.display === 'block') {
-                document.getElementById('hs-meeting-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('hs-meeting-date').value = toDateInputValue(new Date());
                 document.getElementById('hs-meeting-topic').value = '';
                 document.getElementById('hs-meeting-notes').value = '';
                 
@@ -11416,7 +11439,7 @@
             
             const newMeeting = {
                 id: 'meeting_' + Date.now(),
-                date: date || new Date().toISOString().split('T')[0],
+                date: date || toDateInputValue(new Date()),
                 topic: topic,
                 attendees: attendees,
                 notes: notes || ''
@@ -11482,7 +11505,7 @@
             }
             
             if (form.style.display === 'block') {
-                document.getElementById('hs-interaction-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('hs-interaction-date').value = toDateInputValue(new Date());
                 document.getElementById('hs-interaction-details').value = '';
                 document.getElementById('hs-interaction-action').value = '';
                 
@@ -11534,7 +11557,7 @@
             
             const newLog = {
                 id: 'inter_' + Date.now(),
-                date: date || new Date().toISOString().split('T')[0],
+                date: date || toDateInputValue(new Date()),
                 observerId: observer,
                 observedId: observed,
                 type: type,
@@ -11606,7 +11629,7 @@
             }
             
             if (form.style.display === 'block') {
-                document.getElementById('hs-incident-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('hs-incident-date').value = toDateInputValue(new Date());
                 const now = new Date();
                 const timeString = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
                 document.getElementById('hs-incident-time').value = timeString;
@@ -11659,7 +11682,7 @@
             
             const newIncident = {
                 id: 'inc_' + Date.now(),
-                date: date || new Date().toISOString().split('T')[0],
+                date: date || toDateInputValue(new Date()),
                 time: time || '00:00',
                 reporter: reporter,
                 type: type,
@@ -12227,7 +12250,7 @@
             if (!vehicle) return;
 
             document.getElementById('vm-modal-title').innerText = `🔧 ${vehicle.name} – Service Check`;
-            document.getElementById('vm-service-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('vm-service-date').value = toDateInputValue(new Date());
             document.getElementById('vm-service-notes').value = '';
 
             // Populate performer dropdown from H&S staff list
@@ -12274,7 +12297,7 @@
             const vehicle = vmVehicles.find(v => v.id === vehicleId);
             if (!vehicle) return;
 
-            const date = document.getElementById('vm-service-date').value || new Date().toISOString().split('T')[0];
+            const date = document.getElementById('vm-service-date').value || toDateInputValue(new Date());
             const performedBy = document.getElementById('vm-service-performer').value || 'Unknown';
             const notes = document.getElementById('vm-service-notes').value.trim();
 
