@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.96</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.97</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.96</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.97</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -1756,6 +1756,11 @@
             </div>
 
             <input type="text" id="search" placeholder="Search paddocks..." style="margin-top:8px;">
+            <div id="sort-bar" style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; color:#7f8c8d;">
+                <span style="font-weight:600;">Sort by</span>
+                <button id="sort-cover" onclick="setPaddockSort('cover')" style="padding:4px 12px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid #27ae60;">COVER</button>
+                <button id="sort-growth" onclick="setPaddockSort('growth')" style="padding:4px 12px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid #27ae60;">GROWTH</button>
+            </div>
         </div>
         <div id="list">Loading data...</div>
 
@@ -4435,6 +4440,31 @@
 
         let isFarmwalkEntryActive = false;
 
+        // How the paddock list is ranked. Cover is the default; entering a walk
+        // overrides both and follows the route.
+        let paddockSortMode = 'cover';
+
+        function setPaddockSort(mode) {
+            paddockSortMode = (mode === 'growth') ? 'growth' : 'cover';
+            renderPaddockSortButtons();
+            renderDashboard();
+        }
+
+        function renderPaddockSortButtons() {
+            const c = document.getElementById('sort-cover');
+            const g = document.getElementById('sort-growth');
+            if (!c || !g) return;
+            const on = (b, active) => {
+                b.style.background = active ? '#27ae60' : '#fff';
+                b.style.color = active ? '#fff' : '#27ae60';
+            };
+            on(c, paddockSortMode === 'cover');
+            on(g, paddockSortMode === 'growth');
+            // The route decides the order while a walk is being entered.
+            const bar = document.getElementById('sort-bar');
+            if (bar) bar.style.opacity = isFarmwalkEntryActive ? 0.4 : 1;
+        }
+
         /* ===== FARMWALK ROUTE =====
          * Filled by the CSV parser: every walk date, and the paddocks in the
          * order their rows sit in the sheet, which is the order they were
@@ -5940,6 +5970,9 @@
             document.getElementById('roster-view').style.display = (mode === 'roster') ? 'block' : 'none';
             document.getElementById('vehicle-maintenance-view').style.display = (mode === 'vehicle_maintenance') ? 'block' : 'none';
             document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
+            // Sorting only means something where paddock cards are listed.
+            const sortBar = document.getElementById('sort-bar');
+            if (sortBar) sortBar.style.display = (mode === 'satellite' || mode === 'manual') ? 'flex' : 'none';
 
             const farmConfigView = document.getElementById('farm-config-view');
             if (farmConfigView) farmConfigView.style.display = (mode === 'farm_config') ? 'block' : 'none';
@@ -6766,6 +6799,8 @@
             const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
             const scoped = activeUnit ? data.filter(p => unitHasPaddock(activeUnit, p.name)) : data;
 
+            const walkInfo = latestWalkInfo(scoped);
+
             /* Entering a walk follows the route, not the cover. Ranking by cover
              * reshuffles the list as soon as a number is typed, which moves the
              * card you are standing in front of. Everywhere else still ranks by
@@ -6779,6 +6814,19 @@
                     const ra = rank[normName(a.name)], rb = rank[normName(b.name)];
                     return (ra === undefined ? far : ra) - (rb === undefined ? far : rb);
                 });
+            } else if (paddockSortMode === 'growth') {
+                /* Highest growth first. A paddock with no comparable growth has
+                 * nothing to rank on, so those go to the bottom rather than
+                 * being treated as zero and mixed in with the slow ones. */
+                sorted.sort((a, b) => {
+                    if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
+                    const ga = growthIsComparable(a, walkInfo) && a.growthRate != null ? a.growthRate : null;
+                    const gb = growthIsComparable(b, walkInfo) && b.growthRate != null ? b.growthRate : null;
+                    if (ga === null && gb === null) return b.latest.cover - a.latest.cover;
+                    if (ga === null) return 1;
+                    if (gb === null) return -1;
+                    return gb - ga;
+                });
             } else {
                 sorted.sort((a, b) => {
                     if (a.isOut !== b.isOut) return a.isOut ? 1 : -1;
@@ -6786,9 +6834,10 @@
                 });
             }
 
-            const walkInfo = latestWalkInfo(scoped);
             const maxTs = walkInfo.maxTs;
             const isPartialWalk = (currentDashboardMode === 'manual' && walkInfo.isPartial);
+
+            renderPaddockSortButtons();
 
             const list = document.getElementById('list'); list.innerHTML = "";
 
