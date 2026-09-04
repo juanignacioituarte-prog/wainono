@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.95</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.96</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.95</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.96</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4837,12 +4837,25 @@
             let p = manualModeData.find(d => d.name === pName);
             if (!p) return;
 
+            /* Send a real date, never the printed one.
+             *
+             * This used to send formattedDate, which is display text with no
+             * year - "3 Sept", "21 Aug". Those went into the sheet's Date
+             * column as-is and came back as the year 2001. A reading with no
+             * timestamp is skipped rather than written with a guess. */
+            const sheetDate = ts => {
+                const d = new Date(ts);
+                return isNaN(d.getTime()) ? null : `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+            };
+
             const entries = [];
-            if (p.latest && p.latest.cover !== undefined && p.latest.formattedDate !== 'None') {
-                entries.push({ date: p.latest.formattedDate, paddock: p.name, cover: p.latest.cover, reason: p.reason || '' });
+            if (p.latest && p.latest.cover !== undefined && p.latest.ts) {
+                const ds = sheetDate(p.latest.ts);
+                if (ds) entries.push({ date: ds, paddock: p.name, cover: p.latest.cover, reason: p.reason || '' });
             }
-            if (p.previous && p.previous.cover !== undefined && p.previous.formattedDate !== 'None') {
-                entries.push({ date: p.previous.formattedDate, paddock: p.name, cover: p.previous.cover, reason: '' });
+            if (p.previous && p.previous.cover !== undefined && p.previous.ts) {
+                const ds = sheetDate(p.previous.ts);
+                if (ds) entries.push({ date: ds, paddock: p.name, cover: p.previous.cover, reason: '' });
             }
 
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
