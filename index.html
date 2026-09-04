@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.97</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.98</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.97</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.98</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -4910,12 +4910,25 @@
             let p = manualModeData.find(d => d.name === pName);
             if (!p) return;
 
-            const entries = (p.entries || []).map(e => ({
-                date: fmtNZ(e.dateObj),
-                paddock: p.name,
-                cover: e.cover,
-                reason: e.reason || ''
-            }));
+            /* Send the real date so the edit replaces the original row.
+             *
+             * This sent fmtNZ - "21 Aug", with no year. The sheet could not tie
+             * that to the row it came from, so editing a previous cover left the
+             * old row and added another, and the app then read the new one as
+             * the year 2001. L2 ended up with two "21 Aug" rows and no growth.
+             *
+             * An entry with no usable date is dropped rather than written with a
+             * guessed one. */
+            const entries = (p.entries || []).map(e => {
+                const d = e.dateObj;
+                if (!d || isNaN(d.getTime())) return null;
+                return {
+                    date: `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`,
+                    paddock: p.name,
+                    cover: e.cover,
+                    reason: e.reason || ''
+                };
+            }).filter(Boolean);
 
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                 try {
