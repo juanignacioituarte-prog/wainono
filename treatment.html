@@ -14,6 +14,7 @@
     <link rel="manifest" href="treatment-wn.webmanifest">
     <!-- END ICONS -->
     <title>Wainono | Cow Treatments</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         :root {
             --accent: #2ecc71;
@@ -271,6 +272,24 @@
         #draft-bar .info b { font-size: 16px; display: block; opacity: 1; }
         body.drafting { padding-bottom: 84px; }
 
+        /* ---------- the sign-in screen, over everything until we know who you are ---------- */
+        #login {
+            position: fixed; inset: 0; z-index: 900; background: var(--bg);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 24px; text-align: center;
+        }
+        #login img { width: 108px; border-radius: 24px; margin-bottom: 18px; }
+        #login h2 { margin: 0 0 4px; font-size: 20px; }
+        #login .sub { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
+        #login .box { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.1); max-width: 340px; width: 100%; }
+        #login .note { font-size: 13px; color: var(--muted); margin-top: 16px; max-width: 340px; line-height: 1.5; }
+        #login .bad {
+            background: #fdecea; border: 1px solid var(--red); color: var(--red-dark);
+            border-radius: 10px; padding: 14px; margin-top: 16px; font-size: 14px;
+            max-width: 340px; width: 100%; text-align: left; line-height: 1.6;
+        }
+        #login .bad code { background: rgba(0,0,0,.07); padding: 1px 5px; border-radius: 4px; word-break: break-all; }
+
         #toast {
             position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px;
             background: #2c3e50; color: #fff; padding: 11px 16px; border-radius: 8px;
@@ -473,6 +492,23 @@
 
     </div>
 
+    <div id="login">
+        <img src="icon-wn-192.png" alt="">
+        <h2 id="login-farm">Cow Treatments</h2>
+        <p class="sub">Sign in so every dose has a name on it.</p>
+        <div class="box">
+            <div id="g_id_onload"
+                 data-client_id="299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com"
+                 data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
+            <div class="g_id_signin" data-type="standard" data-size="large"
+                 data-theme="outline" data-text="sign_in_with" data-shape="rectangular"
+                 data-logo_alignment="left"></div>
+            <div id="login-busy" class="muted hidden" style="margin-top:12px;">Checking…</div>
+        </div>
+        <div id="login-bad" class="bad hidden"></div>
+        <p class="note" id="login-note">Use the same Google account you use for the farm app.</p>
+    </div>
+
     <div id="draft-bar" class="hidden">
         <div class="inner">
             <div class="info" id="draft-info"></div>
@@ -517,7 +553,8 @@
          */
         const LS = {
             queue: 'treat_queue_' + FARM.key,
-            name: 'treat_user_name',            // the same person on both farms
+            // auth_email and auth_name are shared with the main farm app and with
+            // the other farm's page: it is the same person signing in to all of them.
             cows: 'treat_cows_' + FARM.key
         };
 
@@ -699,24 +736,158 @@
             return n + ' ' + word + (n === 1 ? '' : 's');
         }
 
+        /* ===================== WHO IS USING THE APP =====================
+         *
+         * Everything recorded here carries a name: who started a treatment, who
+         * gave each dose, who cleared a cow. That name is worth nothing if anyone
+         * can type it, so the app now asks people to sign in with Google and
+         * checks them against the farm's list of authorised users.
+         *
+         * The list is a published sheet with no header row:
+         *
+         *     email , name , role
+         *
+         * The NAME on every record comes from that list, not from anything typed
+         * on the phone. A role of "manager" in the third column is what opens the
+         * ⚙ Config tab, backdating, and the other manager-only actions. One list,
+         * edited in one place, for both farms.
+         */
+        const AUTH_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSS16sZX7c152J7kK9dFzeXg6UwDfsj4GKOYsfwTt2B2jakqUk2mdNm-JhQi56TtVKeVNlGW9IllUIs/pub?gid=1351321649&single=true&output=csv';
+
+        function parseJwt(token) {
+            const part = token.split('.')[1];
+            const json = decodeURIComponent(atob(part.replace(/-/g, '+').replace(/_/g, '/'))
+                .split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+            return JSON.parse(json);
+        }
+
+        /** Read the authorised list: email, name, role. */
+        async function readAuthList() {
+            const res = await fetch(AUTH_CSV_URL + '&t=' + Date.now(), { cache: 'no-store' });
+            const rows = parseCsv(await res.text());
+            const people = {};
+            rows.forEach(r => {
+                const email = String(r[0] || '').toLowerCase().replace(/\s/g, '').trim();
+                const name = String(r[1] || '').trim();
+                const role = String(r[2] || '').toLowerCase().trim();
+                if (email && email.indexOf('@') !== -1) {
+                    people[email] = { name: name || email, manager: role === 'manager' };
+                }
+            });
+            return people;
+        }
+
+        function loginBusy(on, text) {
+            $('login-busy').classList.toggle('hidden', !on);
+            if (text) $('login-busy').textContent = text;
+            document.querySelectorAll('.g_id_signin').forEach(e => e.classList.toggle('hidden', !!on));
+        }
+
+        function loginRefused(html) {
+            loginBusy(false);
+            // Always put the lock screen back. Someone taken off the list is shut
+            // out on their next visit, even if the app had opened for them before.
+            $('login').classList.remove('hidden');
+            $('login-bad').classList.remove('hidden');
+            $('login-bad').innerHTML = html;
+        }
+
+        /** Google calls this with a signed token. Also called on boot with a saved email. */
+        window.handleCredentialResponse = async function (response) {
+            let email = '';
+            if (response && response.credential) {
+                try { email = String(parseJwt(response.credential).email || '').toLowerCase().trim(); }
+                catch (e) { loginRefused('Could not read the Google sign-in. Try again.'); return; }
+            } else {
+                email = String(response || '').toLowerCase().trim();   // the saved one
+            }
+            if (!email) return;
+
+            $('login-bad').classList.add('hidden');
+            loginBusy(true, 'Checking the list…');
+
+            let people;
+            try {
+                people = await readAuthList();
+            } catch (err) {
+                // No signal. Someone who signed in before stays in, so the app still
+                // works in the paddock. A new person cannot get in without signal.
+                if (localStorage.getItem('auth_email') === email) {
+                    signedIn(email, localStorage.getItem('auth_name') || email,
+                             localStorage.getItem('auth_role') === 'manager', true);
+                } else {
+                    loginRefused('Could not reach the list of users. Check the signal and try again.');
+                }
+                return;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(people, email)) {
+                const who = people[email];
+                signedIn(email, who.name, who.manager, false);
+            } else {
+                localStorage.removeItem('auth_email');
+                localStorage.removeItem('auth_name');
+                loginRefused(
+                    '<b>Not on the list.</b><br><code>' + esc(email) + '</code><br>' +
+                    'Ask a manager to add this address, then sign in again.' +
+                    '<div style="margin-top:10px;"><a class="btn small" style="text-decoration:none;" href="mailto:'
+                    + OWNER_EMAIL + '?subject=' + encodeURIComponent('Access to ' + FARM.name + ' treatments')
+                    + '&body=' + encodeURIComponent('Please add ' + email + ' to the treatment app.')
+                    + '">Ask for access</a></div>' +
+                    '<div style="margin-top:10px;"><button class="btn small grey" onclick="signOut()">Use another account</button></div>');
+            }
+        };
+
+        function signedIn(email, name, manager, offline) {
+            localStorage.setItem('auth_email', email);
+            localStorage.setItem('auth_name', name);
+            localStorage.setItem('auth_role', manager ? 'manager' : 'staff');
+            $('login').classList.add('hidden');
+            if (offline) toast('No signal — signed in from this phone');
+            startApp();
+            // The ⚙ tab depends on who signed in, so the tabs are built again here.
+            buildTabs();
+            renderAll();
+        }
+
+        function signOut() {
+            localStorage.removeItem('auth_email');
+            localStorage.removeItem('auth_name');
+            localStorage.removeItem('auth_role');
+            try { if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) { }
+            location.reload();
+        }
+
         /* ===================== IDENTITY ===================== */
 
         function userEmail() {
             return (localStorage.getItem('auth_email') || '').toLowerCase().trim();
         }
 
+        /**
+         * The name comes from the authorised list, never from something typed on
+         * the phone. That is the whole point: a record signed "Unknown" is no
+         * record at all.
+         */
         function userName() {
-            return (localStorage.getItem(LS.name) || localStorage.getItem('auth_name') || '').trim();
+            return (localStorage.getItem('auth_name') || '').trim();
         }
 
         function whoAmI() {
             return userName() || userEmail() || 'Unknown';
         }
 
+        /**
+         * Manager rights come from the role column of the authorised list, checked
+         * again every time the app is opened. One list, edited in one place, for
+         * both farms. The Settings tab of each sheet can name extra managers for
+         * that farm alone.
+         */
         function isManager() {
             const email = userEmail();
             if (!email) return false;
             if (email === OWNER_EMAIL) return true;
+            if (localStorage.getItem('auth_role') === 'manager') return true;
             return String(state.managers || '')
                 .split(/[\n,;]+/)
                 .map(s => s.toLowerCase().trim())
@@ -725,26 +896,23 @@
         }
 
         function openUserBox() {
-            const email = userEmail();
             openModal(`
-                <h3>Who is using the app?</h3>
-                <label class="lbl">Your name (goes on every record)</label>
-                <input type="text" id="m-name" value="${esc(userName())}" placeholder="e.g. Juani">
+                <h3>Signed in</h3>
+                <div style="font-size:15px; line-height:1.9;">
+                    <div><span class="muted">Name on your records:</span> <b>${esc(userName() || '—')}</b></div>
+                    <div><span class="muted">Account:</span> ${esc(userEmail() || '—')}</div>
+                    <div><span class="muted">Farm:</span> ${esc(FARM.name)}</div>
+                    <div><span class="muted">Manager:</span> ${isManager() ? 'yes' : 'no'}</div>
+                </div>
                 <p class="muted" style="margin-top:10px;">
-                    ${email
-                        ? 'Signed in as <b>' + esc(email) + '</b>.' + (isManager() ? ' You are a manager.' : '')
-                        : 'Not signed in. Open the main farm app first if you need the Config tab.'}
+                    The name comes from the farm's list of users. To change it, a manager
+                    edits that list.
                 </p>
-                <button class="btn wide" style="margin-top:12px;" onclick="saveUserName()">Save</button>
+                <div class="row" style="margin-top:14px;">
+                    <button class="btn grey" onclick="closeModal()">Close</button>
+                    <button class="btn red" onclick="signOut()">Sign out</button>
+                </div>
             `);
-        }
-
-        function saveUserName() {
-            const v = ($('m-name').value || '').trim();
-            if (v) localStorage.setItem(LS.name, v);
-            closeModal();
-            buildTabs();
-            toast('Saved');
         }
 
         /* ===================== STORAGE + SYNC ===================== */
@@ -3164,31 +3332,44 @@
 
         // Which farm this page belongs to, on the page and in the browser tab.
         document.getElementById('farm-name').textContent = FARM.name;
+        document.getElementById('login-farm').textContent = FARM.name + ' Cow Treatments';
         document.title = FARM.name + ' | Cow Treatments';
 
-        loadQueue();
-        loadCachedCows();
-        setBatchMode(false);
-        setSearchMode('Tag');
-        buildTabs();
-        renderAll();
-        refreshAll(false);
+        let appStarted = false;
+
+        /** Nothing runs until we know who is using the app. */
+        function startApp() {
+            if (appStarted) return;
+            appStarted = true;
+
+            loadQueue();
+            loadCachedCows();
+            setBatchMode(false);
+            setSearchMode('Tag');
+            buildTabs();
+            renderAll();
+            refreshAll(false);
+
+            // Two people dose cows at the same time, so the screen is re-read often.
+            setInterval(() => { if (document.visibilityState === 'visible') refreshAll(false); }, 60000);
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') refreshAll(false);
+            });
+        }
+
+        // Already signed in on this phone? Check the list again anyway, so someone
+        // taken off it loses access on their next visit.
+        const saved = (localStorage.getItem('auth_email') || '').trim();
+        if (saved) handleCredentialResponse(saved);
 
         /** Read the sheet again if the copy on screen is older than this. */
         const STALE_MS = 20000;
 
         function maybeRefresh() {
-            if (state.syncing) return;
+            if (!appStarted || state.syncing) return;
             if (!state.loaded || Date.now() - state.loadedAt > STALE_MS) refreshAll(false);
         }
-
-        // Two people dose cows at the same time, so the screen is re-read often.
-        setInterval(() => { if (document.visibilityState === 'visible') refreshAll(false); }, 60000);
-
-        // Coming back to the app, or switching tabs, always re-reads the sheet.
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') refreshAll(false);
-        });
     </script>
 </body>
 
