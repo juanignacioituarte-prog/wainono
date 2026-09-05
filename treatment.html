@@ -2986,10 +2986,22 @@
                     <th>Animal ID</th><th>Created Date</th><th>Condition</th><th>Treatment</th>
                     <th>Last Treated</th><th>Doses</th>
                     <th>Milk Withholding Period</th><th>Meat Withholding Period</th>
-                    <th>Return to Vat</th><th>Meat Clear</th><th>Recorded by</th>
+                    <th>Return to Vat</th><th>Cleared On</th><th>Meat Clear</th><th>Recorded by</th>
                 </tr></thead>
                 <tbody>${rows.map(x => {
                     const t = x.t, i = x.i;
+
+                    /* When she actually went back in the vat, against when she was
+                       allowed to. Cleared before the due date is the one thing on
+                       this report that should never happen, so it is marked. */
+                    const clearedAt = parseDate(t.ClearedAt);
+                    const early = clearedAt && i.milkClear && !i.noHold && clearedAt < i.milkClear;
+                    const cleared = clearedAt
+                        ? `<b${early ? ' style="color:var(--red);"' : ''}>${fmtDay(clearedAt)}</b>`
+                          + (t.ClearedBy ? '<br><span class="muted">' + esc(t.ClearedBy) + '</span>' : '')
+                          + (early ? '<br><span style="color:var(--red); font-weight:700;">⚠ before due</span>' : '')
+                        : (i.noHold ? '—' : '<span class="muted">not yet</span>');
+
                     return `<tr>
                         <td class="tag">${esc(byTag(t))}${t._farm ? ' <span class="rep-farmtag">' + esc(t._farm) + '</span>' : ''}</td>
                         <td>${fmtDay(t.Started)}</td>
@@ -3000,6 +3012,7 @@
                         <td>${whText(t.MilkWithhold, t.MilkWithholdUnit)}</td>
                         <td>${whText(t.MeatWithhold, t.MeatWithholdUnit)}</td>
                         <td><b>${i.noHold ? '—' : fmtClear(i.milkClear)}</b></td>
+                        <td class="wrap">${cleared}</td>
                         <td>${i.noHold ? '—' : fmtDay(i.meatClear)}</td>
                         <td class="wrap">${esc(t.CreatedBy || '—')}</td>
                     </tr>`;
@@ -3015,10 +3028,13 @@
             const head = ['Animal ID', 'Birth ID', 'EID', 'Farm', 'Created Date', 'Condition', 'Quarter',
                 'Treatment', 'Last Treated', 'Doses given', 'Doses planned',
                 'Milk withholding period', 'Meat withholding period',
-                'Return to vat', 'Meat clear', 'Recorded by', 'Cleared', 'Cleared by'];
+                'Return to vat', 'Cleared on', 'Cleared by', 'Cleared before due',
+                'Meat clear', 'Recorded by'];
 
             const body = rows.map(x => {
                 const t = x.t, i = x.i;
+                const clearedAt = parseDate(t.ClearedAt);
+                const early = clearedAt && i.milkClear && !i.noHold && clearedAt < i.milkClear;
                 return [byTag(t), t.BirthID || '', t.EID || '', t._farm || FARM.name,
                     fmtDay(t.Started), t.Condition || '', quartersText(t),
                     t.Drug || '', i.lastDoseAt ? fmtDay(i.lastDoseAt) : '',
@@ -3026,8 +3042,11 @@
                     whText(t.MilkWithhold, t.MilkWithholdUnit),
                     whText(t.MeatWithhold, t.MeatWithholdUnit),
                     i.noHold ? '' : fmtClear(i.milkClear),
+                    clearedAt ? fmtDay(clearedAt) : '',
+                    t.ClearedBy || '',
+                    early ? 'YES' : '',
                     i.noHold ? '' : fmtDay(i.meatClear),
-                    t.CreatedBy || '', t.ClearedAt ? fmtDay(t.ClearedAt) : '', t.ClearedBy || ''];
+                    t.CreatedBy || ''];
             });
 
             const quote = v => {
