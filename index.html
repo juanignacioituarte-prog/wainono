@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.98</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.99</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.98</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.99</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2896,7 +2896,7 @@
             if (geoLayer) { map.removeLayer(geoLayer); geoLayer = null; }
             paddockMap = {};
             areaLookup = {};
-            data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
+            data.features.forEach(f => { if (f.properties.name) { areaLookup[f.properties.name] = f.properties.calcArea || 0; PADDOCK_NAME_BY_NORM[normName(f.properties.name)] = f.properties.name; } });
             buildPaddockLayer(data);
             applyAreasToLoadedData();   // a merge or split changes the areas
             selectedPaddockIds = selectedPaddockIds.filter(paddockById);
@@ -3991,6 +3991,25 @@
         // strings, so this has to coerce before trimming.
         function normName(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
 
+        /* The boundary decides how a paddock is spelled.
+         *
+         * Farmwalk rows are typed by hand, so the same paddock turns up as
+         * "HILL" one week and "Hill" the next. The rows are grouped without
+         * caring about case, but the name kept was whichever came first - and
+         * the map, the area table and the out list are all matched on exact
+         * text. "HILL" never equals "Hill", so Hill ended up with no area and
+         * no colour on the map even though it had covers.
+         */
+        let PADDOCK_NAME_BY_NORM = {};
+
+        function canonicalPaddockName(name) {
+            return PADDOCK_NAME_BY_NORM[normName(name)] || name;
+        }
+
+        function paddockAreaFor(name) {
+            return areaLookup[canonicalPaddockName(name)] || areaLookup[name] || 0;
+        }
+
         function isPointInLayer(layer, x, y) {
             const ptL = L.latLng(y, x);
             if (layer.getBounds && !layer.getBounds().contains(ptL)) return false;
@@ -4414,7 +4433,7 @@
                             growthRate: growth,
                             isOut: isOut,
                             reason: reason,
-                            area: areaLookup[p.name] || 0
+                            area: paddockAreaFor(p.name)
                         });
                     });
 
@@ -5822,7 +5841,7 @@
                     const response = await fetch(GEOJSON_URL + "?t=" + Date.now());
                     data = await response.json();
                 }
-                data.features.forEach(f => { if (f.properties.name) areaLookup[f.properties.name] = f.properties.calcArea || 0; });
+                data.features.forEach(f => { if (f.properties.name) { areaLookup[f.properties.name] = f.properties.calcArea || 0; PADDOCK_NAME_BY_NORM[normName(f.properties.name)] = f.properties.name; } });
                 buildPaddockLayer(data, true);
                 applyAreasToLoadedData();
             } catch (e) {
@@ -5842,7 +5861,14 @@
             const fix = list => {
                 if (!Array.isArray(list)) return 0;
                 let n = 0;
-                list.forEach(p => { p.area = areaLookup[p.name] || 0; if (p.area > 0) n++; });
+                // The boundaries have arrived, so adopt their spelling first.
+                // The farmwalk is parsed before them, so this is where a paddock
+                // typed as "HILL" becomes "Hill" and finds its area.
+                list.forEach(p => {
+                    p.name = canonicalPaddockName(p.name);
+                    p.area = paddockAreaFor(p.name);
+                    if (p.area > 0) n++;
+                });
                 return n;
             };
             const m = fix(typeof manualModeData !== 'undefined' ? manualModeData : null);
@@ -6277,7 +6303,7 @@
                 const isOut = !!excludedPaddocks.get(normName(name));
                 if (isOut) return;
 
-                const area = areaLookup[name] || 0;
+                const area = paddockAreaFor(name);
                 if (area > 0) { tWGrowth += g * area; tAreaG += area; } else { tWGrowth += g; tAreaG += 1; }
             });
             return tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
@@ -6491,7 +6517,7 @@
             satellitePaddockData = Object.keys(satelliteHistory).map(name => {
                 const sorted = satelliteHistory[name]; const latest = sorted[0];
                 const previous = sorted.find(s => s.dateObj < latest.dateObj) || null;
-                const area = areaLookup[name] || 0; const lowerName = name.toLowerCase();
+                const area = paddockAreaFor(name); const lowerName = name.toLowerCase();
                 const isOut = !!excludedPaddocks.get(normName(name));
                 if (latest.formattedDate && (!globalLatestDate || latest.formattedDate !== "")) globalLatestDate = latest.formattedDate;
                 let growthRate = null;
@@ -6981,7 +7007,9 @@
             const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
             geoLayer.eachLayer(layer => {
                 const pName = layer.feature.properties.name;
-                const p = currentData.find(pd => pd.name === pName);
+                // Matched without caring about case, so a paddock spelled
+                // differently in the farmwalk still gets its colour.
+                const p = currentData.find(pd => normName(pd.name) === normName(pName));
 
                 if (p) {
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>`);
