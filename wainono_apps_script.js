@@ -24,7 +24,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-08-22-b";
+var SCRIPT_VERSION = "2026-09-05-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -91,6 +91,8 @@ function doPost(e) {
       return savePaddocks(payload);
     } else if (type === 'farmwalk_load') {
       return loadFarmwalk(payload);
+    } else if (type === 'rename_paddock') {
+      return renamePaddockEverywhere(payload);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -875,6 +877,136 @@ function farmwalkDateParts(v) {
   m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (m) return [Number(m[3]), Number(m[2]), Number(m[1])];
   return null;
+}
+
+/* ================== RENAMING A PADDOCK ==================
+ * A paddock's name is the key in every tab except the boundaries, where the
+ * paddockId is. Renaming only the boundary would leave the cover history, the
+ * breaks and the units pointing at a name nothing uses any more, and the
+ * paddock would start again from nothing.
+ *
+ * So a rename changes the name everywhere it appears, in one go.
+ */
+
+// Tab names are inconsistent - "breaks" is lower case while the rest are not -
+// so find them without caring about case.
+function findSheetByName(name) {
+  var sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+  var want = normalisePaddockKey(name);
+  for (var i = 0; i < sheets.length; i++) {
+    if (normalisePaddockKey(sheets[i].getName()) === want) return sheets[i];
+  }
+  return null;
+}
+
+function renameInColumn(sheet, col, from, to) {
+  if (!sheet) return 0;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  var range = sheet.getRange(2, col, lastRow - 1, 1);
+  var vals = range.getValues();
+  var key = normalisePaddockKey(from), n = 0;
+  for (var i = 0; i < vals.length; i++) {
+    if (normalisePaddockKey(vals[i][0]) === key) { vals[i][0] = to; n++; }
+  }
+  if (n > 0) range.setValues(vals);
+  return n;
+}
+
+function renamePaddockEverywhere(payload) {
+  var from = String(payload.from || '').trim();
+  var to = String(payload.to || '').trim();
+  if (!from || !to) return errorResponse("Missing from or to");
+  if (normalisePaddockKey(from) === normalisePaddockKey(to) && from === to) {
+    return errorResponse("The new name is the same as the old one");
+  }
+
+  var changed = {};
+
+  // 1. The boundary itself. Matched on paddockId when given, because that is
+  //    the one thing about a paddock that never changes.
+  var pad = findSheetByName(PADDOCK_SHEET);
+  if (pad) {
+    var lastRow = pad.getLastRow();
+    if (lastRow > 1) {
+      var rows = pad.getRange(2, 1, lastRow - 1, 2).getValues();
+      var wantId = payload.paddockId ? String(payload.paddockId).trim() : null;
+      var key = normalisePaddockKey(from), hits = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var isMatch = wantId ? String(rows[i][0]).trim() === wantId
+                             : normalisePaddockKey(rows[i][1]) === key;
+        if (isMatch) { pad.getRange(i + 2, 2).setValue(to); hits++; }
+      }
+      changed.boundaries = hits;
+    }
+  }
+
+  // 2. The cover history, the breaks and the out list, all keyed by name.
+  changed.farmwalks = renameInColumn(findSheetByName("Farmwalks"), 2, from, to);
+  changed.breaks    = renameInColumn(findSheetByName("breaks"), 3, from, to);
+  changed.out       = renameInColumn(findSheetByName("out"), 1, from, to);
+
+  // 3. Units keep their paddocks as a JSON list in one cell.
+  var units = findSheetByName("Units");
+  if (units) {
+    var uLast = units.getLastRow();
+    if (uLast > 1) {
+      var uRange = units.getRange(2, 4, uLast - 1, 1);
+      var uVals = uRange.getValues(), uHits = 0;
+      for (var u = 0; u < uVals.length; u++) {
+        var list = [];
+        try { list = JSON.parse(uVals[u][0] || "[]"); } catch (e) { list = []; }
+        if (!Array.isArray(list)) continue;
+        var touched = false;
+        for (var k = 0; k < list.length; k++) {
+          if (normalisePaddockKey(list[k]) === normalisePaddockKey(from)) { list[k] = to; touched = true; uHits++; }
+        }
+        if (touched) uVals[u][0] = JSON.stringify(list);
+      }
+      if (uHits > 0) uRange.setValues(uVals);
+      changed.units = uHits;
+    }
+  }
+
+  // 4. Settings: crop yields are keyed by name, and a herd can be pointed at a
+  //    crop paddock by name.
+  var settings = getOrCreateSheet("Settings");
+  var yields = readSettingValue(settings, 'cropYields');
+  if (yields) {
+    try {
+      var y = JSON.parse(yields) || {};
+      var moved = 0;
+      Object.keys(y).forEach(function(k) {
+        if (normalisePaddockKey(k) === normalisePaddockKey(from)) {
+          y[to] = y[k];
+          if (k !== to) delete y[k];
+          moved++;
+        }
+      });
+      if (moved > 0) writeSettingValue(settings, 'cropYields', JSON.stringify(y));
+      changed.cropYields = moved;
+    } catch (e) {}
+  }
+
+  var herdsRaw = readSettingValue(settings, 'customHerds');
+  if (herdsRaw) {
+    try {
+      var herds = JSON.parse(herdsRaw) || [];
+      var hHits = 0;
+      if (Array.isArray(herds)) {
+        herds.forEach(function(h) {
+          if (h && h.custom_crop_paddock &&
+              normalisePaddockKey(h.custom_crop_paddock) === normalisePaddockKey(from)) {
+            h.custom_crop_paddock = to; hHits++;
+          }
+        });
+        if (hHits > 0) writeSettingValue(settings, 'customHerds', JSON.stringify(herds));
+      }
+      changed.herds = hHits;
+    } catch (e) {}
+  }
+
+  return jsonResponse({ status: "success", from: from, to: to, changed: changed });
 }
 
 /* ================== PADDOCK BOUNDARIES ================== */

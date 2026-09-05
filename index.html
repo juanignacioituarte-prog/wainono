@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.0.99</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.00</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.0.99</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.00</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-sat" class="mode-btn"
@@ -2906,6 +2906,13 @@
 
         /* ---- the four jobs ---- */
 
+        /* Renaming takes the paddock's history with it.
+         *
+         * The name is the key in every tab except the boundaries, so changing
+         * only the boundary would leave the covers, the breaks and the units
+         * pointing at a name nothing uses, and the paddock would start again
+         * from nothing. The sheet does the whole rename in one go.
+         */
         async function renameSelectedPaddock() {
             const sel = selectedPaddocks();
             if (sel.length !== 1) return;
@@ -2914,7 +2921,35 @@
             if (!name || name === p.name) return;
             const clash = PADDOCK_ROWS.find(x => x.name === name && x.paddockId !== p.paddockId);
             if (clash && !confirm(`There is already a paddock called ${name}. Use the name anyway?`)) return;
-            await savePaddockChanges([{ paddockId: p.paddockId, name: name }]);
+
+            setPaddockStatus('Renaming and moving its history...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'rename_paddock', paddockId: p.paddockId, from: p.name, to: name })
+                });
+                const d = await res.json();
+                if (!d || d.status !== 'success') {
+                    const msg = (d && d.message) ? d.message : 'the sheet refused it';
+                    // An older script has no rename branch. Renaming the boundary
+                    // alone would orphan the history, so do nothing instead.
+                    setPaddockStatus(/unknown payload type/i.test(msg)
+                        ? '⚠ Not renamed - the Apps Script needs the rename update.'
+                        : '⚠ Not renamed - ' + msg, '#e74c3c');
+                    return;
+                }
+                const c = d.changed || {};
+                setPaddockStatus(
+                    `✓ Renamed to ${name}. Moved ${c.farmwalks || 0} covers, ${c.breaks || 0} breaks` +
+                    `${c.units ? ', ' + c.units + ' unit entries' : ''}${c.out ? ', out list' : ''}.`, '#27ae60');
+                await reloadPaddockBoundaries();
+                await loadManualRankCSV();     // covers now carry the new name
+                renderDashboard();
+                updateGeoStyles();
+            } catch (e) {
+                console.error("Rename failed:", e);
+                setPaddockStatus('⚠ Not renamed - could not reach the sheet.', '#e74c3c');
+            }
         }
 
         async function mergeSelectedPaddocks() {
