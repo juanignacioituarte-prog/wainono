@@ -272,6 +272,42 @@
         #draft-bar .info b { font-size: 16px; display: block; opacity: 1; }
         body.drafting { padding-bottom: 84px; }
 
+        /* ---------- the treatment register ---------- */
+        #report {
+            position: fixed; inset: 0; z-index: 800; background: var(--bg);
+            display: flex; flex-direction: column;
+        }
+        .rep-head { background: #fff; border-bottom: 1px solid var(--line); padding: 12px 14px; }
+        .rep-head-row { display: flex; align-items: center; gap: 10px; }
+        .rep-head-row h2 { margin: 0; flex: 1; font-size: 18px; }
+        .rep-head-row h2 span { color: var(--muted); font-weight: 400; font-size: 14px; }
+        .rep-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .rep-filters label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+        .rep-filters input[type=date], .rep-filters select { font-size: 14px; padding: 7px 8px; }
+        .rep-filters .rep-check { flex-direction: row; align-items: center; gap: 7px; font-size: 13px; color: var(--text); align-self: flex-end; padding-bottom: 8px; }
+        .rep-filters .rep-check input { width: 18px; height: 18px; }
+        .rep-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+        .rep-actions > div:first-child { flex: 1; font-size: 14px; }
+        .rep-body { flex: 1; overflow: auto; padding: 12px 14px 40px; }
+
+        table.rep { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; }
+        table.rep th, table.rep td { border-bottom: 1px solid var(--line); padding: 9px 10px; text-align: left; white-space: nowrap; }
+        table.rep th { background: #eef2f1; font-size: 12px; position: sticky; top: 0; }
+        table.rep tbody tr:nth-child(even) { background: #fafbfb; }
+        table.rep td.tag { font-weight: 800; font-size: 15px; }
+        table.rep td.wrap { white-space: normal; min-width: 130px; }
+        .rep-empty { text-align: center; color: var(--muted); padding: 36px 10px; }
+        .rep-farmtag { background: var(--blue); color: #fff; border-radius: 9px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+
+        @media print {
+            body > *:not(#report) { display: none !important; }
+            #report { position: static; background: #fff; }
+            .rep-head-row button, .rep-filters, .rep-actions button { display: none !important; }
+            .rep-body { overflow: visible; padding: 0; }
+            table.rep th { position: static; }
+            table.rep th, table.rep td { white-space: normal; }
+        }
+
         /* ---------- the sign-in screen, over everything until we know who you are ---------- */
         #login {
             position: fixed; inset: 0; z-index: 900; background: var(--bg);
@@ -439,6 +475,8 @@
             <div class="card">
                 <input type="search" id="hist-search" placeholder="Search tag, condition, drug, person…"
                        oninput="renderHistory()" autocomplete="off">
+                <button class="btn wide" style="margin-top:10px;" onclick="openReport()">
+                    📋 Treatment Register</button>
             </div>
             <div id="history-body"></div>
         </section>
@@ -490,6 +528,33 @@
             </div>
         </section>
 
+    </div>
+
+    <!-- ============ TREATMENT REGISTER ============ -->
+    <div id="report" class="hidden">
+        <div class="rep-head">
+            <div class="rep-head-row">
+                <h2>Treatment Register <span id="rep-farm"></span></h2>
+                <button class="btn small grey" onclick="closeReport()">✕ Close</button>
+            </div>
+            <div class="rep-filters">
+                <label>From <input type="date" id="rep-from" onchange="renderReport()"></label>
+                <label>To <input type="date" id="rep-to" onchange="renderReport()"></label>
+                <label>Condition <select id="rep-cond" onchange="renderReport()"></select></label>
+                <label>Treatment <select id="rep-drug" onchange="renderReport()"></select></label>
+                <label class="rep-check">
+                    <input type="checkbox" id="rep-others" onchange="renderReport()"> Include the other farm
+                </label>
+            </div>
+            <div class="rep-actions">
+                <div id="rep-totals"></div>
+                <div>
+                    <button class="btn small" onclick="window.print()">🖨 Print / PDF</button>
+                    <button class="btn small blue" onclick="exportReportCsv()">⬇ Export CSV</button>
+                </div>
+            </div>
+        </div>
+        <div class="rep-body"><div id="rep-table"></div></div>
     </div>
 
     <div id="login">
@@ -1223,6 +1288,7 @@
             state.otherLoaded = true;
             state.otherLoading = false;
             renderAll();
+            renderReport();   // the register may be open and waiting on this
         }
 
         /** Doses live in a different list for another farm's treatments. */
@@ -2827,6 +2893,158 @@
                 if (who && seen.indexOf(who) === -1) seen.push(who);
             });
             return seen.join(', ');
+        }
+
+        /* ===================== TREATMENT REGISTER =====================
+         *
+         * The register the vet or the milk company asks for: every treatment in a
+         * date range, with its withholds and the day her milk goes back in the
+         * vat. Laid out like the one on MINDA so it reads the same way, and
+         * "Treatment" here means the drug, as it does there.
+         */
+
+        function isoDay(d) {
+            const x = new Date(d);
+            x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+            return x.toISOString().slice(0, 10);
+        }
+
+        function openReport() {
+            $('rep-farm').textContent = 'for ' + FARM.name;
+
+            if (!$('rep-from').value) {
+                const from = new Date();
+                from.setMonth(from.getMonth() - 1);
+                $('rep-from').value = isoDay(from);
+                $('rep-to').value = isoDay(new Date());
+            }
+
+            // The other farm's records are only here if History has fetched them.
+            loadOtherFarms(false);
+
+            $('report').classList.remove('hidden');
+            renderReport();
+        }
+
+        function closeReport() {
+            $('report').classList.add('hidden');
+        }
+
+        /** Every treatment inside the filters, newest first. */
+        function reportRows() {
+            const from = $('rep-from').value ? new Date($('rep-from').value + 'T00:00:00') : null;
+            const to = $('rep-to').value ? new Date($('rep-to').value + 'T23:59:59') : null;
+            const cond = $('rep-cond').value;
+            const drug = $('rep-drug').value;
+            const withOthers = $('rep-others').checked;
+
+            let list = state.treatments.slice();
+            if (withOthers) list = list.concat(state.otherTreatments);
+
+            return list
+                .map(t => ({ t, i: info(t) }))
+                .filter(x => {
+                    const d = parseDate(x.t.Started);
+                    if (!d) return false;
+                    if (from && d < from) return false;
+                    if (to && d > to) return false;
+                    if (cond && String(x.t.Condition) !== cond) return false;
+                    if (drug && String(x.t.Drug) !== drug) return false;
+                    return true;
+                })
+                .sort((a, b) => (parseDate(b.t.Started) || 0) - (parseDate(a.t.Started) || 0));
+        }
+
+        function fillReportFilters() {
+            const all = state.treatments.concat($('rep-others').checked ? state.otherTreatments : []);
+            const opts = (sel, values, label) => {
+                const keep = sel.value;
+                sel.innerHTML = '<option value="">All ' + label + '</option>'
+                    + values.map(v => `<option${v === keep ? ' selected' : ''}>${esc(v)}</option>`).join('');
+            };
+            opts($('rep-cond'), [...new Set(all.map(t => String(t.Condition || '')).filter(Boolean))].sort(), 'conditions');
+            opts($('rep-drug'), [...new Set(all.map(t => String(t.Drug || '')).filter(Boolean))].sort(), 'treatments');
+        }
+
+        function renderReport() {
+            if ($('report').classList.contains('hidden')) return;
+            fillReportFilters();
+
+            const rows = reportRows();
+            const cows = new Set(rows.map(x => cowKeyOf(x.t)));
+            $('rep-totals').innerHTML =
+                `<b>Total treatments: ${rows.length}</b> &nbsp; <b>Total animals: ${cows.size}</b>`
+                + (state.otherLoading ? ' <span class="muted">· reading the other farm…</span>' : '');
+
+            if (!rows.length) {
+                $('rep-table').innerHTML = '<div class="rep-empty">No treatments in this range.</div>';
+                return;
+            }
+
+            $('rep-table').innerHTML = `<table class="rep">
+                <thead><tr>
+                    <th>Animal ID</th><th>Created Date</th><th>Condition</th><th>Treatment</th>
+                    <th>Last Treated</th><th>Doses</th>
+                    <th>Milk Withholding Period</th><th>Meat Withholding Period</th>
+                    <th>Return to Vat</th><th>Meat Clear</th><th>Recorded by</th>
+                </tr></thead>
+                <tbody>${rows.map(x => {
+                    const t = x.t, i = x.i;
+                    return `<tr>
+                        <td class="tag">${esc(byTag(t))}${t._farm ? ' <span class="rep-farmtag">' + esc(t._farm) + '</span>' : ''}</td>
+                        <td>${fmtDay(t.Started)}</td>
+                        <td class="wrap">${esc(t.Condition)}${quartersText(t) ? '<br><span class="muted">' + esc(quartersText(t)) + '</span>' : ''}</td>
+                        <td class="wrap">${esc(t.Drug)}</td>
+                        <td>${i.lastDoseAt ? fmtDay(i.lastDoseAt) : '—'}</td>
+                        <td>${i.given}/${i.total}${i.missed.length ? ' <span style="color:var(--red);">⚠</span>' : ''}</td>
+                        <td>${whText(t.MilkWithhold, t.MilkWithholdUnit)}</td>
+                        <td>${whText(t.MeatWithhold, t.MeatWithholdUnit)}</td>
+                        <td><b>${i.noHold ? '—' : fmtClear(i.milkClear)}</b></td>
+                        <td>${i.noHold ? '—' : fmtDay(i.meatClear)}</td>
+                        <td class="wrap">${esc(t.CreatedBy || '—')}</td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>`;
+        }
+
+        /** The same table as a CSV, for the vet or the milk company. */
+        function exportReportCsv() {
+            const rows = reportRows();
+            if (!rows.length) { toast('Nothing to export'); return; }
+
+            const head = ['Animal ID', 'Birth ID', 'EID', 'Farm', 'Created Date', 'Condition', 'Quarter',
+                'Treatment', 'Last Treated', 'Doses given', 'Doses planned',
+                'Milk withholding period', 'Meat withholding period',
+                'Return to vat', 'Meat clear', 'Recorded by', 'Cleared', 'Cleared by'];
+
+            const body = rows.map(x => {
+                const t = x.t, i = x.i;
+                return [byTag(t), t.BirthID || '', t.EID || '', t._farm || FARM.name,
+                    fmtDay(t.Started), t.Condition || '', quartersText(t),
+                    t.Drug || '', i.lastDoseAt ? fmtDay(i.lastDoseAt) : '',
+                    i.given, i.total,
+                    whText(t.MilkWithhold, t.MilkWithholdUnit),
+                    whText(t.MeatWithhold, t.MeatWithholdUnit),
+                    i.noHold ? '' : fmtClear(i.milkClear),
+                    i.noHold ? '' : fmtDay(i.meatClear),
+                    t.CreatedBy || '', t.ClearedAt ? fmtDay(t.ClearedAt) : '', t.ClearedBy || ''];
+            });
+
+            const quote = v => {
+                const s = String(v === undefined || v === null ? '' : v);
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            };
+            // The BOM is what makes Excel read the accents properly.
+            const csv = '﻿' + [head, ...body].map(r => r.map(quote).join(',')).join('\r\n');
+
+            const name = FARM.name.replace(/\s+/g, '-') + '-treatment-register-'
+                + ($('rep-from').value || '') + '-to-' + ($('rep-to').value || '') + '.csv';
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            const a = document.createElement('a');
+            a.href = url; a.download = name;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            toast(rows.length + ' treatments exported');
         }
 
         /* ---------- treatment detail sheet ---------- */
