@@ -138,6 +138,18 @@
         .empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: 14px; }
         .hidden { display: none !important; }
 
+        /* the square mark on a cow who is on one of the lists */
+        .flag {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; border-radius: 5px; margin-left: 5px;
+            color: #fff; font-weight: 800; font-size: 13px; letter-spacing: -0.5px;
+            vertical-align: middle; flex: 0 0 auto;
+        }
+        .flag.big { width: 34px; height: 34px; font-size: 16px; border-radius: 7px; }
+        .flag-S { background: #e67e22; }
+        .flag-3T { background: #2980b9; }
+        .tcard .flag { box-shadow: 0 0 0 2px rgba(255, 255, 255, .55); }
+
         .pill {
             display: inline-block; padding: 2px 8px; border-radius: 10px;
             font-size: 11px; font-weight: 700; background: #ecf0f1; color: var(--muted);
@@ -512,6 +524,16 @@
             </div>
 
             <div class="card">
+                <h2>Cow lists</h2>
+                <p class="muted">Cows on these lists carry a mark wherever their number
+                    shows. A treatment recorded for one of these conditions adds the cow
+                    by itself, so the list cannot fall behind the records.</p>
+                <div id="cfg-flags"></div>
+                <button class="btn small wide grey" style="margin-top:10px;" onclick="backfillFlags()">
+                    Rebuild the lists from the records</button>
+            </div>
+
+            <div class="card">
                 <h2>Maintenance</h2>
                 <p class="muted">The clear dates are stored in the sheet and only written
                     when a dose is given. After the Apps Script is updated, run this once so
@@ -650,6 +672,7 @@
 
         const state = {
             cows: [], conditions: [], drugs: [], treatments: [], doses: [], seen: [],
+            flags: {},           // cow numbers on each list, keyed by condition
             managers: '',
             queue: [],
             loaded: false,    // has the sheet answered at least once
@@ -1070,6 +1093,7 @@
             state.treatments = (data.treatments || []).map(fillOldWithholds);
             state.doses = data.doses || [];
             state.seen = data.seen || [];
+            state.flags = data.flags || {};
             state.managers = data.managers || '';
             state.loaded = true;
             state.loadedAt = Date.now();
@@ -1439,6 +1463,31 @@
             return String(t.Tag || t.BirthID || t.EID || '?');
         }
 
+        /* ================= COWS ON A LIST =================
+         * Some things stay with a cow: staph aureus, three teats. The sheet keeps
+         * a list per condition, and every cow on one carries a small square mark
+         * wherever her number is shown, so nobody has to remember.
+         */
+        const FLAG_LOOK = {
+            'Staph aureus': { code: 'S', title: 'Staph aureus' },
+            '3 Titter': { code: '3T', title: 'Three teats' }
+        };
+
+        /** Which lists this cow is on. Matched on her tag. */
+        function flagsForCow(tag) {
+            const key = String(tag || '').trim();
+            if (!key) return [];
+            return Object.keys(FLAG_LOOK).filter(name =>
+                (state.flags[name] || []).some(c => String(c).trim() === key));
+        }
+
+        function flagMarks(tag, big) {
+            return flagsForCow(tag).map(name => {
+                const f = FLAG_LOOK[name];
+                return `<span class="flag flag-${f.code}${big ? ' big' : ''}" title="${esc(f.title)}">${f.code}</span>`;
+            }).join('');
+        }
+
         function maxDate(dates) {
             const d = dates.filter(Boolean);
             return d.length ? new Date(Math.max.apply(null, d.map(x => x.getTime()))) : null;
@@ -1716,6 +1765,7 @@
                 const onList = draft.cows.some(x => cowKey(x) === cowKey(c));
                 return `<div class="cow-row" onclick="pickCowIndex(${state.cows.indexOf(c)})">
                     <div class="tag">${esc(c.Tag || '—')}</div>
+                    ${flagMarks(c.Tag)}
                     <div class="grow" style="flex:1;">
                         <div class="sub">Birth ID: ${esc(c.BirthID || '—')}</div>
                         <div class="sub">EID: ${esc(c.EID || '—')}</div>
@@ -1830,6 +1880,7 @@
                       Keep searching to add more.</p>`
                 : `<div style="display:flex; align-items:center; gap:12px;">
                     <div style="font-size:40px; font-weight:900; line-height:1;">${esc(cowName(draft.cows[0]))}</div>
+                    ${flagMarks(draft.cows[0].Tag, true)}
                     <div class="sub muted" style="flex:1;">
                         Birth ID: ${esc(draft.cows[0].BirthID || '—')}<br>EID: ${esc(draft.cows[0].EID || '—')}
                     </div>
@@ -2551,7 +2602,7 @@
 
             return `<div class="tcard ${colour}">
                 <div class="top">
-                    <div class="num">${esc(g.key)}<small>${label}</small></div>
+                    <div class="num">${esc(g.key)}${flagMarks(g.t.Tag)}<small>${label}</small></div>
                     <div class="info">
                         ${g.list.map(x => treatmentLine(x, g.many)).join(g.many ? rule : '')}
                         ${combined}
@@ -2795,7 +2846,7 @@
             $('meat-body').innerHTML = head + (rows.length
                 ? rows.map(g => `<div class="tcard orange">
                     <div class="top">
-                        <div class="num">${esc(g.key)}<small>DO NOT CULL</small></div>
+                        <div class="num">${esc(g.key)}${flagMarks(g.t.Tag)}<small>DO NOT CULL</small></div>
                         <div class="info">
                             <b>Meat clear ${fmtDayTime(g.meatClear)}</b> (${relDay(g.meatClear)})
                             ${g.many ? ' — the latest of ' + plural(g.list.length, 'treatment') : ''}<br>
@@ -3244,6 +3295,26 @@
                   </div>`).join('')
                 : '<p class="muted">No drugs yet.</p>';
 
+            $('cfg-flags').innerHTML = Object.keys(FLAG_LOOK).map(name => {
+                const f = FLAG_LOOK[name];
+                const on = state.flags[name] || [];
+                const id = 'flag-' + f.code;
+                return `<div style="border-top:1px solid var(--line); padding-top:10px; margin-top:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="flag flag-${f.code}">${f.code}</span>
+                        <b>${esc(name)}</b>
+                        <span class="muted" style="margin-left:auto;">${plural(on.length, 'cow')}</span>
+                    </div>
+                    <textarea id="${id}" style="min-height:70px; margin-top:8px;"
+                        placeholder="Cow numbers, one per line or separated by commas"></textarea>
+                    <div class="row" style="margin-top:6px;">
+                        <button class="btn small grey" onclick="loadFlagList('${esc(name)}','${id}','merge')">Add these</button>
+                        <button class="btn small grey" onclick="loadFlagList('${esc(name)}','${id}','replace')">Replace the list</button>
+                        <button class="btn small grey" onclick="showFlagList('${esc(name)}')">Show list</button>
+                    </div>
+                  </div>`;
+            }).join('');
+
             $('cow-count').textContent = state.cows.length
                 ? state.cows.length + ' cows, kept on this phone so every refresh stays fast.'
                 : 'No cows loaded yet.';
@@ -3534,6 +3605,53 @@
                 + 'Only the stored clear dates and statuses are rewritten.')) return;
             send({ type: 'recalc_all' });
             toast('Recalculating…');
+        }
+
+        /** Paste a list of cow numbers onto one of the lists. */
+        function loadFlagList(name, boxId, mode) {
+            if (!isManager()) return;
+            const raw = ($(boxId).value || '').trim();
+            if (!raw) { toast('Paste the cow numbers first'); return; }
+
+            const cows = [...new Set(raw.split(/[\s,;]+/).map(s => s.trim()).filter(Boolean))];
+            if (!cows.length) { toast('No cow numbers found'); return; }
+
+            // Say which ones are not in the herd list, rather than swallowing them.
+            const known = new Set(state.cows.map(c => String(c.Tag).trim()));
+            const strangers = cows.filter(c => !known.has(c));
+
+            if (!confirm(`${mode === 'replace' ? 'REPLACE' : 'Add to'} the ${name} list with ${plural(cows.length, 'cow')}?`
+                + (strangers.length
+                    ? `\n\n${plural(strangers.length, 'cow')} not in the herd list: ${strangers.slice(0, 12).join(', ')}`
+                      + (strangers.length > 12 ? '…' : '')
+                    : ''))) return;
+
+            send({ type: 'import_flags', flag: name, mode: mode, cows: cows });
+            $(boxId).value = '';
+            toast(cows.length + ' sent to the ' + name + ' list');
+        }
+
+        function showFlagList(name) {
+            const on = (state.flags[name] || []).slice()
+                .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+            const f = FLAG_LOOK[name];
+            openModal(`
+                <h3><span class="flag flag-${f.code}">${f.code}</span> ${esc(name)}</h3>
+                <p class="muted">${plural(on.length, 'cow')} on this list.</p>
+                <div style="max-height:50vh; overflow:auto; font-size:15px; line-height:2;">
+                    ${on.length ? on.map(c => esc(c)).join(', ') : 'Nobody yet.'}
+                </div>
+                <button class="btn wide grey" style="margin-top:14px;" onclick="closeModal()">Close</button>
+            `);
+        }
+
+        /** Walk every treatment and put its cow on the matching list. */
+        function backfillFlags() {
+            if (!isManager()) return;
+            if (!confirm('Go through every treatment and add its cow to the matching list?\n\n'
+                + 'Safe to run again: a cow already on a list is not added twice.')) return;
+            send({ type: 'backfill_flags' });
+            toast('Rebuilding the lists…');
         }
 
         function saveManagers() {
