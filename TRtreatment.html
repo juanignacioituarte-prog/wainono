@@ -149,6 +149,9 @@
         .flag-S { background: #e67e22; }
         .flag-3T { background: #2980b9; }
         .tcard .flag { box-shadow: 0 0 0 2px rgba(255, 255, 255, .55); }
+        /* the history row lines its items up on the text baseline, which drops a
+           box to the floor, so the marks centre themselves instead */
+        .hrow .hd .flag { align-self: center; width: 23px; height: 23px; font-size: 12px; }
 
         .pill {
             display: inline-block; padding: 2px 8px; border-radius: 10px;
@@ -2921,7 +2924,7 @@
             const q = quartersText(t);
             return `<div class="hrow" onclick="openTreatment('${esc(t.ID)}')" style="cursor:pointer;">
                 <div class="hd">
-                    <b>${esc(byTag(t))}</b>
+                    <b>${esc(byTag(t))}</b>${flagMarks(t.Tag)}
                     ${t._farm ? `<span class="pill" style="background:var(--blue); color:#fff;">${esc(t._farm)}</span>` : ''}
                     <span class="pill" style="background:${colour}; color:#fff;">${stage}</span>
                     <span class="muted" style="margin-left:auto;">${fmtDay(t.Started)}</span>
