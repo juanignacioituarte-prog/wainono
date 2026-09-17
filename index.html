@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.01</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.02</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,11 +1690,9 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.01</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.02</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
-                    <button id="btn-mode-sat" class="mode-btn"
-                        onclick="switchDashboardMode('satellite')">SATELLITE</button>
                     <button id="btn-mode-man" class="mode-btn"
                         onclick="switchDashboardMode('manual')">FARMWALK</button>
                     <button id="btn-mode-feed" class="mode-btn" onclick="switchDashboardMode('feed')">FEED</button>
@@ -1751,7 +1749,13 @@
                     <button id="btn-farmwalk-history" onclick="switchDashboardMode('farmwalk_history')" style="background:#16a085; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         🕘 HISTORY
                     </button>
-                    <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
+                    <button id="btn-satellite" onclick="toggleSatelliteView()" style="background:#2471a3; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                        🛰 SATELLITE
+                    </button>
+                    <div style="flex-basis:100%; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
+                        <button id="btn-toggle-breaks" onclick="toggleBreaksOnMap()" style="padding:5px 11px; border-radius:14px; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap; border:1.5px solid #e67e22; transition:0.15s;">BREAKS ON</button>
+                    </div>
                 </div>
             </div>
 
@@ -2611,7 +2615,7 @@
             try { localStorage.setItem('farm_units', JSON.stringify(FARM_UNITS)); } catch (e) {}
             if (activeUnitId && !FARM_UNITS.some(u => u.id === activeUnitId)) activeUnitId = null;
             renderUnitChips();
-            if (currentDashboardMode === 'manual') { renderDashboard(); updateGeoStyles(); }
+            if (unitFilterApplies()) { renderDashboard(); updateGeoStyles(); }
         }
 
         // Everyone can filter the farmwalk by unit; only admins can change what the units are.
@@ -2628,6 +2632,11 @@
             if (canEditUnits()) return true;
             alert("Only administrators can edit farm units.");
             return false;
+        }
+
+        // The unit chips filter FARMWALK and SATELLITE.
+        function unitFilterApplies() {
+            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite';
         }
 
         function getActiveUnit() {
@@ -4007,6 +4016,9 @@
         let drawingPolyline = null;
         let drawingPolygon = null;
         let breakLayers = new Map();
+        // Per phone: the BREAKS ON/OFF button on FARMWALK and SATELLITE.
+        let breaksOnMapVisible = true;
+        try { breaksOnMapVisible = localStorage.getItem('wn_show_breaks') !== '0'; } catch (e) {}
         let breakSelectMode = false;
         let selectedBreakIds = new Set();
         let editingBreakId = null;
@@ -5271,17 +5283,20 @@
             updateGeoStyles();
 
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                // farmwalk_entry always added a row, so pressing Silage twice, or
+                // Out then Bring back on one day, left two rows for that paddock.
+                // A merge load replaces this paddock's row for this date instead.
+                const parts = dateVal.split('-');
+                const nzDate = parts.length === 3 ? `${Number(parts[2])}/${Number(parts[1])}/${parts[0]}` : dateVal;
                 try {
                     fetch(GOOGLE_SCRIPT_URL, {
                         method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({
-                            type: 'farmwalk_entry',
-                            date: dateVal,
-                            paddock: pName,
-                            cover: coverVal,
-                            reason: reasonVal
+                            type: 'farmwalk_load',
+                            sheetName: 'Farmwalks',
+                            date: nzDate,
+                            mode: 'merge',
+                            entries: [{ paddock: pName, cover: coverVal, reason: reasonVal }]
                         })
                     }).catch(e => console.error("Cloud save error:", e));
                 } catch(e) {}
@@ -6016,8 +6031,8 @@
             breakSelectMode = false;
             selectedBreakIds.clear();
             currentDashboardMode = mode;
-            document.getElementById('btn-mode-sat').classList.toggle('active', mode === 'satellite');
-            document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual');
+            // SATELLITE now lives inside FARMWALK, so FARMWALK stays lit for both.
+            document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual' || mode === 'satellite');
             document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
             document.getElementById('btn-mode-breaks').classList.toggle('active', mode === 'breaks');
 
@@ -6033,7 +6048,8 @@
             }
 
             // UI Toggles
-            document.getElementById('farmwalk-entry-bar').style.display = (mode === 'manual') ? 'flex' : 'none';
+            document.getElementById('farmwalk-entry-bar').style.display = (mode === 'manual' || mode === 'satellite') ? 'flex' : 'none';
+            updateFarmwalkBarForMode(mode);
             document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'flex' : 'none';
             document.getElementById('latest-date').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'block' : 'none';
@@ -6169,6 +6185,8 @@
                     if (mode === 'roster') fetchRoster(currentRosterSheet);
                     if (mode === 'vehicle_maintenance') loadVehicleMaintenance();
                     if (typeof renderHazardsOnMap === 'function') renderHazardsOnMap();
+                    // Re-adding the paddock layer put it over the breaks.
+                    raiseBreakLayers();
                 }, 50);
 
                 if (mode === 'manual') {
@@ -6177,6 +6195,7 @@
                     renderUnitChips();
                     setLayerMode('cover');
                 } else if (mode === 'satellite') {
+                    renderUnitChips();
                     setLayerMode('ndvi');
                     document.getElementById('legend').style.display = 'none';
                 } else if (mode === 'breaks') {
@@ -6293,6 +6312,58 @@
             if (document.getElementById('farmwalk-history-view')) document.getElementById('farmwalk-history-view').style.display = 'none';
             renderDashboard();
             updateGeoStyles();
+            // The breaks button only applies on FARMWALK and SATELLITE, so redraw
+            // the breaks for the mode we are now in.
+            renderBreaksOnMap();
+        }
+
+        /* ---- SATELLITE button, inside the FARMWALK bar ---- */
+        function toggleSatelliteView() {
+            switchDashboardMode(currentDashboardMode === 'satellite' ? 'manual' : 'satellite');
+        }
+
+        function updateFarmwalkBarForMode(mode) {
+            const isSat = (mode === 'satellite');
+            const entryBtn = document.getElementById('btn-farmwalk-entry');
+            if (entryBtn) entryBtn.style.display = isSat ? 'none' : 'flex';
+            // The walk controls belong to entering covers, not to the satellite view.
+            const walkOn = !isSat && isFarmwalkEntryActive;
+            ['farmwalk-entry-date', 'btn-save-farmwalk-all', 'farmwalk-progress'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = walkOn ? 'inline-block' : 'none';
+            });
+            const satBtn = document.getElementById('btn-satellite');
+            if (satBtn) {
+                satBtn.innerHTML = isSat ? '✕ SATELLITE' : '🛰 SATELLITE';
+                satBtn.style.background = isSat ? '#34495e' : '#2471a3';
+            }
+            updateBreaksToggleButton();
+        }
+
+        /* ---- Breaks on the map: show / hide on FARMWALK and SATELLITE ---- */
+        function breakToggleApplies() {
+            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite';
+        }
+
+        function toggleBreaksOnMap() {
+            breaksOnMapVisible = !breaksOnMapVisible;
+            try { localStorage.setItem('wn_show_breaks', breaksOnMapVisible ? '1' : '0'); } catch (e) {}
+            updateBreaksToggleButton();
+            renderBreaksOnMap();
+        }
+
+        function updateBreaksToggleButton() {
+            const b = document.getElementById('btn-toggle-breaks');
+            if (!b) return;
+            b.textContent = breaksOnMapVisible ? 'BREAKS ON' : 'BREAKS OFF';
+            b.style.background = breaksOnMapVisible ? '#e67e22' : '#fff';
+            b.style.color = breaksOnMapVisible ? '#fff' : '#2c3e50';
+        }
+
+        // Breaks sit on top of the paddock colours so they can be seen.
+        function raiseBreakLayers() {
+            if (!breakToggleApplies()) return;
+            breakLayers.forEach(l => { if (l && l.bringToFront) l.bringToFront(); });
         }
 
         function getCurrentModeData() {
@@ -6794,7 +6865,7 @@
             const walk = latestWalkInfo(data);
 
             // The header follows what is selected. A unit shows that unit.
-            const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
+            const activeUnit = unitFilterApplies() ? getActiveUnit() : null;
             const scoped = activeUnit ? data.filter(p => unitHasPaddock(activeUnit, p.name)) : data;
 
             const whole = weightedFarmStats(data, walk);
@@ -6870,7 +6941,7 @@
             updateFarmStats();
             calculateFeedLogic();
 
-            const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
+            const activeUnit = unitFilterApplies() ? getActiveUnit() : null;
             const scoped = activeUnit ? data.filter(p => unitHasPaddock(activeUnit, p.name)) : data;
 
             const walkInfo = latestWalkInfo(scoped);
@@ -7039,7 +7110,7 @@
             if (!geoLayer) return;
             const currentData = getCurrentModeData();
             const walk = latestWalkInfo(currentData);
-            const activeUnit = (currentDashboardMode === 'manual') ? getActiveUnit() : null;
+            const activeUnit = unitFilterApplies() ? getActiveUnit() : null;
             geoLayer.eachLayer(layer => {
                 const pName = layer.feature.properties.name;
                 // Matched without caring about case, so a paddock spelled
@@ -7092,6 +7163,7 @@
                 // CRITICAL: Bring boundary to the very top so it stays above satellite tiles
                 if (layer.bringToFront) layer.bringToFront();
             });
+            raiseBreakLayers();
         }
 
         function setLayerMode(mode) {
@@ -9359,6 +9431,12 @@
             window.audioAidParallelLayers.forEach(l => { if (l) map.removeLayer(l); });
             window.audioAidParallelLayers = [];
 
+            // FARMWALK and SATELLITE have a BREAKS ON/OFF button. There the breaks
+            // are only drawn to look at: they let taps through to the paddock
+            // underneath, so picking a paddock still works.
+            const viewOnly = breakToggleApplies();
+            if (viewOnly && !breaksOnMapVisible) return;
+
             savedBreaks.forEach(brk => {
                 if (brk.isDeleted) return;
                 if (brk.id === editingBreakId) return;
@@ -9385,7 +9463,7 @@
                 
                 if (isLineMode) {
                     renderLayer = L.polyline(coords, {
-                        color: gColor, weight: 4, opacity: 0.9
+                        color: gColor, weight: 4, opacity: 0.9, interactive: !viewOnly
                     }).addTo(map);
                     measureStr = brk.distanceMeters ? brk.distanceMeters.toFixed(0) + ' m' : '0 m';
 
@@ -9408,7 +9486,7 @@
                 } else {
                     const polyOpts = {
                         color: gColor, weight: 2.5, fillColor: gColor,
-                        fillOpacity: 0.2, opacity: 0.9
+                        fillOpacity: 0.2, opacity: 0.9, interactive: !viewOnly
                     };
                     if (brk.isCropBreak && (brk.cropStatus === 'marked' || !brk.cropStatus)) {
                         polyOpts.dashArray = '5, 5';
@@ -9469,6 +9547,7 @@
                 breakLayers.set(String(brk.id), renderLayer);
             });
             highlightSelectedBreaksOnMap();
+            raiseBreakLayers();
         }
 
         function scrollToBreakCard(breakId) {
