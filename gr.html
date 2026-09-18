@@ -202,7 +202,6 @@
       <th onclick="sortTable('growth')">Growth</th>
       <th onclick="sortTable('ndvi')">NDVI</th>
       <th onclick="sortTable('area')">Area ha</th>
-      <th onclick="sortTable('total')">kgDM/day</th>
       <th onclick="sortTable('irrClass')">Water</th>
     </tr></thead><tbody></tbody></table>
     <div class="kv" id="model-note"></div>
@@ -255,6 +254,11 @@ const NDVI_CSV_URL        = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRB
  * because its formula is broken, so it is not used here. */
 const FARMWALK_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=470390408&single=true&output=csv";
 const EXCLUSIONS_CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=376904965&single=true&output=csv";
+/* Real soil moisture, pushed by watermetrics_bookmarklet.js into a sheet via
+ * watermetrics_apps_script.js - see NOTES.md. Empty until that is set up and
+ * this is filled in with the published CSV link; the page works fine without
+ * it, just modelling soil water the way it already does. */
+const WATERMETRICS_CSV_URL = "";
 
 /* ---- model constants ----------------------------------------------------- *
  * These are the tuning knobs. The calibration factor fixes the overall
@@ -308,6 +312,7 @@ let WX = [];                 // one row per day, past and future, merged
 let NDVI = {};               // paddock -> {ndvi, date}
 let WALKS = {};              // paddock -> [{date, cover, reason}] ascending
 let HIST_WALKS = {};         // paddock -> [{date, cover}] ascending, last season's history
+let WM_MM_BY_DATE = {};       // iso -> real soil water in mm, on the days a Watermetrics reading exists
 let EXCLUDED = new Map();    // paddock (normalised) -> reason
 let AREAS = {};              // paddock -> ha
 let NAME_BY_NORM = {};
@@ -431,8 +436,16 @@ const inIrrSeason = d => MODEL.IRR_MONTHS.indexOf(d.getMonth()+1) !== -1;
  * names rather than always `sw`/`m`, so it can be run TWICE over the same
  * list of days - once as if the block were irrigated, once as if it were
  * not - without the second run overwriting the first. Every paddock then
- * reads off whichever pair of fields matches its own class.                 */
-function runWaterBalance(days, sw0, irrigated, swProp, mProp){
+ * reads off whichever pair of fields matches its own class.
+ *
+ * `override` (optional) is a lookup of real soil water by date - see
+ * WM_MM_BY_DATE. On any day it has a real reading, that reading REPLACES the
+ * modelled figure and becomes the anchor the next day's balance runs from,
+ * so a gap after a real day still starts from ground truth rather than from
+ * whatever the model would have guessed anyway. Farm-wide only (one probe),
+ * so both the irrigated and dryland runs get the same override, per the
+ * spec's own farm-wide-average design.                                     */
+function runWaterBalance(days, sw0, irrigated, swProp, mProp, override){
   swProp = swProp || 'sw'; mProp = mProp || 'm';
   let sw = sw0;
   for (const d of days){
@@ -441,6 +454,10 @@ function runWaterBalance(days, sw0, irrigated, swProp, mProp){
     // back to full instead made the growth line saw up and down every week.
     if (irrigated && inIrrSeason(d.date) && sw < MODEL.IRR_TRIGGER) sw += MODEL.IRR_MM_DAY;
     sw = clamp(sw, MODEL.WILT_MM, MODEL.FC_MM);
+    if (override && override[d.iso] != null){
+      sw = clamp(override[d.iso], MODEL.WILT_MM, MODEL.FC_MM);   // real reading wins
+      d.swMeasured = true;
+    }
     d[swProp] = sw;
     d[mProp]  = mFactor(sw);
   }
@@ -504,12 +521,23 @@ async function loadWeather(){
   if (WX.length < 400) throw new Error("not enough weather history came back");
 
   // One long spin-up so today's soil water is a settled number, not a guess.
-  // It is run twice - as if the whole farm were irrigated, and as if none of
-  // it were - so that later, each paddock can read off the run that matches
-  // its own class. See runWaterBalance() for why this does not clash.
+  // Run once here without real readings (Watermetrics may not have loaded
+  // yet - it is fetched in parallel), then re-run from loadAll() once it
+  // has, via applyWatermetrics(). Cheap enough to redo, and it means this
+  // function never has to wait on that other fetch to finish first.
+  applyWaterBalance();
+}
+
+/* The water balance + potential-growth pass over WX. Pulled out of
+ * loadWeather() so it can be re-run once Watermetrics has loaded (it comes
+ * in on its own fetch, in parallel with the weather) without re-fetching
+ * any weather - see loadAll(). Run twice, as if the whole farm were
+ * irrigated and as if none of it were, so each paddock can read off
+ * whichever matches its own class - see runWaterBalance().              */
+function applyWaterBalance(){
   smoothGdd(WX, []);
-  runWaterBalance(WX, MODEL.FC_MM, true,  'swIrr', 'mIrr');
-  runWaterBalance(WX, MODEL.FC_MM, false, 'swDry', 'mDry');
+  runWaterBalance(WX, MODEL.FC_MM, true,  'swIrr', 'mIrr', WM_MM_BY_DATE);
+  runWaterBalance(WX, MODEL.FC_MM, false, 'swDry', 'mDry', WM_MM_BY_DATE);
   WX.forEach(d => { d.potIrr = potential(d, 'mIrr'); d.potDry = potential(d, 'mDry'); });
 }
 
@@ -667,8 +695,14 @@ function buildSeries(){
   let pastSum = 0;
   const pastTo = new Date(Math.min(to.getTime(), today.getTime() - DAY));
   if (from <= pastTo){
+    // Every WX row for a date that has already happened, whichever endpoint
+    // its weather came from. The archive lags about 2 days behind today, so
+    // yesterday and the day before are only in WX via the forecast fetch -
+    // that flag is about WHERE the number came from, not whether the day is
+    // actually still ahead of us. Filtering those out here made the last
+    // couple of days before today wrongly vanish from a past-range query.
     const byIso = {};
-    WX.forEach(d => { if (!d.isForecast) byIso[d.iso] = d; });
+    WX.forEach(d => { byIso[d.iso] = d; });
     for (let t = from.getTime(); t <= pastTo.getTime(); t += DAY){
       const date = new Date(t), key = iso(date);
       const d = byIso[key];
@@ -862,11 +896,12 @@ function computeTodayPoint(){
   const today = todayNZ();
   const frac = classAreaFractions();
   const wxToday = WX.find(d => d.iso === iso(today));
-  let expIrr, expDry, swIrr, swDry;
+  let expIrr, expDry, swIrr, swDry, measured = false;
   if (wxToday && wxToday.potIrr != null && wxToday.potDry != null){
     const calF = CAL.factorFor(today);
     expIrr = wxToday.potIrr * calF; expDry = wxToday.potDry * calF;
     swIrr = wxToday.swIrr; swDry = wxToday.swDry;
+    measured = !!wxToday.swMeasured;    // a real Watermetrics reading, not modelled
   } else {
     // No weather for today specifically (a gap right at the join between the
     // archive and the forecast) - fall back to the newest day there is.
@@ -874,11 +909,12 @@ function computeTodayPoint(){
     const calF = d ? CAL.factorFor(d.date) : 1;
     expIrr = d ? d.potIrr * calF : 0; expDry = d ? d.potDry * calF : 0;
     swIrr = d ? d.swIrr : null; swDry = d ? d.swDry : null;
+    measured = !!(d && d.swMeasured);
   }
   return {
     exp: frac.irr*expIrr + frac.dry*expDry, expIrr, expDry,
     sw: (swIrr != null && swDry != null) ? frac.irr*swIrr + frac.dry*swDry : null,
-    swIrr, swDry
+    swIrr, swDry, measured
   };
 }
 
@@ -1030,6 +1066,39 @@ function parseWalkDate(v){
   return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/* Real soil moisture, pushed by the Watermetrics bookmarklet into a sheet -
+ * see NOTES.md and watermetrics_apps_script.js. The sheet is LONG format
+ * (date, sensor_id, series, value) rather than one column per reading,
+ * because nobody has confirmed what Watermetrics actually calls each series
+ * yet - matching loosely here, on whatever text comes back, means a wrong
+ * guess only needs a tweak to this function, not a reflight of the bookmarklet
+ * or the Apps Script. */
+async function loadWatermetrics(){
+  WM_MM_BY_DATE = {};
+  if (!WATERMETRICS_CSV_URL) return;        // not set up yet - the model just runs on its own
+  const res = await csv(WATERMETRICS_CSV_URL);
+  const byDate = {};
+  (res.data || []).forEach(r => {
+    const date = (r.date || '').toString().trim(); if (!date) return;
+    const series = (r.series || '').toString().trim();
+    const value = parseFloat(r.value);
+    if (!isFinite(value)) return;
+    (byDate[date] = byDate[date] || []).push({ series, value });
+  });
+  Object.keys(byDate).forEach(date => {
+    // "Upper" is the shallower sensor, closer to where ryegrass roots
+    // actually draw from - matches Field Capacity/Refill Point being
+    // published for that one, not the lower probe, in the original spec.
+    const upper = byDate[date].find(x => /moistur/i.test(x.series) && /upper/i.test(x.series));
+    if (!upper) return;
+    // Watermetrics' own thresholds - Field Capacity 25%, Refill Point 15% -
+    // already sit at a flat 3 mm per 1% against this model's FC_MM (75mm)
+    // and REFILL_MM (45mm), over the assumed 300mm root zone. So the real
+    // reading converts onto the model's mm scale with no extra fitting.
+    WM_MM_BY_DATE[date] = clamp(upper.value * 3, MODEL.WILT_MM, MODEL.FC_MM);
+  });
+}
+
 async function loadExclusions(){
   try {
     const res = await csv(EXCLUSIONS_CSV_URL);
@@ -1094,8 +1163,8 @@ async function loadAll(){
   // one bar loses them often.
   // Weather stays at index 4 - the one hard failure below checks res[4].
   const jobs  = [loadBoundaries(), loadNDVI(), loadWalks(), loadExclusions(),
-                 withRetry(() => loadWeather()), loadHistWalks()];
-  const names = ['paddock boundaries','NDVI','farmwalk covers','out list','weather','farmwalk history'];
+                 withRetry(() => loadWeather()), loadHistWalks(), loadWatermetrics()];
+  const names = ['paddock boundaries','NDVI','farmwalk covers','out list','weather','farmwalk history','Watermetrics'];
   const res   = await Promise.allSettled(jobs);
   const failed = res.map((r,i) => r.status === 'rejected' ? names[i] : null).filter(Boolean);
   res.forEach((r,i) => { if (r.status === 'rejected') console.error(names[i], r.reason); });
@@ -1111,7 +1180,8 @@ async function loadAll(){
   }
 
   try {
-    buildCalibration();       // needs NDVI and the weather, both are in by now
+    applyWaterBalance();       // now that Watermetrics has had its chance to load too
+    buildCalibration();        // needs NDVI and the weather, both are in by now
     buildSeries();
     buildPaddocks();
     if (res[0].status === 'fulfilled') drawMap(res[0].value);
@@ -1383,8 +1453,12 @@ function render(){
   // alone makes "irrigated 68 · dryland 68" a confusing thing to print.
   const swSplit = (frac.irr > 0 && frac.dry > 0 && todayPt.swIrr != null)
     ? ` <span style="color:#78847f">(irr ${Math.round(todayPt.swIrr)} · dry ${Math.round(todayPt.swDry)})</span>` : '';
+  // Says outright whether this number is a real Watermetrics reading or the
+  // model's own guess, so nobody mistakes one for the other.
+  const swSource = sw == null ? '' : todayPt.measured
+    ? ' <span class="pill ok">measured</span>' : ' <span class="pill warn">modelled</span>';
   document.getElementById('t-soil-note').innerHTML =
-    `<span class="pill ${swState[0]}">${swState[1]}</span> refill at ${MODEL.REFILL_MM} mm${swSplit}`;
+    `<span class="pill ${swState[0]}">${swState[1]}</span> refill at ${MODEL.REFILL_MM} mm${swSplit}${swSource}`;
 
   // The calibration factor is per calendar month now (see computeCalibration),
   // so the tile shows THIS month's - the one actually driving today's number.
@@ -1418,13 +1492,14 @@ function render(){
   // headline cumulative, taken across whole replayed years - unless the
   // whole range is already in the past, in which case there is no scenario
   // spread at all: this already happened, once, one way.
+  const avgDay = SERIES.cumEx / days.length;
   document.getElementById('headline').innerHTML = SERIES.years === 0
     ? `Over ${days.length} days, ${fmtNZ(days[0].date)} to ${fmtNZ(days[days.length-1].date)}, ` +
       `the model says <b>${Math.round(SERIES.cumEx).toLocaleString('en-NZ')}</b> kgDM/ha grew ` +
-      `<span style="color:#78847f">(measured weather, not a forecast - this already happened)</span>`
+      `<span style="color:#78847f">(average ${avgDay.toFixed(1)} kgDM/ha/day — measured weather, not a forecast, this already happened)</span>`
     : `Over ${days.length} days, ${fmtNZ(days[0].date)} to ${fmtNZ(days[days.length-1].date)}, ` +
       `expected growth is <b>${Math.round(SERIES.cumEx).toLocaleString('en-NZ')}</b> kgDM/ha ` +
-      `<span style="color:#78847f">(a drier year ${Math.round(SERIES.cumLo).toLocaleString('en-NZ')} – ` +
+      `<span style="color:#78847f">(average ${avgDay.toFixed(1)} kgDM/ha/day — a drier year ${Math.round(SERIES.cumLo).toLocaleString('en-NZ')} – ` +
       `a wetter year ${Math.round(SERIES.cumHi).toLocaleString('en-NZ')}, across ${SERIES.years} past years)</span>`;
 
   // forecast table, the accessible view of the same numbers
@@ -1465,6 +1540,9 @@ function render(){
     `set per paddock in the map or the table below` +
     `<br><span>Rainfall check</span> this grid point averages <b>${Math.round(rainAvg)} mm a year</b>. ` +
     `If the farm gauge disagrees, set RAIN_SCALE to gauge ÷ ${Math.round(rainAvg)}.` +
+    `<br><span>Soil moisture</span> ` + (Object.keys(WM_MM_BY_DATE).length
+      ? `<b>${Object.keys(WM_MM_BY_DATE).length} real Watermetrics days</b> used where they exist, modelled the rest`
+      : `not connected yet — every day is the water-balance model's own guess (see NOTES.md, Watermetrics)`) +
     `<br><span>Outlook</span> ${SERIES.years} past years replayed from today, Open-Meteo archive at ${FARM.lat}, ${FARM.lon}` +
     `<br><span>Calibration</span> one factor per calendar month, ${CAL.n} clean intervals all up ` +
     `(this season's walks plus last season's history) — ` +
@@ -1485,7 +1563,6 @@ function renderTable(){
     `<td><b>${p.growth.toFixed(1)}</b></td>` +
     `<td>${p.ndvi != null ? p.ndvi.toFixed(3) : '–'}</td>` +
     `<td>${p.area ? p.area.toFixed(2) : '–'}</td>` +
-    `<td>${p.area ? Math.round(p.total).toLocaleString('en-NZ') : '–'}</td>` +
     `<td><button class="btn" style="padding:3px 8px;font-size:10px;${p.irrClass==='dry' ? '' :
       'background:var(--accent);border-color:var(--accent);color:#06140b;'}" ` +
       `onclick="toggleClass('${escAttr(p.name)}')">${p.irrClass==='dry' ? '🌾 Dry' : '💧 Irr'}</button></td></tr>`
