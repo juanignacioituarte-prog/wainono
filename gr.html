@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Wainono Growth Rate</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --bg:#101413; --card:#1a201e; --line:#2c3633;
+    --ink:#f2f5f4; --ink2:#a9b5b1; --ink3:#78847f;
+    /* single hue green ramp, light -> dark. Same family the cover map uses,
+       so "darker = more grass" stays the one visual rule on this farm. */
+    --g1:#a1d99b; --g2:#74c476; --g3:#41ab5d; --g4:#238b45; --g5:#006d2c; --g6:#00441b;
+    --accent:#41ab5d;
+    /* status colours are reserved for state, never for a data series */
+    --ok:#41ab5d; --warn:#eda100; --bad:#e34948;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1100px; margin:0 auto; padding:0 16px 40px;}
+
+  header{position:sticky; top:0; z-index:500; background:var(--bg);
+    border-bottom:1px solid var(--line); padding:10px 16px; display:flex;
+    align-items:center; gap:10px;}
+  header h1{font-size:15px; margin:0; letter-spacing:.5px; flex:1; font-weight:700;}
+  header .sub{font-size:11px; color:var(--ink3); font-weight:400; display:block; letter-spacing:0;}
+  .btn{background:var(--card); color:var(--ink); border:1px solid var(--line);
+    padding:7px 12px; border-radius:7px; font-size:12px; cursor:pointer; font-weight:600;}
+  .btn:active{transform:scale(.97);}
+  .btn.on{background:var(--accent); border-color:var(--accent); color:#06140b;}
+
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0;}
+  .tile{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px;}
+  .tile .lab{font-size:10px; letter-spacing:.9px; color:var(--ink3); text-transform:uppercase;}
+  .tile .val{font-size:26px; font-weight:700; margin-top:3px; line-height:1.1;}
+  .tile .unit{font-size:11px; color:var(--ink2); font-weight:400;}
+  .tile .note{font-size:11px; color:var(--ink3); margin-top:4px;}
+  .pill{display:inline-block; font-size:10px; padding:2px 7px; border-radius:20px;
+    font-weight:700; letter-spacing:.4px;}
+  .pill.ok{background:rgba(65,171,93,.18); color:var(--ok);}
+  .pill.warn{background:rgba(237,161,0,.18); color:var(--warn);}
+  .pill.bad{background:rgba(227,73,72,.18); color:var(--bad);}
+
+  section{background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:14px; margin-bottom:14px;}
+  section h2{font-size:12px; margin:0 0 3px; letter-spacing:.8px; text-transform:uppercase; color:var(--ink);}
+  section .hint{font-size:11px; color:var(--ink3); margin:0 0 12px;}
+
+  /* filters sit in one row above the chart */
+  .filters{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:12px;}
+  .filters .sep{width:1px; height:20px; background:var(--line); margin:0 4px;}
+  .filters label{font-size:11px; color:var(--ink3);}
+  .filters input[type=date]{background:var(--bg); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:6px 8px; font-size:12px; font-family:inherit;}
+
+  #chart{width:100%; display:block; overflow:visible; touch-action:pan-y;}
+  .headline{margin-top:10px; padding-top:12px; border-top:1px solid var(--line);
+    font-size:13px; color:var(--ink2);}
+  .headline b{color:var(--ink); font-size:20px;}
+
+  #map{height:64vh; min-height:340px; border-radius:8px; overflow:hidden;}
+  .legend{display:flex; align-items:center; gap:0; margin-top:10px; flex-wrap:wrap;}
+  .legend .sw{width:34px; height:12px;}
+  .legend .tick{font-size:10px; color:var(--ink3); width:34px; text-align:center; margin-top:3px;}
+  .legend-title{font-size:10px; color:var(--ink3); letter-spacing:.7px;
+    text-transform:uppercase; width:100%; margin-bottom:5px;}
+
+  table{width:100%; border-collapse:collapse; font-size:12px;}
+  th,td{text-align:right; padding:7px 8px; border-bottom:1px solid var(--line);}
+  th{font-size:10px; letter-spacing:.7px; color:var(--ink3); text-transform:uppercase;
+    font-weight:600; cursor:pointer; white-space:nowrap;}
+  td:first-child,th:first-child{text-align:left;}
+  .dot{display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:7px; vertical-align:-1px;}
+  tr.out td{color:var(--ink3);}
+
+  #tip{position:fixed; z-index:900; pointer-events:none; background:#000;
+    border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:11px;
+    line-height:1.5; display:none; box-shadow:0 6px 20px rgba(0,0,0,.6); max-width:200px;}
+  #tip .t{font-weight:700; margin-bottom:3px; font-size:11px;}
+  #tip .r{color:var(--ink2);} #tip .r b{color:var(--ink); float:right; margin-left:12px;}
+
+  #err{display:none; background:rgba(227,73,72,.12); border:1px solid var(--bad);
+    color:#ffb3b3; padding:10px 12px; border-radius:8px; font-size:12px; margin:14px 0;}
+  .loading{color:var(--ink3); font-size:12px; padding:26px 0; text-align:center;}
+  details{margin-top:12px;} details summary{font-size:11px; color:var(--ink3); cursor:pointer;}
+  .kv{font-size:11px; color:var(--ink2); margin-top:8px; line-height:1.8;}
+  .kv span{color:var(--ink3);}
+  .leaflet-container{background:#0a0d0c;}
+  @media (max-width:560px){ .tile .val{font-size:22px;} #map{height:54vh;} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>GROWTH RATE<span class="sub" id="hdr-sub">loading…</span></h1>
+  <button class="btn" id="btn-refresh" onclick="loadAll(true)">↻</button>
+</header>
+
+<div class="wrap">
+  <div id="err"></div>
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="lab">Growth today</div>
+      <div class="val" id="t-today">–<span class="unit"> kgDM/ha/day</span></div>
+      <div class="note" id="t-today-note">farm average</div>
+    </div>
+    <div class="tile">
+      <div class="lab">Soil water</div>
+      <div class="val" id="t-soil">–<span class="unit"> mm</span></div>
+      <div class="note" id="t-soil-note"></div>
+    </div>
+    <div class="tile">
+      <div class="lab">Calibration</div>
+      <div class="val" id="t-cal">–<span class="unit">×</span></div>
+      <div class="note" id="t-cal-note"></div>
+    </div>
+    <div class="tile">
+      <div class="lab">Last 7 days</div>
+      <div class="val" id="t-week">–<span class="unit"> kgDM/ha/day</span></div>
+      <div class="note">measured weather</div>
+    </div>
+  </div>
+
+  <div id="cal-table-wrap" style="display:none; margin:-4px 0 14px;">
+    <div class="hint" style="margin-bottom:6px;">One calibration factor per calendar month, not one number for the
+      whole year — a flat factor cannot fit both a quiet May and a fast October at once. Built from this
+      season's farmwalks plus last season's history. A greyed-out month has no real evidence of its own yet and
+      borrows the all-year figure.</div>
+    <table style="font-size:11px;"><thead><tr>
+      <th>Month</th><th>Factor</th><th>Middle half</th><th>Real intervals</th>
+    </tr></thead><tbody id="cal-table-body"></tbody></table>
+  </div>
+
+  <section>
+    <h2>Growth outlook</h2>
+    <p class="hint" id="chart-hint">Solid line is the real weather forecast. Past that, each of the
+      last 10 years is replayed from today and the band shows the middle half of them — a drier
+      year at the bottom, a wetter year at the top. Dashed means no forecast is left, only past years.
+      The date boxes also take a <b>past</b> range — pick dates already gone to check what the model
+      would have said, using the weather that actually happened.</p>
+
+    <div class="filters">
+      <button class="btn" data-days="10" onclick="setRange(10)">10 days</button>
+      <button class="btn" data-days="30" onclick="setRange(30)">30 days</button>
+      <button class="btn" data-days="60" onclick="setRange(60)">60 days</button>
+      <button class="btn" data-days="90" onclick="setRange(90)">90 days</button>
+      <span class="sep"></span>
+      <label>from <input type="date" id="d-from" onchange="customRange()"></label>
+      <label>to <input type="date" id="d-to" onchange="customRange()"></label>
+    </div>
+
+    <svg id="chart" role="img" aria-label="Predicted pasture growth rate outlook"></svg>
+
+    <div class="headline" id="headline"></div>
+
+    <details>
+      <summary>Show the numbers as a table</summary>
+      <div style="max-height:260px; overflow:auto; margin-top:10px;">
+        <table id="fc-table"><thead><tr>
+          <th>Date</th><th>Source</th><th>Dry</th><th>Expected</th><th>Wet</th><th>Cum. exp.</th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Paddocks today</h2>
+    <p class="hint">Growth rate per paddock. Darker green is faster growth.
+      Paddock differences come from NDVI, so a paddock with no recent clear satellite
+      image sits on the farm average.</p>
+
+    <p class="hint">Nobody has told this page which paddocks are under a pivot, so
+      every paddock starts as <b>irrigated</b>. Tap a paddock on the map, or a row in the
+      table below, to switch it to dryland.</p>
+    <div class="filters">
+      <span id="irr-summary" style="font-size:11px; color:var(--ink3);">–</span>
+      <span class="sep"></span>
+      <button class="btn" onclick="setAllClass('irr')">All irrigated</button>
+      <button class="btn" onclick="setAllClass('dry')">All dryland</button>
+    </div>
+
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section>
+    <h2>Paddock table</h2>
+    <p class="hint">Tap a heading to sort.</p>
+
+    <div class="filters">
+      <span style="font-size:11px; color:var(--ink3);">Split paddocks by</span>
+      <button class="btn on" id="btn-ndvi-on" onclick="setUseNdvi(true)">NDVI</button>
+      <button class="btn" id="btn-ndvi-off" onclick="setUseNdvi(false)">Flat, no split</button>
+    </div>
+    <p class="hint" id="ndvi-compare">–</p>
+
+    <table id="pdk-table"><thead><tr>
+      <th onclick="sortTable('name')">Paddock</th>
+      <th onclick="sortTable('growth')">Growth</th>
+      <th onclick="sortTable('ndvi')">NDVI</th>
+      <th onclick="sortTable('area')">Area ha</th>
+      <th onclick="sortTable('total')">kgDM/day</th>
+      <th onclick="sortTable('irrClass')">Water</th>
+    </tr></thead><tbody></tbody></table>
+    <div class="kv" id="model-note"></div>
+  </section>
+</div>
+
+<div id="tip"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+/* ===========================================================================
+   WAINONO PASTURE GROWTH RATE
+   ---------------------------------------------------------------------------
+   Everything runs in the browser. There is no server and no API key.
+
+     Open-Meteo archive   -> past weather, and the 10 year climatology
+     Open-Meteo forecast  -> next 16 days, plus the recent days the archive
+                             has not published yet
+     ndvi tab (CSV)       -> per paddock NDVI, to split the farm figure
+     Farmwalks tab (CSV)  -> ground truth, to calibrate the model
+     Paddock Boundaries   -> the map
+
+   The model is the hybrid from the spec, run once for a paddock as if it were
+   irrigated and once as if it were not:
+
+     growth = MAX_GROWTH x T_factor x M_factor x R_factor      (per class)
+     paddock growth = growth[paddock's own class] x (paddock_ndvi / farm_ndvi)^k
+     then x one farm wide calibration factor from real farmwalk deltas
+
+   Which class a paddock is in is picked on the page (map or table), not by a
+   single farm-wide switch - nobody has told this page which blocks are
+   irrigated, so it starts with everything irrigated and Juani flips the
+   dryland ones. The farm-wide tiles and the chart blend the two classes by
+   real paddock area, so the answer always matches the actual farm.
+
+   Soil moisture is not forecast. It is a slow variable with memory, so a
+   daily water balance is run forward instead (spec section 5).
+   =========================================================================== */
+
+/* ---- farm ---------------------------------------------------------------- */
+const FARM = { name:'Wainono', lat:-44.119, lon:170.852 };   // centre of the paddock geojson
+
+/* ---- data sources (same URLs the dashboard uses) ------------------------- */
+const GOOGLE_SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbzRkkZ9pxJnFYiBpbLdgy_WXoG_itdfnjL199NvOLLxCGrPfh2drA1lcCVditsKxbe2/exec";
+const GEOJSON_URL         = "https://storage.googleapis.com/ndvi-exports/wainono.geojson";
+const NDVI_CSV_URL        = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRBBRftvApfrkHKVQh9FV1qsYVy3Y2whaHKfyAWJ5Ymbc1cTcw7IzB4epF8h_-rN1dxD-N7bdaJyp1V/pub?gid=1426555702&single=true&output=csv";
+/* The farmwalk covers live in the "manual mode" tab, columns Date, paddock,
+ * cover. The other calibration tab (gid 2878588) publishes a single #N/A row
+ * because its formula is broken, so it is not used here. */
+const FARMWALK_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=470390408&single=true&output=csv";
+const EXCLUSIONS_CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ1OhQkUXzp_TuFwnePsBSp2XlHE7Pw165eReEsOUyLwSldUuvviIdx-M8j0bbII2SYc7trwpjfM6aA/pub?gid=376904965&single=true&output=csv";
+
+/* ---- model constants ----------------------------------------------------- *
+ * These are the tuning knobs. The calibration factor fixes the overall
+ * level against real farmwalks, so the job of these numbers is the SHAPE of
+ * the season, not the size of it.                                            */
+const MODEL = {
+  MAX_GROWTH:     85,    // kgDM/ha/day when nothing is holding the grass back
+  T_BASE:          4,    // deg C, base temperature for ryegrass
+  GDD_OPT:        16,    // GDD per day that gives the full temperature response
+  GDD_CLIP:       25,    // any day above this is a logger fault, not weather
+  GDD_SMOOTH:      5,    // days of GDD the temperature response is read from
+  T_EXP:         0.7,    // softens the temperature limit
+  RAD_OPT:        25,    // MJ/m2/day that gives the full radiation response
+  R_EXP:         0.5,    // softens the radiation limit
+  KC:           0.95,    // pasture crop factor applied to PET
+  /* Open-Meteo's archive is ERA5, on a grid about 25 km wide. This farm sits
+   * close enough to the ranges that the grid box catches their rain: it reads
+   * 1000 to 1400 mm a year, where inland South Canterbury is nearer 800 mm.
+   * Leave this at 1 until the farm's own rain gauge is available, then set it
+   * to (gauge annual mm / the annual mm shown under the paddock table).
+   * It only moves the moisture factor, and only in a dry summer - the soil is
+   * genuinely full through spring either way.                               */
+  RAIN_SCALE:      1,
+  FC_MM:          75,    // field capacity  (25% over a 300 mm root zone)
+  REFILL_MM:      45,    // refill point    (15% over a 300 mm root zone)
+  WILT_MM:        33,    // the balance never goes below this
+  STRESS_P:      0.5,    // half the available water can go before growth slows
+  NDVI_K:        0.7,    // damping on the NDVI split
+  /* Irrigation is chosen PER PADDOCK on the page (see IRR_CLASS below), not as
+   * one farm-wide flag. We do not know which blocks are actually under a
+   * pivot, so every paddock starts as irrigated and Juani flips the dryland
+   * ones from the map or the table. These three constants describe what "an
+   * irrigated paddock" does in the water balance - they apply to whichever
+   * paddocks are currently marked irrigated. */
+  IRR_TRIGGER:    54,    // mm, the pivot starts before the grass feels it
+  IRR_MM_DAY:      6,    // mm a pivot puts on in a day
+  IRR_MONTHS:  [9,10,11,12,1,2,3,4],   // Sep to Apr
+  ARCHIVE_YEARS:  10,    // past years pulled, and replayed as the outlook
+  CAL_MIN_DAYS:    5,    // shortest farmwalk interval worth calibrating on
+  CAL_MAX_DAYS:   35,    // longest
+  CAL_MIN_N:       3,    // fewer clean intervals than this -> no calibration
+  CAL_CLAMP:  [0.3, 3.0] // a calibration factor outside this is a data problem
+};
+/* M_MIN note: the spec puts the moisture factor at 0 on the refill point.
+ * That makes growth exactly zero through any dry spell, which then divides by
+ * zero in the calibration step and throws the whole interval away. A small
+ * floor keeps the arithmetic alive and still shows a dry spell as a stall.   */
+
+/* ---- state -------------------------------------------------------------- */
+let WX = [];                 // one row per day, past and future, merged
+let NDVI = {};               // paddock -> {ndvi, date}
+let WALKS = {};              // paddock -> [{date, cover, reason}] ascending
+let HIST_WALKS = {};         // paddock -> [{date, cover}] ascending, last season's history
+let EXCLUDED = new Map();    // paddock (normalised) -> reason
+let AREAS = {};              // paddock -> ha
+let NAME_BY_NORM = {};
+let CAL = { factor:1, n:0, intervals:[] };
+let PADDOCKS = [];           // computed rows for the map and the table
+let SERIES = null;           // the outlook: {days:[{date,dry,exp,wet,kind}]}
+let map, geoLayer;
+let rangeDays = 30, customFrom = null, customTo = null;
+let sortKey = 'growth', sortDir = -1;
+
+/* Which paddocks are irrigated. Nobody has told the page which blocks are
+ * under a pivot, so this starts empty - meaning every paddock defaults to
+ * irrigated - and only the ones flipped to dryland are stored, by name.
+ * Saved to this browser's localStorage, so it is remembered on this phone
+ * or computer but is not shared between devices. */
+let IRR_CLASS = {};           // paddock (normalised) -> 'dry' (absent = 'irr')
+const IRR_KEY = 'gr_irrigation_class';
+function loadIrrClass(){
+  try { IRR_CLASS = JSON.parse(localStorage.getItem(IRR_KEY) || '{}') || {}; }
+  catch(e){ IRR_CLASS = {}; }
+}
+function saveIrrClass(){
+  try { localStorage.setItem(IRR_KEY, JSON.stringify(IRR_CLASS)); } catch(e){}
+}
+function classFor(name){ return IRR_CLASS[normName(name)] === 'dry' ? 'dry' : 'irr'; }
+function setClass(name, cls){
+  const k = normName(name);
+  if (cls === 'dry') IRR_CLASS[k] = 'dry'; else delete IRR_CLASS[k];   // 'irr' is the default, so don't store it
+  saveIrrClass();
+}
+/* The area-weighted split of the farm between the two classes, "out of
+ * rotation" paddocks excluded - the same convention the rest of the app uses
+ * for farm-wide averages. Recomputed on every toggle rather than cached,
+ * because it is one pass over a few hundred paddocks at most. */
+function classAreaFractions(){
+  let areaIrr = 0, areaDry = 0, nIrr = 0, nDry = 0;
+  Object.keys(AREAS).forEach(name => {
+    if (EXCLUDED.get(normName(name))) return;
+    const a = AREAS[name] || 0;
+    if (classFor(name) === 'dry'){ areaDry += a; nDry++; } else { areaIrr += a; nIrr++; }
+  });
+  const total = areaIrr + areaDry;
+  return total > 0
+    ? { irr: areaIrr/total, dry: areaDry/total, areaIrr, areaDry, nIrr, nDry, total }
+    : { irr: 1, dry: 0, areaIrr:0, areaDry:0, nIrr:0, nDry:0, total:0 };
+}
+
+/* ---- small helpers ------------------------------------------------------- */
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const normName = s => String(s==null?'':s).trim().toLowerCase();
+/* Local date, NOT toISOString(). New Zealand is 12 or 13 hours ahead of UTC,
+ * so local midnight converted to UTC lands on the day before and every date
+ * key in the page came out one day early. */
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const DAY = 86400000;
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function parseISO(s){ const p = String(s).split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+function fmtNZ(d){ return d.toLocaleDateString('en-NZ',{day:'numeric',month:'short'}); }
+function median(a){ if(!a.length) return NaN; const s=a.slice().sort((x,y)=>x-y); const m=s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+function pct(a,p){ if(!a.length) return 0; const s=a.slice().sort((x,y)=>x-y);
+  const i = clamp(Math.round((s.length-1)*p), 0, s.length-1); return s[i]; }
+function todayNZ(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+function doy(d){ return Math.floor((d - new Date(d.getFullYear(),0,0)) / DAY); }
+
+/* =========================================================================
+   1. THE MODEL
+   ========================================================================= */
+function gddOf(tmax, tmin){
+  if (tmax==null || tmin==null) return null;
+  const g = (tmax + tmin)/2 - MODEL.T_BASE;
+  // Guard from the spec: the station once logged GDD over 150 in a day while
+  // PET sat at 0. That is a logger reset. Anything past the ceiling is capped
+  // so one bad week cannot inject a false growth spike into the calibration.
+  return clamp(g, 0, MODEL.GDD_CLIP);
+}
+const tFactor = g   => Math.pow(clamp(g / MODEL.GDD_OPT, 0, 1), MODEL.T_EXP);
+
+/* Grass answers to accumulated warmth, not to one day of it. Reading the
+ * temperature response off a 5 day trailing mean stops a single frosty day
+ * dropping the whole farm to zero growth, which is what a plain daily GDD
+ * does and which is not what a paddock actually does.
+ * `seed` is the GDD of the days just before this list, so a forecast run
+ * carries on from the measured weather instead of restarting cold. */
+function smoothGdd(days, seed){
+  const win = (seed || []).slice(-(MODEL.GDD_SMOOTH - 1));
+  for (const d of days){
+    win.push(d.gdd == null ? 0 : d.gdd);
+    while (win.length > MODEL.GDD_SMOOTH) win.shift();
+    d.gddSm = win.reduce((a,b) => a+b, 0) / win.length;
+  }
+}
+const rFactor = rad => Math.pow(clamp(rad / MODEL.RAD_OPT, 0, 1), MODEL.R_EXP);
+/* The moisture factor, as the FAO-56 water stress coefficient Ks.
+ *
+ * The spec puts this at 1 on field capacity and 0 on the refill point. That
+ * shape is not how a pasture behaves: soil sits below field capacity nearly
+ * every day of the year, so it would hold growth down almost all the time,
+ * and it would call the refill point - the moment you START irrigating - a
+ * total stop. It also divided by zero in the calibration step.
+ *
+ * Ks is the standard shape instead. Grass does not feel a shortage until
+ * about half the available water is gone; past that it falls away in a
+ * straight line to nothing at wilting point. On this soil that puts the
+ * refill point at about 0.57, which is the right story - dry enough that you
+ * would turn the water on, not dry enough that the paddock has stopped.     */
+function mFactor(sw){
+  const taw = MODEL.FC_MM - MODEL.WILT_MM;          // total available water
+  const raw = MODEL.STRESS_P * taw;                 // readily available water
+  const dep = MODEL.FC_MM - sw;                     // how far it has dried
+  if (dep <= raw) return 1;
+  return clamp((taw - dep) / (taw - raw), 0, 1);
+}
+const inIrrSeason = d => MODEL.IRR_MONTHS.indexOf(d.getMonth()+1) !== -1;
+
+/* The soil water balance. Walks a list of days forward and writes soil water
+ * and the moisture factor onto each one, under the given property names, and
+ * returns the soil water it ended on.
+ *
+ * It takes an explicit `irrigated` flag and writes to caller-chosen property
+ * names rather than always `sw`/`m`, so it can be run TWICE over the same
+ * list of days - once as if the block were irrigated, once as if it were
+ * not - without the second run overwriting the first. Every paddock then
+ * reads off whichever pair of fields matches its own class.                 */
+function runWaterBalance(days, sw0, irrigated, swProp, mProp){
+  swProp = swProp || 'sw'; mProp = mProp || 'm';
+  let sw = sw0;
+  for (const d of days){
+    sw += (d.rain || 0) * MODEL.RAIN_SCALE - (d.pet || 0) * MODEL.KC;
+    // A pivot puts a set depth on each day it runs. Jumping the soil straight
+    // back to full instead made the growth line saw up and down every week.
+    if (irrigated && inIrrSeason(d.date) && sw < MODEL.IRR_TRIGGER) sw += MODEL.IRR_MM_DAY;
+    sw = clamp(sw, MODEL.WILT_MM, MODEL.FC_MM);
+    d[swProp] = sw;
+    d[mProp]  = mFactor(sw);
+  }
+  return sw;
+}
+
+/* Potential growth for one day, before calibration. `mProp` picks which
+ * class's moisture factor to read off the day object - 'mIrr' or 'mDry'.    */
+function potential(d, mProp){
+  const m = d[mProp || 'm'];
+  const g = (d.gddSm != null) ? d.gddSm : d.gdd;
+  if (g == null || d.rad == null || m == null) return null;
+  return MODEL.MAX_GROWTH * tFactor(g) * m * rFactor(d.rad);
+}
+
+/* =========================================================================
+   2. WEATHER
+   ========================================================================= */
+async function loadWeather(){
+  const today = todayNZ();
+  const start = new Date(today.getFullYear() - MODEL.ARCHIVE_YEARS, today.getMonth(), today.getDate());
+  // The archive refuses an end_date past yesterday and answers 400, which took
+  // the whole page down. Two days back is clear of that edge whatever the
+  // timezone does, and the forecast endpoint carries about 70 past days, so
+  // nothing is lost by stopping the archive early.
+  const arcEnd = new Date(today.getTime() - 2*DAY);
+  const vars  = "temperature_2m_max,temperature_2m_min,precipitation_sum,shortwave_radiation_sum,et0_fao_evapotranspiration";
+  const base  = `latitude=${FARM.lat}&longitude=${FARM.lon}&daily=${vars}&timezone=Pacific%2FAuckland`;
+
+  // The archive is the ground truth but runs about two weeks behind. The
+  // forecast endpoint carries roughly 70 days of past days, which covers the
+  // gap, so the two are stitched and the archive wins wherever it has a value.
+  const [arcRes, fcRes] = await Promise.all([
+    fetchT(`https://archive-api.open-meteo.com/v1/archive?${base}&start_date=${iso(start)}&end_date=${iso(arcEnd)}`),
+    fetchT(`https://api.open-meteo.com/v1/forecast?${base}&past_days=60&forecast_days=16`)
+  ]);
+  if (!arcRes.ok || !fcRes.ok) throw new Error("Open-Meteo did not answer");
+  const arc = await arcRes.json(), fc = await fcRes.json();
+
+  const rows = new Map();
+  const soak = (j, isForecast) => {
+    const D = j.daily; if (!D || !D.time) return;
+    for (let i = 0; i < D.time.length; i++){
+      const tmax = D.temperature_2m_max[i], tmin = D.temperature_2m_min[i];
+      const rad  = D.shortwave_radiation_sum[i], pet = D.et0_fao_evapotranspiration[i];
+      const rain = D.precipitation_sum[i];
+      if (tmax == null || tmin == null || rad == null) continue;   // the forecast pads with nulls
+      const key = D.time[i];
+      if (rows.has(key) && !rows.get(key).isForecast) continue;    // archive wins
+      rows.set(key, {
+        date: parseISO(key), iso: key, tmax, tmin, rain: rain || 0,
+        rad, pet: (pet == null ? 0 : pet), isForecast,
+        gdd: gddOf(tmax, tmin)
+      });
+    }
+  };
+  soak(arc, false);
+  soak(fc,  true);
+
+  WX = Array.from(rows.values()).sort((a,b) => a.date - b.date);
+  if (WX.length < 400) throw new Error("not enough weather history came back");
+
+  // One long spin-up so today's soil water is a settled number, not a guess.
+  // It is run twice - as if the whole farm were irrigated, and as if none of
+  // it were - so that later, each paddock can read off the run that matches
+  // its own class. See runWaterBalance() for why this does not clash.
+  smoothGdd(WX, []);
+  runWaterBalance(WX, MODEL.FC_MM, true,  'swIrr', 'mIrr');
+  runWaterBalance(WX, MODEL.FC_MM, false, 'swDry', 'mDry');
+  WX.forEach(d => { d.potIrr = potential(d, 'mIrr'); d.potDry = potential(d, 'mDry'); });
+}
+
+/* =========================================================================
+   3. CALIBRATION against real farmwalks
+   ========================================================================= */
+const GRAZED_WORDS = /graz|silage|hay|mow|topp|cut|crop|out|break|shut/i;
+
+/* Runs the calibration for ONE way of splitting growth across paddocks,
+ * given as `nfFn(paddockName) -> factor`. Called twice, below: once with the
+ * real NDVI split, once with every paddock getting the same factor (1) - a
+ * "flat" model with no satellite input at all. Comparing the two against the
+ * same farmwalk data says whether NDVI is adding real signal or just adding
+ * scatter on top of what the farmwalks already have.
+ *
+ * Returns ONE FACTOR PER CALENDAR MONTH, not one flat number for the whole
+ * year. A single flat factor, fit on the two farmwalk windows available this
+ * season (May and Aug-Sep, both shoulder season), badly under-predicts real
+ * spring growth: last season's full farmwalk history (bundled below, see
+ * HIST_WALKS) shows October needs roughly DOUBLE the mechanistic model's raw
+ * prediction, while May and shoulder months need much less. A flat factor
+ * cannot represent that at the same time - it has to be wrong somewhere.
+ *
+ * Live walks (this season, WALKS) and last season's history (HIST_WALKS) are
+ * pooled together per paddock. Where the same date appears in both - the
+ * historical file's last column overlaps this season's first farmwalks -
+ * the live sheet wins, since it is the more current source.                */
+function computeCalibration(nfFn){
+  // A lookup of potential by date, so an interval can be summed - one for
+  // each class, since a dryland paddock and an irrigated one predict
+  // differently even on the very same days.
+  const potByDate = { irr:{}, dry:{} };
+  WX.forEach(d => {
+    if (d.potIrr != null) potByDate.irr[d.iso] = d.potIrr;
+    if (d.potDry != null) potByDate.dry[d.iso] = d.potDry;
+  });
+
+  const names = new Set([...Object.keys(WALKS), ...Object.keys(HIST_WALKS)]);
+  const kept = [];
+  names.forEach(pdk => {
+    // Merge by date. The historical file has no Reason column, so a
+    // historical entry gets reason:'' - the "cover must go up" rule is doing
+    // the real work of throwing out a grazing event either way.
+    const seen = {};
+    (HIST_WALKS[pdk] || []).forEach(e => { seen[iso(e.date)] = { date:e.date, cover:e.cover, reason:'' }; });
+    (WALKS[pdk] || []).forEach(e => { seen[iso(e.date)] = e; });
+    const list = Object.keys(seen).sort().map(k => seen[k]);
+
+    const nf = nfFn(pdk);
+    const pot = potByDate[classFor(pdk)];
+    for (let i = 1; i < list.length; i++){
+      const a = list[i-1], b = list[i];
+      const days = Math.round((b.date - a.date) / DAY);
+      if (days < MODEL.CAL_MIN_DAYS || days > MODEL.CAL_MAX_DAYS) continue;
+
+      // A clean interval means the grass only grew. A drop in cover means it
+      // was grazed or cut, whether or not anybody wrote a reason down.
+      if (!(b.cover > a.cover)) continue;
+      if (GRAZED_WORDS.test(a.reason || '') || GRAZED_WORDS.test(b.reason || '')) continue;
+
+      // Sum the predicted growth over the window. The spec compares a rate
+      // against a sum; totals against totals is the version that has matching
+      // units, so that is what this does.
+      let predTotal = 0, have = 0;
+      for (let t = a.date.getTime() + DAY; t <= b.date.getTime(); t += DAY){
+        const key = iso(new Date(t));
+        if (pot[key] != null){ predTotal += pot[key] * nf; have++; }
+      }
+      if (have < days * 0.8 || predTotal <= 1) continue;   // weather gaps -> skip
+
+      const actualTotal = b.cover - a.cover;
+      const f = actualTotal / predTotal;
+      if (!isFinite(f) || f <= 0) continue;
+      // Tagged by the month the interval STARTS in - a walk-to-walk gap
+      // rarely crosses a month boundary by more than a few days.
+      kept.push({ pdk, from:a.date, to:b.date, days, actual:actualTotal, pred:predTotal, f,
+                  month: a.date.getMonth() + 1 });
+    }
+  });
+
+  const summarise = arr => {
+    if (arr.length < MODEL.CAL_MIN_N) return { factor: null, n: arr.length, raw: null, p25: null, p75: null };
+    const m = median(arr);
+    // p25/p75 - the middle half of the factors - is the spread shown next to
+    // the NDVI/flat comparison. A tighter middle half means that model is
+    // explaining more of the farmwalk-to-farmwalk scatter, not less.
+    return { factor: clamp(m, MODEL.CAL_CLAMP[0], MODEL.CAL_CLAMP[1]), n: arr.length,
+             raw: m, p25: pct(arr,0.25), p75: pct(arr,0.75) };
+  };
+
+  const overall = summarise(kept.map(k => k.f));
+  const months = {};
+  for (let mo = 1; mo <= 12; mo++){
+    const s = summarise(kept.filter(k => k.month === mo).map(k => k.f));
+    // A month with too few real intervals of its own borrows the all-months
+    // figure rather than falling back to "no correction" (factor 1), which
+    // would be a much bigger and much less evidenced jump.
+    months[mo] = s.factor != null ? Object.assign(s, { fallback:false })
+                                   : Object.assign({}, overall, { n: s.n, fallback:true });
+  }
+
+  return {
+    months, overall, intervals: kept,
+    n: overall.n, factor: overall.factor != null ? overall.factor : 1, raw: overall.raw,
+    factorFor(date){ const f = this.months[date.getMonth()+1].factor; return f != null ? f : 1; }
+  };
+}
+
+let CAL_NDVI = null, CAL_FLAT = null;
+function buildCalibration(){
+  CAL_NDVI = computeCalibration(pdk => ndviFactorFor(pdk));
+  CAL_FLAT = computeCalibration(() => 1);
+  CAL = USE_NDVI ? CAL_NDVI : CAL_FLAT;
+}
+
+function ndviFactorFor(pdk){
+  const e = NDVI[normName(pdk)];
+  if (!e || !isFinite(e.ndvi) || !NDVI.__farmAvg) return 1;
+  const r = e.ndvi / NDVI.__farmAvg;
+  if (!isFinite(r) || r <= 0) return 1;
+  return clamp(Math.pow(r, MODEL.NDVI_K), 0.6, 1.4);
+}
+
+/* Which of the two models is actually driving the map, the table and the
+ * calibration factor right now. NDVI stays the default - this is here to
+ * let the flat model be compared against it, and used instead if it turns
+ * out to explain the farmwalks better. */
+let USE_NDVI = true;
+const NDVI_TOGGLE_KEY = 'gr_use_ndvi';
+function loadUseNdvi(){
+  try { const v = localStorage.getItem(NDVI_TOGGLE_KEY); if (v !== null) USE_NDVI = (v === '1'); }
+  catch(e){}
+}
+function saveUseNdvi(){ try { localStorage.setItem(NDVI_TOGGLE_KEY, USE_NDVI ? '1' : '0'); } catch(e){} }
+function activeNf(name){ return USE_NDVI ? ndviFactorFor(name) : 1; }
+
+/* =========================================================================
+   4. THE OUTLOOK  (forecast -> blended -> climatology)
+   ========================================================================= */
+function buildSeries(){
+  const today = todayNZ();
+  const from = customFrom || today;
+  const to   = customTo   || new Date(today.getTime() + (rangeDays - 1) * DAY);
+  const frac = classAreaFractions();
+  const days = [];
+
+  /* ---- the past: what actually happened, no scenario needed -------------
+   *
+   * A date before today already has real, measured weather behind it -
+   * there is nothing to forecast and nothing to replay. Each day here reads
+   * its own real potIrr/potDry straight off WX, so lo, exp and hi come out
+   * the same number: this did not turn out three ways, it turned out one.
+   * This is what lets the date pickers below be pointed at the past - to
+   * check what the model would have said for, say, 1-10 July.             */
+  let pastSum = 0;
+  const pastTo = new Date(Math.min(to.getTime(), today.getTime() - DAY));
+  if (from <= pastTo){
+    const byIso = {};
+    WX.forEach(d => { if (!d.isForecast) byIso[d.iso] = d; });
+    for (let t = from.getTime(); t <= pastTo.getTime(); t += DAY){
+      const date = new Date(t), key = iso(date);
+      const d = byIso[key];
+      if (!d || d.potIrr == null || d.potDry == null) continue;   // an archive gap
+      const calF = CAL.factorFor(date);
+      const valIrr = d.potIrr * calF, valDry = d.potDry * calF;
+      const blended = frac.irr * valIrr + frac.dry * valDry;
+      pastSum += blended;
+      days.push({
+        date, iso:key, kind:'actual', horizon: Math.round((date - today) / DAY),
+        lo: blended, exp: blended, hi: blended,
+        expIrr: valIrr, expDry: valDry,
+        sw: frac.irr*d.swIrr + frac.dry*d.swDry, swIrr: d.swIrr, swDry: d.swDry,
+        nYears: 0
+      });
+    }
+  }
+
+  /* ---- the future: forecast, then replayed years ------------------------- */
+  let futureYears = 0, futureCumByYear = [];
+  if (to >= today) buildFuturePortion();
+
+  // The cumulative range adds the known past onto the spread of the
+  // replayed future years - a pure-past query has no spread at all (it
+  // already happened), so the three numbers collapse to one true total.
+  SERIES = { days, from, to, years: futureYears, mix: frac,
+             cumLo: pastSum + (futureYears ? pct(futureCumByYear, 0.25) : 0),
+             cumEx: pastSum + (futureYears ? pct(futureCumByYear, 0.50) : 0),
+             cumHi: pastSum + (futureYears ? pct(futureCumByYear, 0.75) : 0) };
+  return;
+
+  function buildFuturePortion(){
+
+  const fcByDate = {};
+  WX.forEach(d => { if (d.date >= today) fcByDate[d.iso] = d; });
+
+  // Soil water as it stands today, per class, from the long spin-up over
+  // measured days.
+  const lastMeasured = WX.filter(d => d.date < today).pop();
+  const sw0Irr = lastMeasured ? lastMeasured.swIrr : MODEL.FC_MM;
+  const sw0Dry = lastMeasured ? lastMeasured.swDry : MODEL.FC_MM;
+
+  /* ---- scenarios, by replaying real years -------------------------------
+   *
+   * The first version of this chained weekly rainfall percentiles: a dry path
+   * that took the 25th percentile week after week. That is the wrong shape of
+   * scenario. Thirteen 25th percentile weeks in a row is a one in 0.25^13
+   * spring, so the dry line fell to zero and stayed there, which said more
+   * about the arithmetic than about the farm.
+   *
+   * Replaying each of the archive years from today's date instead keeps real
+   * weather sequences intact - the actual droughts, the actual wet spells,
+   * with rain falling in storms rather than as a daily trickle. The band is
+   * then the spread across those years, which is a claim that can be checked:
+   * "in 10 past springs, this is the range the farm grew in".              */
+  const byMD = {};                              // "MM-DD" -> rows, one per year
+  WX.forEach(d => {
+    if (d.isForecast) return;
+    const md = d.iso.slice(5);
+    (byMD[md] = byMD[md] || []).push(d);
+  });
+  const thisYear = today.getFullYear();
+  const years = [...new Set(WX.filter(d => !d.isForecast).map(d => d.date.getFullYear()))]
+                  .filter(y => y !== thisYear).sort();
+
+  const dates = [];
+  for (let t = today.getTime(); t <= to.getTime(); t += DAY) dates.push(new Date(t));
+
+  const seed = WX.filter(d => d.date < today).slice(-(MODEL.GDD_SMOOTH-1)).map(d => d.gdd);
+
+  const paths = years.map(y => {
+    const days = dates.map(date => {
+      const md = iso(date).slice(5);
+      const pool = byMD[md] || [];
+      // 29 February is missing in most years, so fall back to any year's day.
+      const a = pool.find(r => r.date.getFullYear() === y) || pool[pool.length-1];
+      if (!a) return null;
+      const f = fcByDate[iso(date)];
+      const horizon = Math.round((date - today) / DAY);
+
+      // Confidence fades with distance. Days 0-9 are the forecast as given.
+      // Days 10-16 blend toward the replayed year, so the band opens
+      // gradually instead of jumping open. Past that it is the year itself.
+      let kind, blend;
+      if (f && horizon <= 9) { kind = 'forecast';    blend = 0; }
+      // 6, not 7: the forecast's last day is horizon 15, and the blend has to
+      // reach 1 exactly there. Ending at 0.86 left a visible step in the line
+      // where the forecast handed over to the replayed years.
+      else if (f)            { kind = 'low';         blend = (horizon - 9) / 6; }
+      else                   { kind = 'climatology'; blend = 1; }
+      blend = clamp(blend, 0, 1);
+      const mix = (fv, av) => (f ? fv*(1-blend) + av*blend : av);
+
+      const tmax = mix(f && f.tmax, a.tmax), tmin = mix(f && f.tmin, a.tmin);
+      return { date, iso:iso(date), tmax, tmin,
+               rad:  mix(f && f.rad,  a.rad),
+               pet:  mix(f && f.pet,  a.pet),
+               rain: mix(f && f.rain, a.rain),
+               gdd:  gddOf(tmax, tmin), kind, horizon, year:y };
+    }).filter(Boolean);
+    // Every replayed year gets its own soil water run, starting from the soil
+    // as it actually is today. That is what catches "warm enough, but it has
+    // not rained, so this one stalls in a fortnight".
+    //
+    // It is run twice on the SAME day objects - once irrigated, once not -
+    // in their own fields, the same trick as the measured history above. The
+    // weather itself (temp, radiation, rain) is identical either way, so it
+    // is only built once per year and not duplicated per class.
+    smoothGdd(days, seed);
+    runWaterBalance(days, sw0Irr, true,  'swIrr', 'mIrr');
+    runWaterBalance(days, sw0Dry, false, 'swDry', 'mDry');
+    return days;
+  }).filter(p => p.length === dates.length);
+
+  // frac (the irrigated/dryland area split) comes from the outer scope -
+  // it does not depend on whether these particular days are past or future.
+  const futureDays = [];
+  const cumByYear = new Array(paths.length).fill(0);
+  for (let i = 0; i < dates.length; i++){
+    // The calibration factor is per calendar month, not one flat number for
+    // the whole year - see computeCalibration(). A day in October always
+    // uses October's factor, whichever replayed year it is standing in for.
+    const calF = CAL.factorFor(dates[i]);
+    const valsIrr = paths.map(p => { const g = potential(p[i], 'mIrr'); return g == null ? 0 : g * calF; });
+    const valsDry = paths.map(p => { const g = potential(p[i], 'mDry'); return g == null ? 0 : g * calF; });
+    const blended = valsIrr.map((v,j) => frac.irr * v + frac.dry * valsDry[j]);
+    const ref = paths.length ? paths[0][i] : null;
+    // Days before the chosen start are still run, so the soil water arrives
+    // at the start date correctly, but they are not shown or counted.
+    if (dates[i] < from) continue;
+    blended.forEach((v,j) => { cumByYear[j] += v; });
+    futureDays.push({
+      date: dates[i], iso: iso(dates[i]),
+      kind: ref ? ref.kind : 'climatology',
+      horizon: Math.round((dates[i] - today) / DAY),
+      lo:  pct(blended, 0.25), exp: pct(blended, 0.50), hi: pct(blended, 0.75),
+      // per class today's figure, for paddocks to pick their own class from,
+      // not blended - the chart's band is blended, a single paddock is not
+      expIrr: median(valsIrr), expDry: median(valsDry),
+      // the soil water shown is the blend at the middle year of each class,
+      // so the tooltip matches the line rather than some other year's path
+      sw:    frac.irr * median(paths.map(p => p[i].swIrr)) + frac.dry * median(paths.map(p => p[i].swDry)),
+      swIrr: median(paths.map(p => p[i].swIrr)),
+      swDry: median(paths.map(p => p[i].swDry)),
+      nYears: paths.length
+    });
+  }
+
+  /* Past the forecast, each day's figure is a percentile taken across only ten
+   * years, so it jumps about from one calendar day to the next. That jumping
+   * is which years happened to be warm on that date, not anything the farm
+   * will do. Showing it as daily detail would read as forecast skill that is
+   * not there, so the replayed part is smoothed over a week. The forecast days
+   * are left exactly as they are. */
+  const first = futureDays.findIndex(d => d.kind === 'climatology');
+  if (first >= 0){
+    const src = futureDays.map(d => ({ lo:d.lo, exp:d.exp, hi:d.hi }));
+    for (let i = first; i < futureDays.length; i++){
+      for (const k of ['lo','exp','hi']){
+        let s = 0, n = 0;
+        for (let j = -3; j <= 3; j++){
+          const x = i + j;
+          // reaching back into the forecast days keeps the line continuous
+          // where the two join, instead of stepping down onto the mean
+          if (x >= first - 3 && x >= 0 && x < futureDays.length){ s += src[x][k]; n++; }
+        }
+        futureDays[i][k] = s / n;
+      }
+    }
+  }
+
+  days.push(...futureDays);
+  futureYears = paths.length;
+  futureCumByYear = cumByYear;
+  } // end buildFuturePortion
+}
+
+/* "Today" always means the real calendar day, everywhere on the page, even
+ * while the chart below is browsing a past or future date range - looking at
+ * 1-10 July must not make the map, the paddock table or the top tiles claim
+ * July is what is happening right now.
+ *
+ * It is computed straight off WX rather than off SERIES.days[0], because
+ * SERIES.days[0] is whatever the CHART is currently showing, which moves
+ * every time the date pickers change. WX's own row for today already carries
+ * the same forecast weather buildSeries() would use for horizon 0 anyway
+ * (blend=0 there - pure forecast, no replayed-year mixing at the very first
+ * day), so this gives the identical number, just independent of the chart's
+ * selected range.                                                          */
+function computeTodayPoint(){
+  const today = todayNZ();
+  const frac = classAreaFractions();
+  const wxToday = WX.find(d => d.iso === iso(today));
+  let expIrr, expDry, swIrr, swDry;
+  if (wxToday && wxToday.potIrr != null && wxToday.potDry != null){
+    const calF = CAL.factorFor(today);
+    expIrr = wxToday.potIrr * calF; expDry = wxToday.potDry * calF;
+    swIrr = wxToday.swIrr; swDry = wxToday.swDry;
+  } else {
+    // No weather for today specifically (a gap right at the join between the
+    // archive and the forecast) - fall back to the newest day there is.
+    const d = WX.filter(x => x.potIrr != null).pop();
+    const calF = d ? CAL.factorFor(d.date) : 1;
+    expIrr = d ? d.potIrr * calF : 0; expDry = d ? d.potDry * calF : 0;
+    swIrr = d ? d.swIrr : null; swDry = d ? d.swDry : null;
+  }
+  return {
+    exp: frac.irr*expIrr + frac.dry*expDry, expIrr, expDry,
+    sw: (swIrr != null && swDry != null) ? frac.irr*swIrr + frac.dry*swDry : null,
+    swIrr, swDry
+  };
+}
+
+/* =========================================================================
+   5. PADDOCKS
+   ========================================================================= */
+function buildPaddocks(){
+  // Today's figure, one per class - each paddock picks the one that matches
+  // its own irrigation setting, not a single farm-wide number.
+  const t = computeTodayPoint();
+  const baseIrr = t.expIrr, baseDry = t.expDry;
+
+  const names = Object.keys(AREAS).length ? Object.keys(AREAS) : Object.keys(NDVI).filter(k => k[0] !== '_');
+  PADDOCKS = names.map(name => {
+    const nf  = activeNf(name);
+    const e   = NDVI[normName(name)];
+    const out = EXCLUDED.get(normName(name));
+    const irrClass = classFor(name);
+    const growth = (irrClass === 'dry' ? baseDry : baseIrr) * nf;
+    const area = AREAS[name] || 0;
+    return { name, growth, ndvi: e ? e.ndvi : null, ndviDate: e ? e.date : null,
+             nf, area, total: growth * area, isOut: !!out, outReason: out || '', irrClass };
+  }).sort((a,b) => b.growth - a.growth);
+}
+
+/* =========================================================================
+   6. LOADING
+   ========================================================================= */
+/* A fetch that always finishes.
+ *
+ * Google's published CSVs and the Apps Script do not always answer, and a
+ * plain fetch then waits for ever. The page sat on "reading…" with no error
+ * and no way back. Every request here carries its own timeout so the page
+ * either gets the data or gives up and says so.                            */
+const FETCH_MS = 20000;
+async function fetchT(url, opts, ms){
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), ms || FETCH_MS);
+  try {
+    return await fetch(url, Object.assign({ signal: ac.signal }, opts || {}));
+  } catch(e){
+    throw (e && e.name === 'AbortError')
+      ? new Error("timed out after " + Math.round((ms || FETCH_MS)/1000) + "s")
+      : e;
+  } finally { clearTimeout(timer); }
+}
+
+async function csv(url){
+  const r = await fetchT(url + "&t=" + Date.now(), { cache:'no-store' });
+  if (!r.ok) throw new Error("sheet " + r.status);
+  return Papa.parse(await r.text(), { header:true, skipEmptyLines:true });
+}
+
+async function loadNDVI(){
+  const res = await csv(NDVI_CSV_URL);
+  const best = {};     // newest usable reading per paddock
+  (res.data || []).forEach(row => {
+    const name = (row.paddock_name || '').toString().trim(); if (!name) return;
+    const ndvi = parseFloat(row.ndvi_mean || row.ndvi_effective);
+    const cloud = parseFloat(row.cloud_pc) || 0;
+    // The sheet writes dates as d/m/yyyy. Handing that to new Date() makes
+    // Chrome read it as m/d, so 14 September came back as a date in December.
+    const d = parseWalkDate(row.date);
+    if (!isFinite(ndvi) || !d || isNaN(d)) return;
+    if (cloud > 30) return;                            // a cloudy pixel is not greenness
+    const k = normName(name);
+    if (!best[k] || d > best[k].date) best[k] = { name, ndvi, date:d, cloud };
+  });
+  NDVI = best;
+  const vals = Object.values(best).map(e => e.ndvi).filter(v => isFinite(v));
+  NDVI.__farmAvg = vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : null;
+}
+
+async function loadWalks(){
+  const res = await csv(FARMWALK_CSV_URL);
+  const f = (res.meta && res.meta.fields) ? res.meta.fields : [];
+  const low = f.map(h => (h || '').trim().toLowerCase());
+  const col = frag => { const i = low.findIndex(h => h.includes(frag)); return i >= 0 ? f[i] : null; };
+  const cName = col('paddock'), cDate = col('date'),
+        cCover = low.findIndex(h => h.includes('cover')) >= 0 ? f[low.findIndex(h => h.includes('cover'))] : col('kg'),
+        cReason = col('reason');
+
+  const by = {};
+  (res.data || []).forEach(r => {
+    const name = (cName ? r[cName] : '').toString().trim();
+    const cover = parseFloat(cCover ? r[cCover] : NaN);
+    const d = parseWalkDate(cDate ? r[cDate] : '');
+    if (!name || !d || !isFinite(cover) || cover <= 0) return;
+    const k = normName(name);
+    (by[k] = by[k] || []).push({ date:d, cover:Math.round(cover),
+                                 reason:(cReason ? r[cReason] : '') || '' });
+  });
+  // One row per paddock per day, then ascending, so consecutive pairs are real
+  // intervals and not two entries from the same walk.
+  Object.keys(by).forEach(k => {
+    const seen = {};
+    by[k].sort((a,b) => a.date - b.date).forEach(e => { seen[iso(e.date)] = e; });
+    by[k] = Object.keys(seen).sort().map(d => seen[d]);
+  });
+  WALKS = by;
+}
+
+/* Last season's full farmwalk history - wide format, one row per paddock, one
+ * column per walk date (most recent first), covering roughly a full year.
+ * Bundled as a static file next to gr.html, since it is a one-off export, not
+ * something that updates on its own the way the live sheets do.
+ *
+ * The earliest two columns (10 and 18 May 2025) are excluded: every single
+ * paddock reads exactly 1000 on 10 May, and only 3 distinct values (1900,
+ * 1800, 1200) appear across 58 paddocks on 18 May - both are setup
+ * placeholders entered once when the sheet was built, not real walks.       */
+const HIST_CSV_URL = 'fairlie_history.csv';
+const HIST_CUTOFF = new Date(2025, 4, 19);   // 19 May 2025
+
+async function loadHistWalks(){
+  const res = await fetchT(HIST_CSV_URL);
+  if (!res.ok) throw new Error("history file " + res.status);
+  const rows = (await res.text()).trim().split('\n').map(r => r.split(','));
+  const header = rows[0];
+  const dateCols = header.slice(1).map(s => {
+    const m = s.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return m ? new Date(+m[3], +m[2]-1, +m[1]) : null;
+  });
+  const by = {};
+  rows.slice(1).forEach(r => {
+    const name = (r[0] || '').trim(); if (!name) return;
+    const k = normName(name);
+    const entries = [];
+    for (let i = 1; i < r.length; i++){
+      const d = dateCols[i-1]; if (!d || d < HIST_CUTOFF) continue;
+      const v = parseFloat(r[i]);
+      if (isFinite(v) && v > 0) entries.push({ date: d, cover: Math.round(v) });
+    }
+    if (entries.length) by[k] = entries.sort((a,b) => a.date - b.date);
+  });
+  HIST_WALKS = by;
+}
+
+/* Farmwalk dates are typed by hand, so they arrive as d/m/yyyy far more often
+ * than as anything a plain Date() would read correctly. */
+function parseWalkDate(v){
+  if (!v) return null;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const d = new Date(s);
+  return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+async function loadExclusions(){
+  try {
+    const res = await csv(EXCLUSIONS_CSV_URL);
+    EXCLUDED = new Map();
+    (res.data || []).forEach(r => {
+      if (!r.paddock) return;
+      const st = (r.status || 'OUT').toString().trim();
+      if (st) EXCLUDED.set(normName(r.paddock), st);
+    });
+  } catch(e){ /* the out list is a nice to have, not a reason to fail */ }
+}
+
+/* Boundaries come from the sheet first, exactly as the dashboard does it, so a
+ * renamed or split paddock shows up here too. The Cloud geojson is a fallback
+ * so the map still draws if the sheet cannot be read. */
+async function loadBoundaries(){
+  let data = null;
+  try {
+    const r = await fetchT(GOOGLE_SCRIPT_URL + "?type=paddocks&t=" + Date.now(), { cache:'no-store' }, 8000);
+    const d = await r.json();
+    if (d && d.status === 'success' && Array.isArray(d.paddocks) && d.paddocks.length){
+      data = { type:'FeatureCollection', features: d.paddocks.filter(p => p && p.geometry && p.name).map(p => ({
+        type:'Feature',
+        properties:{ name:p.name, calcArea:p.calcArea || 0 },
+        geometry:{ type:p.geometryType || 'MultiPolygon', coordinates:p.geometry }
+      })) };
+      if (!data.features.length) data = null;
+    }
+  } catch(e){ }
+  if (!data){
+    const r = await fetchT(GEOJSON_URL + "?t=" + Date.now());
+    data = await r.json();
+  }
+  AREAS = {}; NAME_BY_NORM = {};
+  data.features.forEach(f => {
+    const n = f.properties && f.properties.name; if (!n) return;
+    AREAS[n] = f.properties.calcArea || 0;
+    NAME_BY_NORM[normName(n)] = n;
+  });
+  return data;
+}
+
+/* Open-Meteo answers 400 when too many calls arrive close together, which on
+ * a reload looked exactly like being offline. One retry clears it. */
+async function withRetry(fn, tries){
+  let last;
+  for (let i = 0; i < (tries || 2); i++){
+    try { return await fn(); }
+    catch(e){ last = e; await new Promise(r => setTimeout(r, 1200 * (i+1))); }
+  }
+  throw last;
+}
+
+async function loadAll(){
+  const btn = document.getElementById('btn-refresh');
+  btn.textContent = '…'; btn.disabled = true;
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('hdr-sub').textContent = 'reading…';
+
+  // Every source is allowed to fail on its own. Losing the farmwalks should
+  // cost the calibration, not the whole page, and a phone in a paddock with
+  // one bar loses them often.
+  // Weather stays at index 4 - the one hard failure below checks res[4].
+  const jobs  = [loadBoundaries(), loadNDVI(), loadWalks(), loadExclusions(),
+                 withRetry(() => loadWeather()), loadHistWalks()];
+  const names = ['paddock boundaries','NDVI','farmwalk covers','out list','weather','farmwalk history'];
+  const res   = await Promise.allSettled(jobs);
+  const failed = res.map((r,i) => r.status === 'rejected' ? names[i] : null).filter(Boolean);
+  res.forEach((r,i) => { if (r.status === 'rejected') console.error(names[i], r.reason); });
+
+  // Weather is the only source the page cannot do without.
+  if (res[4].status === 'rejected'){
+    showErr("<b>No weather, so there is no forecast.</b><br>" +
+            (res[4].reason && res[4].reason.message ? res[4].reason.message : res[4].reason) +
+            "<br><span style='color:#a9b5b1'>Open-Meteo is read straight from this page, so no signal shows this too. Pull down to try again.</span>");
+    document.getElementById('hdr-sub').textContent = FARM.name + ' · no weather';
+    btn.textContent = '↻'; btn.disabled = false;
+    return;
+  }
+
+  try {
+    buildCalibration();       // needs NDVI and the weather, both are in by now
+    buildSeries();
+    buildPaddocks();
+    if (res[0].status === 'fulfilled') drawMap(res[0].value);
+    render();
+    updateIrrSummary();
+    updateNdviCompare();
+    renderCalTable();
+    if (failed.length)
+      showErr("<b>Some of the farm data did not load:</b> " + failed.join(', ') +
+              ".<br><span style='color:#a9b5b1'>The forecast below still works, but it is missing that part.</span>");
+  } catch(e){
+    console.error(e);
+    showErr("<b>Could not build the forecast.</b><br>" + (e && e.message ? e.message : e));
+  } finally {
+    btn.textContent = '↻'; btn.disabled = false;
+  }
+}
+
+/* =========================================================================
+   7. MAP
+   ========================================================================= */
+const RAMP = ['#a1d99b','#74c476','#41ab5d','#238b45','#006d2c','#00441b'];
+let RAMP_STOPS = [10, 20, 30, 45, 60];       // kgDM/ha/day cut points
+
+/* The cut points follow the day's spread instead of being fixed.
+ *
+ * Fixed points looked sensible but made the map almost one colour: on any
+ * single day every paddock sits inside a narrow range - 13 to 26 today - and
+ * that range slides up through the season. Six fixed bands meant two of them
+ * did all the work in September and different two in December.
+ *
+ * Splitting the day's own paddocks into six even groups always shows which
+ * ones are ahead. The legend carries the real kgDM/ha/day figures for each
+ * band, so the colours are still read against actual numbers and nothing is
+ * hidden - only the bands move, and they say where they are.               */
+function updateRamp(){
+  const g = PADDOCKS.filter(p => !p.isOut && isFinite(p.growth))
+                    .map(p => p.growth).sort((a,b) => a-b);
+  if (g.length < 12) return;                 // too few to split, keep the last ones
+  RAMP_STOPS = [1,2,3,4,5].map(i => g[Math.floor((i/6) * (g.length-1))]);
+}
+
+function growthColor(g){
+  if (g == null || !isFinite(g)) return '#3a423f';
+  for (let i = 0; i < RAMP_STOPS.length; i++) if (g < RAMP_STOPS[i]) return RAMP[i];
+  return RAMP[RAMP.length-1];
+}
+
+// Safe to drop a paddock name inside a single-quoted onclick="...(' … ')"
+// attribute. Paddock names are the farm's own data, not user text from the
+// open web, but an apostrophe in a name would otherwise break the handler.
+function escAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+function drawMap(geo){
+  if (!map){
+    map = L.map('map', { zoomControl:false, minZoom:12, maxZoom:19 })
+           .setView([FARM.lat, FARM.lon], 14);
+    L.control.zoom({ position:'topright' }).addTo(map);
+    L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom:20 }).addTo(map);
+  }
+  if (geoLayer){ map.removeLayer(geoLayer); geoLayer = null; }
+  geoLayer = L.geoJSON(geo, {
+    style: f => {
+      const p = PADDOCKS.find(x => normName(x.name) === normName(f.properties.name));
+      return { color:'#0c100f', weight:1,
+               fillColor: (p && !p.isOut) ? growthColor(p.growth) : '#3a423f',
+               fillOpacity: p && p.isOut ? .45 : .8 };
+    },
+    onEachFeature: (f, layer) => {
+      const name = f.properties.name;
+      layer.on('click', () => {
+        const p = PADDOCKS.find(x => normName(x.name) === normName(name));
+        if (!p){ layer.bindPopup(`<b>${name}</b><br>no data`).openPopup(); return; }
+        const water = p.irrClass === 'dry' ? '🌾 Dryland' : '💧 Irrigated';
+        layer.bindPopup(
+          `<div style="font-weight:700;margin-bottom:4px">${p.name}</div>` +
+          (p.isOut ? `<div style="color:#c0392b">OUT — ${p.outReason}</div>` : '') +
+          `<div><b>${p.growth.toFixed(1)}</b> kgDM/ha/day</div>` +
+          `<div style="font-size:11px;color:#555">NDVI ${p.ndvi != null ? p.ndvi.toFixed(3) : '–'}` +
+          `${p.ndviDate ? ' · ' + fmtNZ(p.ndviDate) : ''}</div>` +
+          `<div style="font-size:11px;color:#555">${p.area.toFixed(2)} ha · ` +
+          `${Math.round(p.total)} kgDM/day</div>` +
+          `<button style="margin-top:7px;padding:5px 10px;font-size:11px;border-radius:6px;` +
+          `border:1px solid #ccc;background:#fff;cursor:pointer;" ` +
+          `onclick="toggleClass('${escAttr(p.name)}')">${water} — tap to change</button>`
+        ).openPopup();
+      });
+      layer.bindTooltip(name, { permanent:false, direction:'center', className:'pdk-tip' });
+    }
+  }).addTo(map);
+  try { map.fitBounds(geoLayer.getBounds(), { padding:[12,12] }); } catch(e){}
+}
+
+function drawLegend(){
+  const el = document.getElementById('legend');
+  const f = v => (v >= 100 ? Math.round(v) : v.toFixed(1));
+  const labels = RAMP.map((c,i) =>
+      i === 0 ? '<' + f(RAMP_STOPS[0])
+    : i === RAMP.length-1 ? f(RAMP_STOPS[RAMP_STOPS.length-1]) + '+'
+    : f(RAMP_STOPS[i-1]) + '–' + f(RAMP_STOPS[i]));
+  el.innerHTML = '<div class="legend-title">kgDM/ha/day — bands split today\'s paddocks into six even groups</div>' +
+    RAMP.map((c,i) => `<div><div class="sw" style="background:${c}"></div>` +
+                      `<div class="tick">${labels[i]}</div></div>`).join('');
+}
+
+/* =========================================================================
+   8. THE OUTLOOK CHART
+   -------------------------------------------------------------------------
+   One measure on one axis. The band is the dry-to-wet range, the line is the
+   expected path. Forecast and climatology are told apart by line style, not
+   by colour, so it still reads in greyscale and for colour blind eyes.
+   ========================================================================= */
+function drawChart(){
+  const svg = document.getElementById('chart');
+  const days = SERIES.days;
+  if (!days.length){ svg.innerHTML = ''; return; }
+
+  const W = svg.clientWidth || 800, H = Math.max(230, Math.min(300, W * 0.42));
+  const M = { t:12, r:14, b:26, l:34 };
+  const iw = W - M.l - M.r, ih = H - M.t - M.b;
+
+  // Round the axis to a step people read easily, not to maxY/4.
+  const peak = Math.max(10, Math.max(...days.map(d => d.hi)));
+  const rawStep = peak / 4;
+  const pow = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const n = rawStep / pow;
+  const yStep = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * pow;
+  const maxY = Math.ceil(peak / yStep) * yStep;
+  const x = i  => M.l + (days.length === 1 ? iw/2 : (i / (days.length-1)) * iw);
+  const y = v  => M.t + ih - (clamp(v, 0, maxY) / maxY) * ih;
+
+  const seg = (from, to, key) => days.map((d,i) => (i >= from && i <= to)
+      ? `${i === from ? 'M' : 'L'}${x(i).toFixed(1)},${y(d[key]).toFixed(1)}` : '').join('');
+
+  // Where the real forecast stops, so the styling can change there.
+  let lastFc = -1;
+  days.forEach((d,i) => { if (d.kind !== 'climatology') lastFc = i; });
+
+  const bandPath = (from, to) => {
+    if (to < from) return '';
+    let up = '', dn = '';
+    for (let i = from; i <= to; i++) up += `${i === from ? 'M':'L'}${x(i).toFixed(1)},${y(days[i].hi).toFixed(1)}`;
+    for (let i = to; i >= from; i--) dn += `L${x(i).toFixed(1)},${y(days[i].lo).toFixed(1)}`;
+    return up + dn + 'Z';
+  };
+
+  // y grid, recessive
+  let grid = '';
+  for (let v = 0; v <= maxY + 1e-9; v += yStep){
+    grid += `<line x1="${M.l}" y1="${y(v)}" x2="${W-M.r}" y2="${y(v)}" stroke="#2c3633" stroke-width="1"/>` +
+            `<text x="${M.l-6}" y="${y(v)+3.5}" text-anchor="end" font-size="10" fill="#78847f">${Math.round(v)}</text>`;
+  }
+
+  // x labels, roughly six of them, never more
+  const step = Math.max(1, Math.round(days.length / 6));
+  let xlab = '';
+  days.forEach((d,i) => {
+    if (i % step === 0 || i === days.length-1)
+      xlab += `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="#78847f">${fmtNZ(d.date)}</text>`;
+  });
+
+  // the boundary marker between forecast and climatology
+  let split = '';
+  if (lastFc >= 0 && lastFc < days.length-1){
+    const sx = x(lastFc);
+    split = `<line x1="${sx}" y1="${M.t}" x2="${sx}" y2="${M.t+ih}" stroke="#78847f"
+             stroke-width="1" stroke-dasharray="3 3"/>` +
+            `<text x="${sx+4}" y="${M.t+11}" font-size="9" fill="#78847f">forecast ends</text>`;
+  }
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', H);
+  svg.innerHTML = `
+    ${grid}
+    <path d="${bandPath(0, Math.max(0,lastFc))}" fill="${RAMP[2]}" fill-opacity="0.22"/>
+    <path d="${bandPath(Math.max(0,lastFc), days.length-1)}" fill="${RAMP[2]}" fill-opacity="0.12"/>
+    ${split}
+    <path d="${seg(0, Math.max(0,lastFc), 'exp')}" fill="none" stroke="${RAMP[1]}" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${seg(Math.max(0,lastFc), days.length-1, 'exp')}" fill="none" stroke="${RAMP[1]}"
+          stroke-width="2" stroke-dasharray="5 4" stroke-linecap="round"/>
+    ${xlab}
+    <line id="cross" x1="0" y1="${M.t}" x2="0" y2="${M.t+ih}" stroke="#f2f5f4" stroke-width="1"
+          opacity="0"/>
+    <circle id="crossdot" r="4" fill="${RAMP[1]}" stroke="#101413" stroke-width="2" opacity="0"/>
+    <rect x="${M.l}" y="${M.t}" width="${iw}" height="${ih}" fill="transparent" id="hit"/>
+  `;
+
+  // legend, always present because there is a band and a line
+  const lg = document.getElementById('chart-legend') || (() => {
+    const d = document.createElement('div'); d.id = 'chart-legend';
+    d.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#a9b5b1;margin-top:8px';
+    svg.parentNode.insertBefore(d, svg.nextSibling); return d;
+  })();
+  lg.innerHTML =
+    `<span><svg width="22" height="8" style="vertical-align:-1px"><line x1="0" y1="4" x2="22" y2="4"
+      stroke="${RAMP[1]}" stroke-width="2"/></svg> Expected</span>` +
+    `<span><svg width="22" height="8" style="vertical-align:-1px"><rect y="1" width="22" height="6"
+      fill="${RAMP[2]}" fill-opacity=".35"/></svg> Middle half of past years</span>` +
+    `<span><svg width="22" height="8" style="vertical-align:-1px"><line x1="0" y1="4" x2="22" y2="4"
+      stroke="${RAMP[1]}" stroke-width="2" stroke-dasharray="5 4"/></svg> Past years only</span>`;
+
+  // hover: crosshair plus a tooltip, the default for a line chart
+  const hit = svg.querySelector('#hit'), cross = svg.querySelector('#cross'),
+        dot = svg.querySelector('#crossdot'), tip = document.getElementById('tip');
+  const move = ev => {
+    const r = svg.getBoundingClientRect();
+    const px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) * (W / r.width);
+    let i = Math.round(((px - M.l) / iw) * (days.length-1));
+    i = clamp(i, 0, days.length-1);
+    const d = days[i];
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i));
+    cross.setAttribute('opacity', '.35');
+    dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(d.exp)); dot.setAttribute('opacity','1');
+    tip.style.display = 'block';
+    // A past ("actual") day is one real number, not a scenario - showing a
+    // dry/wet range either side of it would invent an uncertainty that
+    // is not there, since this already happened.
+    tip.innerHTML = `<div class="t">${d.date.toLocaleDateString('en-NZ',{weekday:'short',day:'numeric',month:'short'})}</div>` +
+      (d.kind === 'actual'
+        ? `<div class="r">Modelled <b>${d.exp.toFixed(1)}</b></div>`
+        : `<div class="r">Expected <b>${d.exp.toFixed(1)}</b></div>` +
+          `<div class="r">Dry <b>${d.lo.toFixed(1)}</b></div>` +
+          `<div class="r">Wet <b>${d.hi.toFixed(1)}</b></div>`) +
+      `<div class="r">Soil water <b>${Math.round(d.sw)} mm</b></div>` +
+      `<div class="r" style="color:#78847f">${d.kind === 'actual' ? 'measured weather'
+         : d.kind === 'forecast' ? 'forecast'
+         : d.kind === 'low' ? 'forecast, low confidence' : 'climatology'}</div>`;
+    const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX);
+    const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY);
+    tip.style.left = Math.min(cx + 14, window.innerWidth - 210) + 'px';
+    tip.style.top  = Math.max(8, cy - 110) + 'px';
+  };
+  const leave = () => { cross.setAttribute('opacity','0'); dot.setAttribute('opacity','0');
+                        document.getElementById('tip').style.display = 'none'; };
+  hit.addEventListener('mousemove', move);
+  hit.addEventListener('mouseleave', leave);
+  hit.addEventListener('touchstart', move, {passive:true});
+  hit.addEventListener('touchmove', move, {passive:true});
+  hit.addEventListener('touchend', leave);
+}
+
+/* =========================================================================
+   9. RENDER
+   ========================================================================= */
+function render(){
+  const days = SERIES.days;
+  const frac = SERIES.mix || classAreaFractions();
+  // The top tiles always mean the real calendar day - browsing a past or
+  // future range in the chart below must not make them claim that range is
+  // "now". See computeTodayPoint().
+  const todayPt = computeTodayPoint();
+
+  // tiles
+  document.getElementById('t-today').innerHTML =
+    `${todayPt.exp.toFixed(1)}<span class="unit"> kgDM/ha/day</span>`;
+  const totalDay = PADDOCKS.filter(p => !p.isOut).reduce((a,p) => a + p.total, 0);
+  document.getElementById('t-today-note').textContent =
+    `farm average · ${Math.round(totalDay).toLocaleString('en-NZ')} kgDM/day grown`;
+
+  const sw = todayPt.sw;
+  const swState = sw == null ? ['bad','no data']
+                : sw >= MODEL.REFILL_MM + 8 ? ['ok','wet enough']
+                : sw >= MODEL.REFILL_MM     ? ['warn','near refill']
+                                            : ['bad','dry, growth held back'];
+  document.getElementById('t-soil').innerHTML =
+    `${sw != null ? Math.round(sw) : '–'}<span class="unit"> mm</span>`;
+  // The split is shown only when the farm is actually a mix - one class
+  // alone makes "irrigated 68 · dryland 68" a confusing thing to print.
+  const swSplit = (frac.irr > 0 && frac.dry > 0 && todayPt.swIrr != null)
+    ? ` <span style="color:#78847f">(irr ${Math.round(todayPt.swIrr)} · dry ${Math.round(todayPt.swDry)})</span>` : '';
+  document.getElementById('t-soil-note').innerHTML =
+    `<span class="pill ${swState[0]}">${swState[1]}</span> refill at ${MODEL.REFILL_MM} mm${swSplit}`;
+
+  // The calibration factor is per calendar month now (see computeCalibration),
+  // so the tile shows THIS month's - the one actually driving today's number.
+  const thisMonth = CAL.months[todayNZ().getMonth() + 1];
+  document.getElementById('t-cal').innerHTML = `${thisMonth.factor.toFixed(2)}<span class="unit">×</span>`;
+  document.getElementById('t-cal-note').innerHTML = thisMonth.fallback
+    ? `<span class="pill warn">no ${MONTH_NAMES[todayNZ().getMonth()]} data</span> using the all-year figure (${thisMonth.n} intervals this month)`
+    : `<span class="pill ok">calibrated</span> ${thisMonth.n} clean ${MONTH_NAMES[todayNZ().getMonth()]} intervals — ` +
+      `<a href="#" onclick="toggleCalTable();return false;" style="color:inherit">see every month</a>`;
+
+  // last 7 measured days, blended by the real irrigated/dryland area split,
+  // each day using ITS OWN month's calibration factor
+  const past = WX.filter(d => !d.isForecast && d.potIrr != null && d.potDry != null).slice(-7);
+  const wk = past.length
+    ? past.reduce((a,d) => a + (frac.irr*d.potIrr + frac.dry*d.potDry) * CAL.factorFor(d.date), 0) / past.length
+    : null;
+  document.getElementById('t-week').innerHTML =
+    `${wk != null ? wk.toFixed(1) : '–'}<span class="unit"> kgDM/ha/day</span>`;
+
+  // header
+  const newestNdvi = Object.values(NDVI).filter(e => e && e.date)
+                           .sort((a,b) => b.date - a.date)[0];
+  document.getElementById('hdr-sub').textContent =
+    `${FARM.name} · ${todayNZ().toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'})}` +
+    (newestNdvi ? ` · NDVI ${fmtNZ(newestNdvi.date)}` : '');
+
+  updateRamp();     // the map bands follow today's spread, so set them first
+  drawChart();
+  drawLegend();
+
+  // headline cumulative, taken across whole replayed years - unless the
+  // whole range is already in the past, in which case there is no scenario
+  // spread at all: this already happened, once, one way.
+  document.getElementById('headline').innerHTML = SERIES.years === 0
+    ? `Over ${days.length} days, ${fmtNZ(days[0].date)} to ${fmtNZ(days[days.length-1].date)}, ` +
+      `the model says <b>${Math.round(SERIES.cumEx).toLocaleString('en-NZ')}</b> kgDM/ha grew ` +
+      `<span style="color:#78847f">(measured weather, not a forecast - this already happened)</span>`
+    : `Over ${days.length} days, ${fmtNZ(days[0].date)} to ${fmtNZ(days[days.length-1].date)}, ` +
+      `expected growth is <b>${Math.round(SERIES.cumEx).toLocaleString('en-NZ')}</b> kgDM/ha ` +
+      `<span style="color:#78847f">(a drier year ${Math.round(SERIES.cumLo).toLocaleString('en-NZ')} – ` +
+      `a wetter year ${Math.round(SERIES.cumHi).toLocaleString('en-NZ')}, across ${SERIES.years} past years)</span>`;
+
+  // forecast table, the accessible view of the same numbers
+  let cum = 0;
+  document.querySelector('#fc-table tbody').innerHTML = days.map(d => {
+    cum += d.exp;
+    return `<tr><td>${d.date.toLocaleDateString('en-NZ',{day:'numeric',month:'short'})}</td>` +
+      `<td style="text-align:left;color:#78847f">${d.kind === 'actual' ? 'measured'
+        : d.kind === 'forecast' ? 'forecast'
+        : d.kind === 'low' ? 'forecast (low)' : 'climatology'}</td>` +
+      `<td>${d.lo.toFixed(1)}</td><td>${d.exp.toFixed(1)}</td><td>${d.hi.toFixed(1)}</td>` +
+      `<td>${Math.round(cum).toLocaleString('en-NZ')}</td></tr>`;
+  }).join('');
+
+  renderTable();
+  if (geoLayer) geoLayer.setStyle(f => {
+    const p = PADDOCKS.find(x => normName(x.name) === normName(f.properties.name));
+    return { color:'#0c100f', weight:1,
+             fillColor:(p && !p.isOut) ? growthColor(p.growth) : '#3a423f',
+             fillOpacity: p && p.isOut ? .45 : .8 };
+  });
+
+  // The annual rain figure is on the page on purpose. It is the one number to
+  // check against the farm's rain gauge, and it sets MODEL.RAIN_SCALE.
+  const byYear = {};
+  WX.filter(d => !d.isForecast).forEach(d => {
+    byYear[d.date.getFullYear()] = (byYear[d.date.getFullYear()] || 0) + d.rain;
+  });
+  const fullYears = Object.keys(byYear).slice(1,-1);
+  const rainAvg = fullYears.length
+    ? fullYears.reduce((a,y) => a + byYear[y], 0) / fullYears.length : 0;
+
+  document.getElementById('model-note').innerHTML =
+    `<span>Model</span> max ${MODEL.MAX_GROWTH} kgDM/ha/day · GDD base ${MODEL.T_BASE}°C, optimum ${MODEL.GDD_OPT} ` +
+    `· NDVI exponent k=${MODEL.NDVI_K} · rain scale ${MODEL.RAIN_SCALE}` +
+    `<br><span>Irrigation</span> ${frac.nIrr} paddock${frac.nIrr===1?'':'s'} irrigated ` +
+    `(${frac.areaIrr.toFixed(0)} ha) · ${frac.nDry} dryland (${frac.areaDry.toFixed(0)} ha) — ` +
+    `set per paddock in the map or the table below` +
+    `<br><span>Rainfall check</span> this grid point averages <b>${Math.round(rainAvg)} mm a year</b>. ` +
+    `If the farm gauge disagrees, set RAIN_SCALE to gauge ÷ ${Math.round(rainAvg)}.` +
+    `<br><span>Outlook</span> ${SERIES.years} past years replayed from today, Open-Meteo archive at ${FARM.lat}, ${FARM.lon}` +
+    `<br><span>Calibration</span> one factor per calendar month, ${CAL.n} clean intervals all up ` +
+    `(this season's walks plus last season's history) — ` +
+    `<a href="#" onclick="toggleCalTable();return false;" style="color:inherit">see every month</a>`;
+}
+
+function renderTable(){
+  const rows = PADDOCKS.slice().sort((a,b) => {
+    let A = a[sortKey], B = b[sortKey];
+    if (sortKey === 'name' || sortKey === 'irrClass'){ return String(A).localeCompare(String(B)) * sortDir * -1; }
+    A = A == null ? -1 : A; B = B == null ? -1 : B;
+    return (A - B) * sortDir;
+  });
+  document.querySelector('#pdk-table tbody').innerHTML = rows.map(p =>
+    `<tr class="${p.isOut ? 'out' : ''}">` +
+    `<td><span class="dot" style="background:${p.isOut ? '#3a423f' : growthColor(p.growth)}"></span>${p.name}` +
+      (p.isOut ? ` <span style="color:#78847f;font-size:10px">${p.outReason}</span>` : '') + `</td>` +
+    `<td><b>${p.growth.toFixed(1)}</b></td>` +
+    `<td>${p.ndvi != null ? p.ndvi.toFixed(3) : '–'}</td>` +
+    `<td>${p.area ? p.area.toFixed(2) : '–'}</td>` +
+    `<td>${p.area ? Math.round(p.total).toLocaleString('en-NZ') : '–'}</td>` +
+    `<td><button class="btn" style="padding:3px 8px;font-size:10px;${p.irrClass==='dry' ? '' :
+      'background:var(--accent);border-color:var(--accent);color:#06140b;'}" ` +
+      `onclick="toggleClass('${escAttr(p.name)}')">${p.irrClass==='dry' ? '🌾 Dry' : '💧 Irr'}</button></td></tr>`
+  ).join('');
+}
+
+function sortTable(k){
+  if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = -1; }
+  renderTable();
+}
+
+/* ---- range controls ----------------------------------------------------- */
+function setRange(n){
+  rangeDays = n; customFrom = null; customTo = null;
+  const t = todayNZ();
+  document.getElementById('d-from').value = iso(t);
+  document.getElementById('d-to').value   = iso(new Date(t.getTime() + (n-1)*DAY));
+  markRangeButtons();
+  buildSeries(); buildPaddocks(); render();
+}
+/* A past date range checks what the model would have said, using real
+ * measured weather - see the "past" half of buildSeries(). A future range is
+ * the usual forecast + replayed-years outlook. Either end can be past or
+ * future, so 1-10 July (already gone) and 10-20 October (still ahead) both
+ * work from the same two boxes. */
+function customRange(){
+  const a = document.getElementById('d-from').value, b = document.getElementById('d-to').value;
+  if (!a || !b) return;
+  let from = parseISO(a), to = parseISO(b);
+  const t = todayNZ();
+  const minFrom = WX.length ? WX[0].date : new Date(t.getFullYear()-10, t.getMonth(), t.getDate());
+  if (from < minFrom) from = minFrom;                       // no weather further back than this
+  if (to <= from) to = new Date(from.getTime() + 6*DAY);
+  const maxTo = new Date(t.getTime() + 365*DAY);
+  if (to > maxTo) to = maxTo;                               // one year ahead is the limit
+  customFrom = from; customTo = to; rangeDays = Math.round((to - from)/DAY) + 1;
+  document.getElementById('d-from').value = iso(from);
+  document.getElementById('d-to').value = iso(to);
+  markRangeButtons();
+  buildSeries(); buildPaddocks(); render();
+}
+/* ---- irrigation, per paddock --------------------------------------------
+ *
+ * Which paddocks are irrigated changes the answer more than anything else on
+ * this page - a dryland block and an irrigated one can be five times apart
+ * in a dry month. Nobody has told the page which ones are on a pivot, so it
+ * is a click on the map or the table, not a buried constant.
+ *
+ * Toggling one paddock never re-runs the weather or the water balance - those
+ * were already computed for BOTH hypothetical classes when the weather
+ * loaded (see loadWeather() and buildSeries()). Only the blend by area, the
+ * calibration, and the per-paddock figures need to be redone, which is fast
+ * enough to do on every tap.                                                */
+function toggleClass(name){
+  setClass(name, classFor(name) === 'dry' ? 'irr' : 'dry');
+  if (map) map.closePopup();   // avoid showing a now-stale popup
+  recompute();
+}
+function setAllClass(cls){
+  Object.keys(AREAS).forEach(name => setClass(name, cls));
+  if (map) map.closePopup();
+  recompute();
+}
+function recompute(){
+  buildCalibration();
+  buildSeries();
+  buildPaddocks();
+  render();
+  updateIrrSummary();
+  updateNdviCompare();
+  renderCalTable();
+}
+function updateIrrSummary(){
+  const el = document.getElementById('irr-summary');
+  if (!el) return;
+  const frac = classAreaFractions();
+  el.textContent = frac.total > 0
+    ? `${frac.nIrr} irrigated (${frac.areaIrr.toFixed(0)} ha) · ${frac.nDry} dryland (${frac.areaDry.toFixed(0)} ha)`
+    : 'no paddock boundaries yet';
+}
+
+/* ---- NDVI vs flat: a second model with no satellite input at all --------
+ *
+ * "Flat" gives every paddock the same growth (within its irrigation class) -
+ * no NDVI, no satellite data, nothing splitting the farm figure by paddock.
+ * Comparing its calibration spread against the NDVI model's is a genuine
+ * check on whether NDVI is explaining real paddock-to-paddock differences,
+ * or just adding scatter on top of what the farmwalks already have. */
+function setUseNdvi(v){
+  USE_NDVI = v;
+  saveUseNdvi();
+  document.getElementById('btn-ndvi-on').classList.toggle('on', v);
+  document.getElementById('btn-ndvi-off').classList.toggle('on', !v);
+  recompute();
+}
+function updateNdviCompare(){
+  const el = document.getElementById('ndvi-compare');
+  if (!el || !CAL_NDVI || !CAL_FLAT) return;
+  // Compared on the ALL-MONTHS pooled figure (.overall), not one calendar
+  // month - this is a check on the model's shape in general, not on any one
+  // season, so pooling every real interval gives it the most evidence.
+  const fmt = c => c.overall.factor != null
+    ? `median <b>${c.overall.factor.toFixed(2)}</b>, middle half ${c.overall.p25.toFixed(2)}–${c.overall.p75.toFixed(2)} (${c.overall.n} intervals)`
+    : `not enough clean intervals (${c.overall.n})`;
+  el.innerHTML = `NDVI: ${fmt(CAL_NDVI)} &nbsp;·&nbsp; Flat: ${fmt(CAL_FLAT)} ` +
+    `— whichever has the narrower middle half is explaining more of the real farmwalk scatter.`;
+}
+
+/* ---- calibration by month, shown on request under the tiles ------------- */
+function toggleCalTable(){
+  const el = document.getElementById('cal-table-wrap');
+  el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+}
+function renderCalTable(){
+  const tbody = document.getElementById('cal-table-body');
+  if (!tbody || !CAL.months) return;
+  const thisMonth = todayNZ().getMonth() + 1;
+  tbody.innerHTML = MONTH_NAMES.map((name,i) => {
+    const mo = i + 1, s = CAL.months[mo];
+    const isNow = mo === thisMonth;
+    const row = s.factor == null
+      ? `<td colspan="3" style="color:#78847f">not enough data at all yet</td>`
+      : `<td><b>${s.factor.toFixed(2)}</b></td>` +
+        `<td>${s.p25 != null ? s.p25.toFixed(2)+'–'+s.p75.toFixed(2) : '–'}</td>` +
+        `<td>${s.n}${s.fallback ? ' (borrowed)' : ''}</td>`;
+    return `<tr style="${s.fallback ? 'color:#78847f' : ''}${isNow ? 'font-weight:700' : ''}">` +
+      `<td>${name}${isNow ? ' (now)' : ''}</td>${row}</tr>`;
+  }).join('');
+}
+
+function markRangeButtons(){
+  document.querySelectorAll('.filters .btn[data-days]').forEach(b => {
+    b.classList.toggle('on', !customFrom && +b.dataset.days === rangeDays);
+  });
+}
+
+window.addEventListener('resize', () => { if (SERIES) drawChart(); });
+
+/* ---- go ---------------------------------------------------------------- */
+(function start(){
+  loadIrrClass();
+  loadUseNdvi();
+  document.getElementById('btn-ndvi-on').classList.toggle('on', USE_NDVI);
+  document.getElementById('btn-ndvi-off').classList.toggle('on', !USE_NDVI);
+  const t = todayNZ();
+  document.getElementById('d-from').value = iso(t);
+  document.getElementById('d-to').value = iso(new Date(t.getTime() + (rangeDays-1)*DAY));
+  markRangeButtons();
+  loadAll();
+})();
+</script>
+</body>
+</html>
