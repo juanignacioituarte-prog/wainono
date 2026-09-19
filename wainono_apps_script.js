@@ -24,7 +24,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-09-05-a";
+var SCRIPT_VERSION = "2026-09-19-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -50,6 +50,8 @@ function doGet(e) {
     return getPaddocks();
   } else if (type === 'tabs') {
     return listTabs();
+  } else if (type === 'walk_order') {
+    return getWalkOrder();
   } else if (type === 'version') {
     return jsonResponse({ status: "success", version: SCRIPT_VERSION });
   } else {
@@ -93,6 +95,8 @@ function doPost(e) {
       return loadFarmwalk(payload);
     } else if (type === 'rename_paddock') {
       return renamePaddockEverywhere(payload);
+    } else if (type === 'save_walk_order') {
+      return saveWalkOrder(payload.order);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -169,37 +173,49 @@ function updatePaddockHistory(paddockName, entriesList) {
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Farmwalks") || ss.getSheets()[0];
+
+  /* Edit the paddock's rows where they are.
+   *
+   * This used to take every row of the paddock out and write them back at the
+   * bottom of the tab. The rows sit in the order they were walked, and the
+   * next walk follows that order, so one edit sent the paddock to the end of
+   * every walk's route. Now a date that is still there is changed in its own
+   * row, a date that was removed is deleted, and only a new date is added. */
+  var wanted = [];
+  (Array.isArray(entriesList) ? entriesList : []).forEach(function(item) {
+    var dateStr = String(item.date || "");
+    var formattedDate = dateStr;
+    if (dateStr.indexOf('-') > -1) {
+      var parts = dateStr.split('-');
+      if (parts.length === 3) formattedDate = parts[2] + '/' + parts[1] + '/' + parts[0];
+    }
+    wanted.push({ date: formattedDate, cover: Number(item.cover) || 0, reason: item.reason || "", used: false });
+  });
+
+  var pKey = normalisePaddockKey(paddockName);
   var lastRow = sheet.getLastRow();
-
+  var drop = [];
   if (lastRow > 1) {
-    var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
-    var rowsToKeep = [];
-
-    var pLower = String(paddockName).trim().toLowerCase();
+    var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    // Top down, so if a date is in twice the first (original) row is kept.
     for (var i = 0; i < data.length; i++) {
-      var rowName = String(data[i][1]).trim().toLowerCase();
-      if (rowName !== pLower) {
-        rowsToKeep.push(data[i]);
+      if (normalisePaddockKey(data[i][1]) !== pKey) continue;
+      var match = null;
+      for (var w = 0; w < wanted.length; w++) {
+        if (!wanted[w].used && sameFarmwalkDate(data[i][0], wanted[w].date)) { match = wanted[w]; break; }
+      }
+      if (match) {
+        match.used = true;
+        sheet.getRange(i + 2, 3, 1, 2).setValues([[match.cover, match.reason]]);
+      } else {
+        drop.push(i + 2);
       }
     }
-
-    if (Array.isArray(entriesList)) {
-      entriesList.forEach(function(item) {
-        var dateStr = item.date;
-        var formattedDate = dateStr;
-        if (dateStr && dateStr.indexOf('-') > -1) {
-          var parts = dateStr.split('-');
-          if (parts.length === 3) formattedDate = parts[2] + '/' + parts[1] + '/' + parts[0];
-        }
-        rowsToKeep.push([formattedDate, paddockName, Number(item.cover) || 0, item.reason || ""]);
-      });
-    }
-
-    sheet.getRange(2, 1, lastRow, 4).clearContent();
-    if (rowsToKeep.length > 0) {
-      sheet.getRange(2, 1, rowsToKeep.length, 4).setValues(rowsToKeep);
-    }
   }
+  for (var d = drop.length - 1; d >= 0; d--) sheet.deleteRow(drop[d]);   // bottom up, so row numbers hold
+  wanted.forEach(function(e) {
+    if (!e.used) sheet.appendRow([e.date, paddockName, e.cover, e.reason]);
+  });
 
   return jsonResponse({ status: "success", paddock: paddockName });
 }
@@ -654,6 +670,44 @@ function saveOut(outList) {
   return jsonResponse({ status: "success", count: rows.length });
 }
 
+/* ================== FARMWALK ROUTE ================== */
+// Sheet "walk order": paddock   (one per row, in the order they are walked)
+// Set in Farm Configuration. A new farmwalk lists the paddocks in this order.
+
+function getWalkOrder() {
+  var sheet = getOrCreateSheet("walk order");
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResponse({ status: "success", order: [] });
+  var order = [];
+  sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(function(row) {
+    var name = String(row[0] == null ? "" : row[0]).trim();
+    if (name) order.push(name);
+  });
+  return jsonResponse({ status: "success", order: order });
+}
+
+function saveWalkOrder(orderList) {
+  if (!Array.isArray(orderList)) return errorResponse("Payload order must be array");
+  var rows = [];
+  var seen = {};
+  orderList.forEach(function(n) {
+    var name = String(n == null ? "" : n).trim();
+    var k = normalisePaddockKey(name);
+    if (!name || seen[k]) return;
+    seen[k] = true;
+    rows.push([name]);
+  });
+  // An empty list would wipe the route. Nothing in the app sends one.
+  if (rows.length === 0) return errorResponse("Empty walk order - nothing saved");
+
+  var sheet = getOrCreateSheet("walk order");
+  sheet.clearContents();
+  sheet.getRange(1, 1).setValue("paddock");
+  // Plain text, so a paddock called 7 stays "7" and not a number.
+  sheet.getRange(2, 1, rows.length, 1).setNumberFormat("@").setValues(rows);
+  return jsonResponse({ status: "success", count: rows.length });
+}
+
 /* ================== HERD NUMBERS LOG ================== */
 // Sheet "HerdLog": id | timestamp | herd id | herd | from | to | change | user
 //
@@ -819,12 +873,39 @@ function loadFarmwalk(payload) {
   // read was one behind the sheet. Deleting and appending never rewrites a row
   // that belongs to another walk, so that cannot happen again.
   var removed = 0;
+  var updated = 0;
   var lastRow = sheet.getLastRow();
+
+  /* merge changes a paddock that is already in this walk in its own row.
+   * Deleting it and adding it at the bottom moved it to the end of the walk,
+   * and the next walk follows this order. */
+  var inPlace = {};
+  if (merge && lastRow > 1) {
+    var byKey = {};
+    payload.entries.forEach(function(e) {
+      if (e && e.paddock) byKey[normalisePaddockKey(e.paddock)] = e;
+    });
+    var cur = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    for (var r = 0; r < cur.length; r++) {
+      if (!sameFarmwalkDate(cur[r][0], date)) continue;
+      var k = normalisePaddockKey(cur[r][1]);
+      if (!byKey[k] || inPlace[k]) continue;
+      var e0 = byKey[k];
+      var cells = [Number(e0.cover) || 0];
+      if (lastCol > 3) cells.push(e0.reason ? String(e0.reason) : "");
+      sheet.getRange(r + 2, 3, 1, cells.length).setValues([cells]);
+      inPlace[k] = r + 2;
+      updated++;
+    }
+  }
+
   if (lastRow > 1) {
     var existing = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
     for (var i = existing.length - 1; i >= 0; i--) {       // bottom up, so row numbers hold
       if (!sameFarmwalkDate(existing[i][0], date)) continue;
-      if (merge && !mine[normalisePaddockKey(existing[i][1])]) continue;   // someone else's paddock
+      var key = normalisePaddockKey(existing[i][1]);
+      if (merge && !mine[key]) continue;                   // someone else's paddock
+      if (inPlace[key] === i + 2) continue;                // changed where it is
       sheet.deleteRow(i + 2);
       removed++;
     }
@@ -833,6 +914,7 @@ function loadFarmwalk(payload) {
   var rows = [];
   payload.entries.forEach(function(e) {
     if (!e || !e.paddock) return;
+    if (inPlace[normalisePaddockKey(e.paddock)]) return;   // already written in its row
     var row = [];
     for (var c = 0; c < lastCol; c++) row.push("");
     row[0] = date;
@@ -849,7 +931,7 @@ function loadFarmwalk(payload) {
 
   return jsonResponse({
     status: "success", date: date,
-    added: rows.length, replaced: removed, totalRows: sheet.getLastRow() - 1
+    added: rows.length, replaced: removed, updated: updated, totalRows: sheet.getLastRow() - 1
   });
 }
 

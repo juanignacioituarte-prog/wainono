@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.02</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.03</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.02</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.03</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1738,7 +1738,7 @@
                     <button id="btn-farmwalk-entry" onclick="toggleFarmwalkEntryMode()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         <span>+</span> Farmwalk
                     </button>
-                    <input type="date" id="farmwalk-entry-date" style="display:none; padding:6px 10px; border-radius:6px; border:1px solid #27ae60; font-size:12px; font-weight:bold; color:#2c3e50;" />
+                    <input type="date" id="farmwalk-entry-date" onchange="onFarmwalkDateChange()" style="display:none; padding:6px 10px; border-radius:6px; border:1px solid #27ae60; font-size:12px; font-weight:bold; color:#2c3e50;" />
                     <button id="btn-save-farmwalk-all" onclick="saveEntireFarmwalk()" style="display:none; background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; transition:0.2s;">
                         💾 SAVE FARMWALK
                     </button>
@@ -1788,10 +1788,26 @@
         <div id="farm-config-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
             <h3 style="margin-top:0;">Farm Configuration</h3>
 
-            <div style="display:flex; gap:8px; margin-bottom:16px;">
-                <button id="fc-tab-units" onclick="showFarmConfigSection('units')" style="flex:1; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #9b59b6;">🗺️ FARM UNITS</button>
-                <button id="fc-tab-out" onclick="showFarmConfigSection('out')" style="flex:1; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #e67e22;">🚧 PADDOCKS OUT</button>
-                <button id="fc-tab-paddocks" onclick="showFarmConfigSection('paddocks')" style="flex:1; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #16a085;">📐 PADDOCKS</button>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+                <button id="fc-tab-units" onclick="showFarmConfigSection('units')" style="flex:1 1 40%; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #9b59b6;">🗺️ FARM UNITS</button>
+                <button id="fc-tab-out" onclick="showFarmConfigSection('out')" style="flex:1 1 40%; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #e67e22;">🚧 PADDOCKS OUT</button>
+                <button id="fc-tab-paddocks" onclick="showFarmConfigSection('paddocks')" style="flex:1 1 40%; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #16a085;">📐 PADDOCKS</button>
+                <button id="fc-tab-route" onclick="showFarmConfigSection('route')" style="flex:1 1 40%; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; border:1px solid #2980b9;">🚶 WALK ORDER</button>
+            </div>
+
+            <div id="fc-section-route" style="display:none;">
+                <h4 style="margin:0 0 4px; font-size:13px; color:#2c3e50;">Farmwalk Order</h4>
+                <p style="font-size:12px; color:#666; margin:0 0 12px;">
+                    The order the paddocks come up when you enter a farmwalk.
+                    Use ▲ ▼ to move a paddock, or tap the paddocks on the map in the order you walk them.
+                </p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                    <button id="wo-btn-tap" onclick="toggleWalkOrderTap()" style="flex:1 1 100%; background:#2980b9; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">📍 TAP PADDOCKS ON MAP IN ORDER</button>
+                    <select id="wo-copy-walk" onchange="copyWalkOrderFrom(this.value)" style="flex:1 1 60%; padding:8px; border-radius:6px; border:1px solid #ccc; font-size:12px;"></select>
+                    <button onclick="saveWalkOrder()" style="flex:1 1 30%; background:#27ae60; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer;">💾 SAVE ORDER</button>
+                </div>
+                <div id="wo-status" style="font-size:11px; font-weight:bold; line-height:1.4; margin-bottom:8px;"></div>
+                <div id="wo-list"></div>
             </div>
 
             <div id="fc-section-paddocks" style="display:none;">
@@ -2702,13 +2718,18 @@
 
             const padBtn = document.getElementById('fc-tab-paddocks');
             const padSec = document.getElementById('fc-section-paddocks');
+            const routeBtn = document.getElementById('fc-tab-route');
+            const routeSec = document.getElementById('fc-section-route');
             const hideAll = () => {
                 if (unitsSec) unitsSec.style.display = 'none';
                 if (outSec) outSec.style.display = 'none';
                 if (padSec) padSec.style.display = 'none';
+                if (routeSec) routeSec.style.display = 'none';
                 off(unitsBtn, '#9b59b6'); off(outBtn, '#e67e22');
                 if (padBtn) off(padBtn, '#16a085');
+                if (routeBtn) off(routeBtn, '#2980b9');
             };
+            if (which !== 'route') walkOrderTap = false;
 
             // leaving the boundary editor must not leave a half-done cut running
             if (which !== 'paddocks' && (paddockSelectMode || paddockSplitPoints)) {
@@ -2728,12 +2749,219 @@
                 if (padSec) padSec.style.display = 'block';
                 if (unitEditingId) stopUnitEdit();
                 renderPaddockPanel();
+            } else if (which === 'route') {
+                if (routeBtn) on(routeBtn, '#2980b9');
+                if (routeSec) routeSec.style.display = 'block';
+                if (unitEditingId) stopUnitEdit();
+                startWalkOrderEdit();
             } else {
                 on(unitsBtn, '#9b59b6');
                 if (unitsSec) unitsSec.style.display = 'block';
                 renderFarmConfig();
             }
             updateGeoStyles();
+        }
+
+        /* ===================== FARMWALK ORDER =====================
+         * Kept in the "walk order" tab, one paddock per row. A new farmwalk
+         * lists the paddocks in this order. With none saved, the last walk's
+         * order is used, as before. */
+        let walkOrder = [];
+        try { walkOrder = JSON.parse(localStorage.getItem('wn_walk_order') || '[]') || []; } catch (e) { walkOrder = []; }
+        let walkOrderDraft = [];          // what the editor shows
+        let walkOrderTap = false;         // taps on the map add paddocks to the end
+
+        async function loadWalkOrder() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + "?type=walk_order&t=" + Date.now(), { cache: 'no-store' });
+                const data = await res.json();
+                // An older script has no walk_order and answers with the feed
+                // settings instead, which have no "order". Then nothing changes.
+                if (data && Array.isArray(data.order)) {
+                    walkOrder = data.order.map(String);
+                    try { localStorage.setItem('wn_walk_order', JSON.stringify(walkOrder)); } catch (e) {}
+                    if (isFarmwalkEntryActive) renderDashboard();
+                }
+            } catch (e) {
+                console.log("Walk order load failed, using local copy");
+            }
+        }
+
+        // Every paddock the farmwalk knows, spelled the way the farmwalk spells it.
+        function walkOrderPaddockNames() {
+            const seen = new Set();
+            const out = [];
+            manualModeData.forEach(p => {
+                const k = normName(p.name);
+                if (!seen.has(k)) { seen.add(k); out.push(p.name); }
+            });
+            return out;
+        }
+
+        function setWalkOrderStatus(text, color) {
+            const el = document.getElementById('wo-status');
+            if (el) { el.textContent = text || ''; el.style.color = color || '#7f8c8d'; }
+        }
+
+        function startWalkOrderEdit() {
+            walkOrderTap = false;
+            if (walkOrder.length > 0) {
+                walkOrderDraft = walkOrder.slice();
+                setWalkOrderStatus('');
+            } else {
+                // Nothing saved yet: start from the route the farmwalk uses today.
+                const rank = farmwalkRoute(null);
+                const far = Number.MAX_SAFE_INTEGER;
+                walkOrderDraft = walkOrderPaddockNames().sort((a, b) => {
+                    const ra = rank[normName(a)], rb = rank[normName(b)];
+                    return (ra === undefined ? far : ra) - (rb === undefined ? far : rb);
+                });
+                setWalkOrderStatus('No order saved yet. This is the order of the last walk. Change it and press SAVE ORDER.', '#e67e22');
+            }
+            renderWalkOrderCopyList();
+            renderWalkOrderEditor();
+        }
+
+        function renderWalkOrderCopyList() {
+            const sel = document.getElementById('wo-copy-walk');
+            if (!sel) return;
+            sel.innerHTML = '<option value="">Copy the order of a walk...</option>' +
+                farmwalkDates().map(d => `<option value="${d.key}">${d.label} (${d.count} paddocks)</option>`).join('');
+        }
+
+        function copyWalkOrderFrom(key) {
+            if (!key) return;
+            const order = FARMWALK_ORDER_BY_DATE[key] || [];
+            const names = walkOrderPaddockNames();
+            const byNorm = {};
+            names.forEach(n => { byNorm[normName(n)] = n; });
+            const seen = new Set();
+            walkOrderDraft = [];
+            order.forEach(n => {
+                const k = normName(n);
+                if (byNorm[k] && !seen.has(k)) { seen.add(k); walkOrderDraft.push(byNorm[k]); }
+            });
+            const sel = document.getElementById('wo-copy-walk');
+            if (sel) sel.value = '';
+            setWalkOrderStatus(`Copied from ${fmtNZ(new Date(key))}. Not saved yet.`, '#e67e22');
+            renderWalkOrderEditor();
+        }
+
+        function toggleWalkOrderTap() {
+            walkOrderTap = !walkOrderTap;
+            if (walkOrderTap) {
+                if (walkOrderDraft.length > 0 &&
+                    confirm('Start the order again from empty?\n\nOK = empty list, then tap the paddocks in order.\nCancel = keep the list and add taps to the end.')) {
+                    walkOrderDraft = [];
+                }
+                setWalkOrderStatus('Tap the paddocks on the map in the order you walk them. Tap one again to take it off.', '#2980b9');
+            } else {
+                setWalkOrderStatus('Not saved yet.', '#e67e22');
+            }
+            renderWalkOrderEditor();
+        }
+
+        function walkOrderTapPaddock(pName) {
+            const k = normName(pName);
+            const at = walkOrderDraft.findIndex(n => normName(n) === k);
+            if (at !== -1) walkOrderDraft.splice(at, 1);
+            else walkOrderDraft.push(canonicalPaddockName(pName));
+            renderWalkOrderEditor();
+        }
+
+        function moveWalkOrder(i, dir) {
+            const j = i + dir;
+            if (j < 0 || j >= walkOrderDraft.length) return;
+            const t = walkOrderDraft[i]; walkOrderDraft[i] = walkOrderDraft[j]; walkOrderDraft[j] = t;
+            setWalkOrderStatus('Not saved yet.', '#e67e22');
+            renderWalkOrderEditor();
+        }
+
+        // Type a number to move a paddock straight to that place.
+        function placeWalkOrder(i) {
+            const name = walkOrderDraft[i];
+            const v = prompt(`Move ${name} to which place? (1 - ${walkOrderDraft.length})`, String(i + 1));
+            const n = parseInt(v, 10);
+            if (!isFinite(n)) return;
+            const to = Math.max(1, Math.min(walkOrderDraft.length, n)) - 1;
+            walkOrderDraft.splice(i, 1);
+            walkOrderDraft.splice(to, 0, name);
+            setWalkOrderStatus('Not saved yet.', '#e67e22');
+            renderWalkOrderEditor();
+        }
+
+        function removeWalkOrder(i) {
+            walkOrderDraft.splice(i, 1);
+            setWalkOrderStatus('Not saved yet.', '#e67e22');
+            renderWalkOrderEditor();
+        }
+
+        function addWalkOrder(name) {
+            walkOrderDraft.push(name);
+            setWalkOrderStatus('Not saved yet.', '#e67e22');
+            renderWalkOrderEditor();
+        }
+
+        function renderWalkOrderEditor() {
+            const box = document.getElementById('wo-list');
+            const tapBtn = document.getElementById('wo-btn-tap');
+            if (tapBtn) {
+                tapBtn.textContent = walkOrderTap ? '✓ DONE TAPPING' : '📍 TAP PADDOCKS ON MAP IN ORDER';
+                tapBtn.style.background = walkOrderTap ? '#34495e' : '#2980b9';
+            }
+            if (!box) return;
+
+            const inOrder = new Set(walkOrderDraft.map(normName));
+            const missing = walkOrderPaddockNames().filter(n => !inOrder.has(normName(n)))
+                .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            const btn = 'border:none; border-radius:4px; padding:6px 9px; font-size:12px; font-weight:bold; cursor:pointer;';
+
+            let html = walkOrderDraft.map((n, i) => `
+                <div style="display:flex; align-items:center; gap:6px; background:#fff; border:1px solid #eee; border-radius:6px; padding:5px 8px; margin-bottom:4px;">
+                    <button onclick="placeWalkOrder(${i})" title="Move to a place" style="${btn} background:#ecf0f1; color:#7f8c8d; min-width:34px;">${i + 1}</button>
+                    <span style="flex:1; font-weight:bold; font-size:13px;">${escUnit(n)}</span>
+                    <button onclick="moveWalkOrder(${i}, -1)" style="${btn} background:#ecf0f1; color:#2c3e50;" ${i === 0 ? 'disabled' : ''}>▲</button>
+                    <button onclick="moveWalkOrder(${i}, 1)" style="${btn} background:#ecf0f1; color:#2c3e50;" ${i === walkOrderDraft.length - 1 ? 'disabled' : ''}>▼</button>
+                    <button onclick="removeWalkOrder(${i})" style="${btn} background:#fdeceb; color:#c0392b;">✕</button>
+                </div>`).join('');
+
+            if (missing.length > 0) {
+                html += `<div style="margin-top:12px; font-size:11px; font-weight:bold; color:#e67e22;">
+                        Not in the order (${missing.length}) - these come last in a walk. Tap one to add it to the end.</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:6px;">` +
+                    missing.map(n => `<button onclick="addWalkOrder('${escUnit(n)}')" style="${btn} background:#fff; border:1px solid #e67e22; color:#2c3e50;">+ ${escUnit(n)}</button>`).join('') +
+                    `</div>`;
+            }
+            box.innerHTML = html;
+            updateGeoStyles();
+        }
+
+        async function saveWalkOrder() {
+            if (walkOrderDraft.length === 0) { alert('The order is empty. Add some paddocks first.'); return; }
+            walkOrderTap = false;
+            renderWalkOrderEditor();
+            setWalkOrderStatus('Saving...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'save_walk_order', order: walkOrderDraft })
+                });
+                const d = await res.json();
+                if (d && d.status === 'success') {
+                    walkOrder = walkOrderDraft.slice();
+                    try { localStorage.setItem('wn_walk_order', JSON.stringify(walkOrder)); } catch (e) {}
+                    setWalkOrderStatus(`✓ Saved. ${d.count} paddocks in the walk order.`, '#27ae60');
+                    return;
+                }
+                const msg = (d && d.message) || 'the sheet refused it';
+                setWalkOrderStatus(/unknown payload type/i.test(msg)
+                    ? '⚠ Not saved - the Apps Script needs updating first (walk order).'
+                    : '⚠ Not saved - ' + msg, '#e74c3c');
+            } catch (e) {
+                console.error("Walk order save failed:", e);
+                setWalkOrderStatus('⚠ Not saved - could not reach the sheet.', '#e74c3c');
+            }
         }
 
         /* ===================== PADDOCK BOUNDARY EDITING =====================
@@ -4544,19 +4772,108 @@
          * A walk takes an hour on a bike. If the app is closed, the battery
          * goes, or the page reloads before Save, nothing typed should be lost.
          * Cleared once the walk is saved to the sheet. */
+        /* The draft belongs to one walk date.
+         *
+         * It used to be a bare list of covers with no date. Continuing the
+         * 3 Sept walk filled it with the 3 Sept covers, and the next + Farmwalk
+         * showed them again as if they were today's. Older drafts without a
+         * date cannot be matched to a walk, so they are dropped. */
         let farmwalkDraft = {};
-        try { farmwalkDraft = JSON.parse(localStorage.getItem('wn_farmwalk_draft') || '{}') || {}; } catch (e) { farmwalkDraft = {}; }
+        let farmwalkDraftDate = null;     // yyyy-mm-dd
+        try {
+            const saved = JSON.parse(localStorage.getItem('wn_farmwalk_draft') || 'null');
+            if (saved && saved.date && saved.values && typeof saved.values === 'object') {
+                farmwalkDraft = saved.values;
+                farmwalkDraftDate = saved.date;
+            }
+        } catch (e) { farmwalkDraft = {}; }
+
+        function persistFarmwalkDraft() {
+            const v = document.getElementById('farmwalk-entry-date')?.value;
+            if (v) farmwalkDraftDate = v;
+            try {
+                localStorage.setItem('wn_farmwalk_draft', JSON.stringify({ date: farmwalkDraftDate, values: farmwalkDraft }));
+            } catch (e) {}
+        }
 
         function rememberFarmwalkDraft(name, value) {
             if (value === '' || value === null || value === undefined) delete farmwalkDraft[name];
             else farmwalkDraft[name] = value;
-            try { localStorage.setItem('wn_farmwalk_draft', JSON.stringify(farmwalkDraft)); } catch (e) {}
+            persistFarmwalkDraft();
             updateFarmwalkProgress();
         }
 
         function clearFarmwalkDraft() {
             farmwalkDraft = {};
+            farmwalkDraftDate = null;
             try { localStorage.removeItem('wn_farmwalk_draft'); } catch (e) {}
+        }
+
+        // The cover the sheet has for this paddock on this day, or null.
+        function sheetCoverOn(name, dayKey) {
+            const p = manualModeData.find(x => x.name === name) ||
+                      manualModeData.find(x => normName(x.name) === normName(name));
+            const e = p && (p.entries || []).find(x => x.dateObj && x.dateObj.toDateString() === dayKey);
+            return e ? e.cover : null;
+        }
+
+        // Covers in the draft that the sheet does not have yet.
+        function unsavedDraftCount() {
+            if (!farmwalkDraftDate) return 0;
+            const key = new Date(farmwalkDraftDate + 'T12:00:00').toDateString();
+            return Object.keys(farmwalkDraft).filter(n => {
+                const v = parseFloat(farmwalkDraft[n]);
+                return isFinite(v) && sheetCoverOn(n, key) !== v;
+            }).length;
+        }
+
+        /* Opening + Farmwalk: the draft on this phone must be for the date in
+         * the box. If it is for another day and has covers that were never
+         * saved, ask. Otherwise it is only a copy of the sheet, so drop it. */
+        function matchDraftToEntryDate() {
+            const dateInp = document.getElementById('farmwalk-entry-date');
+            const want = dateInp ? dateInp.value : '';
+            if (!farmwalkDraftDate || farmwalkDraftDate === want) { persistFarmwalkDraft(); return; }
+            const unsaved = unsavedDraftCount();
+            if (unsaved > 0) {
+                const other = fmtNZ(new Date(farmwalkDraftDate + 'T12:00:00'));
+                if (confirm(`This phone has ${unsaved} cover${unsaved === 1 ? '' : 's'} typed for the walk of ${other} that ${unsaved === 1 ? 'is' : 'are'} not saved.\n\n` +
+                            `OK = go back to the ${other} walk.\nCancel = throw ${unsaved === 1 ? 'it' : 'them'} away and start a new walk.`)) {
+                    if (dateInp) dateInp.value = farmwalkDraftDate;
+                    return;
+                }
+            }
+            clearFarmwalkDraft();
+            persistFarmwalkDraft();
+        }
+
+        /* A new date in the box. Covers that only came from the sheet for the
+         * old date go; covers typed and not saved yet move to the new date (you
+         * started typing, then noticed the date was wrong). */
+        function onFarmwalkDateChange() {
+            if (!isFarmwalkEntryActive) return;
+            if (farmwalkDraftDate) {
+                const oldKey = new Date(farmwalkDraftDate + 'T12:00:00').toDateString();
+                Object.keys(farmwalkDraft).forEach(n => {
+                    if (sheetCoverOn(n, oldKey) === parseFloat(farmwalkDraft[n])) delete farmwalkDraft[n];
+                });
+            }
+            persistFarmwalkDraft();
+            prefillFarmwalkFromSheet();
+            renderDashboard();
+            updateFarmwalkProgress();
+        }
+
+        // The walk before this date, for the "Last walk" line on a card.
+        function lastWalkBefore(p, dateObj) {
+            const key = dateObj.toDateString();
+            let best = null;
+            (p.entries || []).forEach(e => {
+                if (!e.dateObj || e.dateObj.toDateString() === key) return;
+                if (e.dateObj.getTime() > dateObj.getTime()) return;
+                if (!best || e.dateObj.getTime() > best.dateObj.getTime()) best = e;
+            });
+            return best;
         }
 
         // The cards on screen, in the order they are shown.
@@ -4710,7 +5027,7 @@
                 const e = (p.entries || []).find(x => x.dateObj && x.dateObj.toDateString() === key);
                 if (e && e.cover > 0) { farmwalkDraft[p.name] = String(e.cover); found++; }
             });
-            try { localStorage.setItem('wn_farmwalk_draft', JSON.stringify(farmwalkDraft)); } catch (e) {}
+            persistFarmwalkDraft();
             return found;
         }
 
@@ -4826,13 +5143,32 @@
          * the done ones happen to be in. Anything that route never mentions
          * goes on the end, so a new paddock is never lost off the list. */
         function farmwalkRoute(entryDateObj) {
+            const rank = {};
+
+            // The order set in Farm Configuration comes first.
+            if (walkOrder.length > 0) {
+                walkOrder.forEach((n, i) => { if (rank[normName(n)] === undefined) rank[normName(n)] = i; });
+                return rank;
+            }
+
+            // No order set yet: follow the last walk. A walk saved by an older
+            // version of the app went into the sheet highest cover first, which
+            // is not a route, so a walk that looks like that is passed over.
             const skip = entryDateObj ? entryDateObj.toDateString() : null;
-            const source = farmwalkDates().find(d => d.key !== skip) || farmwalkDates()[0];
+            const dates = farmwalkDates().filter(d => d.key !== skip);
+            const source = dates.find(d => !walkLooksSortedByCover(d.key)) || dates[0] || farmwalkDates()[0];
             const order = source ? FARMWALK_ORDER_BY_DATE[source.key] : [];
 
-            const rank = {};
             (order || []).forEach((n, i) => { if (rank[normName(n)] === undefined) rank[normName(n)] = i; });
             return rank;
+        }
+
+        function walkLooksSortedByCover(key) {
+            const covers = coversForWalk(key).map(c => c.cover);
+            if (covers.length < 10) return false;
+            let down = 0;
+            for (let i = 1; i < covers.length; i++) if (covers[i] <= covers[i - 1]) down++;
+            return down / (covers.length - 1) > 0.85;
         }
 
         const editingPrevPaddocks = new Set();
@@ -5077,6 +5413,7 @@
                         dateInp.value = toDateInputValue(new Date());
                     }
                 }
+                matchDraftToEntryDate();
                 if (btnSaveAll) btnSaveAll.style.display = 'inline-block';
                 const prog = document.getElementById('farmwalk-progress');
                 if (prog) prog.style.display = 'inline-block';
@@ -5148,6 +5485,13 @@
                     }
                 }
             });
+
+            // Into the sheet in walking order. The next walk with no order set
+            // follows this one, and the paddocks above were in cover order.
+            const routeRank = farmwalkRoute(dateObj);
+            const far = Number.MAX_SAFE_INTEGER;
+            const rankOf = n => { const r = routeRank[normName(n)]; return r === undefined ? far : r; };
+            entriesToSave.sort((a, b) => rankOf(a.paddock) - rankOf(b.paddock));
 
             if (btnSave) {
                 btnSave.disabled = true;
@@ -5823,6 +6167,7 @@
 
             // Units render instantly from localStorage; this refreshes them from the cloud.
             loadFarmUnits();
+            loadWalkOrder();
 
             // Same for the herd log: without this a device only ever shows the
             // changes typed on it, so the stamp under each Cows box would miss
@@ -5968,6 +6313,13 @@
                             if (unitEditingId && currentDashboardMode === 'farm_config') {
                                 L.DomEvent.stopPropagation(e);
                                 togglePaddockInUnit(pName);
+                                return;
+                            }
+
+                            // Setting the walk order by tapping paddocks in turn
+                            if (walkOrderTap && currentDashboardMode === 'farm_config' && farmConfigSection === 'route') {
+                                L.DomEvent.stopPropagation(e);
+                                walkOrderTapPaddock(pName);
                                 return;
                             }
 
@@ -7011,13 +7363,15 @@
 
                 let entryControlsHtml = "";
                 if (isFarmwalkEntryActive && currentDashboardMode === 'manual') {
+                    // The walk before the one being entered, not the one before the latest.
+                    const lastWalk = lastWalkBefore(p, entryDateObj || new Date());
                     if (!p.isOut) {
                         entryControlsHtml = `
                             <div class="farmwalk-card-controls" style="margin-top:10px; padding-top:8px; border-top:1px dashed #ddd; display:flex; flex-direction:column; gap:8px;" onclick="event.stopPropagation();">
                                 <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:11px; color:#7f8c8d;">
                                     <span>Last walk</span>
-                                    <span><b style="color:#2c3e50; font-size:13px;">${p.previous ? p.previous.cover : (p.latest ? p.latest.cover : '--')}</b>
-                                        <span style="font-size:10px;"> kgDM &middot; ${p.previous ? p.previous.formattedDate : (p.latest ? p.latest.formattedDate : '--')}</span></span>
+                                    <span><b style="color:#2c3e50; font-size:13px;">${lastWalk ? lastWalk.cover : '--'}</b>
+                                        <span style="font-size:10px;"> kgDM &middot; ${lastWalk ? fmtNZ(lastWalk.dateObj) : '--'}</span></span>
                                 </div>
                                 <input type="number" inputmode="numeric" id="inp-cover-${p.name}" placeholder="New cover kgDM" value="${farmwalkDraft[p.name] !== undefined ? farmwalkDraft[p.name] : ''}"
                                     oninput="rememberFarmwalkDraft('${p.name}', this.value)"
@@ -7111,8 +7465,15 @@
             const currentData = getCurrentModeData();
             const walk = latestWalkInfo(currentData);
             const activeUnit = unitFilterApplies() ? getActiveUnit() : null;
+            const walkOrderView = currentDashboardMode === 'farm_config' && farmConfigSection === 'route';
             geoLayer.eachLayer(layer => {
                 const pName = layer.feature.properties.name;
+                // Leaving the walk order screen: take its numbers off the map.
+                if (layer._walkOrderLabel && !walkOrderView) {
+                    const tipEl = layer.getTooltip() && layer.getTooltip().getElement();
+                    if (tipEl) tipEl.classList.remove('show-label');
+                    layer._walkOrderLabel = false;
+                }
                 // Matched without caring about case, so a paddock spelled
                 // differently in the farmwalk still gets its colour.
                 const p = currentData.find(pd => normName(pd.name) === normName(pName));
@@ -7134,6 +7495,19 @@
                         opacity: 1,
                         weight: picked ? 3.5 : 1
                     });
+                } else if (currentDashboardMode === 'farm_config' && farmConfigSection === 'route') {
+                    // Walk order: paddocks in the order are blue and show their number.
+                    const at = walkOrderDraft.findIndex(n => normName(n) === normName(pName));
+                    const isLast = at !== -1 && at === walkOrderDraft.length - 1;
+                    layer.setStyle({
+                        fillColor: at === -1 ? '#95a5a6' : (isLast ? '#e67e22' : '#2980b9'),
+                        fillOpacity: at === -1 ? 0.25 : 0.7,
+                        color: 'white', opacity: 1, weight: isLast ? 3 : 1
+                    });
+                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${at === -1 ? '' : (at + 1) + '. '}${pName}</div>`);
+                    const tipEl = layer.getTooltip() && layer.getTooltip().getElement();
+                    if (tipEl) tipEl.classList.toggle('show-label', at !== -1);
+                    layer._walkOrderLabel = true;
                 } else if (currentDashboardMode === 'farm_config') {
                     // Unit editor: every paddock wears its unit's colour, grey if unassigned.
                     const owner = unitForPaddock(pName);
