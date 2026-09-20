@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Wainono | Shed Log</title>
+    <link rel="icon" href="icon-wn-192.png">
+    <style>
+        :root {
+            --accent: #2ecc71; --accent-dark: #27ae60; --red: #e74c3c; --red-dark: #c0392b;
+            --orange: #e67e22; --bg: #f4f6f6; --card: #fff; --line: #e3e8e8; --ink: #2c3e50; --muted: #7f8c8d;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+        header { background: var(--accent); color: #fff; padding: 10px 14px; position: sticky; top: 0; z-index: 50;
+                 box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+        .head-row { display: flex; align-items: center; gap: 10px; max-width: 960px; margin: 0 auto; }
+        .head-row h1 { font-size: 17px; margin: 0; flex: 1; }
+        .head-btn { background: rgba(255,255,255,.22); color: #fff; border: 0; border-radius: 8px; padding: 6px 12px; font-size: 14px; cursor: pointer; }
+        #status { max-width: 960px; margin: 3px auto 0; font-size: 12px; opacity: .92; }
+        .wrap { max-width: 960px; margin: 0 auto; padding: 12px 14px 60px; }
+        .card { background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        input, select, button { font: inherit; }
+        input[type=date], input[type=search], select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+        input[type=search] { flex: 1; min-width: 150px; }
+        .btn { background: var(--accent-dark); color: #fff; border: 0; border-radius: 8px; padding: 9px 13px; cursor: pointer; font-weight: 600; }
+        .btn.grey { background: #95a5a6; } .btn.ghost { background: #ecf0f1; color: var(--ink); } .btn.small { padding: 6px 10px; font-size: 13px; }
+        .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+        .seg button { border: 0; background: #fff; padding: 8px 14px; cursor: pointer; color: var(--ink); }
+        .seg button.on { background: var(--accent-dark); color: #fff; font-weight: 700; }
+        .chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--ink); }
+        .chip.on { background: var(--red); border-color: var(--red); color: #fff; font-weight: 700; }
+        .chip.on.amber { background: var(--orange); border-color: var(--orange); }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+        .stat { background: #fff; border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .stat b { display: block; font-size: 26px; line-height: 1.1; }
+        .stat span { font-size: 12px; color: var(--muted); }
+        .live { background: var(--accent-dark); color: #fff; border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+        .live b { font-size: 22px; }
+        .cow { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+        .cow .tag { font-size: 30px; font-weight: 900; min-width: 70px; line-height: 1; }
+        .cow .tag small { display: block; font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .5px; }
+        .cow .mid { flex: 1; min-width: 0; }
+        .muted { color: var(--muted); font-size: 12px; }
+        .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .pill.tx { background: var(--red); color: #fff; } .pill.no { background: #ecf0f1; color: var(--muted); }
+        .did { margin-top: 5px; background: #fef5e7; border-left: 4px solid var(--orange); padding: 5px 9px; border-radius: 6px; font-size: 13px; }
+        .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+        #modal { position: fixed; inset: 0; background: var(--bg); z-index: 100; overflow: auto; display: none; }
+        #modal.on { display: block; }
+        .bar { display: flex; align-items: center; gap: 10px; background: #fff; padding: 10px 14px; border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+        .hidden { display: none !important; }
+        .err { background: #fdecea; border-left: 4px solid var(--red); padding: 10px 12px; border-radius: 8px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+<header>
+    <div class="head-row">
+        <h1>📋 Shed Log</h1>
+        <button class="head-btn" onclick="refreshAll(true)" id="refresh-btn">⟳ Refresh</button>
+    </div>
+    <div id="status">Loading…</div>
+</header>
+
+<div class="wrap">
+    <div id="err"></div>
+
+    <div class="card">
+        <div class="row">
+            <button class="btn small ghost" onclick="stepDay(-1)">‹</button>
+            <input type="date" id="day" onchange="pickDay(this.value)">
+            <button class="btn small ghost" onclick="stepDay(1)">›</button>
+            <button class="btn small ghost" onclick="pickDay(todayKey())">Today</button>
+            <button class="btn small ghost" onclick="pickDay(todayKey(-1))">Yesterday</button>
+            <select id="sess" onchange="S.sess = this.value; render();"></select>
+        </div>
+        <div class="row" style="margin-top:10px;">
+            <input type="search" id="q" placeholder="Search a cow: tag or EID (looks in every loaded day)" oninput="S.q = this.value; render();">
+        </div>
+        <div class="row" style="margin-top:10px;">
+            <div class="seg" id="viewseg">
+                <button class="on" onclick="setView('cows')">Cows</button>
+                <button onclick="setView('reads')">Every read</button>
+            </div>
+            <button class="chip" id="f-tx" onclick="toggleF('tx')">On treatment</button>
+            <button class="chip amber" id="f-act" onclick="toggleF('act')">Had an action</button>
+            <button class="chip" id="f-new" onclick="toggleSort()">Newest first</button>
+            <span style="flex:1;"></span>
+            <button class="btn small ghost" onclick="exportCsv()">⬇ CSV</button>
+        </div>
+    </div>
+
+    <div id="live"></div>
+    <div id="stats" class="stats" style="margin-bottom:10px;"></div>
+    <div id="list"></div>
+
+    <div class="card" style="margin-top:14px;">
+        <b>Load more days</b>
+        <div class="muted" style="margin:4px 0 8px;">Searching a cow looks in the days that are loaded. Older days load one at a time.</div>
+        <div class="row">
+            <button class="btn small ghost" onclick="loadBack(7)">Last 7 days</button>
+            <button class="btn small ghost" onclick="loadBack(30)">Last 30 days</button>
+            <button class="btn small ghost" onclick="loadBack(120)">Last 120 days</button>
+            <span class="muted" id="loaded-info"></span>
+        </div>
+    </div>
+</div>
+
+<div id="modal"></div>
+
+<script>
+/* ============ SHARED LOGIC: the log sheet script AND the log viewer page use exactly this ============
+ * Source of truth: apps-script/log_logic.js. Do not edit the copies inside scans_script.js or
+ * log-viewer/shed.html. Run `node apps-script/build_log.js` to rebuild them.
+ * Pure functions only: no Google calls, no browser calls, so they can be tested in node.
+ */
+
+/** "05:00,14:00" -> [300, 840] minutes after midnight, sorted. */
+function parseMilking(s) {
+  var out = [];
+  String(s || "").split(/[,\s;]+/).forEach(function (p) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(p.trim());
+    if (m) out.push(Number(m[1]) * 60 + Number(m[2]));
+  });
+  out.sort(function (a, b) { return a - b; });
+  return out.length ? out : [300, 840];
+}
+
+/**
+ * Which milking does a read belong to? A milking runs from one milking time to the next.
+ * offsetMs = local time minus UTC, at the moment of the read.
+ * Returns {startMs, endMs, label, day, time} in real (UTC) milliseconds.
+ *   label = "2026-09-20 14:00"   day = "2026-09-20"   time = "14:00"
+ */
+function sessionOf(tMs, offsetMs, mins) {
+  var local = tMs + offsetMs;
+  var dayStart = Math.floor(local / 86400000) * 86400000;       // local midnight, as if it were UTC
+  var starts = [];
+  for (var d = -1; d <= 1; d++) {
+    mins.forEach(function (m) { starts.push(dayStart + d * 86400000 + m * 60000); });
+  }
+  starts.sort(function (a, b) { return a - b; });
+  var i = 0;
+  for (var k = 0; k < starts.length; k++) { if (starts[k] <= local) i = k; }
+  var s = starts[i], e = starts[i + 1];
+  var dt = new Date(s);
+  var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+  var day = dt.getUTCFullYear() + "-" + pad(dt.getUTCMonth() + 1) + "-" + pad(dt.getUTCDate());
+  var time = pad(dt.getUTCHours()) + ":" + pad(dt.getUTCMinutes());
+  return { startMs: s - offsetMs, endMs: e - offsetMs, label: day + " " + time, day: day, time: time };
+}
+
+function digits(s) { return String(s === undefined || s === null ? "" : s).replace(/\D/g, ""); }
+function norm(s) { return String(s === undefined || s === null ? "" : s).trim().toLowerCase().replace(/\s+/g, ""); }
+
+/** Same cow? Compare EID, or tag. */
+function sameCow(row, tag, eid) {
+  if (eid && digits(row.EID) === eid) return true;
+  if (tag && norm(row.Tag) === norm(tag)) return true;
+  return false;
+}
+
+function inWindow(iso, w) {
+  var t = new Date(iso).getTime();
+  return !isNaN(t) && t >= w.startMs && t < w.endMs;
+}
+
+/** A treatment that holds nothing back (the "No drug" record) is never "on treatment". */
+function holdsNothing(t) {
+  return Number(t.MilkWithhold || 0) === 0 && Number(t.MeatWithhold || 0) === 0;
+}
+
+/**
+ * Was she on treatment at that moment? Same rule as the red list in the treatment app:
+ * started already, not cleared yet, and it holds something back.
+ * data = { treatments: [...] } as the treatment app sends them.
+ * Returns { yes: true/false, text: "Mastitis / Intracillin 300; ..." }
+ */
+function onTreatmentAt(data, tag, eid, tMs) {
+  var found = [];
+  (data.treatments || []).forEach(function (t) {
+    if (!sameCow(t, tag, eid)) return;
+    var started = new Date(t.Started).getTime();
+    if (isNaN(started) || started > tMs) return;
+    if (holdsNothing(t)) return;
+    if (t.ClearedAt) {
+      var c = new Date(t.ClearedAt).getTime();
+      if (!isNaN(c) && c <= tMs) return;
+    } else if (String(t.Status) === "cleared") {
+      return;
+    }
+    found.push(t.Condition + " / " + t.Drug);
+  });
+  return { yes: found.length > 0, text: found.join("; ") };
+}
+
+/**
+ * Everything that happened to one cow inside one milking.
+ * data = { treatments:[], doses:[], seen:[] } as the treatment app sends them.
+ * timeText(iso) formats a time of day for the text.
+ */
+function actionsFor(data, tag, eid, w, timeText) {
+  var out = [];
+  var mine = {};
+  (data.treatments || []).forEach(function (t) {
+    if (!sameCow(t, tag, eid)) return;
+    mine[t.ID] = t;
+    if (t.Started && inWindow(t.Started, w)) {
+      out.push({ at: t.Started, text: "New treatment: " + t.Condition + " / " + t.Drug + (t.CreatedBy ? " (" + t.CreatedBy + ")" : "") });
+    }
+    if (t.ClearedAt && inWindow(t.ClearedAt, w)) {
+      out.push({ at: t.ClearedAt, text: "Cleared " + t.Condition + (t.ClearedBy ? " (" + t.ClearedBy + ")" : "") });
+    }
+  });
+  (data.doses || []).forEach(function (d) {
+    var t = mine[d.TreatmentID];
+    if (!t || !d.GivenAt || !inWindow(d.GivenAt, w)) return;
+    out.push({ at: d.GivenAt, text: "Dose " + d.DoseNo + "/" + t.TotalDoses + " given: " + t.Drug + (d.GivenBy ? " (" + d.GivenBy + ")" : "") });
+  });
+  (data.seen || []).forEach(function (s) {
+    if (!tag || norm(s.Cow) !== norm(tag) || !s.At || !inWindow(s.At, w)) return;
+    out.push({ at: s.At, text: "Seen ticked" + (s.SeenBy ? " (" + s.SeenBy + ")" : "") });
+  });
+  out.sort(function (a, b) { return a.at < b.at ? -1 : 1; });
+  return out.map(function (x) { return timeText(x.at) + " " + x.text; }).join("; ");
+}
+
+
+
+/* ============================ PAGE ============================ */
+
+// Paste the Shed log script's Web app URL (ends in /exec) here after you deploy it.
+const LOG_URL = "";
+// The treatment app. Only READ from here: cows, treatments, doses.
+const TREATMENT_URL = "https://script.google.com/macros/s/AKfycbwoWp8wkebmcbzZqyCRQiLyiU_2PU2TLEPBuLGnKRZU1JmQQIRlYMHi6CU4511dysR8/exec";
+
+const LS = { key: 'shedlog_key', cows: 'shedlog_cows_v1' };
+const DEMO = location.hash === '#demo';
+
+const S = {
+    rowMap: new Map(),          // "iso|eid" -> {t, eid, tag, sheetOnTx, sheetTx, sheetDid}
+    loadedDays: {},             // "2026-09-20" -> when it was loaded
+    milking: '05:00,14:00',
+    eidTag: new Map(),          // digits(EID) -> tag
+    cowsOk: false,
+    live: { treatments: [], doses: [], seen: [] },
+    liveOk: false, liveAt: 0,
+    day: '', sess: 'all', view: 'cows', q: '', fTx: false, fAct: false, newest: true,
+    items: [], busy: false, err: '', updatedAt: 0
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const pad2 = n => (n < 10 ? '0' : '') + n;
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+
+function dayKeyOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function todayKey(plus) { const d = new Date(); d.setDate(d.getDate() + (plus || 0)); return dayKeyOf(d); }
+function dayStart(key) { return new Date(key + 'T00:00:00'); }
+function hm(t) { const d = new Date(t); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+function offsetAt(t) { return -new Date(t).getTimezoneOffset() * 60000; }
+function fmtDur(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? h + ':' + pad2(m) : m) + ':' + pad2(s);
+}
+function nice(dayKey) {
+    return dayStart(dayKey).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/* ---------------- loading ---------------- */
+
+async function getJson(url) {
+    const r = await fetch(url, { cache: 'no-store' });
+    return r.json();
+}
+
+async function loadDay(key, force) {
+    if (DEMO) { if (!S.loadedDays[key]) demoDay(key); return; }
+    const at = S.loadedDays[key];
+    if (at && !force) return;
+    const from = dayStart(key);
+    const to = new Date(from.getTime() + 36 * 3600000);        // that day, and the night milking that runs into the next
+    const url = () => LOG_URL + '?type=log&from=' + encodeURIComponent(from.toISOString())
+        + '&to=' + encodeURIComponent(to.toISOString()) + '&key=' + encodeURIComponent(localStorage.getItem(LS.key) || '') + '&t=' + Date.now();
+    let j = await getJson(url());
+    if (j && j.status === 'error' && /key/i.test(j.message || '')) {
+        const k = prompt('Enter the word for the shed log');
+        if (!k) throw new Error('The shed log needs its word.');
+        localStorage.setItem(LS.key, k);
+        j = await getJson(url());
+    }
+    if (!j || j.status !== 'success') throw new Error((j && j.message) || 'The log did not answer');
+    S.milking = j.milking || S.milking;
+    j.rows.forEach(r => {
+        S.rowMap.set(r[0] + '|' + r[1], {
+            t: Date.parse(r[0]), eid: r[1], tag: r[3], sheetOnTx: r[5], sheetTx: r[6], sheetDid: r[7]
+        });
+    });
+    if (j.truncated) S.err = 'Day ' + key + ' has more reads than one request can carry. Some are missing.';
+    S.loadedDays[key] = Date.now();
+}
+
+async function loadCows() {
+    try {
+        const c = JSON.parse(localStorage.getItem(LS.cows) || 'null');
+        if (c && Date.now() - c.at < 12 * 3600000 && c.cows.length) { setCows(c.cows); return; }
+    } catch (e) { }
+    const j = await getJson(TREATMENT_URL + '?type=cows&t=' + Date.now());
+    if (!j || !Array.isArray(j.cows)) throw new Error('The cow list did not load');
+    const slim = j.cows.map(c => ({ Tag: c.Tag, EID: c.EID }));
+    try { localStorage.setItem(LS.cows, JSON.stringify({ at: Date.now(), cows: slim })); } catch (e) { }
+    setCows(slim);
+}
+
+function setCows(list) {
+    S.eidTag = new Map();
+    list.forEach(c => { const d = digits(c.EID); if (d) S.eidTag.set(d, String(c.Tag || '')); });
+    S.cowsOk = true;
+}
+
+async function loadLive() {
+    const j = await getJson(TREATMENT_URL + '?type=live&t=' + Date.now());
+    if (!j || j.status !== 'success') throw new Error('The treatment app did not answer');
+    S.live = { treatments: j.treatments || [], doses: j.doses || [], seen: j.seen || [] };
+    S.liveOk = true; S.liveAt = Date.now();
+}
+
+async function refreshAll(manual) {
+    if (S.busy) return;
+    S.busy = true; S.err = '';
+    setStatus(manual ? 'Refreshing…' : 'Loading…');
+    try {
+        if (!LOG_URL && !DEMO) throw new Error('Paste the Shed log script URL into LOG_URL at the top of this page.');
+        await loadCows().catch(e => { S.err = 'Cow list: ' + e.message; });
+        await Promise.all([
+            loadDay(S.day, true).catch(e => { S.err = e.message; }),
+            (manual || Date.now() - S.liveAt > 300000 || !S.liveOk)
+                ? loadLive().catch(e => { S.err = S.err || 'Treatments: ' + e.message + ' (using what the sheet holds)'; })
+                : Promise.resolve()
+        ]);
+        S.updatedAt = Date.now();
+    } catch (e) {
+        S.err = e.message;
+    } finally {
+        S.busy = false;
+    }
+    derive(); render();
+}
+
+async function ensureDay(key) {
+    if (S.loadedDays[key]) return;
+    S.busy = true; setStatus('Loading ' + key + '…');
+    try { await loadDay(key, false); } catch (e) { S.err = e.message; }
+    S.busy = false;
+}
+
+async function loadBack(days) {
+    for (let i = 0; i < days; i++) {
+        const key = todayKey(-i);
+        if (S.loadedDays[key]) continue;
+        setStatus('Loading ' + key + ' (' + (i + 1) + ' of ' + days + ')…');
+        try { await loadDay(key, false); } catch (e) { S.err = e.message; break; }
+        derive(); render();
+    }
+    setStatus();
+}
+
+/* ---------------- working it out ---------------- */
+
+/**
+ * One item = one cow in one milking: first and last read, how many reads, was she on treatment
+ * when first read, and what was done to her that milking. Counted from the reads.
+ */
+function derive() {
+    const mins = parseMilking(S.milking);
+    const items = new Map();
+    S.rowMap.forEach(r => {
+        const w = sessionOf(r.t, offsetAt(r.t), mins);
+        const key = w.label + '|' + r.eid;
+        let it = items.get(key);
+        if (!it) {
+            it = { key: key, eid: r.eid, tag: S.eidTag.get(r.eid) || r.tag || '', w: w, first: r.t, last: r.t, reads: 0, rows: [], sheet: r };
+            items.set(key, it);
+        }
+        it.reads++; it.rows.push(r);
+        if (r.t < it.first) { it.first = r.t; it.sheet = r; }
+        if (r.t > it.last) it.last = r.t;
+    });
+    items.forEach(it => {
+        if (S.liveOk) {
+            const tx = onTreatmentAt(S.live, it.tag, it.eid, it.first);
+            it.onTx = tx.yes; it.tx = tx.text;
+            it.did = actionsFor(S.live, it.tag, it.eid, it.w, iso => hm(Date.parse(iso)));
+        } else {
+            it.onTx = it.sheet.sheetOnTx === 'Yes'; it.tx = it.sheet.sheetTx; it.did = it.sheet.sheetDid;
+        }
+    });
+    S.items = [...items.values()];
+}
+
+function sessionsOfDay(day) {
+    const set = new Set(parseMilking(S.milking).map(m => pad2(Math.floor(m / 60)) + ':' + pad2(m % 60)));
+    S.items.forEach(it => { if (it.w.day === day) set.add(it.w.time); });
+    return [...set].sort();
+}
+
+/** The milking that is running now, from the milking times. */
+function currentSession() {
+    const mins = parseMilking(S.milking);
+    const t = Date.now();
+    return sessionOf(t, offsetAt(t), mins);
+}
+
+function inView() {
+    return S.items.filter(it => it.w.day === S.day && (S.sess === 'all' || it.w.time === S.sess));
+}
+
+function applyFilters(list) {
+    return list.filter(it => (!S.fTx || it.onTx) && (!S.fAct || it.did));
+}
+
+function matchesQuery(it) {
+    const q = S.q.trim().toLowerCase().replace(/\s+/g, '');
+    if (!q) return true;
+    if (String(it.tag).toLowerCase().indexOf(q) >= 0) return true;
+    // An EID is 15 digits, so only a long run of digits is looked for in it. "293" means tag 293.
+    const d = q.replace(/\D/g, '');
+    return d.length >= 8 && it.eid.indexOf(d) >= 0;
+}
+
+/* ---------------- drawing ---------------- */
+
+function setStatus(t) {
+    $('status').textContent = t !== undefined ? t
+        : (S.updatedAt ? 'Updated ' + hm(S.updatedAt) + ' · ' + plural(S.rowMap.size, 'read') + ' loaded'
+            + (S.liveOk ? ' · treatments read ' + hm(S.liveAt) : ' · treatments not read') : 'Loading…');
+}
+
+function itemCard(it, showDay) {
+    const known = it.tag !== '';
+    return `<div class="card cow" onclick="openCow('${it.eid}')">
+        <div class="tag">${known ? esc(it.tag) : '?'}<small>${known ? 'TAG' : 'NOT IN COW LIST'}</small></div>
+        <div class="mid">
+            <div>${it.onTx ? '<span class="pill tx">On treatment</span> ' + esc(it.tx) : '<span class="pill no">Not on treatment</span>'}</div>
+            <div class="muted" style="margin-top:3px;">
+                ${showDay ? esc(nice(it.w.day)) + ' · ' + esc(it.w.time) + ' milking · ' : ''}first ${hm(it.first)}${it.reads > 1 ? ' · last ' + hm(it.last) + ' · ' + it.reads + ' reads' : ''}
+                <span style="opacity:.7;"> · EID ${esc(it.eid)}</span>
+            </div>
+            ${it.did ? '<div class="did">' + esc(it.did) + '</div>' : ''}
+        </div>
+    </div>`;
+}
+
+function render() {
+    setStatus();
+    $('err').innerHTML = S.err ? '<div class="err">' + esc(S.err) + '</div>' : '';
+    $('day').value = S.day;
+
+    // session menu for this day
+    const sel = $('sess');
+    const opts = ['<option value="all">Whole day</option>']
+        .concat(sessionsOfDay(S.day).map(t => `<option value="${t}">${t} milking</option>`));
+    sel.innerHTML = opts.join('');
+    if (![...sel.options].some(o => o.value === S.sess)) S.sess = 'all';
+    sel.value = S.sess;
+
+    $('f-tx').classList.toggle('on', S.fTx);
+    $('f-act').classList.toggle('on', S.fAct);
+    $('f-new').textContent = S.newest ? 'Newest first' : 'Oldest first';
+    [...$('viewseg').children].forEach((b, i) => b.classList.toggle('on', (i === 0) === (S.view === 'cows')));
+
+    const searching = S.q.trim() !== '';
+    const base = searching ? S.items.filter(matchesQuery) : inView();
+    const qq = S.q.trim().toLowerCase();
+    const exact = it => (searching && String(it.tag).toLowerCase() === qq) ? 0 : 1;      // an exact tag comes first
+    const list = applyFilters(base).sort((a, b) => exact(a) - exact(b) || (S.newest ? b.first - a.first : a.first - b.first));
+
+    // the milking that is running now: live counter, only when looking at it
+    const cur = currentSession();
+    const live = !searching && S.day === cur.day && (S.sess === 'all' || S.sess === cur.time);
+    const nowItems = S.items.filter(it => it.w.label === cur.label);
+    if (live && nowItems.length) {
+        const first = Math.min(...nowItems.map(i => i.first));
+        $('live').innerHTML = `<div class="live"><span>● Milking now (from ${esc(cur.time)})</span>
+            <span><b>${nowItems.length}</b> cows</span><span>⏱ <b id="live-t">${fmtDur((Date.now() - first) / 1000)}</b> since first cow</span>
+            <span>${nowItems.filter(i => i.onTx).length} on treatment</span></div>`;
+        window._liveFirst = first;
+    } else { $('live').innerHTML = ''; window._liveFirst = 0; }
+
+    // numbers for the day / milking being looked at (not for a search)
+    if (!searching) {
+        const all = inView();
+        const firsts = all.map(i => i.first), lasts = all.map(i => i.last);
+        const reads = all.reduce((n, i) => n + i.reads, 0);
+        $('stats').innerHTML = [
+            [all.length, 'cows milked'], [reads, 'reads'],
+            [all.filter(i => i.onTx).length, 'on treatment'], [all.filter(i => i.did).length, 'had an action'],
+            [all.length ? hm(Math.min(...firsts)) : '—', 'first cow'], [all.length ? hm(Math.max(...lasts)) : '—', 'last cow'],
+            [all.length ? fmtDur((Math.max(...lasts) - Math.min(...firsts)) / 1000) : '—', 'first to last']
+        ].map(s => `<div class="stat"><b>${s[0]}</b><span>${s[1]}</span></div>`).join('');
+    } else {
+        $('stats').innerHTML = `<div class="stat"><b>${list.length}</b><span>results in ${Object.keys(S.loadedDays).length} loaded days</span></div>`;
+    }
+
+    if (!list.length) {
+        $('list').innerHTML = '<div class="empty">' + (searching ? 'No cow found in the loaded days.' : 'No cows read for this day and milking.') + '</div>';
+    } else if (S.view === 'reads' && !searching) {
+        const reads = [];
+        list.forEach(it => it.rows.forEach(r => reads.push({ r, it })));
+        reads.sort((a, b) => S.newest ? b.r.t - a.r.t : a.r.t - b.r.t);
+        $('list').innerHTML = '<div class="card">' + reads.slice(0, 1500).map(x => `<div class="row" style="padding:5px 0; border-bottom:1px solid var(--line); cursor:pointer;" onclick="openCow('${x.it.eid}')">
+            <b style="width:52px;">${hm(x.r.t)}</b><b style="min-width:60px; font-size:18px;">${esc(x.it.tag || '?')}</b>
+            <span class="pill ${x.it.onTx ? 'tx' : 'no'}">${x.it.onTx ? 'On treatment' : 'Not on treatment'}</span>
+            <span class="muted">${esc(x.it.w.time)} milking</span></div>`).join('') + (reads.length > 1500 ? '<div class="muted">Showing the first 1500 reads.</div>' : '') + '</div>';
+    } else {
+        $('list').innerHTML = list.slice(0, 600).map(it => itemCard(it, searching)).join('')
+            + (list.length > 600 ? '<div class="muted" style="text-align:center;">Showing 600 of ' + list.length + '. Narrow it down with a search or filter.</div>' : '');
+    }
+
+    $('loaded-info').textContent = Object.keys(S.loadedDays).length + ' days loaded';
+}
+
+/* ---------------- a cow's history ---------------- */
+
+function openCow(eid) {
+    const its = S.items.filter(i => i.eid === eid).sort((a, b) => b.first - a.first);
+    const tag = (its[0] && its[0].tag) || S.eidTag.get(eid) || '';
+    $('modal').innerHTML = `<div class="bar"><button class="btn small ghost" onclick="closeCow()">✕ Close</button>
+        <b style="font-size:20px;">${tag ? 'Cow ' + esc(tag) : 'Unknown cow'}</b><span class="muted">EID ${esc(eid)}</span></div>
+        <div class="wrap">
+        <div class="stats" style="margin-bottom:10px;">
+            <div class="stat"><b>${its.length}</b><span>milkings loaded</span></div>
+            <div class="stat"><b>${its.filter(i => i.onTx).length}</b><span>on treatment</span></div>
+            <div class="stat"><b>${its.filter(i => i.did).length}</b><span>with an action</span></div></div>
+        ${its.map(it => itemCard(it, true).replace('onclick="openCow(\'' + eid + '\')"', '')).join('') || '<div class="empty">No reads loaded for this cow.</div>'}
+        <div class="row"><button class="btn small ghost" onclick="loadBack(30); closeCow();">Load 30 days</button></div>
+        </div>`;
+    $('modal').classList.add('on');
+}
+function closeCow() { $('modal').classList.remove('on'); }
+
+/* ---------------- controls ---------------- */
+
+async function pickDay(key) {
+    if (!key) return;
+    S.day = key; S.sess = 'all'; S.q = ''; $('q').value = '';
+    await ensureDay(key);
+    derive(); render();
+}
+function stepDay(n) { const d = dayStart(S.day); d.setDate(d.getDate() + n); pickDay(dayKeyOf(d)); }
+function setView(v) { S.view = v; render(); }
+function toggleF(k) { if (k === 'tx') S.fTx = !S.fTx; else S.fAct = !S.fAct; render(); }
+function toggleSort() { S.newest = !S.newest; render(); }
+
+function exportCsv() {
+    const searching = S.q.trim() !== '';
+    const list = applyFilters(searching ? S.items.filter(matchesQuery) : inView()).sort((a, b) => a.first - b.first);
+    const q = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+    const lines = [['Day', 'Milking', 'Tag', 'EID', 'First read', 'Last read', 'Reads', 'On treatment', 'Treatment', 'What happened'].map(q).join(',')]
+        .concat(list.map(it => [it.w.day, it.w.time, it.tag, it.eid, hm(it.first), hm(it.last), it.reads,
+            it.onTx ? 'Yes' : 'No', it.tx, it.did].map(q).join(',')));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' }));
+    a.download = 'shed-log-' + S.day + (S.sess === 'all' ? '' : '-' + S.sess.replace(':', '')) + '.csv';
+    a.click();
+}
+
+/* ---------------- demo (only with #demo in the address) ---------------- */
+
+function demoDay(key) {
+    const eids = [...S.eidTag.keys()];
+    if (!eids.length) return;
+    const mins = parseMilking(S.milking);
+    mins.forEach((m, si) => {
+        const start = dayStart(key).getTime() + m * 60000;
+        const n = 250 + ((key.charCodeAt(9) * 7 + si * 31) % 120);
+        for (let i = 0; i < n; i++) {
+            const eid = eids[(i * 37 + si * 911 + key.charCodeAt(9) * 13) % eids.length];
+            const t = start + 20 * 60000 + i * 22000 + (i % 5) * 1000;
+            if (t > Date.now()) return;
+            S.rowMap.set(new Date(t).toISOString() + '|' + eid, { t: t, eid: eid, tag: '', sheetOnTx: '', sheetTx: '', sheetDid: '' });
+        }
+    });
+    S.loadedDays[key] = Date.now();
+}
+
+/* ---------------- start ---------------- */
+
+(async function start() {
+    S.day = todayKey();
+    await refreshAll(false);
+    // The two days that matter for "today" are always loaded: the milking may run past midnight.
+    if (!DEMO) await ensureDay(todayKey(-1)).then(() => { derive(); render(); });
+    setInterval(() => { if (!document.hidden && S.day === todayKey()) refreshAll(false); }, 60000);
+    setInterval(() => { const el = $('live-t'); if (el && window._liveFirst) el.textContent = fmtDur((Date.now() - window._liveFirst) / 1000); }, 1000);
+})();
+</script>
+</body>
+</html>
