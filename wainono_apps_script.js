@@ -24,7 +24,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-09-19-a";
+var SCRIPT_VERSION = "2026-09-20-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -1027,6 +1027,7 @@ function renamePaddockEverywhere(payload) {
   changed.farmwalks = renameInColumn(findSheetByName("Farmwalks"), 2, from, to);
   changed.breaks    = renameInColumn(findSheetByName("breaks"), 3, from, to);
   changed.out       = renameInColumn(findSheetByName("out"), 1, from, to);
+  changed.walkOrder = renameInColumn(findSheetByName("walk order"), 1, from, to);
 
   // 3. Units keep their paddocks as a JSON list in one cell.
   var units = findSheetByName("Units");
