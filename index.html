@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.03</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.04</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1690,7 +1690,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.03</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.04</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1732,7 +1732,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="sync-note">Synchronized on <span id="sync-time">...</span></div>
+                <div class="sync-note">Synchronized on <span id="sync-time">...</span><span id="stats-basis"></span></div>
 
                 <div id="farmwalk-entry-bar" style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     <button id="btn-farmwalk-entry" onclick="toggleFarmwalkEntryMode()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
@@ -4680,7 +4680,13 @@
                          * cached copy is ignored.
                          */
                         const localItem = localSavedData[norm];
-                        if (localItem && localItem.latest && localItem.latest.ts) {
+                        // Only a reading from the last few days can still be on
+                        // its way to the sheet. An older one is this device
+                        // holding on to something everybody else has moved past,
+                        // which is how two phones ended up with two averages.
+                        const cacheIsFresh = localItem && localItem.latest && localItem.latest.ts &&
+                            (Date.now() - localItem.latest.ts) < 3 * 24 * 60 * 60 * 1000;
+                        if (cacheIsFresh) {
                             const localDay = new Date(localItem.latest.ts).toDateString();
                             const sheetHasThatDay = (p.entries || [])
                                 .some(e => e.dateObj && e.dateObj.toDateString() === localDay);
@@ -7199,6 +7205,10 @@
          * paddock was walked this time and the time before. The walk dates come
          * from the whole farm, so picking a unit changes which paddocks are
          * counted, never what "the previous walk" means. */
+        // How far back a crop break still takes area off the farm average.
+        // Fixed on purpose, so every device works out the same average.
+        const CROP_BREAK_DAYS = 21;
+
         function weightedFarmStats(paddocks, walk) {
             let wCover = 0, areaC = 0, wGrowth = 0, areaG = 0;
             paddocks.forEach(p => {
@@ -7226,11 +7236,16 @@
             let tWCover = shown.wCover, tAreaC = shown.areaC;
             let tWGrowth = shown.wGrowth, tAreaG = shown.areaG;
 
-            // --- SUBTRACT CROP BREAK AREAS ---
-            // Counted per scope: a crop break only comes off the area of the unit
-            // whose paddock it sits in.
-            const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 21;
-            const daysAgoTs = Date.now() - filterDays * 24 * 60 * 60 * 1000;
+            /* Crop breaks are taken off the FEED area only.
+             *
+             * The farmwalk average is the average cover of the paddocks that
+             * were walked, weighted by their area. Crops have nothing to do
+             * with it. Taking crop area off the bottom of that sum while the
+             * whole paddock's cover stayed on the top pushed the average up,
+             * and by a different amount on each phone, because the number of
+             * days came from the "show breaks for N days" setting, which each
+             * phone keeps for itself. It is now fixed at 21 days here. */
+            const daysAgoTs = Date.now() - CROP_BREAK_DAYS * 24 * 60 * 60 * 1000;
             const cropBreakArea = (inScope) => {
                 let total = 0;
                 savedBreaks.forEach(b => {
@@ -7245,8 +7260,6 @@
                 return total;
             };
 
-            tAreaC = Math.max(0, tAreaC - cropBreakArea(activeUnit ? (n => n && unitHasPaddock(activeUnit, n)) : null));
-
             const avgCoverVal = tAreaC > 0 ? Math.round(tWCover / tAreaC) : 0;
             const avgGrowthVal = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
 
@@ -7255,9 +7268,10 @@
             // from whatever PLAN is showing, not from what FARMWALK is showing.
             const pUnit = planUnit();
             const planStats = pUnit ? weightedFarmStats(planScopedPaddocks(data), walk) : whole;
-            const planAreaC = Math.max(0, planStats.areaC - cropBreakArea(pUnit ? (n => n && unitHasPaddock(pUnit, n)) : null));
-            const wholeAreaC = planAreaC;
-            const wholeCoverVal = planAreaC > 0 ? Math.round(planStats.wCover / planAreaC) : 0;
+            // The feed area leaves out what is under a crop break. The average
+            // cover does not: it is the average of the paddocks that were walked.
+            const wholeAreaC = Math.max(0, planStats.areaC - cropBreakArea(pUnit ? (n => n && unitHasPaddock(pUnit, n)) : null));
+            const wholeCoverVal = planStats.areaC > 0 ? Math.round(planStats.wCover / planStats.areaC) : 0;
             const wholeGrowthVal = planStats.areaG > 0 ? Math.round(planStats.wGrowth / planStats.areaG) : 0;
 
             const elTotalAvg = document.getElementById('total-avg');
@@ -7271,6 +7285,17 @@
             if (elAvgGrowth) elAvgGrowth.innerText = "+" + avgGrowthVal;
 
             if (elSyncTime) elSyncTime.innerText = new Date().toLocaleTimeString();
+
+            /* What the average was worked out from. Two devices showing two
+             * averages can be compared here: the walk, how many paddocks were
+             * counted and how much area. */
+            const elBasis = document.getElementById('stats-basis');
+            if (elBasis) {
+                const counted = scoped.filter(p => (p.area || 0) > 0 && !p.isOut && !skippedInLatestWalk(p, walk)).length;
+                elBasis.innerText = walk.maxTs
+                    ? ` · walk ${fmtNZ(new Date(walk.maxTs))} · ${counted} paddocks · ${tAreaC.toFixed(1)} ha`
+                    : '';
+            }
 
             const rot = rotationAreas(pUnit);
             const elFeedAreaOut = document.getElementById('feed-area-out');
