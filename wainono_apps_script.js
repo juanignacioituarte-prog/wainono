@@ -24,7 +24,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-09-20-a";
+var SCRIPT_VERSION = "2026-09-25-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -52,6 +52,8 @@ function doGet(e) {
     return listTabs();
   } else if (type === 'walk_order') {
     return getWalkOrder();
+  } else if (type === 'maintenance') {
+    return getMaintenance();
   } else if (type === 'version') {
     return jsonResponse({ status: "success", version: SCRIPT_VERSION });
   } else {
@@ -97,6 +99,12 @@ function doPost(e) {
       return renamePaddockEverywhere(payload);
     } else if (type === 'save_walk_order') {
       return saveWalkOrder(payload.order);
+    } else if (type === 'save_maintenance_job') {
+      return saveMaintenanceJob(payload.job);
+    } else if (type === 'delete_maintenance_job') {
+      return deleteMaintenanceJob(payload.id);
+    } else if (type === 'save_maintenance_categories') {
+      return saveMaintenanceCategories(payload.categories);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -667,6 +675,124 @@ function saveOut(outList) {
     sheet.getRange(2, 1, rows.length, 2).setValues(rows);
   }
 
+  return jsonResponse({ status: "success", count: rows.length });
+}
+
+/* ================== FARM MAINTENANCE ==================
+ * Sheet "maintenance": one row per job.
+ *   id | status | category | sub | title | notes | type | geometry |
+ *   createdBy | createdAt | fixedBy | fixedAt | fixNotes
+ * status is "open" or "fixed". geometry is JSON: a point {lat,lng} or a
+ * line [{lat,lng},...]. A fixed job keeps its row, which is the history.
+ *
+ * Sheet "maintenance categories": category | subcategory (one row per pair).
+ */
+var MAINT_COLS = ["id", "status", "category", "sub", "title", "notes", "type",
+                  "geometry", "createdBy", "createdAt", "fixedBy", "fixedAt", "fixNotes"];
+
+function maintenanceSheet() {
+  var sheet = getOrCreateSheet("maintenance");
+  if (sheet.getLastRow() === 0) sheet.appendRow(MAINT_COLS);
+  return sheet;
+}
+
+function getMaintenance() {
+  var sheet = maintenanceSheet();
+  var jobs = [];
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var data = sheet.getRange(2, 1, lastRow - 1, MAINT_COLS.length).getValues();
+    data.forEach(function(row) {
+      if (!String(row[0] || "").trim()) return;
+      var job = {};
+      MAINT_COLS.forEach(function(c, i) { job[c] = row[i]; });
+      try { job.geometry = JSON.parse(job.geometry || "null"); } catch (e) { job.geometry = null; }
+      ["createdAt", "fixedAt"].forEach(function(f) {
+        if (job[f] && job[f].toISOString) job[f] = job[f].toISOString();
+        else job[f] = String(job[f] || "");
+      });
+      MAINT_COLS.forEach(function(c) {
+        if (c !== "geometry" && typeof job[c] !== "string") job[c] = String(job[c] == null ? "" : job[c]);
+      });
+      jobs.push(job);
+    });
+  }
+  return jsonResponse({ status: "success", jobs: jobs, categories: readMaintenanceCategories() });
+}
+
+// One job at a time, found by its id. Two people can report jobs at once
+// without either of them writing over the other's list.
+function saveMaintenanceJob(job) {
+  if (!job || !job.id) return errorResponse("Missing job id");
+  var sheet = maintenanceSheet();
+  var row = MAINT_COLS.map(function(c) {
+    if (c === "geometry") return JSON.stringify(job.geometry || null);
+    return job[c] == null ? "" : String(job[c]);
+  });
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === String(job.id).trim()) {
+        sheet.getRange(i + 2, 1, 1, MAINT_COLS.length).setValues([row]);
+        return jsonResponse({ status: "success", id: job.id, updated: true });
+      }
+    }
+  }
+  sheet.appendRow(row);
+  return jsonResponse({ status: "success", id: job.id, updated: false });
+}
+
+function deleteMaintenanceJob(id) {
+  if (!id) return errorResponse("Missing job id");
+  var sheet = maintenanceSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = ids.length - 1; i >= 0; i--) {
+      if (String(ids[i][0]).trim() === String(id).trim()) {
+        sheet.deleteRow(i + 2);
+        return jsonResponse({ status: "success", id: id });
+      }
+    }
+  }
+  return errorResponse("Job not found: " + id);
+}
+
+function readMaintenanceCategories() {
+  var sheet = getOrCreateSheet("maintenance categories");
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var out = [];
+  sheet.getRange(2, 1, lastRow - 1, 2).getValues().forEach(function(r) {
+    var cat = String(r[0] == null ? "" : r[0]).trim();
+    if (!cat) return;
+    out.push({ category: cat, sub: String(r[1] == null ? "" : r[1]).trim() });
+  });
+  return out;
+}
+
+function saveMaintenanceCategories(list) {
+  if (!Array.isArray(list)) return errorResponse("Payload categories must be array");
+  var rows = [];
+  var seen = {};
+  list.forEach(function(c) {
+    if (!c) return;
+    var cat = String(c.category == null ? "" : c.category).trim();
+    var sub = String(c.sub == null ? "" : c.sub).trim();
+    if (!cat) return;
+    var key = cat.toLowerCase() + "|" + sub.toLowerCase();
+    if (seen[key]) return;
+    seen[key] = true;
+    rows.push([cat, sub]);
+  });
+  if (rows.length === 0) return errorResponse("Empty category list - nothing saved");
+
+  var sheet = getOrCreateSheet("maintenance categories");
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, 2).setValues([["category", "subcategory"]]);
+  sheet.getRange(2, 1, rows.length, 2).setValues(rows);
   return jsonResponse({ status: "success", count: rows.length });
 }
 

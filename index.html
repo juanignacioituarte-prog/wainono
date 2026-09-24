@@ -1679,18 +1679,19 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.05</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.06</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('roster'); toggleSettingsMenu();" style="font-weight: bold; color: #3498db;">📅 Roster</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weather'); toggleSettingsMenu();" style="font-weight: bold; color: #f1c40f;">☁️ Weather</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('vehicle_maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #e67e22;">🚜 Vehicle Maintenance</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #16a085;">🔧 Farm Maintenance</div>
                     <div class="dropdown-item" id="menu-item-farm-config" style="display:none; font-weight: bold; color: #9b59b6;" onclick="switchDashboardMode('farm_config'); toggleSettingsMenu();">🗺️ Farm Configuration</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.05</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.06</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1912,6 +1913,95 @@
             <div id="fw-history-list"></div>
             <div id="fw-history-edit" style="display:none;"></div>
             <div id="fw-history-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
+        </div>
+
+        <div id="maintenance-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <h3 style="margin:0;">🔧 Farm Maintenance</h3>
+                <button onclick="openMaintCategories()" style="background:#ecf0f1; color:#2c3e50; border:none; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">⚙ Categories</button>
+            </div>
+            <p style="font-size:12px; color:#666; margin:0 0 10px;">
+                Jobs stay on the map until someone reports them fixed. Drop a pin for one spot,
+                or draw a line for a fence or a pipe.
+            </p>
+
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <button id="mt-btn-point" onclick="startMaintDrawing('point')" style="flex:1 1 46%; background:#16a085; color:#fff; border:none; padding:10px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">📍 NEW POINT JOB</button>
+                <button id="mt-btn-line" onclick="startMaintDrawing('line')" style="flex:1 1 46%; background:#2980b9; color:#fff; border:none; padding:10px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">〰 NEW LINE JOB</button>
+            </div>
+
+            <div id="mt-draw-bar" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border:1px solid #16a085; border-radius:6px; padding:8px; margin-bottom:10px;">
+                <span id="mt-draw-msg" style="flex:1; font-size:11px; font-weight:bold; color:#16a085;"></span>
+                <button onclick="undoMaintPoint()" id="mt-btn-undo" style="background:#ecf0f1; color:#2c3e50; border:none; padding:7px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">↩ UNDO</button>
+                <button onclick="finishMaintDrawing()" id="mt-btn-finish" style="background:#27ae60; color:#fff; border:none; padding:7px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">✓ FINISH</button>
+                <button onclick="cancelMaintDrawing()" style="background:#fdeceb; color:#c0392b; border:none; padding:7px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">✕</button>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <button id="mt-tab-open" onclick="setMaintTab('open')" style="flex:1; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; border:1px solid #16a085;">OPEN JOBS</button>
+                <button id="mt-tab-fixed" onclick="setMaintTab('fixed')" style="flex:1; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; border:1px solid #7f8c8d;">HISTORY</button>
+            </div>
+
+            <select id="mt-filter-cat" onchange="renderMaintList()" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; font-size:12px; margin-bottom:10px;"></select>
+
+            <div id="mt-status" style="font-size:11px; font-weight:bold; line-height:1.4; margin-bottom:8px;"></div>
+            <div id="mt-list"></div>
+        </div>
+
+        <!-- New job / edit job -->
+        <div id="mt-job-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; align-items:center; justify-content:center; padding:15px;">
+            <div style="background:#fff; border-radius:10px; padding:16px; width:100%; max-width:360px; max-height:90vh; overflow-y:auto;">
+                <h4 id="mt-modal-title" style="margin:0 0 12px;">New maintenance job</h4>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Job name</label>
+                <input type="text" id="mt-modal-name" placeholder="e.g. Broken strainer post" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                <label style="font-size:11px; font-weight:bold; color:#555;">Category</label>
+                <select id="mt-modal-cat" onchange="fillMaintSubSelect()" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px;"></select>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Sub category</label>
+                <select id="mt-modal-sub" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px;"></select>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Notes</label>
+                <textarea id="mt-modal-notes" placeholder="What needs doing" style="width:100%; height:64px; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;"></textarea>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Reported by</label>
+                <input type="text" id="mt-modal-by" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 14px; box-sizing:border-box;">
+                <div style="display:flex; gap:8px;">
+                    <button onclick="closeMaintJobModal()" style="flex:1; background:#ecf0f1; color:#2c3e50; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button>
+                    <button onclick="saveMaintJobFromModal()" style="flex:1; background:#16a085; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Save job</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report a job fixed -->
+        <div id="mt-fix-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; align-items:center; justify-content:center; padding:15px;">
+            <div style="background:#fff; border-radius:10px; padding:16px; width:100%; max-width:340px;">
+                <h4 style="margin:0 0 6px;">Report as fixed</h4>
+                <div id="mt-fix-job" style="font-size:12px; color:#666; margin-bottom:12px;"></div>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Fixed by</label>
+                <input type="text" id="mt-fix-by" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                <label style="font-size:11px; font-weight:bold; color:#555;">Date fixed</label>
+                <input type="date" id="mt-fix-date" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                <label style="font-size:11px; font-weight:bold; color:#555;">What was done (optional)</label>
+                <textarea id="mt-fix-notes" style="width:100%; height:56px; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 14px; box-sizing:border-box;"></textarea>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="closeMaintFixModal()" style="flex:1; background:#ecf0f1; color:#2c3e50; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button>
+                    <button onclick="saveMaintFix()" style="flex:1; background:#27ae60; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">✓ Fixed</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories -->
+        <div id="mt-cat-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; align-items:center; justify-content:center; padding:15px;">
+            <div style="background:#fff; border-radius:10px; padding:16px; width:100%; max-width:360px; max-height:90vh; overflow-y:auto;">
+                <h4 style="margin:0 0 10px;">Job categories</h4>
+                <div id="mt-cat-list" style="margin-bottom:12px;"></div>
+                <div style="display:flex; gap:6px; margin-bottom:8px;">
+                    <input type="text" id="mt-new-cat" placeholder="New category" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                    <button onclick="addMaintCategory()" style="background:#16a085; color:#fff; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer;">+</button>
+                </div>
+                <div id="mt-cat-status" style="font-size:11px; font-weight:bold; margin-bottom:10px;"></div>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="closeMaintCategories()" style="flex:1; background:#ecf0f1; color:#2c3e50; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Close</button>
+                    <button onclick="saveMaintCategories()" style="flex:1; background:#16a085; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Save</button>
+                </div>
+            </div>
         </div>
 
         <div id="weekly-report-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
@@ -2762,6 +2852,546 @@
                 renderFarmConfig();
             }
             updateGeoStyles();
+        }
+
+        /* ===================== FARM MAINTENANCE =====================
+         * Jobs on the map: a pin for one spot, a line for a fence or a pipe.
+         * A job stays on the map until somebody reports it fixed, and then it
+         * goes to the history with who fixed it and when. Kept in the
+         * "maintenance" tab of the sheet, one row per job.
+         */
+        let maintJobs = [];
+        let maintCategories = [];
+        let maintTab = 'open';
+        let maintLayers = new Map();
+        let maintDrawType = null;         // 'point' or 'line' while drawing
+        let maintDrawPoints = [];
+        let maintDrawMarkers = [];
+        let maintDrawLine = null;
+        let maintEditingId = null;        // set when the modal is editing an old job
+        let maintFixingId = null;
+
+        const MAINT_DEFAULT_CATEGORIES = [
+            { category: 'Fencing', sub: 'Posts' },
+            { category: 'Fencing', sub: 'Wires' },
+            { category: 'Fencing', sub: 'Gates' },
+            { category: 'Fencing', sub: 'Electric' },
+            { category: 'Water supply', sub: 'Troughs' },
+            { category: 'Water supply', sub: 'Pipes' },
+            { category: 'Water supply', sub: 'Pumps' },
+            { category: 'Water supply', sub: 'Valves' },
+            { category: 'Weeds', sub: 'Thistles' },
+            { category: 'Weeds', sub: 'Gorse' },
+            { category: 'Weeds', sub: 'Broadleaf' },
+            { category: 'Tracks', sub: '' },
+            { category: 'Buildings', sub: '' },
+            { category: 'Effluent', sub: '' }
+        ];
+
+        const MAINT_CAT_COLORS = ['#16a085', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12', '#2c3e50', '#27ae60'];
+
+        function maintCatColor(cat) {
+            const names = maintCategoryNames();
+            const i = names.indexOf(cat);
+            return MAINT_CAT_COLORS[(i < 0 ? 0 : i) % MAINT_CAT_COLORS.length];
+        }
+
+        function maintCategoryNames() {
+            const out = [];
+            maintCategories.forEach(c => { if (c.category && out.indexOf(c.category) === -1) out.push(c.category); });
+            return out;
+        }
+
+        function maintSubsFor(cat) {
+            return maintCategories.filter(c => c.category === cat && c.sub).map(c => c.sub);
+        }
+
+        function setMaintStatus(text, color) {
+            const el = document.getElementById('mt-status');
+            if (el) { el.textContent = text || ''; el.style.color = color || '#7f8c8d'; }
+        }
+
+        async function loadMaintenance() {
+            try { maintJobs = JSON.parse(localStorage.getItem('wn_maint_jobs') || '[]') || []; } catch (e) { maintJobs = []; }
+            try { maintCategories = JSON.parse(localStorage.getItem('wn_maint_cats') || 'null') || MAINT_DEFAULT_CATEGORIES.slice(); } catch (e) { maintCategories = MAINT_DEFAULT_CATEGORIES.slice(); }
+            renderMaintList();
+            renderMaintOnMap();
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + "?type=maintenance&t=" + Date.now(), { cache: 'no-store' });
+                const d = await res.json();
+                // An older script has no maintenance branch and answers with the
+                // feed settings, which have no "jobs". Then the phone's copy stays.
+                if (!d || !Array.isArray(d.jobs)) {
+                    setMaintStatus('⚠ The Apps Script needs updating before jobs can be shared.', '#e67e22');
+                    return;
+                }
+                maintJobs = d.jobs;
+                if (Array.isArray(d.categories) && d.categories.length > 0) maintCategories = d.categories;
+                try {
+                    localStorage.setItem('wn_maint_jobs', JSON.stringify(maintJobs));
+                    localStorage.setItem('wn_maint_cats', JSON.stringify(maintCategories));
+                } catch (e) {}
+                setMaintStatus('');
+                renderMaintList();
+                renderMaintOnMap();
+            } catch (e) {
+                console.log("Maintenance load failed, using this device's copy");
+                setMaintStatus('⚠ Offline - showing the copy on this device.', '#e67e22');
+            }
+        }
+
+        function cacheMaintLocally() {
+            try { localStorage.setItem('wn_maint_jobs', JSON.stringify(maintJobs)); } catch (e) {}
+        }
+
+        async function postMaintenance(payload) {
+            const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+            const d = await res.json();
+            if (!d || d.status !== 'success') {
+                const msg = (d && d.message) ? d.message : 'the sheet refused it';
+                throw new Error(/unknown payload type/i.test(msg) ? 'the Apps Script needs updating' : msg);
+            }
+            return d;
+        }
+
+        /* ---- drawing on the map ---- */
+        function startMaintDrawing(type) {
+            if (typeof isDrawingBreak !== 'undefined' && isDrawingBreak) cancelBreak();
+            cancelMaintDrawing(true);
+            maintDrawType = type;
+            maintDrawPoints = [];
+            document.getElementById('mt-draw-bar').style.display = 'flex';
+            document.getElementById('mt-btn-undo').style.display = type === 'line' ? 'inline-block' : 'none';
+            setMaintDrawMsg();
+            map.getContainer().style.cursor = 'crosshair';
+            map.on('click', handleMaintMapClick);
+        }
+
+        function setMaintDrawMsg() {
+            const el = document.getElementById('mt-draw-msg');
+            if (!el) return;
+            el.textContent = maintDrawType === 'point'
+                ? 'Tap the spot on the map'
+                : `Tap along the fence or pipe (${maintDrawPoints.length} point${maintDrawPoints.length === 1 ? '' : 's'})`;
+        }
+
+        function handleMaintMapClick(e) {
+            if (!maintDrawType) return;
+            maintDrawPoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+            maintDrawMarkers.push(L.circleMarker(e.latlng, { radius: 6, color: '#16a085', fillColor: '#fff', fillOpacity: 1, weight: 3 }).addTo(map));
+            if (maintDrawType === 'line') {
+                if (maintDrawLine) map.removeLayer(maintDrawLine);
+                maintDrawLine = L.polyline(maintDrawPoints.map(p => [p.lat, p.lng]), { color: '#16a085', weight: 4, dashArray: '6,6' }).addTo(map);
+            }
+            setMaintDrawMsg();
+            if (maintDrawType === 'point') finishMaintDrawing();
+        }
+
+        function undoMaintPoint() {
+            if (maintDrawPoints.length === 0) return;
+            maintDrawPoints.pop();
+            const m = maintDrawMarkers.pop();
+            if (m) map.removeLayer(m);
+            if (maintDrawLine) map.removeLayer(maintDrawLine);
+            maintDrawLine = maintDrawPoints.length > 1
+                ? L.polyline(maintDrawPoints.map(p => [p.lat, p.lng]), { color: '#16a085', weight: 4, dashArray: '6,6' }).addTo(map)
+                : null;
+            setMaintDrawMsg();
+        }
+
+        function cancelMaintDrawing(keepBar) {
+            map.off('click', handleMaintMapClick);
+            map.getContainer().style.cursor = '';
+            maintDrawType = null;
+            maintDrawPoints = [];
+            maintDrawMarkers.forEach(m => map.removeLayer(m));
+            maintDrawMarkers = [];
+            if (maintDrawLine) map.removeLayer(maintDrawLine);
+            maintDrawLine = null;
+            if (!keepBar) {
+                const bar = document.getElementById('mt-draw-bar');
+                if (bar) bar.style.display = 'none';
+            }
+        }
+
+        function finishMaintDrawing() {
+            if (!maintDrawType) return;
+            if (maintDrawType === 'line' && maintDrawPoints.length < 2) {
+                alert('A line needs at least two points.');
+                return;
+            }
+            map.off('click', handleMaintMapClick);
+            map.getContainer().style.cursor = '';
+            openMaintJobModal(null, maintDrawType, maintDrawPoints.slice());
+        }
+
+        /* ---- the job card form ---- */
+        function openMaintJobModal(job, type, points) {
+            maintEditingId = job ? job.id : null;
+            window._maintPending = job ? null : { type: type, points: points };
+            document.getElementById('mt-modal-title').textContent = job ? 'Edit job' : 'New maintenance job';
+            document.getElementById('mt-modal-name').value = job ? job.title : '';
+            document.getElementById('mt-modal-notes').value = job ? (job.notes || '') : '';
+            document.getElementById('mt-modal-by').value = job ? (job.createdBy || '') : (localStorage.getItem('auth_name') || '');
+            fillMaintCatSelect(job ? job.category : '');
+            fillMaintSubSelect(job ? job.sub : '');
+            document.getElementById('mt-job-modal').style.display = 'flex';
+        }
+
+        function fillMaintCatSelect(selected) {
+            const sel = document.getElementById('mt-modal-cat');
+            const names = maintCategoryNames();
+            sel.innerHTML = names.map(n => `<option value="${escUnit(n)}"${n === selected ? ' selected' : ''}>${escUnit(n)}</option>`).join('');
+            if (!selected && names.length > 0) sel.value = names[0];
+        }
+
+        function fillMaintSubSelect(selected) {
+            const sel = document.getElementById('mt-modal-sub');
+            const cat = document.getElementById('mt-modal-cat').value;
+            const subs = maintSubsFor(cat);
+            sel.innerHTML = '<option value="">(none)</option>' +
+                subs.map(s => `<option value="${escUnit(s)}"${s === selected ? ' selected' : ''}>${escUnit(s)}</option>`).join('');
+            if (selected) sel.value = selected;
+        }
+
+        function closeMaintJobModal() {
+            document.getElementById('mt-job-modal').style.display = 'none';
+            if (!maintEditingId) cancelMaintDrawing();
+            maintEditingId = null;
+            window._maintPending = null;
+        }
+
+        async function saveMaintJobFromModal() {
+            const title = document.getElementById('mt-modal-name').value.trim();
+            if (!title) { alert('Give the job a name.'); return; }
+            const cat = document.getElementById('mt-modal-cat').value;
+            const sub = document.getElementById('mt-modal-sub').value;
+            const notes = document.getElementById('mt-modal-notes').value.trim();
+            const by = document.getElementById('mt-modal-by').value.trim() || 'Unknown';
+
+            let job;
+            if (maintEditingId) {
+                job = Object.assign({}, maintJobs.find(j => String(j.id) === String(maintEditingId)));
+                job.title = title; job.category = cat; job.sub = sub; job.notes = notes; job.createdBy = by;
+            } else {
+                const pending = window._maintPending || {};
+                const pts = pending.points || [];
+                if (pts.length === 0) { alert('Mark the job on the map first.'); return; }
+                job = {
+                    id: 'MT_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                    status: 'open',
+                    category: cat, sub: sub, title: title, notes: notes,
+                    type: pending.type,
+                    geometry: pending.type === 'point' ? pts[0] : pts,
+                    createdBy: by,
+                    createdAt: new Date().toISOString(),
+                    fixedBy: '', fixedAt: '', fixNotes: ''
+                };
+            }
+
+            const idx = maintJobs.findIndex(j => String(j.id) === String(job.id));
+            if (idx === -1) maintJobs.push(job); else maintJobs[idx] = job;
+            cacheMaintLocally();
+            document.getElementById('mt-job-modal').style.display = 'none';
+            cancelMaintDrawing();
+            maintEditingId = null;
+            window._maintPending = null;
+            maintTab = 'open';
+            renderMaintList();
+            renderMaintOnMap();
+
+            setMaintStatus('Saving...', '#7f8c8d');
+            try {
+                await postMaintenance({ type: 'save_maintenance_job', job: job });
+                setMaintStatus('✓ Saved to the sheet.', '#27ae60');
+            } catch (e) {
+                setMaintStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
+        }
+
+        /* ---- fixing a job ---- */
+        function openMaintFix(id) {
+            const job = maintJobs.find(j => String(j.id) === String(id));
+            if (!job) return;
+            maintFixingId = id;
+            document.getElementById('mt-fix-job').textContent = `${job.title} (${job.category}${job.sub ? ' - ' + job.sub : ''})`;
+            document.getElementById('mt-fix-by').value = localStorage.getItem('auth_name') || '';
+            document.getElementById('mt-fix-date').value = toDateInputValue(new Date());
+            document.getElementById('mt-fix-notes').value = '';
+            document.getElementById('mt-fix-modal').style.display = 'flex';
+        }
+
+        function closeMaintFixModal() {
+            document.getElementById('mt-fix-modal').style.display = 'none';
+            maintFixingId = null;
+        }
+
+        async function saveMaintFix() {
+            const job = maintJobs.find(j => String(j.id) === String(maintFixingId));
+            if (!job) return closeMaintFixModal();
+            const by = document.getElementById('mt-fix-by').value.trim() || 'Unknown';
+            const dateVal = document.getElementById('mt-fix-date').value || toDateInputValue(new Date());
+            job.status = 'fixed';
+            job.fixedBy = by;
+            job.fixedAt = new Date(dateVal + 'T12:00:00').toISOString();
+            job.fixNotes = document.getElementById('mt-fix-notes').value.trim();
+
+            cacheMaintLocally();
+            closeMaintFixModal();
+            renderMaintList();
+            renderMaintOnMap();
+
+            setMaintStatus('Saving...', '#7f8c8d');
+            try {
+                await postMaintenance({ type: 'save_maintenance_job', job: job });
+                setMaintStatus(`✓ ${job.title} marked fixed by ${by}.`, '#27ae60');
+            } catch (e) {
+                setMaintStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
+        }
+
+        function reopenMaintJob(id) {
+            const job = maintJobs.find(j => String(j.id) === String(id));
+            if (!job) return;
+            if (!confirm(`Put ${job.title} back on the map as an open job?`)) return;
+            job.status = 'open'; job.fixedBy = ''; job.fixedAt = ''; job.fixNotes = '';
+            cacheMaintLocally();
+            renderMaintList();
+            renderMaintOnMap();
+            postMaintenance({ type: 'save_maintenance_job', job: job })
+                .then(() => setMaintStatus('✓ Back on the map.', '#27ae60'))
+                .catch(e => setMaintStatus('⚠ Saved on this device only - ' + e.message, '#e67e22'));
+        }
+
+        async function deleteMaintJob(id) {
+            const job = maintJobs.find(j => String(j.id) === String(id));
+            if (!job) return;
+            if (!confirm(`Delete "${job.title}"?\n\nThis removes it from the sheet for everybody.`)) return;
+            maintJobs = maintJobs.filter(j => String(j.id) !== String(id));
+            cacheMaintLocally();
+            renderMaintList();
+            renderMaintOnMap();
+            try {
+                await postMaintenance({ type: 'delete_maintenance_job', id: id });
+                setMaintStatus('✓ Deleted.', '#27ae60');
+            } catch (e) {
+                setMaintStatus('⚠ Removed here only - ' + e.message, '#e67e22');
+            }
+        }
+
+        function editMaintJob(id) {
+            const job = maintJobs.find(j => String(j.id) === String(id));
+            if (job) openMaintJobModal(job);
+        }
+
+        /* ---- the list under the map ---- */
+        function setMaintTab(which) {
+            maintTab = which;
+            renderMaintList();
+            renderMaintOnMap();
+        }
+
+        function maintDateText(v) {
+            if (!v) return '--';
+            const d = new Date(v);
+            return isFinite(d.getTime()) ? fmtNZ(d) : String(v);
+        }
+
+        function renderMaintList() {
+            const list = document.getElementById('mt-list');
+            if (!list) return;
+
+            const openBtn = document.getElementById('mt-tab-open');
+            const fixedBtn = document.getElementById('mt-tab-fixed');
+            if (openBtn && fixedBtn) {
+                openBtn.style.background = maintTab === 'open' ? '#16a085' : '#fff';
+                openBtn.style.color = maintTab === 'open' ? '#fff' : '#16a085';
+                fixedBtn.style.background = maintTab === 'fixed' ? '#7f8c8d' : '#fff';
+                fixedBtn.style.color = maintTab === 'fixed' ? '#fff' : '#7f8c8d';
+            }
+
+            const filter = document.getElementById('mt-filter-cat');
+            if (filter) {
+                const cur = filter.value;
+                filter.innerHTML = '<option value="">All categories</option>' +
+                    maintCategoryNames().map(n => `<option value="${escUnit(n)}">${escUnit(n)}</option>`).join('');
+                filter.value = cur || '';
+            }
+            const wantCat = filter ? filter.value : '';
+
+            const jobs = maintJobs
+                .filter(j => (maintTab === 'fixed' ? j.status === 'fixed' : j.status !== 'fixed'))
+                .filter(j => !wantCat || j.category === wantCat)
+                .sort((a, b) => new Date(maintTab === 'fixed' ? b.fixedAt || b.createdAt : b.createdAt) -
+                                new Date(maintTab === 'fixed' ? a.fixedAt || a.createdAt : a.createdAt));
+
+            if (jobs.length === 0) {
+                list.innerHTML = `<div style="padding:18px; text-align:center; color:#7f8c8d; font-size:12px;">
+                    ${maintTab === 'fixed' ? 'No jobs have been reported fixed yet.' : 'No open jobs. Drop a pin or draw a line to report one.'}</div>`;
+                return;
+            }
+
+            const btn = 'border:none; border-radius:5px; padding:7px 4px; font-size:11px; font-weight:bold; cursor:pointer;';
+            list.innerHTML = jobs.map(j => {
+                const col = maintCatColor(j.category);
+                return `<div id="mt-card-${j.id}" style="background:#fff; border:1px solid #e5e5e5; border-left:5px solid ${col}; border-radius:8px; padding:10px 12px; margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+                        <b style="font-size:13px;">${escUnit(j.title)}</b>
+                        <span style="font-size:10px; color:#fff; background:${col}; padding:2px 6px; border-radius:10px; white-space:nowrap;">${escUnit(j.category)}${j.sub ? ' · ' + escUnit(j.sub) : ''}</span>
+                    </div>
+                    <div style="font-size:11px; color:#7f8c8d; margin-top:4px;">
+                        ${j.type === 'line' ? '〰 line' : '📍 point'} · reported ${maintDateText(j.createdAt)} by <b>${escUnit(j.createdBy || '--')}</b>
+                    </div>
+                    ${j.notes ? `<div style="font-size:12px; color:#2c3e50; margin-top:6px; white-space:pre-wrap;">${escUnit(j.notes)}</div>` : ''}
+                    ${j.status === 'fixed' ? `<div style="font-size:11px; color:#27ae60; font-weight:bold; margin-top:6px;">✓ Fixed ${maintDateText(j.fixedAt)} by ${escUnit(j.fixedBy || '--')}</div>
+                        ${j.fixNotes ? `<div style="font-size:11px; color:#7f8c8d; margin-top:2px; white-space:pre-wrap;">${escUnit(j.fixNotes)}</div>` : ''}` : ''}
+                    <div style="display:flex; gap:6px; margin-top:8px;">
+                        <button onclick="zoomToMaintJob('${j.id}')" style="${btn} flex:1; background:#ecf0f1; color:#2c3e50;">🔍 SHOW</button>
+                        ${j.status === 'fixed'
+                            ? `<button onclick="reopenMaintJob('${j.id}')" style="${btn} flex:1; background:#f39c12; color:#fff;">↩ REOPEN</button>`
+                            : `<button onclick="openMaintFix('${j.id}')" style="${btn} flex:1; background:#27ae60; color:#fff;">✓ FIXED</button>
+                               <button onclick="editMaintJob('${j.id}')" style="${btn} flex:1; background:#2980b9; color:#fff;">✏️ EDIT</button>`}
+                        <button onclick="deleteMaintJob('${j.id}')" style="${btn} flex:0 0 auto; background:#fdeceb; color:#c0392b;">🗑</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        /* ---- the jobs on the map ---- */
+        function clearMaintFromMap() {
+            maintLayers.forEach(l => { if (l) map.removeLayer(l); });
+            maintLayers.clear();
+        }
+
+        function renderMaintOnMap() {
+            clearMaintFromMap();
+            if (currentDashboardMode !== 'maintenance') return;
+
+            maintJobs.forEach(j => {
+                const isFixed = j.status === 'fixed';
+                if (isFixed && maintTab !== 'fixed') return;      // the map shows what is open
+                if (!isFixed && maintTab === 'fixed') return;
+                const col = isFixed ? '#95a5a6' : maintCatColor(j.category);
+                const label = `<div style="font-family:sans-serif; width:170px;">
+                        <div style="font-weight:bold; font-size:13px; color:#2c3e50;">${escUnit(j.title)}</div>
+                        <div style="font-size:11px; color:${col}; font-weight:bold; margin-bottom:4px;">${escUnit(j.category)}${j.sub ? ' · ' + escUnit(j.sub) : ''}</div>
+                        ${j.notes ? `<div style="font-size:11px; color:#666; margin-bottom:4px;">${escUnit(j.notes)}</div>` : ''}
+                        <div style="font-size:9px; color:#999;">By ${escUnit(j.createdBy || '--')} · ${maintDateText(j.createdAt)}</div>
+                        ${isFixed ? `<div style="font-size:9px; color:#27ae60; font-weight:bold;">Fixed by ${escUnit(j.fixedBy || '--')} · ${maintDateText(j.fixedAt)}</div>`
+                                  : `<button onclick="openMaintFix('${j.id}')" style="width:100%; margin-top:6px; background:#27ae60; color:#fff; border:none; padding:5px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">✓ Report fixed</button>`}
+                    </div>`;
+
+                let layer;
+                if (j.type === 'line' && Array.isArray(j.geometry)) {
+                    layer = L.polyline(j.geometry.map(p => [p.lat, p.lng]), {
+                        color: col, weight: 5, opacity: isFixed ? 0.5 : 0.95
+                    }).addTo(map);
+                } else if (j.geometry && j.geometry.lat != null) {
+                    const icon = L.divIcon({
+                        className: 'maint-marker',
+                        html: `<div style="background:${col}; width:18px; height:18px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold;">${isFixed ? '✓' : '🔧'}</div>`,
+                        iconSize: [18, 18], iconAnchor: [9, 9]
+                    });
+                    layer = L.marker([j.geometry.lat, j.geometry.lng], { icon: icon }).addTo(map);
+                } else {
+                    return;
+                }
+                layer.bindPopup(label);
+                layer.on('click', () => { const c = document.getElementById('mt-card-' + j.id); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+                maintLayers.set(String(j.id), layer);
+            });
+        }
+
+        function zoomToMaintJob(id) {
+            const job = maintJobs.find(j => String(j.id) === String(id));
+            if (!job || !job.geometry) return;
+            if (job.type === 'line' && Array.isArray(job.geometry)) {
+                map.fitBounds(L.latLngBounds(job.geometry.map(p => [p.lat, p.lng])), { padding: [60, 60] });
+            } else {
+                map.setView([job.geometry.lat, job.geometry.lng], 18);
+            }
+            const layer = maintLayers.get(String(id));
+            if (layer && layer.openPopup) layer.openPopup();
+        }
+
+        /* ---- categories ---- */
+        function openMaintCategories() {
+            document.getElementById('mt-cat-modal').style.display = 'flex';
+            document.getElementById('mt-cat-status').textContent = '';
+            renderMaintCategories();
+        }
+
+        function closeMaintCategories() {
+            document.getElementById('mt-cat-modal').style.display = 'none';
+        }
+
+        function renderMaintCategories() {
+            const box = document.getElementById('mt-cat-list');
+            if (!box) return;
+            const btn = 'border:none; border-radius:4px; padding:5px 8px; font-size:11px; font-weight:bold; cursor:pointer;';
+            box.innerHTML = maintCategoryNames().map(cat => {
+                const subs = maintSubsFor(cat);
+                return `<div style="border:1px solid #eee; border-radius:6px; padding:8px; margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <b style="font-size:13px; color:${maintCatColor(cat)};">${escUnit(cat)}</b>
+                        <button onclick="removeMaintCategory('${escUnit(cat)}')" style="${btn} background:#fdeceb; color:#c0392b;">🗑</button>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+                        ${subs.map(s => `<span style="font-size:11px; background:#ecf0f1; border-radius:10px; padding:3px 8px;">${escUnit(s)}
+                            <b onclick="removeMaintSub('${escUnit(cat)}','${escUnit(s)}')" style="cursor:pointer; color:#c0392b;">×</b></span>`).join('')}
+                        <button onclick="addMaintSub('${escUnit(cat)}')" style="${btn} background:#fff; border:1px dashed #16a085; color:#16a085;">+ sub</button>
+                    </div>
+                </div>`;
+            }).join('') || '<div style="font-size:12px; color:#7f8c8d;">No categories yet.</div>';
+        }
+
+        function addMaintCategory() {
+            const inp = document.getElementById('mt-new-cat');
+            const name = inp.value.trim();
+            if (!name) return;
+            if (maintCategoryNames().some(n => n.toLowerCase() === name.toLowerCase())) { alert('That category is already there.'); return; }
+            maintCategories.push({ category: name, sub: '' });
+            inp.value = '';
+            renderMaintCategories();
+        }
+
+        function addMaintSub(cat) {
+            const name = (prompt(`New sub category for ${cat}:`) || '').trim();
+            if (!name) return;
+            if (maintSubsFor(cat).some(s => s.toLowerCase() === name.toLowerCase())) return;
+            maintCategories.push({ category: cat, sub: name });
+            renderMaintCategories();
+        }
+
+        function removeMaintSub(cat, sub) {
+            maintCategories = maintCategories.filter(c => !(c.category === cat && c.sub === sub));
+            if (maintSubsFor(cat).length === 0 && !maintCategories.some(c => c.category === cat)) {
+                maintCategories.push({ category: cat, sub: '' });
+            }
+            renderMaintCategories();
+        }
+
+        function removeMaintCategory(cat) {
+            const used = maintJobs.filter(j => j.category === cat && j.status !== 'fixed').length;
+            if (used > 0 && !confirm(`${used} open job${used === 1 ? ' uses' : 's use'} ${cat}. Remove it anyway?\n\nThose jobs keep the name.`)) return;
+            maintCategories = maintCategories.filter(c => c.category !== cat);
+            renderMaintCategories();
+        }
+
+        async function saveMaintCategories() {
+            const el = document.getElementById('mt-cat-status');
+            if (maintCategories.length === 0) { el.textContent = 'Add at least one category.'; el.style.color = '#e74c3c'; return; }
+            try { localStorage.setItem('wn_maint_cats', JSON.stringify(maintCategories)); } catch (e) {}
+            el.textContent = 'Saving...'; el.style.color = '#7f8c8d';
+            try {
+                const d = await postMaintenance({ type: 'save_maintenance_categories', categories: maintCategories });
+                el.textContent = `✓ Saved. ${d.count} category lines.`; el.style.color = '#27ae60';
+                renderMaintList();
+            } catch (e) {
+                el.textContent = '⚠ Saved on this device only - ' + e.message; el.style.color = '#e67e22';
+            }
         }
 
         /* ===================== FARMWALK ORDER =====================
@@ -6466,6 +7096,8 @@
                         
                         layer.on('click', (e) => {
                             if (isDrawingBreak || (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) || (typeof editingHazardId !== 'undefined' && editingHazardId)) return; // bubble up for drawing
+                            // Marking a maintenance job: the tap belongs to the map, not the paddock
+                            if (typeof maintDrawType !== 'undefined' && maintDrawType) return;
 
                             // Assigning paddocks to a unit takes over the tap entirely
                             if (unitEditingId && currentDashboardMode === 'farm_config') {
@@ -6569,6 +7201,17 @@
             document.getElementById('weather-view').style.display = (mode === 'weather') ? 'flex' : 'none';
             document.getElementById('roster-view').style.display = (mode === 'roster') ? 'block' : 'none';
             document.getElementById('vehicle-maintenance-view').style.display = (mode === 'vehicle_maintenance') ? 'block' : 'none';
+            const maintView = document.getElementById('maintenance-view');
+            if (maintView) maintView.style.display = (mode === 'maintenance') ? 'block' : 'none';
+            // The cover figures belong to the farmwalk, not to a jobs list.
+            const avgBox = document.querySelector('.avg-box');
+            const syncNote = document.querySelector('.sync-note');
+            if (avgBox) avgBox.style.display = (mode === 'maintenance') ? 'none' : '';
+            if (syncNote) syncNote.style.display = (mode === 'maintenance') ? 'none' : '';
+            if (mode !== 'maintenance') {
+                if (maintDrawType) cancelMaintDrawing();
+                clearMaintFromMap();      // the jobs belong to their own map
+            }
             document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
             // Sorting only means something where paddock cards are listed.
             const sortBar = document.getElementById('sort-bar');
@@ -6636,7 +7279,7 @@
                 return;
             } else {
                 document.getElementById('map').style.display = (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
-                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config') ? 'none' : 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config' || mode === 'maintenance') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
@@ -6694,6 +7337,7 @@
                     if (mode === 'health_safety') loadHSTables();
                     if (mode === 'roster') fetchRoster(currentRosterSheet);
                     if (mode === 'vehicle_maintenance') loadVehicleMaintenance();
+                    if (mode === 'maintenance') renderMaintOnMap();
                     if (typeof renderHazardsOnMap === 'function') renderHazardsOnMap();
                     // Re-adding the paddock layer put it over the breaks.
                     raiseBreakLayers();
@@ -6719,6 +7363,17 @@
                     if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                         loadBreaks();
                     }
+                    return;
+                } else if (mode === 'maintenance') {
+                    // The jobs map: the farm, the hazards and the jobs. No breaks.
+                    setLayerMode('satellite');
+                    document.getElementById('legend').style.display = 'none';
+                    updateGeoStyles();
+                    renderBreaksOnMap();          // clears them off the map
+                    loadMaintenance();
+                    // The hazards are wanted here too, so fetch them if this
+                    // device has not opened Health & Safety yet.
+                    if (typeof hsHazards !== 'undefined' && hsHazards.length === 0 && typeof loadHSTables === 'function') loadHSTables();
                     return;
                 } else if (mode === 'admin') {
                     document.getElementById('map').style.display = 'none';
@@ -7699,7 +8354,7 @@
                         opacity: 1,
                         weight: isTarget ? 3.5 : 1
                     });
-                } else if (currentDashboardMode === 'breaks') {
+                } else if (currentDashboardMode === 'breaks' || currentDashboardMode === 'maintenance') {
                     layer.setStyle({ fillColor: 'transparent', fillOpacity: 0, color: 'white', opacity: 0.8, weight: 1.5 });
                 } else if (activeUnit && !unitHasPaddock(activeUnit, pName)) {
                     // A unit is selected: everything outside it goes flat blue and recedes.
@@ -9984,6 +10639,9 @@
             if (!window.audioAidParallelLayers) window.audioAidParallelLayers = [];
             window.audioAidParallelLayers.forEach(l => { if (l) map.removeLayer(l); });
             window.audioAidParallelLayers = [];
+
+            // The maintenance map never shows breaks.
+            if (currentDashboardMode === 'maintenance') return;
 
             // FARMWALK and SATELLITE have a BREAKS ON/OFF button. There the breaks
             // are only drawn to look at: they let taps through to the paddock
