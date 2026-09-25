@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.08</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.09</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1691,7 +1691,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.08</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.09</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1925,13 +1925,12 @@
                 or draw a line for a fence or a pipe. Drag a pin to move it.
             </p>
 
-            <div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">QUICK JOB - tap a button, then tap the spot</div>
-            <div id="mt-quick" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px;"></div>
-
-            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-                <button id="mt-btn-point" onclick="startMaintDrawing('point')" style="flex:1 1 46%; background:#16a085; color:#fff; border:none; padding:10px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">📍 NEW POINT JOB</button>
-                <button id="mt-btn-line" onclick="startMaintDrawing('line')" style="flex:1 1 46%; background:#2980b9; color:#fff; border:none; padding:10px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">〰 NEW LINE JOB</button>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span style="flex:1; font-size:11px; font-weight:bold; color:#7f8c8d;">TAP A JOB, THEN TAP THE MAP</span>
+                <button id="mt-shape-point" onclick="setMaintShape('point')" style="padding:6px 10px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid #16a085;">📍 POINT</button>
+                <button id="mt-shape-line" onclick="setMaintShape('line')" style="padding:6px 10px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid #2980b9;">〰 LINE</button>
             </div>
+            <div id="mt-quick" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px;"></div>
 
             <div id="mt-draw-bar" style="display:none; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border:1px solid #16a085; border-radius:6px; padding:8px; margin-bottom:10px;">
                 <span id="mt-draw-msg" style="flex:1; font-size:11px; font-weight:bold; color:#16a085;"></span>
@@ -1998,6 +1997,7 @@
             <div style="background:#fff; border-radius:10px; padding:16px; width:100%; max-width:360px; max-height:90vh; overflow-y:auto;">
                 <h4 style="margin:0 0 10px;">Job categories</h4>
                 <div id="mt-cat-list" style="margin-bottom:12px;"></div>
+                <p style="font-size:11px; color:#7f8c8d; margin:0 0 12px;">Every sub category is a quick button on the maintenance screen.</p>
                 <div style="display:flex; gap:6px; margin-bottom:8px;">
                     <input type="text" id="mt-new-cat" placeholder="New category" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
                     <button onclick="addMaintCategory()" style="background:#16a085; color:#fff; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer;">+</button>
@@ -2877,6 +2877,7 @@
         let maintEditingId = null;        // set when the modal is editing an old job
         let maintFixingId = null;
         let maintRedrawId = null;         // set while a line job is being drawn again
+        let maintDrawStartedAt = 0;       // guards against the tap that started it
 
         const MAINT_DEFAULT_CATEGORIES = [
             { category: 'Fencing', sub: 'Posts' },
@@ -2899,23 +2900,22 @@
 
         const MAINT_CAT_COLORS = ['#16a085', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12', '#2c3e50', '#27ae60'];
 
-        /* The jobs reported most often, as one button each. Tap the button, tap
-         * the spot, and the job is on the map - no form to fill in on a bike.
-         * Anything else goes through NEW POINT JOB, which asks for the details. */
-        let maintQuickJobs = [
-            { label: '🪵 Post', category: 'Fencing', sub: 'Posts' },
-            { label: '⚡ Insulator', category: 'Fencing', sub: 'Insulator' },
-            { label: '🚧 Broken fence', category: 'Fencing', sub: 'Wires' },
-            { label: '🌿 Thistles', category: 'Weeds', sub: 'Thistles' },
-            { label: '🌱 Broom', category: 'Weeds', sub: 'Broom' },
-            { label: '🌾 Gorse', category: 'Weeds', sub: 'Gorse' },
-            { label: '💧 Broken pipe', category: 'Water supply', sub: 'Pipes' }
-        ];
-        try {
-            const savedQuick = JSON.parse(localStorage.getItem('wn_maint_quick') || 'null');
-            if (Array.isArray(savedQuick) && savedQuick.length > 0) maintQuickJobs = savedQuick;
-        } catch (e) {}
+        /* Every sub category is a job button: tap it, tap the spot, and the job
+         * is on the map - no form to fill in on a bike. Add a sub category and
+         * its button is there for everybody, because the categories come from
+         * the sheet. A category with no sub is one button on its own. */
         let maintQuickPreset = null;      // set while a quick job is waiting for its tap
+        let maintShape = 'point';         // one spot, or a line along a fence or pipe
+        let maintOpenCat = null;          // which category's sub buttons are showing
+
+        function setMaintShape(shape) {
+            maintShape = shape;
+            if (maintDrawType) cancelMaintDrawing();
+            const p = document.getElementById('mt-shape-point');
+            const l = document.getElementById('mt-shape-line');
+            if (p) { p.style.background = shape === 'point' ? '#16a085' : '#fff'; p.style.color = shape === 'point' ? '#fff' : '#16a085'; }
+            if (l) { l.style.background = shape === 'line' ? '#2980b9' : '#fff'; l.style.color = shape === 'line' ? '#fff' : '#2980b9'; }
+        }
 
         function maintCatColor(cat) {
             const names = maintCategoryNames();
@@ -2939,6 +2939,8 @@
         }
 
         async function loadMaintenance() {
+            maintOpenCat = null;
+            setMaintShape(maintShape);        // paints the POINT / LINE switch
             try { maintJobs = JSON.parse(localStorage.getItem('wn_maint_jobs') || '[]') || []; } catch (e) { maintJobs = []; }
             try { maintCategories = JSON.parse(localStorage.getItem('wn_maint_cats') || 'null') || MAINT_DEFAULT_CATEGORIES.slice(); } catch (e) { maintCategories = MAINT_DEFAULT_CATEGORIES.slice(); }
             renderMaintQuickButtons();
@@ -2956,12 +2958,14 @@
                     return;
                 }
                 maintJobs = d.jobs;
+                // The categories carry the quick buttons with them.
                 if (Array.isArray(d.categories) && d.categories.length > 0) maintCategories = d.categories;
                 try {
                     localStorage.setItem('wn_maint_jobs', JSON.stringify(maintJobs));
                     localStorage.setItem('wn_maint_cats', JSON.stringify(maintCategories));
                 } catch (e) {}
                 setMaintStatus('');
+                renderMaintQuickButtons();
                 renderMaintList();
                 renderMaintOnMap();
             } catch (e) {
@@ -2984,50 +2988,61 @@
             return d;
         }
 
-        /* ---- quick jobs ---- */
+        /* ---- quick jobs ----
+         * One screen of category buttons. Tapping one opens its sub category
+         * buttons, so the list never fills the screen. A category with no sub
+         * starts the job as soon as it is tapped. */
         function renderMaintQuickButtons() {
             const box = document.getElementById('mt-quick');
             if (!box) return;
-            box.innerHTML = maintQuickJobs.map((q, i) => {
-                const on = maintQuickPreset && maintQuickPreset.i === i;
-                const col = maintCatColor(q.category);
-                return `<button onclick="startQuickMaintJob(${i})" style="background:${on ? col : '#fff'}; color:${on ? '#fff' : '#2c3e50'};
-                    border:1.5px solid ${col}; border-radius:14px; padding:7px 11px; font-size:11px; font-weight:bold; cursor:pointer;">${escUnit(q.label)}</button>`;
-            }).join('') +
-            `<button onclick="addMaintQuickJob()" title="Add a quick button" style="background:#fff; color:#7f8c8d; border:1.5px dashed #bdc3c7; border-radius:14px; padding:7px 11px; font-size:11px; font-weight:bold; cursor:pointer;">＋</button>`;
-        }
-
-        function startQuickMaintJob(i) {
-            const q = maintQuickJobs[i];
-            if (!q) return;
-            if (maintQuickPreset && maintQuickPreset.i === i) { cancelMaintDrawing(); return; }   // tapped again: off
-            maintQuickPreset = Object.assign({ i: i }, q);
-            startMaintDrawing('point');
-            renderMaintQuickButtons();
-        }
-
-        function addMaintQuickJob() {
-            const label = (prompt('Name for the quick button (e.g. Broken trough):') || '').trim();
-            if (!label) return;
             const cats = maintCategoryNames();
-            const cat = (prompt(`Category?\n\n${cats.join(', ')}`, cats[0] || '') || '').trim();
-            if (!cat) return;
-            const subs = maintSubsFor(cat);
-            const sub = (prompt(`Sub category? (leave empty for none)\n\n${subs.join(', ') || 'none yet'}`, subs[0] || '') || '').trim();
-            maintQuickJobs.push({ label: label, category: cat, sub: sub });
-            if (sub && !maintSubsFor(cat).includes(sub)) maintCategories.push({ category: cat, sub: sub });
-            try { localStorage.setItem('wn_maint_quick', JSON.stringify(maintQuickJobs)); } catch (e) {}
+            if (cats.length === 0) {
+                box.innerHTML = '<div style="font-size:11px; color:#7f8c8d;">No categories yet. Add some with ⚙ Categories.</div>';
+                return;
+            }
+            const chip = (label, col, on, onclick) => `<button onclick="${onclick}" style="background:${on ? col : '#fff'};
+                color:${on ? '#fff' : '#2c3e50'}; border:1.5px solid ${col}; border-radius:14px; padding:8px 12px;
+                font-size:12px; font-weight:bold; cursor:pointer;">${escUnit(label)}</button>`;
+
+            if (!maintOpenCat) {
+                box.innerHTML = cats.map(c => {
+                    const on = maintQuickPreset && maintQuickPreset.category === c && !maintQuickPreset.sub;
+                    return chip(c, maintCatColor(c), on, `openMaintQuickCat('${escUnit(c)}')`);
+                }).join('');
+                return;
+            }
+
+            const col = maintCatColor(maintOpenCat);
+            const subs = maintSubsFor(maintOpenCat);
+            box.innerHTML =
+                `<button onclick="openMaintQuickCat(null)" style="background:#ecf0f1; color:#2c3e50; border:none; border-radius:14px;
+                    padding:8px 12px; font-size:12px; font-weight:bold; cursor:pointer;">◀</button>
+                 <span style="align-self:center; font-size:12px; font-weight:bold; color:${col}; margin-right:2px;">${escUnit(maintOpenCat)}</span>` +
+                subs.map(s => {
+                    const on = maintQuickPreset && maintQuickPreset.category === maintOpenCat && maintQuickPreset.sub === s;
+                    return chip(s, col, on, `startQuickMaintJob('${escUnit(maintOpenCat)}','${escUnit(s)}')`);
+                }).join('');
+        }
+
+        function openMaintQuickCat(cat) {
+            // A category with no sub categories is a job on its own.
+            if (cat && maintSubsFor(cat).length === 0) { startQuickMaintJob(cat, ''); return; }
+            maintOpenCat = cat;
+            if (!cat && maintDrawType) cancelMaintDrawing();
             renderMaintQuickButtons();
         }
 
-        function removeMaintQuickJob(i) {
-            maintQuickJobs.splice(i, 1);
-            try { localStorage.setItem('wn_maint_quick', JSON.stringify(maintQuickJobs)); } catch (e) {}
+        function startQuickMaintJob(cat, sub) {
+            const same = maintQuickPreset && maintQuickPreset.category === cat && maintQuickPreset.sub === (sub || '');
+            if (same) { cancelMaintDrawing(); return; }              // tapped again: off
+            maintQuickPreset = { label: sub || cat, category: cat, sub: sub || '' };
+            startMaintDrawing(maintShape);
             renderMaintQuickButtons();
         }
 
-        // A quick job is saved the moment the map is tapped.
-        async function saveQuickMaintJob(latlng) {
+        // A quick point job is saved the moment the map is tapped; a quick line
+        // job when FINISH is pressed.
+        async function saveQuickMaintJob(geometry, type) {
             const q = maintQuickPreset;
             const job = {
                 id: 'MT_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
@@ -3035,8 +3050,8 @@
                 category: q.category, sub: q.sub,
                 title: String(q.label).replace(/^[^\w]+/, '').trim(),
                 notes: '',
-                type: 'point',
-                geometry: { lat: latlng.lat, lng: latlng.lng },
+                type: type || 'point',
+                geometry: geometry,
                 createdBy: localStorage.getItem('auth_name') || 'Unknown',
                 createdAt: new Date().toISOString(),
                 fixedBy: '', fixedAt: '', fixNotes: ''
@@ -3063,6 +3078,10 @@
             cancelMaintDrawing(true);
             maintQuickPreset = keepPreset;
             maintDrawType = type;
+            maintDrawStartedAt = Date.now();
+            // The sidebar has just changed height. Without this Leaflet still
+            // works from the old size and puts the tap in the wrong place.
+            setTimeout(() => map.invalidateSize(), 60);
             maintDrawPoints = [];
             document.getElementById('mt-draw-bar').style.display = 'flex';
             document.getElementById('mt-btn-undo').style.display = type === 'line' ? 'inline-block' : 'none';
@@ -3081,8 +3100,23 @@
 
         function handleMaintMapClick(e) {
             if (!maintDrawType) return;
-            // A quick job needs nothing else: it is on the map with this tap.
-            if (maintQuickPreset && maintDrawType === 'point') { saveQuickMaintJob(e.latlng); return; }
+
+            /* Only a real tap on the map counts.
+             *
+             * Tapping a button in the list can send a second, ghost click a
+             * moment later. On a phone that landed on the map and dropped the
+             * job somewhere nobody chose. A click is ignored unless it came
+             * from inside the map, and unless the tap on the button has had
+             * time to finish. */
+            const oe = e.originalEvent;
+            const mapEl = document.getElementById('map');
+            if (oe && oe.target && mapEl && !mapEl.contains(oe.target)) return;
+            if (Date.now() - maintDrawStartedAt < 500) return;
+            // A quick point job needs nothing else: it is on the map with this tap.
+            if (maintQuickPreset && maintDrawType === 'point') {
+                saveQuickMaintJob({ lat: e.latlng.lat, lng: e.latlng.lng }, 'point');
+                return;
+            }
             maintDrawPoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
             maintDrawMarkers.push(L.circleMarker(e.latlng, { radius: 6, color: '#16a085', fillColor: '#fff', fillOpacity: 1, weight: 3 }).addTo(map));
             if (maintDrawType === 'line') {
@@ -3132,6 +3166,7 @@
             map.off('click', handleMaintMapClick);
             map.getContainer().style.cursor = '';
             if (maintRedrawId) { applyMaintRedraw(maintDrawPoints.slice()); return; }
+            if (maintQuickPreset) { saveQuickMaintJob(maintDrawPoints.slice(), 'line'); return; }
             openMaintJobModal(null, maintDrawType, maintDrawPoints.slice());
         }
 
@@ -3537,6 +3572,7 @@
                     </div>
                 </div>`;
             }).join('') || '<div style="font-size:12px; color:#7f8c8d;">No categories yet.</div>';
+
         }
 
         function addMaintCategory() {
