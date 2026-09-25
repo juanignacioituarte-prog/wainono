@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.06</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.07</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1691,7 +1691,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.06</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.07</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1925,6 +1925,9 @@
                 or draw a line for a fence or a pipe.
             </p>
 
+            <div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">QUICK JOB - tap a button, then tap the spot</div>
+            <div id="mt-quick" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px;"></div>
+
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
                 <button id="mt-btn-point" onclick="startMaintDrawing('point')" style="flex:1 1 46%; background:#16a085; color:#fff; border:none; padding:10px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">📍 NEW POINT JOB</button>
                 <button id="mt-btn-line" onclick="startMaintDrawing('line')" style="flex:1 1 46%; background:#2980b9; color:#fff; border:none; padding:10px 4px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">〰 NEW LINE JOB</button>
@@ -1942,7 +1945,10 @@
                 <button id="mt-tab-fixed" onclick="setMaintTab('fixed')" style="flex:1; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; border:1px solid #7f8c8d;">HISTORY</button>
             </div>
 
-            <select id="mt-filter-cat" onchange="renderMaintList()" style="width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; font-size:12px; margin-bottom:10px;"></select>
+            <div style="display:flex; gap:6px; margin-bottom:10px;">
+                <select id="mt-filter-cat" onchange="onMaintCatFilterChange()" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc; font-size:12px;"></select>
+                <select id="mt-filter-sub" onchange="renderMaintList(); renderMaintOnMap();" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc; font-size:12px;"></select>
+            </div>
 
             <div id="mt-status" style="font-size:11px; font-weight:bold; line-height:1.4; margin-bottom:8px;"></div>
             <div id="mt-list"></div>
@@ -2883,12 +2889,32 @@
             { category: 'Weeds', sub: 'Thistles' },
             { category: 'Weeds', sub: 'Gorse' },
             { category: 'Weeds', sub: 'Broadleaf' },
+            { category: 'Weeds', sub: 'Broom' },
             { category: 'Tracks', sub: '' },
             { category: 'Buildings', sub: '' },
-            { category: 'Effluent', sub: '' }
+            { category: 'Effluent', sub: '' },
+            { category: 'Rubbish removal', sub: '' }
         ];
 
         const MAINT_CAT_COLORS = ['#16a085', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12', '#2c3e50', '#27ae60'];
+
+        /* The jobs reported most often, as one button each. Tap the button, tap
+         * the spot, and the job is on the map - no form to fill in on a bike.
+         * Anything else goes through NEW POINT JOB, which asks for the details. */
+        let maintQuickJobs = [
+            { label: '🪵 Post', category: 'Fencing', sub: 'Posts' },
+            { label: '⚡ Insulator', category: 'Fencing', sub: 'Insulator' },
+            { label: '🚧 Broken fence', category: 'Fencing', sub: 'Wires' },
+            { label: '🌿 Thistles', category: 'Weeds', sub: 'Thistles' },
+            { label: '🌱 Broom', category: 'Weeds', sub: 'Broom' },
+            { label: '🌾 Gorse', category: 'Weeds', sub: 'Gorse' },
+            { label: '💧 Broken pipe', category: 'Water supply', sub: 'Pipes' }
+        ];
+        try {
+            const savedQuick = JSON.parse(localStorage.getItem('wn_maint_quick') || 'null');
+            if (Array.isArray(savedQuick) && savedQuick.length > 0) maintQuickJobs = savedQuick;
+        } catch (e) {}
+        let maintQuickPreset = null;      // set while a quick job is waiting for its tap
 
         function maintCatColor(cat) {
             const names = maintCategoryNames();
@@ -2914,6 +2940,7 @@
         async function loadMaintenance() {
             try { maintJobs = JSON.parse(localStorage.getItem('wn_maint_jobs') || '[]') || []; } catch (e) { maintJobs = []; }
             try { maintCategories = JSON.parse(localStorage.getItem('wn_maint_cats') || 'null') || MAINT_DEFAULT_CATEGORIES.slice(); } catch (e) { maintCategories = MAINT_DEFAULT_CATEGORIES.slice(); }
+            renderMaintQuickButtons();
             renderMaintList();
             renderMaintOnMap();
 
@@ -2956,10 +2983,84 @@
             return d;
         }
 
+        /* ---- quick jobs ---- */
+        function renderMaintQuickButtons() {
+            const box = document.getElementById('mt-quick');
+            if (!box) return;
+            box.innerHTML = maintQuickJobs.map((q, i) => {
+                const on = maintQuickPreset && maintQuickPreset.i === i;
+                const col = maintCatColor(q.category);
+                return `<button onclick="startQuickMaintJob(${i})" style="background:${on ? col : '#fff'}; color:${on ? '#fff' : '#2c3e50'};
+                    border:1.5px solid ${col}; border-radius:14px; padding:7px 11px; font-size:11px; font-weight:bold; cursor:pointer;">${escUnit(q.label)}</button>`;
+            }).join('') +
+            `<button onclick="addMaintQuickJob()" title="Add a quick button" style="background:#fff; color:#7f8c8d; border:1.5px dashed #bdc3c7; border-radius:14px; padding:7px 11px; font-size:11px; font-weight:bold; cursor:pointer;">＋</button>`;
+        }
+
+        function startQuickMaintJob(i) {
+            const q = maintQuickJobs[i];
+            if (!q) return;
+            if (maintQuickPreset && maintQuickPreset.i === i) { cancelMaintDrawing(); return; }   // tapped again: off
+            maintQuickPreset = Object.assign({ i: i }, q);
+            startMaintDrawing('point');
+            renderMaintQuickButtons();
+        }
+
+        function addMaintQuickJob() {
+            const label = (prompt('Name for the quick button (e.g. Broken trough):') || '').trim();
+            if (!label) return;
+            const cats = maintCategoryNames();
+            const cat = (prompt(`Category?\n\n${cats.join(', ')}`, cats[0] || '') || '').trim();
+            if (!cat) return;
+            const subs = maintSubsFor(cat);
+            const sub = (prompt(`Sub category? (leave empty for none)\n\n${subs.join(', ') || 'none yet'}`, subs[0] || '') || '').trim();
+            maintQuickJobs.push({ label: label, category: cat, sub: sub });
+            if (sub && !maintSubsFor(cat).includes(sub)) maintCategories.push({ category: cat, sub: sub });
+            try { localStorage.setItem('wn_maint_quick', JSON.stringify(maintQuickJobs)); } catch (e) {}
+            renderMaintQuickButtons();
+        }
+
+        function removeMaintQuickJob(i) {
+            maintQuickJobs.splice(i, 1);
+            try { localStorage.setItem('wn_maint_quick', JSON.stringify(maintQuickJobs)); } catch (e) {}
+            renderMaintQuickButtons();
+        }
+
+        // A quick job is saved the moment the map is tapped.
+        async function saveQuickMaintJob(latlng) {
+            const q = maintQuickPreset;
+            const job = {
+                id: 'MT_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                status: 'open',
+                category: q.category, sub: q.sub,
+                title: String(q.label).replace(/^[^\w]+/, '').trim(),
+                notes: '',
+                type: 'point',
+                geometry: { lat: latlng.lat, lng: latlng.lng },
+                createdBy: localStorage.getItem('auth_name') || 'Unknown',
+                createdAt: new Date().toISOString(),
+                fixedBy: '', fixedAt: '', fixNotes: ''
+            };
+            maintJobs.push(job);
+            cacheMaintLocally();
+            cancelMaintDrawing();
+            maintTab = 'open';
+            renderMaintList();
+            renderMaintOnMap();
+            setMaintStatus('Saving ' + job.title + '...', '#7f8c8d');
+            try {
+                await postMaintenance({ type: 'save_maintenance_job', job: job });
+                setMaintStatus(`✓ ${job.title} added. Tap EDIT on the card to add notes.`, '#27ae60');
+            } catch (e) {
+                setMaintStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
+        }
+
         /* ---- drawing on the map ---- */
         function startMaintDrawing(type) {
             if (typeof isDrawingBreak !== 'undefined' && isDrawingBreak) cancelBreak();
+            const keepPreset = maintQuickPreset;
             cancelMaintDrawing(true);
+            maintQuickPreset = keepPreset;
             maintDrawType = type;
             maintDrawPoints = [];
             document.getElementById('mt-draw-bar').style.display = 'flex';
@@ -2973,12 +3074,14 @@
             const el = document.getElementById('mt-draw-msg');
             if (!el) return;
             el.textContent = maintDrawType === 'point'
-                ? 'Tap the spot on the map'
+                ? (maintQuickPreset ? `Tap the spot for: ${maintQuickPreset.label}` : 'Tap the spot on the map')
                 : `Tap along the fence or pipe (${maintDrawPoints.length} point${maintDrawPoints.length === 1 ? '' : 's'})`;
         }
 
         function handleMaintMapClick(e) {
             if (!maintDrawType) return;
+            // A quick job needs nothing else: it is on the map with this tap.
+            if (maintQuickPreset && maintDrawType === 'point') { saveQuickMaintJob(e.latlng); return; }
             maintDrawPoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
             maintDrawMarkers.push(L.circleMarker(e.latlng, { radius: 6, color: '#16a085', fillColor: '#fff', fillOpacity: 1, weight: 3 }).addTo(map));
             if (maintDrawType === 'line') {
@@ -3005,6 +3108,8 @@
             map.off('click', handleMaintMapClick);
             map.getContainer().style.cursor = '';
             maintDrawType = null;
+            maintQuickPreset = null;
+            renderMaintQuickButtons();
             maintDrawPoints = [];
             maintDrawMarkers.forEach(m => map.removeLayer(m));
             maintDrawMarkers = [];
@@ -3187,6 +3292,13 @@
         }
 
         /* ---- the list under the map ---- */
+        function onMaintCatFilterChange() {
+            const sub = document.getElementById('mt-filter-sub');
+            if (sub) sub.value = '';           // a new category, so start the sub again
+            renderMaintList();
+            renderMaintOnMap();
+        }
+
         function setMaintTab(which) {
             maintTab = which;
             renderMaintList();
@@ -3221,9 +3333,29 @@
             }
             const wantCat = filter ? filter.value : '';
 
+            /* The sub filter follows the category. With no category picked it
+             * lists every sub there is, so "Posts" can be found on its own. */
+            const subFilter = document.getElementById('mt-filter-sub');
+            let wantSub = '';
+            if (subFilter) {
+                const cur = subFilter.value;
+                // Subs on jobs count too, so a job can always be filtered for,
+                // even if its sub was later taken off the category list.
+                const onJobs = maintJobs.filter(j => j.sub && (!wantCat || j.category === wantCat)).map(j => j.sub);
+                const subs = [...new Set((wantCat
+                    ? maintSubsFor(wantCat)
+                    : maintCategories.filter(c => c.sub).map(c => c.sub)).concat(onJobs))];
+                subFilter.innerHTML = '<option value="">All sub categories</option>' +
+                    subs.map(s => `<option value="${escUnit(s)}">${escUnit(s)}</option>`).join('');
+                subFilter.value = subs.indexOf(cur) !== -1 ? cur : '';
+                subFilter.disabled = subs.length === 0;
+                wantSub = subFilter.value;
+            }
+
             const jobs = maintJobs
                 .filter(j => (maintTab === 'fixed' ? j.status === 'fixed' : j.status !== 'fixed'))
                 .filter(j => !wantCat || j.category === wantCat)
+                .filter(j => !wantSub || j.sub === wantSub)
                 .sort((a, b) => new Date(maintTab === 'fixed' ? b.fixedAt || b.createdAt : b.createdAt) -
                                 new Date(maintTab === 'fixed' ? a.fixedAt || a.createdAt : a.createdAt));
 
@@ -3269,7 +3401,15 @@
             clearMaintFromMap();
             if (currentDashboardMode !== 'maintenance') return;
 
+            // The map shows what the list shows.
+            const catEl = document.getElementById('mt-filter-cat');
+            const subEl = document.getElementById('mt-filter-sub');
+            const wantCat = catEl ? catEl.value : '';
+            const wantSub = subEl ? subEl.value : '';
+
             maintJobs.forEach(j => {
+                if (wantCat && j.category !== wantCat) return;
+                if (wantSub && j.sub !== wantSub) return;
                 const isFixed = j.status === 'fixed';
                 if (isFixed && maintTab !== 'fixed') return;      // the map shows what is open
                 if (!isFixed && maintTab === 'fixed') return;
