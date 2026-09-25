@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.11</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.12</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1691,7 +1691,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.11</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.12</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2915,6 +2915,7 @@
         let maintQuickPreset = null;      // set while a quick job is waiting for its tap
         let maintShape = 'point';         // one spot, or a line along a fence or pipe
         let maintOpenCat = null;          // which category's sub buttons are showing
+        let maintCatsTouchedAt = 0;       // when the categories were last changed here
 
         function setMaintShape(shape) {
             maintShape = shape;
@@ -2956,6 +2957,7 @@
             renderMaintOnMap();
 
             if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            const askedAt = Date.now();
             try {
                 const res = await fetch(GOOGLE_SCRIPT_URL + "?type=maintenance&t=" + Date.now(), { cache: 'no-store' });
                 const d = await res.json();
@@ -2966,8 +2968,12 @@
                     return;
                 }
                 maintJobs = d.jobs;
-                // The categories carry the quick buttons with them.
-                if (Array.isArray(d.categories) && d.categories.length > 0) maintCategories = d.categories;
+                /* The categories carry the job buttons with them. A category
+                 * added while this answer was on its way is kept: the reply is
+                 * older than the change, so it must not undo it. */
+                if (Array.isArray(d.categories) && d.categories.length > 0 && maintCatsTouchedAt < askedAt) {
+                    maintCategories = d.categories;
+                }
                 try {
                     localStorage.setItem('wn_maint_jobs', JSON.stringify(maintJobs));
                     localStorage.setItem('wn_maint_cats', JSON.stringify(maintCategories));
@@ -3012,29 +3018,73 @@
                 color:${on ? '#fff' : '#2c3e50'}; border:1.5px solid ${col}; border-radius:14px; padding:8px 12px;
                 font-size:12px; font-weight:bold; cursor:pointer;">${escUnit(label)}</button>`;
 
+            const plus = (title, onclick) => `<button onclick="${onclick}" title="${title}" style="background:#fff; color:#7f8c8d;
+                border:1.5px dashed #bdc3c7; border-radius:14px; padding:8px 12px; font-size:12px; font-weight:bold; cursor:pointer;">＋</button>`;
+
             if (!maintOpenCat) {
                 box.innerHTML = cats.map(c => {
                     const on = maintQuickPreset && maintQuickPreset.category === c && !maintQuickPreset.sub;
                     return chip(c, maintCatColor(c), on, `openMaintQuickCat('${escUnit(c)}')`);
-                }).join('');
+                }).join('') + plus('Add a category', 'addMaintCategoryHere()');
                 return;
             }
 
             const col = maintCatColor(maintOpenCat);
             const subs = maintSubsFor(maintOpenCat);
+            const catOn = maintQuickPreset && maintQuickPreset.category === maintOpenCat && !maintQuickPreset.sub;
             box.innerHTML =
                 `<button onclick="openMaintQuickCat(null)" style="background:#ecf0f1; color:#2c3e50; border:none; border-radius:14px;
-                    padding:8px 12px; font-size:12px; font-weight:bold; cursor:pointer;">◀</button>
-                 <span style="align-self:center; font-size:12px; font-weight:bold; color:${col}; margin-right:2px;">${escUnit(maintOpenCat)}</span>` +
+                    padding:8px 12px; font-size:12px; font-weight:bold; cursor:pointer;">◀</button>` +
+                // The category on its own, for a job that fits no sub category.
+                chip(maintOpenCat, col, catOn, `startQuickMaintJob('${escUnit(maintOpenCat)}','')`) +
                 subs.map(s => {
                     const on = maintQuickPreset && maintQuickPreset.category === maintOpenCat && maintQuickPreset.sub === s;
                     return chip(s, col, on, `startQuickMaintJob('${escUnit(maintOpenCat)}','${escUnit(s)}')`);
-                }).join('');
+                }).join('') + plus('Add a sub category', `addMaintSubHere('${escUnit(maintOpenCat)}')`);
+        }
+
+        /* ＋ on the job buttons. A category or a sub category added here is
+         * saved to the sheet at once, so it is on everybody's phone. */
+        async function addMaintCategoryHere() {
+            const name = (prompt('New category (e.g. Culverts):') || '').trim();
+            if (!name) return;
+            if (maintCategoryNames().some(n => n.toLowerCase() === name.toLowerCase())) {
+                openMaintQuickCat(name);
+                return;
+            }
+            maintCategories.push({ category: name, sub: '' });
+            renderMaintQuickButtons();
+            await persistMaintCategories(`✓ ${name} added.`);
+            maintOpenCat = null;
+            renderMaintQuickButtons();
+            renderMaintList();
+        }
+
+        async function addMaintSubHere(cat) {
+            const name = (prompt(`New sub category for ${cat}:`) || '').trim();
+            if (!name) return;
+            if (maintSubsFor(cat).some(s => s.toLowerCase() === name.toLowerCase())) return;
+            // A category row with no sub is replaced by its first real sub.
+            maintCategories = maintCategories.filter(c => !(c.category === cat && !c.sub));
+            maintCategories.push({ category: cat, sub: name });
+            renderMaintQuickButtons();
+            await persistMaintCategories(`✓ ${name} added to ${cat}.`);
+            renderMaintList();
+        }
+
+        async function persistMaintCategories(okMsg) {
+            maintCatsTouchedAt = Date.now();
+            try { localStorage.setItem('wn_maint_cats', JSON.stringify(maintCategories)); } catch (e) {}
+            setMaintStatus('Saving...', '#7f8c8d');
+            try {
+                await postMaintenance({ type: 'save_maintenance_categories', categories: maintCategories });
+                setMaintStatus(okMsg || '✓ Saved.', '#27ae60');
+            } catch (e) {
+                setMaintStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
         }
 
         function openMaintQuickCat(cat) {
-            // A category with no sub categories is a job on its own.
-            if (cat && maintSubsFor(cat).length === 0) { startQuickMaintJob(cat, ''); return; }
             maintOpenCat = cat;
             if (!cat && maintDrawType) cancelMaintDrawing();
             renderMaintQuickButtons();
