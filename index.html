@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.07</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.08</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1691,7 +1691,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.07</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.08</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1922,7 +1922,7 @@
             </div>
             <p style="font-size:12px; color:#666; margin:0 0 10px;">
                 Jobs stay on the map until someone reports them fixed. Drop a pin for one spot,
-                or draw a line for a fence or a pipe.
+                or draw a line for a fence or a pipe. Drag a pin to move it.
             </p>
 
             <div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:5px;">QUICK JOB - tap a button, then tap the spot</div>
@@ -2876,6 +2876,7 @@
         let maintDrawLine = null;
         let maintEditingId = null;        // set when the modal is editing an old job
         let maintFixingId = null;
+        let maintRedrawId = null;         // set while a line job is being drawn again
 
         const MAINT_DEFAULT_CATEGORIES = [
             { category: 'Fencing', sub: 'Posts' },
@@ -3109,6 +3110,7 @@
             map.getContainer().style.cursor = '';
             maintDrawType = null;
             maintQuickPreset = null;
+            maintRedrawId = null;
             renderMaintQuickButtons();
             maintDrawPoints = [];
             maintDrawMarkers.forEach(m => map.removeLayer(m));
@@ -3129,6 +3131,7 @@
             }
             map.off('click', handleMaintMapClick);
             map.getContainer().style.cursor = '';
+            if (maintRedrawId) { applyMaintRedraw(maintDrawPoints.slice()); return; }
             openMaintJobModal(null, maintDrawType, maintDrawPoints.slice());
         }
 
@@ -3384,7 +3387,8 @@
                         ${j.status === 'fixed'
                             ? `<button onclick="reopenMaintJob('${j.id}')" style="${btn} flex:1; background:#f39c12; color:#fff;">↩ REOPEN</button>`
                             : `<button onclick="openMaintFix('${j.id}')" style="${btn} flex:1; background:#27ae60; color:#fff;">✓ FIXED</button>
-                               <button onclick="editMaintJob('${j.id}')" style="${btn} flex:1; background:#2980b9; color:#fff;">✏️ EDIT</button>`}
+                               <button onclick="editMaintJob('${j.id}')" style="${btn} flex:1; background:#2980b9; color:#fff;">✏️ EDIT</button>
+                               ${j.type === 'line' ? `<button onclick="redrawMaintLine('${j.id}')" style="${btn} flex:1; background:#8e44ad; color:#fff;">〰 REDRAW</button>` : ''}`}
                         <button onclick="deleteMaintJob('${j.id}')" style="${btn} flex:0 0 auto; background:#fdeceb; color:#c0392b;">🗑</button>
                     </div>
                 </div>`;
@@ -3434,7 +3438,10 @@
                         html: `<div style="background:${col}; width:18px; height:18px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 5px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold;">${isFixed ? '✓' : '🔧'}</div>`,
                         iconSize: [18, 18], iconAnchor: [9, 9]
                     });
-                    layer = L.marker([j.geometry.lat, j.geometry.lng], { icon: icon }).addTo(map);
+                    // An open job can be dragged to the right spot. A fixed one
+                    // is history, so it stays where it was.
+                    layer = L.marker([j.geometry.lat, j.geometry.lng], { icon: icon, draggable: !isFixed, autoPan: true }).addTo(map);
+                    if (!isFixed) layer.on('dragend', e => moveMaintJob(j.id, e.target.getLatLng()));
                 } else {
                     return;
                 }
@@ -3442,6 +3449,51 @@
                 layer.on('click', () => { const c = document.getElementById('mt-card-' + j.id); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
                 maintLayers.set(String(j.id), layer);
             });
+        }
+
+        /* Dropped in the wrong place, or the job moved along the fence: drag
+         * the pin and the sheet is updated where it lands. */
+        async function moveMaintJob(id, latlng) {
+            const job = maintJobs.find(j => String(j.id) === String(id));
+            if (!job) return;
+            job.geometry = { lat: latlng.lat, lng: latlng.lng };
+            cacheMaintLocally();
+            setMaintStatus('Moving ' + job.title + '...', '#7f8c8d');
+            try {
+                await postMaintenance({ type: 'save_maintenance_job', job: job });
+                setMaintStatus(`✓ ${job.title} moved.`, '#27ae60');
+            } catch (e) {
+                setMaintStatus('⚠ Moved on this device only - ' + e.message, '#e67e22');
+            }
+        }
+
+        /* A line cannot be dragged point by point, so it is drawn again. */
+        function redrawMaintLine(id) {
+            const job = maintJobs.find(j => String(j.id) === String(id));
+            if (!job) return;
+            // After startMaintDrawing, which clears whatever was half drawn.
+            startMaintDrawing('line');
+            maintRedrawId = id;
+            setMaintStatus(`Draw the new line for ${job.title}, then press FINISH.`, '#2980b9');
+        }
+
+        async function applyMaintRedraw(points) {
+            const job = maintJobs.find(j => String(j.id) === String(maintRedrawId));
+            maintRedrawId = null;
+            if (!job) return;
+            job.geometry = points;
+            job.type = 'line';
+            cacheMaintLocally();
+            cancelMaintDrawing();
+            renderMaintList();
+            renderMaintOnMap();
+            setMaintStatus('Saving ' + job.title + '...', '#7f8c8d');
+            try {
+                await postMaintenance({ type: 'save_maintenance_job', job: job });
+                setMaintStatus(`✓ ${job.title} line saved.`, '#27ae60');
+            } catch (e) {
+                setMaintStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
         }
 
         function zoomToMaintJob(id) {
