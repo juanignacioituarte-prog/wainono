@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.10</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.11</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1691,7 +1691,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.10</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.11</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2403,7 +2403,10 @@
             <div id="vm-tab-content-vehicles" style="display:block;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <span style="font-size:11px; font-weight:bold; color:#555;">Fleet Status</span>
-                    <button onclick="openAddVehicleForm()" style="background:#e67e22; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">+ Add Vehicle</button>
+                    <div style="display:flex; gap:6px;">
+                        <button onclick="openVMServiceModal(null)" style="background:#16a085; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">🔧 Service Several</button>
+                        <button onclick="openAddVehicleForm()" style="background:#e67e22; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">+ Add Vehicle</button>
+                    </div>
                 </div>
 
                 <!-- Add Vehicle Form -->
@@ -2445,6 +2448,10 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <h3 style="margin:0; color:#e67e22; font-size:15px;" id="vm-modal-title">🔧 Service Check</h3>
             <button onclick="closeVMModal()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#999;">✕</button>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label style="font-size:10px; color:#777; display:block; margin-bottom:4px; font-weight:bold;">Vehicles serviced</label>
+            <div id="vm-service-vehicles" style="display:flex; flex-direction:column; gap:4px; max-height:150px; overflow-y:auto; border:1px solid #eee; border-radius:6px; padding:6px;"></div>
         </div>
         <div style="margin-bottom:10px;">
             <label style="font-size:10px; color:#777; display:block; margin-bottom:2px;">Date</label>
@@ -13970,13 +13977,17 @@
             saveVMToCloud();
         }
 
-        /* --- Service Check Modal --- */
+        /* --- Service Check Modal ---
+         * Several vehicles can be checked in one go: the quads are usually
+         * done together. Each one still gets its own log line, so its own
+         * service history stays right. */
         function openVMServiceModal(vehicleId) {
-            vmActiveVehicleId = vehicleId;
-            const vehicle = vmVehicles.find(v => v.id === vehicleId);
-            if (!vehicle) return;
+            vmActiveVehicleId = vehicleId || null;
+            const vehicle = vehicleId ? vmVehicles.find(v => v.id === vehicleId) : null;
+            if (vehicleId && !vehicle) return;
+            if (vmVehicles.length === 0) { alert('Add a vehicle first.'); return; }
 
-            document.getElementById('vm-modal-title').innerText = `🔧 ${vehicle.name} – Service Check`;
+            renderVMServiceVehiclePicker(vehicle ? [vehicle.id] : []);
             document.getElementById('vm-service-date').value = toDateInputValue(new Date());
             document.getElementById('vm-service-notes').value = '';
 
@@ -14000,18 +14011,78 @@
                 }
             });
 
-            // Render checklist
-            const checklistContainer = document.getElementById('vm-checklist-items');
-            checklistContainer.innerHTML = '';
-            (VM_CHECKLISTS[vehicle.type] || []).forEach((item, i) => {
-                const row = document.createElement('label');
-                row.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:12px; color:#333; padding:5px 8px; border-radius:6px; background:#f9f9f9; cursor:pointer;';
-                row.innerHTML = `<input type="checkbox" id="vm-chk-${i}" value="${item}" style="width:15px; height:15px; cursor:pointer;"> ${item}`;
-                checklistContainer.appendChild(row);
-            });
+            renderVMChecklist();
 
             const modal = document.getElementById('vm-service-modal');
             modal.style.display = 'flex';
+        }
+
+        function vmPickedVehicleIds() {
+            return [...document.querySelectorAll('#vm-service-vehicles input[type="checkbox"]:checked')].map(cb => cb.value);
+        }
+
+        function renderVMServiceVehiclePicker(picked) {
+            const box = document.getElementById('vm-service-vehicles');
+            if (!box) return;
+            const chosen = new Set(picked || vmPickedVehicleIds());
+            const types = [...new Set(vmVehicles.map(v => v.type))];
+            box.innerHTML = types.map(type => {
+                const mine = vmVehicles.filter(v => v.type === type);
+                const allOn = mine.every(v => chosen.has(v.id));
+                return `<div style="font-size:10px; font-weight:bold; color:#777; margin-top:4px; display:flex; justify-content:space-between;">
+                        <span>${type}</span>
+                        <span onclick="vmPickAllOfType('${type}', ${!allOn})" style="color:#16a085; cursor:pointer;">${allOn ? 'none' : 'all'}</span>
+                    </div>` +
+                    mine.map(v => `<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:3px 4px; cursor:pointer;">
+                        <input type="checkbox" value="${v.id}" onchange="renderVMChecklist(); updateVMServiceTitle();" ${chosen.has(v.id) ? 'checked' : ''} style="width:15px; height:15px;">
+                        ${v.name}${v.status === 'out' ? ' <span style="color:#e74c3c; font-size:10px;">(out of service)</span>' : ''}
+                    </label>`).join('');
+            }).join('');
+            updateVMServiceTitle();
+        }
+
+        function vmPickAllOfType(type, on) {
+            const ids = new Set(vmVehicles.filter(v => v.type === type).map(v => v.id));
+            document.querySelectorAll('#vm-service-vehicles input[type="checkbox"]').forEach(cb => {
+                if (ids.has(cb.value)) cb.checked = on;
+            });
+            renderVMChecklist();
+            updateVMServiceTitle();
+        }
+
+        function updateVMServiceTitle() {
+            const ids = vmPickedVehicleIds();
+            const el = document.getElementById('vm-modal-title');
+            if (!el) return;
+            if (ids.length === 1) {
+                const v = vmVehicles.find(x => x.id === ids[0]);
+                el.innerText = `🔧 ${v ? v.name : ''} – Service Check`;
+            } else {
+                el.innerText = `🔧 Service Check – ${ids.length} vehicle${ids.length === 1 ? '' : 's'}`;
+            }
+        }
+
+        /* The checklist covers every type picked. A check is only written to a
+         * vehicle whose own list has it, so a quad never gets a tractor item. */
+        function renderVMChecklist() {
+            const box = document.getElementById('vm-checklist-items');
+            if (!box) return;
+            const wasChecked = new Set([...box.querySelectorAll('input:checked')].map(cb => cb.value));
+            const types = [...new Set(vmPickedVehicleIds().map(id => {
+                const v = vmVehicles.find(x => x.id === id);
+                return v ? v.type : null;
+            }).filter(Boolean))];
+            const items = [];
+            types.forEach(t => (VM_CHECKLISTS[t] || []).forEach(it => { if (items.indexOf(it) === -1) items.push(it); }));
+
+            box.innerHTML = '';
+            items.forEach((item, i) => {
+                const row = document.createElement('label');
+                row.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:12px; color:#333; padding:5px 8px; border-radius:6px; background:#f9f9f9; cursor:pointer;';
+                row.innerHTML = `<input type="checkbox" id="vm-chk-${i}" value="${item}" ${wasChecked.has(item) ? 'checked' : ''} style="width:15px; height:15px; cursor:pointer;"> ${item}`;
+                box.appendChild(row);
+            });
+            if (items.length === 0) box.innerHTML = '<div style="font-size:11px; color:#999;">Pick a vehicle to see its checklist.</div>';
         }
 
         function closeVMModal() {
@@ -14020,9 +14091,8 @@
         }
 
         function saveVehicleService() {
-            const vehicleId = vmActiveVehicleId;
-            const vehicle = vmVehicles.find(v => v.id === vehicleId);
-            if (!vehicle) return;
+            const ids = vmPickedVehicleIds();
+            if (ids.length === 0) { alert('Pick at least one vehicle.'); return; }
 
             const date = document.getElementById('vm-service-date').value || toDateInputValue(new Date());
             const performedBy = document.getElementById('vm-service-performer').value || 'Unknown';
@@ -14033,24 +14103,24 @@
                 checkedPoints.push(cb.value);
             });
 
-            const newLog = {
-                id: 'vl_' + Date.now(),
-                vehicleId: vehicleId,
-                date: date,
-                performedBy: performedBy,
-                checkedPoints: checkedPoints,
-                notes: notes
-            };
-
-            vmLogs.push(newLog);
-            localStorage.setItem('vm_logs', JSON.stringify(vmLogs));
-
-            // Update vehicle's lastService date
-            const vIdx = vmVehicles.findIndex(v => v.id === vehicleId);
-            if (vIdx !== -1) {
+            // One log per vehicle, so each history is its own.
+            ids.forEach((vehicleId, n) => {
+                const vIdx = vmVehicles.findIndex(v => v.id === vehicleId);
+                if (vIdx === -1) return;
+                const ownList = VM_CHECKLISTS[vmVehicles[vIdx].type] || [];
+                vmLogs.push({
+                    id: 'vl_' + Date.now() + '_' + n,
+                    vehicleId: vehicleId,
+                    date: date,
+                    performedBy: performedBy,
+                    checkedPoints: checkedPoints.filter(p => ownList.indexOf(p) !== -1),
+                    notes: notes
+                });
                 vmVehicles[vIdx].lastService = date;
-                localStorage.setItem('vm_vehicles', JSON.stringify(vmVehicles));
-            }
+            });
+
+            localStorage.setItem('vm_logs', JSON.stringify(vmLogs));
+            localStorage.setItem('vm_vehicles', JSON.stringify(vmVehicles));
 
             closeVMModal();
             renderVMVehicles();
