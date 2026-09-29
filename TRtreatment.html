@@ -649,7 +649,9 @@
         };
 
         /** A read that never answers must not leave the app stuck on "Reading…". */
-        const FETCH_TIMEOUT_MS = 30000;
+        // A read takes about ten seconds, and queues behind any other request to
+        // the same script, so give it room before calling it a failure.
+        const FETCH_TIMEOUT_MS = 60000;
 
         function fetchJson(url, options) {
             const ctl = new AbortController();
@@ -3703,10 +3705,20 @@
             refreshAll(false);
 
             // Two people dose cows at the same time, so the screen is re-read often.
-            setInterval(() => { if (document.visibilityState === 'visible') refreshAll(false); }, 60000);
+            /*
+             * The sheet takes about ten seconds to answer, and Google runs one
+             * request at a time for this script. Several phones asking every
+             * minute queue up behind each other until they pass the timeout, and
+             * the app looks broken. Asking every five minutes leaves room.
+             *
+             * Nothing waits on the clock anyway: the Refresh button is at the top
+             * of every list, and anything a person changes goes straight to the
+             * sheet and comes back with the sheet's own answer.
+             */
+            setInterval(() => { if (document.visibilityState === 'visible') maybeRefresh(); }, 5 * 60000);
 
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') refreshAll(false);
+                if (document.visibilityState === 'visible') maybeRefresh();
             });
         }
 
@@ -3716,7 +3728,7 @@
         if (saved) handleCredentialResponse(saved);
 
         /** Read the sheet again if the copy on screen is older than this. */
-        const STALE_MS = 20000;
+        const STALE_MS = 120000;
 
         function maybeRefresh() {
             if (!appStarted || state.syncing) return;
