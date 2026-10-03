@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.13</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.14</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1692,7 +1692,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.13</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.14</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2053,6 +2053,11 @@
                     </div>
                     <label id="sgs-loc-qty-label" style="font-size:11px; font-weight:bold; color:#555;">How many bales are there now</label>
                     <input type="number" id="sgs-loc-qty" min="0" step="any" inputmode="decimal" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                </div>
+                <div id="sgs-loc-balekg-wrap">
+                    <label style="font-size:11px; font-weight:bold; color:#555;">Average kg DM per bale</label>
+                    <input type="number" id="sgs-loc-balekg" min="0" step="1" inputmode="decimal" placeholder="e.g. 200" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 2px; box-sizing:border-box;">
+                    <div style="font-size:10px; color:#95a5a6; margin-bottom:10px;">Used to count the bales as tons of DM.</div>
                 </div>
                 <label style="font-size:11px; font-weight:bold; color:#555;">Dry matter %DM (optional)</label>
                 <input type="number" id="sgs-loc-dm" min="0" max="100" step="0.1" inputmode="decimal" placeholder="e.g. 35" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
@@ -3016,6 +3021,22 @@
             return form === 'stack' ? `${n} t` : `${n} bale${n === 1 ? '' : 's'}`;
         }
 
+        /* Tons of dry matter at one place, or null when it cannot be known:
+         * bales need the kg DM per bale, a stack needs its %DM. */
+        function silageLocTonsDm(l) {
+            const q = silageNum(l.quantity);
+            if (l.form === 'stack') return Number(l.dm) > 0 ? q * Number(l.dm) / 100 : null;
+            return Number(l.baleKgDm) > 0 ? q * Number(l.baleKgDm) / 1000 : null;
+        }
+
+        // "· 32% DM", "· 200 kg DM/bale", or both, for the cards and the pins.
+        function silageQualityText(l) {
+            let t = '';
+            if (l.form !== 'stack' && Number(l.baleKgDm) > 0) t += ' · ' + Number(l.baleKgDm) + ' kg DM/bale';
+            if (Number(l.dm) > 0) t += ' · ' + Number(l.dm) + '% DM';
+            return t;
+        }
+
         function silageUser() {
             return localStorage.getItem('auth_name') || 'Unknown User';
         }
@@ -3118,19 +3139,29 @@
 
                 const lines = [];
                 if (baleLocs.length > 0 || stackLocs.length === 0) {
-                    lines.push(`<div><b style="font-size:20px; color:${SILAGE_FORM_COLORS.bales};">${bales}</b> <small>bale${bales === 1 ? '' : 's'}</small></div>`);
+                    lines.push(`<div><b style="font-size:18px; color:${SILAGE_FORM_COLORS.bales};">${bales}</b> <small>bale${bales === 1 ? '' : 's'}</small></div>`);
                 }
                 if (stackLocs.length > 0) {
-                    // Tons of dry matter only mean something when every stack
-                    // that has silage in it has a %DM.
-                    const full = stackLocs.filter(l => silageNum(l.quantity) > 0);
-                    const allTested = full.length > 0 && full.every(l => Number(l.dm) > 0);
-                    const tDm = silageNum(full.reduce((s, l) => s + silageNum(l.quantity) * (Number(l.dm) || 0) / 100, 0));
-                    lines.push(`<div><b style="font-size:20px; color:${SILAGE_FORM_COLORS.stack};">${tons}</b> <small>t in stacks${allTested ? ` · ${tDm} t DM` : ''}</small></div>`);
+                    lines.push(`<div><b style="font-size:18px; color:${SILAGE_FORM_COLORS.stack};">${tons}</b> <small>t in stacks</small></div>`);
                 }
-                return `<div style="flex:1; min-width:130px; background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:8px 10px;">
+
+                /* Everything on hand as tons of DM, bales and stacks together.
+                 * A place with silage but no DM figure cannot be counted, so it
+                 * is left out and the box says so, rather than showing a total
+                 * that looks complete and is not. */
+                const full = locs.filter(l => silageNum(l.quantity) > 0);
+                const known = full.filter(l => silageLocTonsDm(l) !== null);
+                const missing = full.length - known.length;
+                const tDm = known.reduce((s, l) => s + silageLocTonsDm(l), 0);
+                const dmLine = full.length === 0 ? '' :
+                    `<div style="margin-top:4px; padding-top:4px; border-top:1px solid #eee;">
+                        <b style="font-size:20px; color:#2c3e50;">${known.length ? Math.round(tDm * 10) / 10 : '--'}</b> <small><b>t DM on hand</b></small>
+                        ${missing ? `<div style="font-size:10px; font-weight:bold; color:#e67e22;">${missing} place${missing === 1 ? '' : 's'} without DM - not in this total</div>` : ''}
+                    </div>`;
+                return `<div style="flex:1; min-width:150px; background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:8px 10px;">
                         <div style="font-size:11px; font-weight:bold; color:#7f8c8d; text-transform:uppercase;">${escUnit(name)}</div>
                         ${lines.join('')}
+                        ${dmLine}
                         <div style="font-size:10px; color:#95a5a6;">${locs.length} location${locs.length === 1 ? '' : 's'}</div>
                     </div>`;
             }).join('');
@@ -3150,13 +3181,17 @@
                 .map(l => {
                     const col = SILAGE_FORM_COLORS[l.form === 'stack' ? 'stack' : 'bales'];
                     const empty = silageNum(l.quantity) === 0;
+                    const tDm = silageLocTonsDm(l);
                     return `<div id="sgs-card-${l.id}" style="background:#fff; border:1px solid #e0e0e0; border-left:5px solid ${empty ? '#95a5a6' : col}; border-radius:8px; padding:10px; margin-bottom:8px;">
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
                             <div style="min-width:0;">
                                 <div style="font-weight:bold; font-size:14px; color:#2c3e50;">${escUnit(l.name)}</div>
-                                <div style="font-size:11px; color:${col}; font-weight:bold;">${escUnit(l.product)} · ${l.form === 'stack' ? 'STACK' : 'BALES'}${Number(l.dm) > 0 ? ' · ' + Number(l.dm) + '% DM' : ''}</div>
+                                <div style="font-size:11px; color:${col}; font-weight:bold;">${escUnit(l.product)} · ${l.form === 'stack' ? 'STACK' : 'BALES'}${silageQualityText(l)}</div>
                             </div>
-                            <div style="text-align:right; white-space:nowrap; font-weight:bold; font-size:18px; color:${empty ? '#95a5a6' : '#2c3e50'};">${silageQtyText(l.quantity, l.form)}</div>
+                            <div style="text-align:right; white-space:nowrap;">
+                                <div style="font-weight:bold; font-size:18px; color:${empty ? '#95a5a6' : '#2c3e50'};">${silageQtyText(l.quantity, l.form)}</div>
+                                <div style="font-size:11px; font-weight:bold; color:${tDm === null && !empty ? '#e67e22' : '#7f8c8d'};">${tDm === null ? (empty ? '' : 'no DM yet') : Math.round(tDm * 10) / 10 + ' t DM'}</div>
+                            </div>
                         </div>
                         ${l.notes ? `<div style="font-size:12px; color:#666; margin-top:6px; white-space:pre-wrap;">${escUnit(l.notes)}</div>` : ''}
                         <div style="display:flex; gap:6px; margin-top:8px;">
@@ -3195,8 +3230,8 @@
                 });
                 const popup = `<div style="font-family:sans-serif; width:180px;">
                         <div style="font-weight:bold; font-size:13px; color:#2c3e50;">${escUnit(l.name)}</div>
-                        <div style="font-size:11px; color:${col}; font-weight:bold;">${escUnit(l.product)} · ${l.form === 'stack' ? 'stack' : 'bales'}${Number(l.dm) > 0 ? ' · ' + Number(l.dm) + '% DM' : ''}</div>
-                        <div style="font-size:16px; font-weight:bold; color:#2c3e50; margin:4px 0;">${silageQtyText(l.quantity, l.form)}</div>
+                        <div style="font-size:11px; color:${col}; font-weight:bold;">${escUnit(l.product)} · ${l.form === 'stack' ? 'stack' : 'bales'}${silageQualityText(l)}</div>
+                        <div style="font-size:16px; font-weight:bold; color:#2c3e50; margin:4px 0;">${silageQtyText(l.quantity, l.form)}${silageLocTonsDm(l) !== null ? ` <small style="color:#7f8c8d;">(${Math.round(silageLocTonsDm(l) * 10) / 10} t DM)</small>` : ''}</div>
                         ${l.notes ? `<div style="font-size:11px; color:#666; margin-bottom:4px;">${escUnit(l.notes)}</div>` : ''}
                         <div style="display:flex; gap:6px; margin-top:6px;">
                             <button onclick="openSilageStockChange('${l.id}','add')" style="flex:1; background:#27ae60; color:#fff; border:none; padding:6px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">＋ ADD</button>
@@ -3285,6 +3320,9 @@
                 document.getElementById('sgs-loc-qty').value = '';
                 setSilageLocForm('bales');
             }
+            // kg DM per bale only means something for bales.
+            document.getElementById('sgs-loc-balekg-wrap').style.display = (loc ? loc.form === 'stack' : silageLocForm === 'stack') ? 'none' : 'block';
+            document.getElementById('sgs-loc-balekg').value = loc && Number(loc.baleKgDm) > 0 ? loc.baleKgDm : '';
             document.getElementById('sgs-loc-dm').value = loc && Number(loc.dm) > 0 ? loc.dm : '';
             document.getElementById('sgs-loc-notes').value = loc ? (loc.notes || '') : '';
             document.getElementById('sgs-loc-status').textContent = '';
@@ -3303,6 +3341,7 @@
             paint('sgs-form-stack', silageLocForm === 'stack', SILAGE_FORM_COLORS.stack);
             document.getElementById('sgs-loc-qty-label').textContent =
                 silageLocForm === 'stack' ? 'How many tons are there now' : 'How many bales are there now';
+            document.getElementById('sgs-loc-balekg-wrap').style.display = silageLocForm === 'stack' ? 'none' : 'block';
         }
 
         function editSilageLocation(id) {
@@ -3326,13 +3365,16 @@
             const dmRaw = document.getElementById('sgs-loc-dm').value.trim();
             const dm = dmRaw === '' ? '' : Number(dmRaw);
             if (dm !== '' && (!isFinite(dm) || dm <= 0 || dm > 100)) return fail('%DM must be between 1 and 100, or empty.');
+            const kgRaw = document.getElementById('sgs-loc-balekg').value.trim();
+            const baleKgDm = kgRaw === '' ? '' : Number(kgRaw);
+            if (baleKgDm !== '' && (!isFinite(baleKgDm) || baleKgDm <= 0 || baleKgDm > 2000)) return fail('kg DM per bale must be between 1 and 2000, or empty.');
             const notes = document.getElementById('sgs-loc-notes').value.trim();
 
             let loc;
             if (silageLocEditingId) {
                 const old = silageStockLocations.find(l => String(l.id) === String(silageLocEditingId));
                 if (!old) return closeSilageLocModal();
-                loc = Object.assign({}, old, { name: name, dm: dm, notes: notes });
+                loc = Object.assign({}, old, { name: name, dm: dm, baleKgDm: old.form === 'stack' ? '' : baleKgDm, notes: notes });
             } else {
                 if (!silageLocPending) return closeSilageLocModal();
                 const qtyRaw = document.getElementById('sgs-loc-qty').value.trim();
@@ -3345,6 +3387,7 @@
                     form: silageLocForm,
                     quantity: silageNum(qty),
                     dm: dm, notes: notes,
+                    baleKgDm: silageLocForm === 'stack' ? '' : baleKgDm,
                     lat: silageLocPending.lat, lng: silageLocPending.lng,
                     createdBy: silageUser(),
                     createdAt: new Date().toISOString()

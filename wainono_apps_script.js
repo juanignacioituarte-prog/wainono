@@ -19,7 +19,8 @@
  *      add / remove / set at a time under the script lock and writes the log row
  *      itself, and saveFeedSettings no longer takes herdCows from the payload,
  *      so a phone holding an old page cannot overwrite everyone else's counts.
- *   8. Silage stock: pins on the map, each with a number of bales or tons.
+ *   8. Silage stock: pins on the map, each with a number of bales or tons,
+ *      and kg DM per bale for bales.
  *      doGet 'silage' and 'silage_log'; doPost 'save_silage_location',
  *      'silage_stock', 'delete_silage_location' and 'save_silage_products'.
  *      New sheets "silage", "silage products" and "silage log".
@@ -28,7 +29,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-03-a";
+var SCRIPT_VERSION = "2026-10-03-b";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -815,9 +816,11 @@ function saveMaintenanceCategories(list) {
 /* ================== SILAGE STOCK ==================
  * Sheet "silage": one row per location (a pin on the map).
  *   id | name | product | form | quantity | dm | notes | lat | lng |
- *   createdBy | createdAt
+ *   createdBy | createdAt | baleKgDm
  * form is "bales" or "stack". Bales are counted in bales, a stack in tons.
  * dm is the dry matter in percent, or empty when nobody has tested it.
+ * baleKgDm is the average kg of dry matter in one bale (bales only), so the
+ * bales can be counted as tons of DM too.
  *
  * Sheet "silage products": product (one per row).
  *
@@ -830,13 +833,21 @@ function saveMaintenanceCategories(list) {
  * script lock, so two people at two stacks cannot write over each other.
  */
 var SILAGE_COLS = ["id", "name", "product", "form", "quantity", "dm", "notes",
-                   "lat", "lng", "createdBy", "createdAt"];
+                   "lat", "lng", "createdBy", "createdAt", "baleKgDm"];
 var SILAGE_LOG_HEADERS = ["id", "timestamp", "location id", "location", "product",
                           "form", "from", "to", "change", "user", "note"];
 
 function silageSheet() {
   var sheet = getOrCreateSheet("silage");
-  if (sheet.getLastRow() === 0) sheet.appendRow(SILAGE_COLS);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(SILAGE_COLS);
+  } else {
+    // A sheet made by an older script has fewer columns: name the new ones.
+    var header = sheet.getRange(1, 1, 1, SILAGE_COLS.length).getValues()[0];
+    if (String(header[SILAGE_COLS.length - 1]) !== SILAGE_COLS[SILAGE_COLS.length - 1]) {
+      sheet.getRange(1, 1, 1, SILAGE_COLS.length).setValues([SILAGE_COLS]);
+    }
+  }
   return sheet;
 }
 
@@ -857,6 +868,14 @@ function silageDm(v) {
   if (v === null || v === undefined || v === '') return '';
   var n = Number(v);
   if (!isFinite(n) || n <= 0 || n > 100) return '';
+  return Math.round(n * 10) / 10;
+}
+
+// kg of DM in one bale: a positive number, or empty when not known.
+function silageBaleKg(v) {
+  if (v === null || v === undefined || v === '') return '';
+  var n = Number(v);
+  if (!isFinite(n) || n <= 0 || n > 2000) return '';
   return Math.round(n * 10) / 10;
 }
 
@@ -881,14 +900,16 @@ function silageRowToLocation(row) {
     lat: Number(row[7]),
     lng: Number(row[8]),
     createdBy: String(row[9] == null ? "" : row[9]),
-    createdAt: silageStamp(row[10])
+    createdAt: silageStamp(row[10]),
+    baleKgDm: silageBaleKg(row[11])
   };
 }
 
 function silageLocationToRow(loc) {
   return [String(loc.id), String(loc.name || ""), String(loc.product || ""), silageForm(loc.form),
           silageNumber(loc.quantity), silageDm(loc.dm), String(loc.notes || ""),
-          Number(loc.lat), Number(loc.lng), String(loc.createdBy || ""), String(loc.createdAt || "")];
+          Number(loc.lat), Number(loc.lng), String(loc.createdBy || ""), String(loc.createdAt || ""),
+          silageBaleKg(loc.baleKgDm)];
 }
 
 // The sheet row number of a location, or -1.
@@ -970,6 +991,7 @@ function saveSilageLocation(payload) {
     var old = readSilageLocation(sheet, rowNumber);
     old.name = String(loc.name).trim();
     old.dm = silageDm(loc.dm);
+    old.baleKgDm = old.form === 'bales' ? silageBaleKg(loc.baleKgDm) : '';
     old.notes = String(loc.notes || "");
     old.lat = Number(loc.lat);
     old.lng = Number(loc.lng);
@@ -989,8 +1011,10 @@ function saveSilageLocation(payload) {
     lat: Number(loc.lat),
     lng: Number(loc.lng),
     createdBy: user,
-    createdAt: String(loc.createdAt || new Date().toISOString())
+    createdAt: String(loc.createdAt || new Date().toISOString()),
+    baleKgDm: ''
   };
+  if (fresh.form === 'bales') fresh.baleKgDm = silageBaleKg(loc.baleKgDm);
   sheet.appendRow(silageLocationToRow(fresh));
 
   if (fresh.quantity !== 0) {

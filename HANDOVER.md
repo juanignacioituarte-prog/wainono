@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 3 October 2026. App version: **v1.1.13**,
-service worker cache `wn-farm-v1.1.27`, Apps Script `2026-10-03-a`.
+Written 2 October 2026, updated 3 October 2026. App version: **v1.1.14**,
+service worker cache `wn-farm-v1.1.28`, Apps Script `2026-10-03-b`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`.
 
@@ -203,8 +203,11 @@ It has nothing to do with Farm Maintenance; it only drops pins the same way.
   (counted in tons), with a product, a %DM and notes. One pin = one product.
 - `＋ NEW LOCATION`, then tap the map. The number is on the pin.
 - `＋ ADD`, `− TAKE` and `SET NUMBER` change the number. Each has a note.
-- Totals per product at the top: bales, tons in stacks, and tons of DM when
-  every stack with silage in it has a %DM.
+- Bales also have an **average kg DM per bale**. Tons of DM: bales x kg DM per
+  bale / 1000, and for a stack, tons x %DM / 100.
+- Totals per product at the top: bales, tons in stacks, and **t DM on hand**
+  (bales and stacks together). A place with silage but no DM figure is left
+  out of that total, and the box says how many places are missing.
 - `📋 LOG` shows every change, with a filter per location and EXPORT CSV.
 - `⚙ Products` is the shared product list. Other feeds can be added there.
 - **The sheet owns the numbers**, like the cow numbers: the phone sends
@@ -215,8 +218,9 @@ It has nothing to do with Farm Maintenance; it only drops pins the same way.
   refused and the box stays open. The phone only keeps a copy to look at
   (`silage_stock_locations`, `silage_stock_products`, `silage_stock_log`).
 - The quantity, the product and bales / stack are set when the pin is made.
-  `save_silage_location` on an old pin changes only name, %DM, notes and
-  position, so an old number on a phone can never be written back.
+  `save_silage_location` on an old pin changes only name, %DM, kg DM per
+  bale, notes and position, so an old number on a phone can never be written
+  back.
 - Deleting a pin writes what was left to the log as taken away.
 - In the code the names are `silageStock...` and the ids `sgs-...`, because
   the Silage card on the FEED screen (the daily feeding sum) already uses
@@ -224,7 +228,8 @@ It has nothing to do with Farm Maintenance; it only drops pins the same way.
 
 Row in the `silage` tab:
 `id | name | product | form | quantity | dm | notes | lat | lng | createdBy |
-createdAt`. `form` is `bales` or `stack`.
+createdAt | baleKgDm`. `form` is `bales` or `stack`. `baleKgDm` is empty for a
+stack. A sheet made by script `-a` gets the last header cell added by itself.
 Row in the `silage log` tab:
 `id | timestamp | location id | location | product | form | from | to |
 change | user | note`.
@@ -287,8 +292,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.13/v1.1.14/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.27/wn-farm-v1.1.28/" sw.js
+sed -i "s/v1\.1\.14/v1.1.15/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.28/wn-farm-v1.1.29/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -371,8 +376,9 @@ Added 3 October 2026:
 - **Silage** section (v1.1.13). It needs Apps Script `2026-10-03-a`: paste the
   script first (section 4), then push the app. With the old script the screen
   says "The Apps Script needs updating".
-- Silage ideas not built: link the stock to the Silage card on the FEED screen
-  (take what is fed each day), and a weight per bale to show bales as tons DM.
+- kg DM per bale and "t DM on hand" (v1.1.14, script `2026-10-03-b`).
+- Silage idea not built: link the stock to the Silage card on the FEED screen
+  (take what is fed each day).
 - Old tracked files still in the repo: `riverterrace-main\`, `index viejo.html`,
   `test.html`, `diff.txt`, `diff_local.txt`. Removing them needs its own commit.
 - There is no `.gitignore`. Add files to git by name only.
