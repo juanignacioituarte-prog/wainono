@@ -1,8 +1,10 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026. App version at that date: **v1.1.12**, service worker
-cache `wn-farm-v1.1.26`, Apps Script `2026-09-25-a`.
+Written 2 October 2026, updated 3 October 2026. App version: **v1.1.13**,
+service worker cache `wn-farm-v1.1.27`, Apps Script `2026-10-03-a`.
+
+The index of all projects and the rules is `G:\My Drive\Apps\README.md`.
 
 ---
 
@@ -11,7 +13,7 @@ cache `wn-farm-v1.1.26`, Apps Script `2026-09-25-a`.
 | What | Where |
 |---|---|
 | Repo | `https://github.com/juanignacioituarte-prog/wainono.git` (remote `origin`, branch `main`) |
-| Local folder | `C:\Users\juani\Desktop\ndvi app\riverterrace_repo` |
+| Local folder | `C:\dev\onefarm` on each computer. Never in Google Drive: Drive damaged the git records once (3 October 2026) |
 | Live app | https://juanignacioituarte-prog.github.io/wainono/index.html |
 | Hosting | GitHub Pages, straight off `main`. A push is live in 1-3 minutes |
 | Second remote | `onefarm` - a different project, do not push there by accident |
@@ -26,9 +28,9 @@ cache `wn-farm-v1.1.26`, Apps Script `2026-09-25-a`.
 | `health_safety_apps_script.js` | Script for the Health & Safety sheet (separate spreadsheet) |
 | `vehicle_maintenance_apps_script.js` | Script for the vehicle sheet (separate spreadsheet) |
 | `roster_apps_script.js` | Script for the roster sheet |
-| `treatment.html`, `TRtreatment.html` | Cow treatment app (own project folder: `Desktop\cow-treatment`) |
-| `shed.html` | Shed cow display log viewer (own project: `Desktop\shed-cow-display`) |
-| `gr.html` | Pasture growth prediction page (own project: `Desktop\pasture-growth`) |
+| `treatment.html`, `TRtreatment.html` | Cow treatment app (own project folder: `G:\My Drive\Apps\cow-treatment`) |
+| `shed.html` | Shed cow display log viewer (own project: `G:\My Drive\Apps\shed-cow-display`) |
+| `gr.html` | Pasture growth prediction page (own project: `G:\My Drive\Apps\pasture-growth`) |
 | `index viejo.html`, `test.html` | Old copies. **Ignore them.** Only `index.html` is live |
 
 ---
@@ -81,6 +83,9 @@ Script web app URL (all of them are in `index.html` near line 2544).
 | `auth` | who may use the app |
 | `maintenance` | one row per maintenance job (see section 5) |
 | `maintenance categories` | `category | subcategory` |
+| `silage` | one row per silage location (see section 5) |
+| `silage products` | `product`, one per row |
+| `silage log` | every change of a silage number, append only |
 
 ### Reading data: two paths
 
@@ -92,13 +97,15 @@ Script web app URL (all of them are in `index.html` near line 2544).
 ### Apps Script endpoints (feed sync)
 
 GET `?type=`: `breaks`, `units`, `out`, `herd_log`, `paddocks`, `tabs`,
-`version`, `walk_order`, `maintenance`, and with no type, the feed settings.
+`version`, `walk_order`, `maintenance`, `silage`, `silage_log`, and with no
+type, the feed settings.
 
 POST `{type: ...}`: `breaks`, `feed_settings`, `farmwalk_batch`,
 `update_paddock_history`, `farmwalk_entry`, `farmwalk_load`, `save_units`,
 `save_out`, `herd_log`, `herd_cows`, `paddocks`, `rename_paddock`,
 `save_walk_order`, `save_maintenance_job`, `delete_maintenance_job`,
-`save_maintenance_categories`.
+`save_maintenance_categories`, `save_silage_location`, `silage_stock`,
+`delete_silage_location`, `save_silage_products`.
 
 `?type=tabs` lists every tab with its live row count. `?type=version` says
 which script version is really deployed. Both are the quickest way to check
@@ -132,8 +139,9 @@ fetch(URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
 ## 5. What the app does (sections)
 
 Top buttons: **FARMWALK**, **FEED**, **BREAKS**. The ⋮ menu holds Health &
-Safety, Roster, Weather, Vehicle Maintenance, **Farm Maintenance**, Farm
-Configuration (admin only), Audio & Map Settings, Weekly Area Report.
+Safety, Roster, Weather, Vehicle Maintenance, **Farm Maintenance**,
+**Silage**, Farm Configuration (admin only), Audio & Map Settings, Weekly Area
+Report.
 
 The app **opens on BREAKS with the plain satellite picture**.
 
@@ -188,6 +196,39 @@ createdAt | fixedBy | fixedAt | fixNotes`
 list of them for a line. One row per job, written by id, so two phones cannot
 clash.
 
+### Silage (⋮ menu)
+The stock of silage on a map. Paddock boundaries are shown, **never breaks**.
+It has nothing to do with Farm Maintenance; it only drops pins the same way.
+- A pin is one place. It is **bales** (counted in bales) or a **stack**
+  (counted in tons), with a product, a %DM and notes. One pin = one product.
+- `＋ NEW LOCATION`, then tap the map. The number is on the pin.
+- `＋ ADD`, `− TAKE` and `SET NUMBER` change the number. Each has a note.
+- Totals per product at the top: bales, tons in stacks, and tons of DM when
+  every stack with silage in it has a %DM.
+- `📋 LOG` shows every change, with a filter per location and EXPORT CSV.
+- `⚙ Products` is the shared product list. Other feeds can be added there.
+- **The sheet owns the numbers**, like the cow numbers: the phone sends
+  "add 12" and `applySilageStock` does the sum under the script lock and
+  writes the log row. Every change has an id, so a change sent twice on poor
+  signal is counted once.
+- **Nothing is saved on the phone first.** With no signal the change is
+  refused and the box stays open. The phone only keeps a copy to look at
+  (`silage_stock_locations`, `silage_stock_products`, `silage_stock_log`).
+- The quantity, the product and bales / stack are set when the pin is made.
+  `save_silage_location` on an old pin changes only name, %DM, notes and
+  position, so an old number on a phone can never be written back.
+- Deleting a pin writes what was left to the log as taken away.
+- In the code the names are `silageStock...` and the ids `sgs-...`, because
+  the Silage card on the FEED screen (the daily feeding sum) already uses
+  `silage...`. The two are not linked.
+
+Row in the `silage` tab:
+`id | name | product | form | quantity | dm | notes | lat | lng | createdBy |
+createdAt`. `form` is `bales` or `stack`.
+Row in the `silage log` tab:
+`id | timestamp | location id | location | product | form | from | to |
+change | user | note`.
+
 ### Vehicle Maintenance
 Fleet list, service checks with a checklist per vehicle type.
 **Service Several** does many vehicles in one go: tick the vehicles (or "all"
@@ -214,6 +255,12 @@ node -e "const h=require('http'),f=require('fs');h.createServer((q,s)=>{f.readFi
 Then open `http://localhost:8765/`. The copy reads real data but refuses every
 write, and shows an orange "LOCAL COPY - READ ONLY" tag.
 
+The second PC has no node. There, serve the folder with
+`py -3 -m http.server 8765 --directory <folder>` and run the syntax check
+below in the browser console (`fetch('index.html')`, then the same loop).
+The copy stops at the Google sign-in. For a test, hide `#login-screen`, set
+`localStorage.auth_name` to a test name and call `init()` in the console.
+
 To test code that saves, stub `window.fetch` in the browser console so POSTs
 return `{status:'success'}` and collect what would have been sent.
 
@@ -230,7 +277,9 @@ console.log(n+' inline scripts, '+bad+' with errors');"
 The Apps Script can be tested with a fake sheet: build a small object with
 `getRange/getValues/setValues/appendRow/deleteRow`, set `SpreadsheetApp`,
 `ContentService` and `LockService` globals, then `eval` the file. There were
-working test files for the farmwalk order and the maintenance functions.
+working test files for the farmwalk order, the maintenance functions and the
+silage functions. The same fake sheet in a hidden iframe, with `fetch` sent to
+it, tests a whole screen without touching the live sheet.
 
 ---
 
@@ -238,8 +287,8 @@ working test files for the farmwalk order and the maintenance functions.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.12/v1.1.13/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.26/wn-farm-v1.1.27/" sw.js
+sed -i "s/v1\.1\.13/v1.1.14/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.27/wn-farm-v1.1.28/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -261,7 +310,8 @@ pushed, or the version was not bumped.
 - **Published CSV lag.** Minutes behind. Check with `?type=tabs` or a script
   GET instead of guessing.
 - **Device caches.** `wn_cached_manual_data`, `wn_cached_farmwalk_csv`,
-  `wn_maint_jobs`, `wn_maint_cats`, `wn_walk_order`, `wn_farmwalk_draft`.
+  `wn_maint_jobs`, `wn_maint_cats`, `wn_walk_order`, `wn_farmwalk_draft`,
+  `silage_stock_locations`, `silage_stock_products`, `silage_stock_log`.
   The sheet is the record; a cached cover is only used for 3 days.
 - **Per device settings must never change shared numbers.** A phone's "show
   breaks for N days" setting once changed the farm average (2291 on the phone,
@@ -280,21 +330,23 @@ pushed, or the version was not bumped.
 
 ## 9. Other projects in their own folders
 
-These are separate and have their own notes (read `NOTES.md` in each first):
+These are separate and have their own notes. They live in
+`G:\My Drive\Apps\`. The full list, and what to read first in each, is in
+`G:\My Drive\Apps\README.md`:
 
 | Project | Folder |
 |---|---|
-| Cow treatment app | `Desktop\cow-treatment` (ships as `treatment.html` here) |
-| Shed cow display | `Desktop\shed-cow-display` (ships as `shed.html` here) |
-| Pasture growth prediction | `Desktop\pasture-growth` (`gr.html`) |
-| LH daily benchmark | `Desktop\daily-benchmark` |
-| Mineral dispenser (ESP32) | its own folder |
-| Drafting gate (ESP32) | `Desktop\drafting-gate` |
-| RUC off-road logger (ESP32) | `Desktop\ruc-offroad-logger` |
+| Cow treatment app | `Apps\cow-treatment` (ships as `treatment.html` here) |
+| Shed cow display | `Apps\shed-cow-display` (ships as `shed.html` here) |
+| Pasture growth prediction | `Apps\pasture-growth` (`gr.html`) |
+| LH daily benchmark | `Apps\daily-benchmark` |
+| Mineral dispenser (ESP32) | `Apps\mineral-dispenser` |
+| Drafting gate (ESP32) | `Apps\drafting-gate` |
+| RUC off-road logger (ESP32) | `Apps\ruc-offroad-logger` |
 | NDVI sync | repo `juanignacioituarte-prog/farm-biomass-sync` |
 
 ESP32 work uses the installed PlatformIO CLI
-(`~/.platformio/penv/Scripts/pio.exe`), board on COM10.
+(`~/.platformio/penv/Scripts/pio.exe`), board on COM10 on the Zenbook.
 Never change the XRP2 reader's DATA FORMAT / OUTPUT MODE settings - the
 drafting gate parses that output.
 
@@ -313,3 +365,17 @@ Everything listed above is live and working. Open points:
   The user wanted to fix them; nothing has been done yet.
 - Quick buttons used to be kept per device. They are now the sub categories,
   shared through the sheet, so that is settled.
+
+Added 3 October 2026:
+
+- **Silage** section (v1.1.13). It needs Apps Script `2026-10-03-a`: paste the
+  script first (section 4), then push the app. With the old script the screen
+  says "The Apps Script needs updating".
+- Silage ideas not built: link the stock to the Silage card on the FEED screen
+  (take what is fed each day), and a weight per bale to show bales as tons DM.
+- Old tracked files still in the repo: `riverterrace-main\`, `index viejo.html`,
+  `test.html`, `diff.txt`, `diff_local.txt`. Removing them needs its own commit.
+- There is no `.gitignore`. Add files to git by name only.
+- The names with `wainono` in them (repo, live address, cache name, the word in
+  the app, the title of this file) stay until Juani says. A farm setup system
+  is planned and the names will be handled there.

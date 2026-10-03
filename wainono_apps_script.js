@@ -19,12 +19,16 @@
  *      add / remove / set at a time under the script lock and writes the log row
  *      itself, and saveFeedSettings no longer takes herdCows from the payload,
  *      so a phone holding an old page cannot overwrite everyone else's counts.
+ *   8. Silage stock: pins on the map, each with a number of bales or tons.
+ *      doGet 'silage' and 'silage_log'; doPost 'save_silage_location',
+ *      'silage_stock', 'delete_silage_location' and 'save_silage_products'.
+ *      New sheets "silage", "silage products" and "silage log".
  * Everything else is byte-identical to what you had.
  */
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-09-25-a";
+var SCRIPT_VERSION = "2026-10-03-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -54,6 +58,10 @@ function doGet(e) {
     return getWalkOrder();
   } else if (type === 'maintenance') {
     return getMaintenance();
+  } else if (type === 'silage') {
+    return getSilage();
+  } else if (type === 'silage_log') {
+    return getSilageLog();
   } else if (type === 'version') {
     return jsonResponse({ status: "success", version: SCRIPT_VERSION });
   } else {
@@ -105,6 +113,14 @@ function doPost(e) {
       return deleteMaintenanceJob(payload.id);
     } else if (type === 'save_maintenance_categories') {
       return saveMaintenanceCategories(payload.categories);
+    } else if (type === 'save_silage_location') {
+      return saveSilageLocation(payload);
+    } else if (type === 'silage_stock') {
+      return applySilageStock(payload);
+    } else if (type === 'delete_silage_location') {
+      return deleteSilageLocation(payload);
+    } else if (type === 'save_silage_products') {
+      return saveSilageProducts(payload.products);
     } else {
       return errorResponse("Unknown payload type: " + type);
     }
@@ -794,6 +810,338 @@ function saveMaintenanceCategories(list) {
   sheet.getRange(1, 1, 1, 2).setValues([["category", "subcategory"]]);
   sheet.getRange(2, 1, rows.length, 2).setValues(rows);
   return jsonResponse({ status: "success", count: rows.length });
+}
+
+/* ================== SILAGE STOCK ==================
+ * Sheet "silage": one row per location (a pin on the map).
+ *   id | name | product | form | quantity | dm | notes | lat | lng |
+ *   createdBy | createdAt
+ * form is "bales" or "stack". Bales are counted in bales, a stack in tons.
+ * dm is the dry matter in percent, or empty when nobody has tested it.
+ *
+ * Sheet "silage products": product (one per row).
+ *
+ * Sheet "silage log": append only, one row per change of a quantity.
+ *   id | timestamp | location id | location | product | form | from | to |
+ *   change | user | note
+ *
+ * The quantity is owned by the sheet, the same way the cow numbers are: a
+ * phone asks for "add 12" or "take 4" and the sum is done here under the
+ * script lock, so two people at two stacks cannot write over each other.
+ */
+var SILAGE_COLS = ["id", "name", "product", "form", "quantity", "dm", "notes",
+                   "lat", "lng", "createdBy", "createdAt"];
+var SILAGE_LOG_HEADERS = ["id", "timestamp", "location id", "location", "product",
+                          "form", "from", "to", "change", "user", "note"];
+
+function silageSheet() {
+  var sheet = getOrCreateSheet("silage");
+  if (sheet.getLastRow() === 0) sheet.appendRow(SILAGE_COLS);
+  return sheet;
+}
+
+function silageLogSheet() {
+  var sheet = getOrCreateSheet("silage log");
+  if (sheet.getLastRow() === 0) sheet.appendRow(SILAGE_LOG_HEADERS);
+  return sheet;
+}
+
+// Tons can have a decimal. Two places is plenty and keeps 0.1 + 0.2 honest.
+function silageNumber(v) {
+  var n = Number(v);
+  if (!isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+}
+
+function silageDm(v) {
+  if (v === null || v === undefined || v === '') return '';
+  var n = Number(v);
+  if (!isFinite(n) || n <= 0 || n > 100) return '';
+  return Math.round(n * 10) / 10;
+}
+
+function silageForm(v) {
+  return String(v || '').toLowerCase() === 'stack' ? 'stack' : 'bales';
+}
+
+function silageStamp(v) {
+  var isDate = v && typeof v.getTime === 'function' && !isNaN(v.getTime());
+  return isDate ? v.toISOString() : String(v || "");
+}
+
+function silageRowToLocation(row) {
+  return {
+    id: String(row[0]),
+    name: String(row[1] == null ? "" : row[1]),
+    product: String(row[2] == null ? "" : row[2]),
+    form: silageForm(row[3]),
+    quantity: silageNumber(row[4]),
+    dm: silageDm(row[5]),
+    notes: String(row[6] == null ? "" : row[6]),
+    lat: Number(row[7]),
+    lng: Number(row[8]),
+    createdBy: String(row[9] == null ? "" : row[9]),
+    createdAt: silageStamp(row[10])
+  };
+}
+
+function silageLocationToRow(loc) {
+  return [String(loc.id), String(loc.name || ""), String(loc.product || ""), silageForm(loc.form),
+          silageNumber(loc.quantity), silageDm(loc.dm), String(loc.notes || ""),
+          Number(loc.lat), Number(loc.lng), String(loc.createdBy || ""), String(loc.createdAt || "")];
+}
+
+// The sheet row number of a location, or -1.
+function findSilageRow(sheet, id) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === String(id).trim()) return i + 2;
+  }
+  return -1;
+}
+
+function readSilageLocation(sheet, rowNumber) {
+  return silageRowToLocation(sheet.getRange(rowNumber, 1, 1, SILAGE_COLS.length).getValues()[0]);
+}
+
+function getSilage() {
+  var sheet = silageSheet();
+  var locations = [];
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, SILAGE_COLS.length).getValues().forEach(function(row) {
+      if (!String(row[0] || "").trim()) return;
+      locations.push(silageRowToLocation(row));
+    });
+  }
+  return jsonResponse({ status: "success", locations: locations, products: readSilageProducts() });
+}
+
+function readSilageProducts() {
+  var sheet = getOrCreateSheet("silage products");
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var out = [];
+  sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(function(r) {
+    var name = String(r[0] == null ? "" : r[0]).trim();
+    if (name) out.push(name);
+  });
+  return out;
+}
+
+function saveSilageProducts(list) {
+  if (!Array.isArray(list)) return errorResponse("Payload products must be array");
+  var rows = [];
+  var seen = {};
+  list.forEach(function(p) {
+    var name = String(p == null ? "" : p).trim();
+    if (!name || seen[name.toLowerCase()]) return;
+    seen[name.toLowerCase()] = true;
+    rows.push([name]);
+  });
+  if (rows.length === 0) return errorResponse("Empty product list - nothing saved");
+
+  var sheet = getOrCreateSheet("silage products");
+  sheet.clearContents();
+  sheet.getRange(1, 1).setValue("product");
+  sheet.getRange(2, 1, rows.length, 1).setValues(rows);
+  return jsonResponse({ status: "success", count: rows.length });
+}
+
+/**
+ * A new pin, or new details for an old one (name, %DM, notes, where it is).
+ *
+ * The quantity is only taken from the payload when the pin is new. After that
+ * it changes through applySilageStock alone, so editing a name on a phone that
+ * has an old number on screen cannot put that old number back.
+ */
+function saveSilageLocation(payload) {
+  var loc = payload && payload.location;
+  if (!loc || !loc.id) return errorResponse("Missing location id");
+  if (!isFinite(Number(loc.lat)) || !isFinite(Number(loc.lng))) return errorResponse("Missing position");
+  if (!String(loc.name || "").trim()) return errorResponse("Missing name");
+
+  var sheet = silageSheet();
+  var rowNumber = findSilageRow(sheet, loc.id);
+
+  if (rowNumber !== -1) {
+    var old = readSilageLocation(sheet, rowNumber);
+    old.name = String(loc.name).trim();
+    old.dm = silageDm(loc.dm);
+    old.notes = String(loc.notes || "");
+    old.lat = Number(loc.lat);
+    old.lng = Number(loc.lng);
+    sheet.getRange(rowNumber, 1, 1, SILAGE_COLS.length).setValues([silageLocationToRow(old)]);
+    return jsonResponse({ status: "success", location: old, updated: true });
+  }
+
+  var user = String(payload.user || loc.createdBy || "Unknown User");
+  var fresh = {
+    id: String(loc.id),
+    name: String(loc.name).trim(),
+    product: String(loc.product || "Silage").trim(),
+    form: silageForm(loc.form),
+    quantity: Math.max(0, silageNumber(loc.quantity)),
+    dm: silageDm(loc.dm),
+    notes: String(loc.notes || ""),
+    lat: Number(loc.lat),
+    lng: Number(loc.lng),
+    createdBy: user,
+    createdAt: String(loc.createdAt || new Date().toISOString())
+  };
+  sheet.appendRow(silageLocationToRow(fresh));
+
+  if (fresh.quantity !== 0) {
+    appendSilageLogRows([{
+      id: 'sl_new_' + fresh.id, ts: fresh.createdAt, location: fresh.id, locationName: fresh.name,
+      product: fresh.product, form: fresh.form, from: 0, to: fresh.quantity, delta: fresh.quantity,
+      user: user, note: "New location"
+    }]);
+  }
+  return jsonResponse({ status: "success", location: fresh, updated: false });
+}
+
+/**
+ * The only thing that may change the quantity at a location.
+ * mode 'delta' adds or takes; mode 'set' forces the number after a count.
+ */
+function applySilageStock(payload) {
+  if (!payload || !payload.location) return errorResponse("Missing location");
+
+  var sheet = silageSheet();
+  var rowNumber = findSilageRow(sheet, payload.location);
+  if (rowNumber === -1) return errorResponse("Location not found: " + payload.location);
+  var loc = readSilageLocation(sheet, rowNumber);
+
+  // Poor signal: the reply can be lost and the person taps again. The log row
+  // is the record that the change already happened, so it is not done twice.
+  if (payload.id) {
+    var already = findSilageLogEntry(payload.id);
+    if (already) return jsonResponse({ status: "success", entry: already, location: loc, repeated: true });
+  }
+
+  var from = loc.quantity;
+  var to;
+  if (payload.mode === 'set') {
+    to = Number(payload.to);
+    if (!isFinite(to)) return errorResponse("Bad total");
+  } else {
+    var delta = Number(payload.delta);
+    if (!isFinite(delta) || delta === 0) return errorResponse("Bad amount");
+    to = from + delta;
+  }
+  if (to < 0) to = 0;
+  to = silageNumber(to);
+
+  loc.quantity = to;
+  sheet.getRange(rowNumber, SILAGE_COLS.indexOf("quantity") + 1).setValue(to);
+
+  var entry = {
+    id: payload.id || ('sl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+    ts: payload.ts || new Date().toISOString(),
+    location: loc.id,
+    locationName: loc.name,
+    product: loc.product,
+    form: loc.form,
+    from: from,
+    to: to,
+    delta: silageNumber(to - from),
+    user: String(payload.user || 'Unknown User'),
+    note: String(payload.note || '')
+  };
+  if (entry.delta !== 0) appendSilageLogRows([entry]);
+
+  return jsonResponse({ status: "success", entry: entry, location: loc });
+}
+
+// The pin goes. What was still there is written to the log as taken away, so
+// the totals in the log still add up.
+function deleteSilageLocation(payload) {
+  if (!payload || !payload.id) return errorResponse("Missing location id");
+  var sheet = silageSheet();
+  var rowNumber = findSilageRow(sheet, payload.id);
+  if (rowNumber === -1) return errorResponse("Location not found: " + payload.id);
+
+  var loc = readSilageLocation(sheet, rowNumber);
+  if (loc.quantity !== 0) {
+    appendSilageLogRows([{
+      id: 'sl_del_' + loc.id, ts: new Date().toISOString(), location: loc.id, locationName: loc.name,
+      product: loc.product, form: loc.form, from: loc.quantity, to: 0, delta: -loc.quantity,
+      user: String(payload.user || 'Unknown User'), note: "Location deleted"
+    }]);
+  }
+  sheet.deleteRow(rowNumber);
+  return jsonResponse({ status: "success", id: loc.id });
+}
+
+function silageLogRowToEntry(row) {
+  return {
+    id: String(row[0]),
+    ts: silageStamp(row[1]),
+    location: String(row[2] || ""),
+    locationName: String(row[3] || ""),
+    product: String(row[4] || ""),
+    form: silageForm(row[5]),
+    from: silageNumber(row[6]),
+    to: silageNumber(row[7]),
+    delta: silageNumber(row[8]),
+    user: String(row[9] || ""),
+    note: String(row[10] == null ? "" : row[10])
+  };
+}
+
+function getSilageLog() {
+  var sheet = silageLogSheet();
+  var lastRow = sheet.getLastRow();
+  var entries = [];
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, SILAGE_LOG_HEADERS.length).getValues().forEach(function(row) {
+      if (row[0]) entries.push(silageLogRowToEntry(row));
+    });
+  }
+  return jsonResponse({ status: "success", entries: entries });
+}
+
+function findSilageLogEntry(id) {
+  var sheet = silageLogSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+  var data = sheet.getRange(2, 1, lastRow - 1, SILAGE_LOG_HEADERS.length).getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) return silageLogRowToEntry(data[i]);
+  }
+  return null;
+}
+
+function appendSilageLogRows(entries) {
+  var sheet = silageLogSheet();
+  var lastRow = sheet.getLastRow();
+
+  var seen = {};
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(function(r) {
+      if (r[0]) seen[String(r[0])] = true;
+    });
+  }
+
+  var rows = [];
+  entries.forEach(function(e) {
+    if (!e || !e.id || seen[String(e.id)]) return;
+    seen[String(e.id)] = true;
+    rows.push([
+      String(e.id), e.ts || new Date().toISOString(), String(e.location || ""),
+      String(e.locationName || ""), String(e.product || ""), silageForm(e.form),
+      silageNumber(e.from), silageNumber(e.to), silageNumber(e.delta),
+      String(e.user || "Unknown User"), String(e.note || "")
+    ]);
+  });
+
+  if (rows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, SILAGE_LOG_HEADERS.length).setValues(rows);
+  }
+  return rows.length;
 }
 
 /* ================== FARMWALK ROUTE ================== */

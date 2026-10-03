@@ -1679,7 +1679,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.12</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.13</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1687,11 +1687,12 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('weather'); toggleSettingsMenu();" style="font-weight: bold; color: #f1c40f;">☁️ Weather</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('vehicle_maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #e67e22;">🚜 Vehicle Maintenance</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #16a085;">🔧 Farm Maintenance</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('silage'); toggleSettingsMenu();" style="font-weight: bold; color: #b7791f;">🌾 Silage</div>
                     <div class="dropdown-item" id="menu-item-farm-config" style="display:none; font-weight: bold; color: #9b59b6;" onclick="switchDashboardMode('farm_config'); toggleSettingsMenu();">🗺️ Farm Configuration</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.12</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.13</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2008,6 +2009,111 @@
                     <button onclick="closeMaintCategories()" style="flex:1; background:#ecf0f1; color:#2c3e50; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Close</button>
                     <button onclick="saveMaintCategories()" style="flex:1; background:#16a085; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Save</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Silage stock -->
+        <div id="silage-stock-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
+                <h3 style="margin:0; flex:1;">🌾 Silage</h3>
+                <button onclick="showSilageStockLog()" style="background:#34495e; color:#fff; border:none; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">📋 LOG</button>
+                <button onclick="openSilageProducts()" style="background:#ecf0f1; color:#2c3e50; border:none; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">⚙ Products</button>
+            </div>
+            <p style="font-size:12px; color:#666; margin:0 0 10px;">
+                Every pin is a place where silage is kept. Use ADD and TAKE to keep the number right.
+                Drag a pin to move it.
+            </p>
+
+            <div id="sgs-totals" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;"></div>
+
+            <button id="sgs-btn-new" onclick="startSilagePlacing()" style="width:100%; background:#b7791f; color:#fff; border:none; padding:10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:10px;">＋ NEW LOCATION</button>
+
+            <div id="sgs-place-bar" style="display:none; align-items:center; gap:8px; background:#fff; border:1px solid #b7791f; border-radius:6px; padding:8px; margin-bottom:10px;">
+                <span style="flex:1; font-size:11px; font-weight:bold; color:#b7791f;">Tap the map where the silage is</span>
+                <button onclick="cancelSilagePlacing()" style="background:#fdeceb; color:#c0392b; border:none; padding:7px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">✕</button>
+            </div>
+
+            <div id="sgs-status" style="font-size:11px; font-weight:bold; line-height:1.4; margin-bottom:8px;"></div>
+            <div id="sgs-list"></div>
+        </div>
+
+        <!-- Silage: new location / edit location -->
+        <div id="sgs-loc-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; align-items:center; justify-content:center; padding:15px;">
+            <div style="background:#fff; border-radius:10px; padding:16px; width:100%; max-width:360px; max-height:90vh; overflow-y:auto;">
+                <h4 id="sgs-loc-title" style="margin:0 0 12px;">New silage location</h4>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Name of the place</label>
+                <input type="text" id="sgs-loc-name" placeholder="e.g. Stack by the shed" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                <div id="sgs-loc-new-only">
+                    <label style="font-size:11px; font-weight:bold; color:#555;">Product</label>
+                    <select id="sgs-loc-product" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px;"></select>
+                    <label style="font-size:11px; font-weight:bold; color:#555;">Bales or stack</label>
+                    <div style="display:flex; gap:8px; margin:4px 0 10px;">
+                        <button id="sgs-form-bales" onclick="setSilageLocForm('bales')" style="flex:1; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; border:1.5px solid #b7791f;">BALES</button>
+                        <button id="sgs-form-stack" onclick="setSilageLocForm('stack')" style="flex:1; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; border:1.5px solid #6d4c41;">STACK (tons)</button>
+                    </div>
+                    <label id="sgs-loc-qty-label" style="font-size:11px; font-weight:bold; color:#555;">How many bales are there now</label>
+                    <input type="number" id="sgs-loc-qty" min="0" step="any" inputmode="decimal" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                </div>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Dry matter %DM (optional)</label>
+                <input type="number" id="sgs-loc-dm" min="0" max="100" step="0.1" inputmode="decimal" placeholder="e.g. 35" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                <label style="font-size:11px; font-weight:bold; color:#555;">Notes (optional)</label>
+                <textarea id="sgs-loc-notes" placeholder="e.g. 2nd cut, made in November" style="width:100%; height:56px; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;"></textarea>
+                <div id="sgs-loc-status" style="font-size:11px; font-weight:bold; margin-bottom:10px;"></div>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="closeSilageLocModal()" style="flex:1; background:#ecf0f1; color:#2c3e50; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button>
+                    <button id="sgs-loc-save" onclick="saveSilageLocFromModal()" style="flex:1; background:#b7791f; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Silage: add, take or set the number -->
+        <div id="sgs-stock-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; align-items:center; justify-content:center; padding:15px;">
+            <div style="background:#fff; border-radius:10px; padding:16px; width:100%; max-width:340px;">
+                <h4 id="sgs-stock-title" style="margin:0 0 6px;">Add silage</h4>
+                <div id="sgs-stock-loc" style="font-size:12px; color:#666; margin-bottom:12px;"></div>
+                <label id="sgs-stock-label" style="font-size:11px; font-weight:bold; color:#555;">How many</label>
+                <input type="number" id="sgs-stock-amount" min="0" step="any" inputmode="decimal" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box; font-size:18px; font-weight:bold;">
+                <label style="font-size:11px; font-weight:bold; color:#555;">Note (optional)</label>
+                <input type="text" id="sgs-stock-note" placeholder="e.g. fed to the 1st herd" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; margin:4px 0 10px; box-sizing:border-box;">
+                <div id="sgs-stock-status" style="font-size:11px; font-weight:bold; margin-bottom:10px;"></div>
+                <div style="display:flex; gap:8px;">
+                    <button onclick="closeSilageStockModal()" style="flex:1; background:#ecf0f1; color:#2c3e50; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Cancel</button>
+                    <button id="sgs-stock-save" onclick="saveSilageStockChange()" style="flex:1; background:#27ae60; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Silage: products -->
+        <div id="sgs-products-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; align-items:center; justify-content:center; padding:15px;">
+            <div style="background:#fff; border-radius:10px; padding:16px; width:100%; max-width:340px; max-height:90vh; overflow-y:auto;">
+                <h4 style="margin:0 0 10px;">Products</h4>
+                <div id="sgs-products-list" style="margin-bottom:12px;"></div>
+                <div style="display:flex; gap:6px; margin-bottom:8px;">
+                    <input type="text" id="sgs-new-product" placeholder="New product, e.g. Hay" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                    <button onclick="addSilageProduct()" style="background:#b7791f; color:#fff; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer;">+</button>
+                </div>
+                <div id="sgs-products-status" style="font-size:11px; font-weight:bold; margin-bottom:10px;"></div>
+                <button onclick="closeSilageProducts()" style="width:100%; background:#ecf0f1; color:#2c3e50; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">Close</button>
+            </div>
+        </div>
+
+        <!-- Silage: log -->
+        <div id="sgs-log-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:4000; align-items:center; justify-content:center;">
+            <div style="background:#fff; border-radius:12px; width:94%; max-width:560px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+                <div style="padding:16px 18px 12px; border-bottom:1px solid #eee;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; font-size:16px;">Silage Log</h3>
+                        <button onclick="closeSilageStockLog()" style="background:none; border:none; font-size:22px; line-height:1; color:#95a5a6; cursor:pointer; padding:0 4px;">&times;</button>
+                    </div>
+                    <div id="sgs-log-status" style="font-size:11px; color:#95a5a6; margin-top:4px;"></div>
+                    <div style="display:flex; gap:8px; margin-top:10px;">
+                        <select id="sgs-log-filter" style="flex:1; min-width:0; padding:6px; border:1px solid #ddd; border-radius:6px; font-size:12px; background:#f9f9f9;" onchange="renderSilageStockLog()">
+                            <option value="all">All locations</option>
+                        </select>
+                        <button class="btn-save" style="background:#27ae60; border-color:#27ae60;" onclick="exportSilageStockLogCsv()">EXPORT CSV</button>
+                    </div>
+                </div>
+                <div id="sgs-log-body" style="overflow-y:auto; padding:12px 18px 18px; flex:1;"></div>
             </div>
         </div>
 
@@ -2866,6 +2972,683 @@
                 renderFarmConfig();
             }
             updateGeoStyles();
+        }
+
+        /* ===================== SILAGE STOCK =====================
+         * Where the silage is and how much is left. Every pin is one place:
+         * bales (counted in bales) or a stack (counted in tons), with its
+         * %DM and notes. Kept in the "silage" tab of the sheet, one row per
+         * place.
+         *
+         * The sheet owns the numbers, the same way it owns the cow numbers.
+         * A phone asks for "add 12" or "take 4" and shows what the sheet
+         * answers, so two people at two stacks cannot write over each other.
+         * Nothing here is saved on the phone first: with no signal the change
+         * is refused and the person is told, rather than a number being shown
+         * that the sheet never got. Every change goes to the "silage log" tab.
+         *
+         * This is the stock. The Silage card on the FEED screen is the daily
+         * feeding sum and is separate.
+         */
+        let silageStockLocations = [];
+        let silageStockProducts = [];
+        let silageStockLog = [];
+        let silageStockLayers = new Map();
+        let silageStockTouchedAt = 0;      // when a change last came back from the sheet
+        let silageStockBusy = false;       // one save at a time
+        let silagePlacing = false;         // waiting for the tap that puts a new pin down
+        let silagePlaceStartedAt = 0;      // guards against the tap that started it
+        let silageLocEditingId = null;     // set when the form is editing an old place
+        let silageLocPending = null;       // {id, lat, lng} of a new pin waiting for its form
+        let silageLocForm = 'bales';
+        let silageStockChange = null;      // {id, location, mode} while the add / take box is open
+
+        const SILAGE_DEFAULT_PRODUCTS = ['Silage'];
+        const SILAGE_FORM_COLORS = { bales: '#b7791f', stack: '#6d4c41' };
+
+        function silageNum(v) {
+            const n = Number(v);
+            return isFinite(n) ? Math.round(n * 100) / 100 : 0;
+        }
+
+        function silageQtyText(qty, form) {
+            const n = silageNum(qty);
+            return form === 'stack' ? `${n} t` : `${n} bale${n === 1 ? '' : 's'}`;
+        }
+
+        function silageUser() {
+            return localStorage.getItem('auth_name') || 'Unknown User';
+        }
+
+        function silageNewId(prefix) {
+            return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        }
+
+        // The product list, plus any product that is still on a pin.
+        function silageProductNames() {
+            const out = silageStockProducts.slice();
+            silageStockLocations.forEach(l => { if (l.product && out.indexOf(l.product) === -1) out.push(l.product); });
+            return out;
+        }
+
+        function setSilageStockStatus(text, color) {
+            const el = document.getElementById('sgs-status');
+            if (el) { el.textContent = text || ''; el.style.color = color || '#7f8c8d'; }
+        }
+
+        function cacheSilageStock() {
+            try {
+                localStorage.setItem('silage_stock_locations', JSON.stringify(silageStockLocations));
+                localStorage.setItem('silage_stock_products', JSON.stringify(silageStockProducts));
+            } catch (e) {}
+        }
+
+        function renderSilageStock() {
+            renderSilageStockTotals();
+            renderSilageStockList();
+            renderSilageStockOnMap();
+        }
+
+        async function loadSilageStock() {
+            try { silageStockLocations = JSON.parse(localStorage.getItem('silage_stock_locations') || '[]') || []; } catch (e) { silageStockLocations = []; }
+            try { silageStockProducts = JSON.parse(localStorage.getItem('silage_stock_products') || 'null') || SILAGE_DEFAULT_PRODUCTS.slice(); } catch (e) { silageStockProducts = SILAGE_DEFAULT_PRODUCTS.slice(); }
+            renderSilageStock();
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            const askedAt = Date.now();
+            setSilageStockStatus('Loading from the sheet...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + "?type=silage&t=" + Date.now(), { cache: 'no-store' });
+                const d = await res.json();
+                // An older script has no silage branch and answers with the
+                // feed settings, which have no "locations".
+                if (!d || !Array.isArray(d.locations)) {
+                    setSilageStockStatus('⚠ The Apps Script needs updating before silage can be used.', '#e67e22');
+                    return;
+                }
+                // A change made while this answer was on its way is newer than
+                // the answer, so the answer must not undo it.
+                if (silageStockTouchedAt > askedAt) { setSilageStockStatus(''); return; }
+                silageStockLocations = d.locations;
+                if (Array.isArray(d.products) && d.products.length > 0) silageStockProducts = d.products;
+                cacheSilageStock();
+                setSilageStockStatus('');
+                renderSilageStock();
+            } catch (e) {
+                console.log("Silage load failed, using this device's copy");
+                setSilageStockStatus('⚠ Offline - showing the copy on this device.', '#e67e22');
+            }
+        }
+
+        async function postSilageStock(payload) {
+            let d;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+                d = await res.json();
+            } catch (e) {
+                throw new Error('could not reach the sheet');
+            }
+            if (!d || d.status !== 'success') {
+                const msg = (d && d.message) ? d.message : 'the sheet refused it';
+                throw new Error(/unknown payload type/i.test(msg) ? 'the Apps Script needs updating' : msg);
+            }
+            return d;
+        }
+
+        // What the sheet answered for one place goes onto the screen.
+        function applySilageLocation(loc) {
+            if (!loc || !loc.id) return;
+            const idx = silageStockLocations.findIndex(l => String(l.id) === String(loc.id));
+            if (idx === -1) silageStockLocations.push(loc); else silageStockLocations[idx] = loc;
+            silageStockTouchedAt = Date.now();
+            cacheSilageStock();
+            renderSilageStock();
+        }
+
+        /* ---- totals ---- */
+        function renderSilageStockTotals() {
+            const box = document.getElementById('sgs-totals');
+            if (!box) return;
+            box.innerHTML = silageProductNames().map(name => {
+                const locs = silageStockLocations.filter(l => l.product === name);
+                const baleLocs = locs.filter(l => l.form !== 'stack');
+                const stackLocs = locs.filter(l => l.form === 'stack');
+                const bales = silageNum(baleLocs.reduce((s, l) => s + silageNum(l.quantity), 0));
+                const tons = silageNum(stackLocs.reduce((s, l) => s + silageNum(l.quantity), 0));
+
+                const lines = [];
+                if (baleLocs.length > 0 || stackLocs.length === 0) {
+                    lines.push(`<div><b style="font-size:20px; color:${SILAGE_FORM_COLORS.bales};">${bales}</b> <small>bale${bales === 1 ? '' : 's'}</small></div>`);
+                }
+                if (stackLocs.length > 0) {
+                    // Tons of dry matter only mean something when every stack
+                    // that has silage in it has a %DM.
+                    const full = stackLocs.filter(l => silageNum(l.quantity) > 0);
+                    const allTested = full.length > 0 && full.every(l => Number(l.dm) > 0);
+                    const tDm = silageNum(full.reduce((s, l) => s + silageNum(l.quantity) * (Number(l.dm) || 0) / 100, 0));
+                    lines.push(`<div><b style="font-size:20px; color:${SILAGE_FORM_COLORS.stack};">${tons}</b> <small>t in stacks${allTested ? ` · ${tDm} t DM` : ''}</small></div>`);
+                }
+                return `<div style="flex:1; min-width:130px; background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:8px 10px;">
+                        <div style="font-size:11px; font-weight:bold; color:#7f8c8d; text-transform:uppercase;">${escUnit(name)}</div>
+                        ${lines.join('')}
+                        <div style="font-size:10px; color:#95a5a6;">${locs.length} location${locs.length === 1 ? '' : 's'}</div>
+                    </div>`;
+            }).join('');
+        }
+
+        /* ---- the list ---- */
+        function renderSilageStockList() {
+            const list = document.getElementById('sgs-list');
+            if (!list) return;
+            if (silageStockLocations.length === 0) {
+                list.innerHTML = `<div style="text-align:center; color:#95a5a6; font-size:12px; padding:20px 0;">No silage on the map yet. Press NEW LOCATION, then tap the map.</div>`;
+                return;
+            }
+            const btn = 'border:none; padding:8px 6px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;';
+            list.innerHTML = silageStockLocations.slice()
+                .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }))
+                .map(l => {
+                    const col = SILAGE_FORM_COLORS[l.form === 'stack' ? 'stack' : 'bales'];
+                    const empty = silageNum(l.quantity) === 0;
+                    return `<div id="sgs-card-${l.id}" style="background:#fff; border:1px solid #e0e0e0; border-left:5px solid ${empty ? '#95a5a6' : col}; border-radius:8px; padding:10px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                            <div style="min-width:0;">
+                                <div style="font-weight:bold; font-size:14px; color:#2c3e50;">${escUnit(l.name)}</div>
+                                <div style="font-size:11px; color:${col}; font-weight:bold;">${escUnit(l.product)} · ${l.form === 'stack' ? 'STACK' : 'BALES'}${Number(l.dm) > 0 ? ' · ' + Number(l.dm) + '% DM' : ''}</div>
+                            </div>
+                            <div style="text-align:right; white-space:nowrap; font-weight:bold; font-size:18px; color:${empty ? '#95a5a6' : '#2c3e50'};">${silageQtyText(l.quantity, l.form)}</div>
+                        </div>
+                        ${l.notes ? `<div style="font-size:12px; color:#666; margin-top:6px; white-space:pre-wrap;">${escUnit(l.notes)}</div>` : ''}
+                        <div style="display:flex; gap:6px; margin-top:8px;">
+                            <button onclick="openSilageStockChange('${l.id}','add')" style="${btn} flex:1; background:#27ae60; color:#fff; font-size:12px;">＋ ADD</button>
+                            <button onclick="openSilageStockChange('${l.id}','take')" style="${btn} flex:1; background:#e74c3c; color:#fff; font-size:12px;">− TAKE</button>
+                        </div>
+                        <div style="display:flex; gap:6px; margin-top:6px;">
+                            <button onclick="zoomToSilageLocation('${l.id}')" style="${btn} flex:1; background:#ecf0f1; color:#2c3e50;">🔍 SHOW</button>
+                            <button onclick="openSilageStockChange('${l.id}','set')" style="${btn} flex:1; background:#2980b9; color:#fff;">SET NUMBER</button>
+                            <button onclick="editSilageLocation('${l.id}')" style="${btn} flex:1; background:#ecf0f1; color:#2c3e50;">✏️ EDIT</button>
+                            <button onclick="deleteSilageLocation('${l.id}')" style="${btn} flex:0 0 auto; background:#fdeceb; color:#c0392b;">🗑</button>
+                        </div>
+                    </div>`;
+                }).join('');
+        }
+
+        /* ---- the map ---- */
+        function clearSilageStockFromMap() {
+            silageStockLayers.forEach(l => { if (l) map.removeLayer(l); });
+            silageStockLayers.clear();
+        }
+
+        function renderSilageStockOnMap() {
+            clearSilageStockFromMap();
+            if (currentDashboardMode !== 'silage') return;
+
+            silageStockLocations.forEach(l => {
+                if (!isFinite(Number(l.lat)) || !isFinite(Number(l.lng))) return;
+                const empty = silageNum(l.quantity) === 0;
+                const col = empty ? '#95a5a6' : SILAGE_FORM_COLORS[l.form === 'stack' ? 'stack' : 'bales'];
+                // The number is on the pin, so the map alone says what is where.
+                const icon = L.divIcon({
+                    className: 'silage-marker',
+                    html: `<div style="display:inline-block; transform:translate(-50%,-50%); background:${col}; color:#fff; border:2px solid #fff; border-radius:12px; padding:2px 8px; font-size:11px; font-weight:bold; white-space:nowrap; box-shadow:0 0 5px rgba(0,0,0,0.5);">${l.form === 'stack' ? '⛰' : '🌾'} ${silageNum(l.quantity)}${l.form === 'stack' ? ' t' : ''}</div>`,
+                    iconSize: [0, 0], iconAnchor: [0, 0]
+                });
+                const popup = `<div style="font-family:sans-serif; width:180px;">
+                        <div style="font-weight:bold; font-size:13px; color:#2c3e50;">${escUnit(l.name)}</div>
+                        <div style="font-size:11px; color:${col}; font-weight:bold;">${escUnit(l.product)} · ${l.form === 'stack' ? 'stack' : 'bales'}${Number(l.dm) > 0 ? ' · ' + Number(l.dm) + '% DM' : ''}</div>
+                        <div style="font-size:16px; font-weight:bold; color:#2c3e50; margin:4px 0;">${silageQtyText(l.quantity, l.form)}</div>
+                        ${l.notes ? `<div style="font-size:11px; color:#666; margin-bottom:4px;">${escUnit(l.notes)}</div>` : ''}
+                        <div style="display:flex; gap:6px; margin-top:6px;">
+                            <button onclick="openSilageStockChange('${l.id}','add')" style="flex:1; background:#27ae60; color:#fff; border:none; padding:6px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">＋ ADD</button>
+                            <button onclick="openSilageStockChange('${l.id}','take')" style="flex:1; background:#e74c3c; color:#fff; border:none; padding:6px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">− TAKE</button>
+                        </div>
+                    </div>`;
+                const layer = L.marker([Number(l.lat), Number(l.lng)], { icon: icon, draggable: true, autoPan: true }).addTo(map);
+                layer.on('dragend', e => moveSilageLocation(l.id, e.target.getLatLng()));
+                layer.bindPopup(popup, { offset: [0, -8] });
+                layer.on('click', () => { const c = document.getElementById('sgs-card-' + l.id); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+                silageStockLayers.set(String(l.id), layer);
+            });
+        }
+
+        function zoomToSilageLocation(id) {
+            const loc = silageStockLocations.find(l => String(l.id) === String(id));
+            if (!loc) return;
+            map.setView([Number(loc.lat), Number(loc.lng)], 18);
+            const layer = silageStockLayers.get(String(id));
+            if (layer && layer.openPopup) layer.openPopup();
+        }
+
+        /* Put down in the wrong place: drag the pin and the sheet is updated
+         * where it lands. If the sheet cannot be reached the pin goes back. */
+        async function moveSilageLocation(id, latlng) {
+            const loc = silageStockLocations.find(l => String(l.id) === String(id));
+            if (!loc) return;
+            const moved = Object.assign({}, loc, { lat: latlng.lat, lng: latlng.lng });
+            setSilageStockStatus('Moving ' + loc.name + '...', '#7f8c8d');
+            try {
+                const d = await postSilageStock({ type: 'save_silage_location', location: moved, user: silageUser() });
+                applySilageLocation(d.location || moved);
+                setSilageStockStatus(`✓ ${loc.name} moved.`, '#27ae60');
+            } catch (e) {
+                setSilageStockStatus('⚠ Not moved - ' + e.message, '#e67e22');
+                renderSilageStockOnMap();
+            }
+        }
+
+        /* ---- a new pin ---- */
+        function startSilagePlacing() {
+            if (silagePlacing) { cancelSilagePlacing(); return; }
+            if (typeof isDrawingBreak !== 'undefined' && isDrawingBreak) cancelBreak();
+            silagePlacing = true;
+            silagePlaceStartedAt = Date.now();
+            document.getElementById('sgs-place-bar').style.display = 'flex';
+            // The sidebar has just changed height. Without this Leaflet still
+            // works from the old size and puts the tap in the wrong place.
+            setTimeout(() => map.invalidateSize(), 60);
+            map.getContainer().style.cursor = 'crosshair';
+            map.on('click', handleSilageMapClick);
+        }
+
+        function cancelSilagePlacing() {
+            map.off('click', handleSilageMapClick);
+            map.getContainer().style.cursor = '';
+            silagePlacing = false;
+            const bar = document.getElementById('sgs-place-bar');
+            if (bar) bar.style.display = 'none';
+        }
+
+        function handleSilageMapClick(e) {
+            if (!silagePlacing) return;
+            // Only a real tap on the map counts, and not the ghost click that
+            // can follow the tap on the button (see handleMaintMapClick).
+            const oe = e.originalEvent;
+            const mapEl = document.getElementById('map');
+            if (oe && oe.target && mapEl && !mapEl.contains(oe.target)) return;
+            if (Date.now() - silagePlaceStartedAt < 500) return;
+            cancelSilagePlacing();
+            silageLocPending = { id: silageNewId('sg'), lat: e.latlng.lat, lng: e.latlng.lng };
+            openSilageLocModal(null);
+        }
+
+        /* ---- the location form ---- */
+        function openSilageLocModal(loc) {
+            silageLocEditingId = loc ? loc.id : null;
+            document.getElementById('sgs-loc-title').textContent = loc ? 'Edit ' + loc.name : 'New silage location';
+            document.getElementById('sgs-loc-name').value = loc ? loc.name : '';
+            // What it is and how much there is are set once, when the pin is
+            // made. After that the number only changes through ADD, TAKE or SET.
+            document.getElementById('sgs-loc-new-only').style.display = loc ? 'none' : 'block';
+            if (!loc) {
+                document.getElementById('sgs-loc-product').innerHTML =
+                    silageProductNames().map(n => `<option value="${escUnit(n)}">${escUnit(n)}</option>`).join('');
+                document.getElementById('sgs-loc-qty').value = '';
+                setSilageLocForm('bales');
+            }
+            document.getElementById('sgs-loc-dm').value = loc && Number(loc.dm) > 0 ? loc.dm : '';
+            document.getElementById('sgs-loc-notes').value = loc ? (loc.notes || '') : '';
+            document.getElementById('sgs-loc-status').textContent = '';
+            document.getElementById('sgs-loc-modal').style.display = 'flex';
+        }
+
+        function setSilageLocForm(form) {
+            silageLocForm = form === 'stack' ? 'stack' : 'bales';
+            const paint = (id, on, col) => {
+                const b = document.getElementById(id);
+                if (!b) return;
+                b.style.background = on ? col : '#fff';
+                b.style.color = on ? '#fff' : col;
+            };
+            paint('sgs-form-bales', silageLocForm === 'bales', SILAGE_FORM_COLORS.bales);
+            paint('sgs-form-stack', silageLocForm === 'stack', SILAGE_FORM_COLORS.stack);
+            document.getElementById('sgs-loc-qty-label').textContent =
+                silageLocForm === 'stack' ? 'How many tons are there now' : 'How many bales are there now';
+        }
+
+        function editSilageLocation(id) {
+            const loc = silageStockLocations.find(l => String(l.id) === String(id));
+            if (loc) openSilageLocModal(loc);
+        }
+
+        function closeSilageLocModal() {
+            document.getElementById('sgs-loc-modal').style.display = 'none';
+            silageLocEditingId = null;
+            silageLocPending = null;
+        }
+
+        async function saveSilageLocFromModal() {
+            if (silageStockBusy) return;
+            const status = document.getElementById('sgs-loc-status');
+            const fail = msg => { status.textContent = msg; status.style.color = '#e74c3c'; };
+
+            const name = document.getElementById('sgs-loc-name').value.trim();
+            if (!name) return fail('Give the place a name.');
+            const dmRaw = document.getElementById('sgs-loc-dm').value.trim();
+            const dm = dmRaw === '' ? '' : Number(dmRaw);
+            if (dm !== '' && (!isFinite(dm) || dm <= 0 || dm > 100)) return fail('%DM must be between 1 and 100, or empty.');
+            const notes = document.getElementById('sgs-loc-notes').value.trim();
+
+            let loc;
+            if (silageLocEditingId) {
+                const old = silageStockLocations.find(l => String(l.id) === String(silageLocEditingId));
+                if (!old) return closeSilageLocModal();
+                loc = Object.assign({}, old, { name: name, dm: dm, notes: notes });
+            } else {
+                if (!silageLocPending) return closeSilageLocModal();
+                const qtyRaw = document.getElementById('sgs-loc-qty').value.trim();
+                const qty = qtyRaw === '' ? 0 : Number(qtyRaw);
+                if (!isFinite(qty) || qty < 0) return fail('The number cannot be less than 0.');
+                loc = {
+                    id: silageLocPending.id,
+                    name: name,
+                    product: document.getElementById('sgs-loc-product').value || SILAGE_DEFAULT_PRODUCTS[0],
+                    form: silageLocForm,
+                    quantity: silageNum(qty),
+                    dm: dm, notes: notes,
+                    lat: silageLocPending.lat, lng: silageLocPending.lng,
+                    createdBy: silageUser(),
+                    createdAt: new Date().toISOString()
+                };
+            }
+
+            silageStockBusy = true;
+            status.textContent = 'Saving...'; status.style.color = '#7f8c8d';
+            try {
+                const d = await postSilageStock({ type: 'save_silage_location', location: loc, user: silageUser() });
+                applySilageLocation(d.location || loc);
+                closeSilageLocModal();
+                setSilageStockStatus(`✓ ${name} saved.`, '#27ae60');
+            } catch (e) {
+                // The form stays open with what was typed, so SAVE can be
+                // pressed again when there is signal.
+                fail('⚠ Not saved - ' + e.message);
+            } finally {
+                silageStockBusy = false;
+            }
+        }
+
+        async function deleteSilageLocation(id) {
+            const loc = silageStockLocations.find(l => String(l.id) === String(id));
+            if (!loc || silageStockBusy) return;
+            const left = silageNum(loc.quantity) > 0 ? ` It still has ${silageQtyText(loc.quantity, loc.form)}.` : '';
+            if (!confirm(`Delete ${loc.name}?${left} The log keeps its history.`)) return;
+            silageStockBusy = true;
+            setSilageStockStatus('Deleting ' + loc.name + '...', '#7f8c8d');
+            try {
+                await postSilageStock({ type: 'delete_silage_location', id: id, user: silageUser() });
+                silageStockLocations = silageStockLocations.filter(l => String(l.id) !== String(id));
+                silageStockTouchedAt = Date.now();
+                cacheSilageStock();
+                renderSilageStock();
+                setSilageStockStatus(`✓ ${loc.name} deleted.`, '#27ae60');
+            } catch (e) {
+                setSilageStockStatus('⚠ Not deleted - ' + e.message, '#e67e22');
+            } finally {
+                silageStockBusy = false;
+            }
+        }
+
+        /* ---- add, take, set ---- */
+        function openSilageStockChange(id, mode) {
+            const loc = silageStockLocations.find(l => String(l.id) === String(id));
+            if (!loc) return;
+            /* The id of the change is made here, once. If the answer is lost on
+             * the way back and SAVE is pressed again, the sheet sees the same id
+             * and does not count the change twice. */
+            silageStockChange = { id: silageNewId('sl'), location: loc.id, mode: mode };
+            const what = loc.form === 'stack' ? 'tons' : 'bales';
+            const text = {
+                add:  { title: 'Add silage',     label: `How many ${what} to add`,        btn: '＋ ADD',  col: '#27ae60' },
+                take: { title: 'Take silage',    label: `How many ${what} to take`,       btn: '− TAKE', col: '#e74c3c' },
+                set:  { title: 'Set the number', label: `How many ${what} are there now`, btn: 'SET',    col: '#2980b9' }
+            }[mode];
+            document.getElementById('sgs-stock-title').textContent = text.title;
+            document.getElementById('sgs-stock-loc').innerHTML =
+                `${escUnit(loc.name)} · now <b>${silageQtyText(loc.quantity, loc.form)}</b>`;
+            document.getElementById('sgs-stock-label').textContent = text.label;
+            document.getElementById('sgs-stock-amount').value = '';
+            document.getElementById('sgs-stock-note').value = '';
+            document.getElementById('sgs-stock-status').textContent = '';
+            const save = document.getElementById('sgs-stock-save');
+            save.textContent = text.btn;
+            save.style.background = text.col;
+            map.closePopup();
+            document.getElementById('sgs-stock-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('sgs-stock-amount').focus(), 50);
+        }
+
+        function closeSilageStockModal() {
+            document.getElementById('sgs-stock-modal').style.display = 'none';
+            silageStockChange = null;
+        }
+
+        async function saveSilageStockChange() {
+            const c = silageStockChange;
+            if (!c || silageStockBusy) return;
+            const status = document.getElementById('sgs-stock-status');
+            const fail = msg => { status.textContent = msg; status.style.color = '#e74c3c'; };
+            const loc = silageStockLocations.find(l => String(l.id) === String(c.location));
+            if (!loc) return closeSilageStockModal();
+
+            const raw = document.getElementById('sgs-stock-amount').value.trim();
+            const amount = silageNum(raw);
+            if (raw === '' || !isFinite(Number(raw)) || amount < 0) return fail('Type a number.');
+            if (c.mode !== 'set' && amount === 0) return fail('Type a number bigger than 0.');
+            if (c.mode === 'take' && amount > silageNum(loc.quantity)) {
+                return fail(`There are only ${silageQtyText(loc.quantity, loc.form)} here. If that is wrong, use SET NUMBER first.`);
+            }
+
+            const payload = {
+                type: 'silage_stock', id: c.id, location: c.location,
+                user: silageUser(), note: document.getElementById('sgs-stock-note').value.trim(),
+                ts: new Date().toISOString()
+            };
+            if (c.mode === 'set') { payload.mode = 'set'; payload.to = amount; }
+            else { payload.mode = 'delta'; payload.delta = c.mode === 'take' ? -amount : amount; }
+
+            silageStockBusy = true;
+            status.textContent = 'Saving...'; status.style.color = '#7f8c8d';
+            try {
+                const d = await postSilageStock(payload);
+                applySilageLocation(d.location);
+                if (d.entry && Number(d.entry.delta) !== 0 && !silageStockLog.some(e => e.id === d.entry.id)) silageStockLog.push(d.entry);
+                closeSilageStockModal();
+                const e = d.entry;
+                setSilageStockStatus(e ? `✓ ${loc.name}: ${e.from} → ${silageQtyText(e.to, loc.form)}` : '✓ Saved.', '#27ae60');
+            } catch (e) {
+                fail('⚠ Not saved - ' + e.message + '. Press the button again to try once more.');
+            } finally {
+                silageStockBusy = false;
+            }
+        }
+
+        /* ---- products ---- */
+        function openSilageProducts() {
+            document.getElementById('sgs-new-product').value = '';
+            document.getElementById('sgs-products-status').textContent = '';
+            renderSilageProducts();
+            document.getElementById('sgs-products-modal').style.display = 'flex';
+        }
+
+        function closeSilageProducts() {
+            document.getElementById('sgs-products-modal').style.display = 'none';
+        }
+
+        function renderSilageProducts() {
+            const box = document.getElementById('sgs-products-list');
+            if (!box) return;
+            box.innerHTML = silageStockProducts.map((name, i) => {
+                const used = silageStockLocations.filter(l => l.product === name).length;
+                return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f0f0f0;">
+                        <span style="font-size:13px; font-weight:bold; color:#2c3e50;">${escUnit(name)}
+                            <span style="font-size:10px; font-weight:normal; color:#95a5a6;">${used} location${used === 1 ? '' : 's'}</span></span>
+                        <button onclick="removeSilageProduct(${i})" style="border:none; padding:5px 9px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; background:#fdeceb; color:#c0392b;">🗑</button>
+                    </div>`;
+            }).join('');
+        }
+
+        async function persistSilageProducts(next, okMsg) {
+            if (silageStockBusy) return;
+            const status = document.getElementById('sgs-products-status');
+            silageStockBusy = true;
+            status.textContent = 'Saving...'; status.style.color = '#7f8c8d';
+            try {
+                await postSilageStock({ type: 'save_silage_products', products: next });
+                silageStockProducts = next;
+                silageStockTouchedAt = Date.now();
+                cacheSilageStock();
+                renderSilageProducts();
+                renderSilageStockTotals();
+                status.textContent = okMsg; status.style.color = '#27ae60';
+            } catch (e) {
+                status.textContent = '⚠ Not saved - ' + e.message; status.style.color = '#e74c3c';
+            } finally {
+                silageStockBusy = false;
+            }
+        }
+
+        function addSilageProduct() {
+            const inp = document.getElementById('sgs-new-product');
+            const status = document.getElementById('sgs-products-status');
+            const name = inp.value.trim();
+            if (!name) return;
+            if (silageStockProducts.some(n => n.toLowerCase() === name.toLowerCase())) {
+                status.textContent = 'That product is already there.'; status.style.color = '#e74c3c';
+                return;
+            }
+            inp.value = '';
+            persistSilageProducts(silageStockProducts.concat([name]), `✓ ${name} added.`);
+        }
+
+        function removeSilageProduct(index) {
+            const status = document.getElementById('sgs-products-status');
+            const name = silageStockProducts[index];
+            if (name === undefined) return;
+            const used = silageStockLocations.filter(l => l.product === name).length;
+            if (used > 0) {
+                status.textContent = `${name} is on ${used} location${used === 1 ? '' : 's'}. Delete those first.`; status.style.color = '#e74c3c';
+                return;
+            }
+            if (silageStockProducts.length <= 1) {
+                status.textContent = 'Keep at least one product.'; status.style.color = '#e74c3c';
+                return;
+            }
+            persistSilageProducts(silageStockProducts.filter(n => n !== name), `✓ ${name} removed.`);
+        }
+
+        /* ---- the log ---- */
+        function setSilageLogStatus(text, color) {
+            const el = document.getElementById('sgs-log-status');
+            if (el) { el.textContent = text || ''; el.style.color = color || '#95a5a6'; }
+        }
+
+        async function loadSilageStockLog() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + "?type=silage_log&t=" + Date.now(), { cache: 'no-store' });
+                const d = await res.json();
+                if (!d || !Array.isArray(d.entries)) {
+                    setSilageLogStatus('⚠ The Apps Script needs updating before the log can be read.', '#e67e22');
+                    return;
+                }
+                silageStockLog = d.entries;
+                try { localStorage.setItem('silage_stock_log', JSON.stringify(silageStockLog)); } catch (e) {}
+                setSilageLogStatus(`${silageStockLog.length} change${silageStockLog.length === 1 ? '' : 's'} logged`);
+            } catch (e) {
+                console.log("Silage log load failed, using this device's copy");
+                setSilageLogStatus('⚠ Offline - showing the copy on this device.', '#e67e22');
+            }
+        }
+
+        // Places that are on the map now, and places that only the log remembers.
+        function fillSilageLogFilter() {
+            const sel = document.getElementById('sgs-log-filter');
+            const keep = sel.value;
+            const names = new Map();
+            silageStockLog.forEach(e => { if (e.location) names.set(String(e.location), e.locationName || e.location); });
+            silageStockLocations.forEach(l => names.set(String(l.id), l.name));
+            sel.innerHTML = '<option value="all">All locations</option>' +
+                [...names.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), undefined, { numeric: true }))
+                    .map(([id, name]) => `<option value="${escUnit(id)}">${escUnit(name)}</option>`).join('');
+            sel.value = keep && [...sel.options].some(o => o.value === keep) ? keep : 'all';
+        }
+
+        async function showSilageStockLog() {
+            document.getElementById('sgs-log-modal').style.display = 'flex';
+            if (silageStockLog.length === 0) {
+                try { silageStockLog = JSON.parse(localStorage.getItem('silage_stock_log') || '[]') || []; } catch (e) { silageStockLog = []; }
+            }
+            fillSilageLogFilter();
+            setSilageLogStatus('Loading from the sheet...', '#7f8c8d');
+            renderSilageStockLog();
+
+            await loadSilageStockLog();
+            fillSilageLogFilter();
+            renderSilageStockLog();
+        }
+
+        function closeSilageStockLog() {
+            document.getElementById('sgs-log-modal').style.display = 'none';
+        }
+
+        function filteredSilageStockLog() {
+            const f = document.getElementById('sgs-log-filter').value;
+            const rows = f === 'all' ? silageStockLog.slice() : silageStockLog.filter(e => String(e.location) === f);
+            return rows.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+        }
+
+        function renderSilageStockLog() {
+            const body = document.getElementById('sgs-log-body');
+            if (!body) return;
+            const rows = filteredSilageStockLog();
+            if (rows.length === 0) {
+                body.innerHTML = '<div class="muted" style="font-size:12px; text-align:center; padding:20px 0;">No changes logged yet.</div>';
+                return;
+            }
+            body.innerHTML = `<div style="font-size:11px; font-weight:bold; color:#7f8c8d; margin-bottom:8px;">${rows.length} CHANGE${rows.length === 1 ? '' : 'S'}</div>` +
+                rows.map(e => {
+                    const delta = silageNum(e.delta);
+                    const up = delta > 0;
+                    const unit = e.form === 'stack' ? ' t' : '';
+                    return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0;">
+                        <div style="min-width:0;">
+                            <div style="font-weight:bold; font-size:12px; color:${SILAGE_FORM_COLORS[e.form === 'stack' ? 'stack' : 'bales']};">${escUnit(e.locationName || e.location)}</div>
+                            <div style="font-size:10px; color:#95a5a6;">${escUnit(e.product)} &middot; ${formatHerdLogStamp(e.ts)} &middot; ${escUnit(e.user || '???')}</div>
+                            ${e.note ? `<div style="font-size:11px; color:#666;">${escUnit(e.note)}</div>` : ''}
+                        </div>
+                        <div style="text-align:right; white-space:nowrap;">
+                            <div style="font-weight:bold; font-size:13px; color:${up ? '#27ae60' : '#e74c3c'};">${up ? '+' : ''}${delta}${unit}</div>
+                            <div style="font-size:10px; color:#95a5a6;">${silageNum(e.from)} → <b style="color:#2c3e50;">${silageQtyText(e.to, e.form)}</b></div>
+                        </div>
+                    </div>`;
+                }).join('');
+        }
+
+        function exportSilageStockLogCsv() {
+            const rows = filteredSilageStockLog();
+            if (rows.length === 0) { alert("Nothing to export yet."); return; }
+            const esc = v => `"${String(v === undefined || v === null ? '' : v).replace(/"/g, '""')}"`;
+            const csv = ['Date,Time,Location,Product,Bales or stack,Unit,Change,From,To,User,Note']
+                .concat(rows.map(e => {
+                    const d = new Date(e.ts);
+                    return [
+                        esc(isNaN(d) ? '' : d.toLocaleDateString('en-NZ')),
+                        esc(isNaN(d) ? '' : d.toLocaleTimeString('en-NZ')),
+                        esc(e.locationName || e.location), esc(e.product),
+                        esc(e.form === 'stack' ? 'stack' : 'bales'), esc(e.form === 'stack' ? 't' : 'bales'),
+                        esc(silageNum(e.delta) > 0 ? '+' + silageNum(e.delta) : silageNum(e.delta)),
+                        esc(e.from), esc(e.to), esc(e.user), esc(e.note)
+                    ].join(',');
+                })).join('\r\n');
+
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `silage-log-${toDateInputValue(new Date())}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         /* ===================== FARM MAINTENANCE =====================
@@ -7404,6 +8187,8 @@
                             if (isDrawingBreak || (typeof isDrawingHazard !== 'undefined' && isDrawingHazard) || (typeof editingHazardId !== 'undefined' && editingHazardId)) return; // bubble up for drawing
                             // Marking a maintenance job: the tap belongs to the map, not the paddock
                             if (typeof maintDrawType !== 'undefined' && maintDrawType) return;
+                            // So does the tap that puts a silage pin down
+                            if (typeof silagePlacing !== 'undefined' && silagePlacing) return;
 
                             // Assigning paddocks to a unit takes over the tap entirely
                             if (unitEditingId && currentDashboardMode === 'farm_config') {
@@ -7509,14 +8294,20 @@
             document.getElementById('vehicle-maintenance-view').style.display = (mode === 'vehicle_maintenance') ? 'block' : 'none';
             const maintView = document.getElementById('maintenance-view');
             if (maintView) maintView.style.display = (mode === 'maintenance') ? 'block' : 'none';
+            const silageView = document.getElementById('silage-stock-view');
+            if (silageView) silageView.style.display = (mode === 'silage') ? 'block' : 'none';
             // The cover figures belong to the farmwalk, not to a jobs list.
             const avgBox = document.querySelector('.avg-box');
             const syncNote = document.querySelector('.sync-note');
-            if (avgBox) avgBox.style.display = (mode === 'maintenance') ? 'none' : '';
-            if (syncNote) syncNote.style.display = (mode === 'maintenance') ? 'none' : '';
+            if (avgBox) avgBox.style.display = (mode === 'maintenance' || mode === 'silage') ? 'none' : '';
+            if (syncNote) syncNote.style.display = (mode === 'maintenance' || mode === 'silage') ? 'none' : '';
             if (mode !== 'maintenance') {
                 if (maintDrawType) cancelMaintDrawing();
                 clearMaintFromMap();      // the jobs belong to their own map
+            }
+            if (mode !== 'silage') {
+                if (silagePlacing) cancelSilagePlacing();
+                clearSilageStockFromMap();    // so does the silage
             }
             document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
             // Sorting only means something where paddock cards are listed.
@@ -7585,7 +8376,7 @@
                 return;
             } else {
                 document.getElementById('map').style.display = (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
-                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config' || mode === 'maintenance') ? 'none' : 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config' || mode === 'maintenance' || mode === 'silage') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
@@ -7644,6 +8435,7 @@
                     if (mode === 'roster') fetchRoster(currentRosterSheet);
                     if (mode === 'vehicle_maintenance') loadVehicleMaintenance();
                     if (mode === 'maintenance') renderMaintOnMap();
+                    if (mode === 'silage') renderSilageStockOnMap();
                     if (typeof renderHazardsOnMap === 'function') renderHazardsOnMap();
                     // Re-adding the paddock layer put it over the breaks.
                     raiseBreakLayers();
@@ -7680,6 +8472,14 @@
                     // The hazards are wanted here too, so fetch them if this
                     // device has not opened Health & Safety yet.
                     if (typeof hsHazards !== 'undefined' && hsHazards.length === 0 && typeof loadHSTables === 'function') loadHSTables();
+                    return;
+                } else if (mode === 'silage') {
+                    // The silage map: the farm and the silage. No breaks.
+                    setLayerMode('satellite');
+                    document.getElementById('legend').style.display = 'none';
+                    updateGeoStyles();
+                    renderBreaksOnMap();          // clears them off the map
+                    loadSilageStock();
                     return;
                 } else if (mode === 'admin') {
                     document.getElementById('map').style.display = 'none';
@@ -8660,7 +9460,7 @@
                         opacity: 1,
                         weight: isTarget ? 3.5 : 1
                     });
-                } else if (currentDashboardMode === 'breaks' || currentDashboardMode === 'maintenance') {
+                } else if (currentDashboardMode === 'breaks' || currentDashboardMode === 'maintenance' || currentDashboardMode === 'silage') {
                     layer.setStyle({ fillColor: 'transparent', fillOpacity: 0, color: 'white', opacity: 0.8, weight: 1.5 });
                 } else if (activeUnit && !unitHasPaddock(activeUnit, pName)) {
                     // A unit is selected: everything outside it goes flat blue and recedes.
@@ -10946,8 +11746,8 @@
             window.audioAidParallelLayers.forEach(l => { if (l) map.removeLayer(l); });
             window.audioAidParallelLayers = [];
 
-            // The maintenance map never shows breaks.
-            if (currentDashboardMode === 'maintenance') return;
+            // The maintenance map and the silage map never show breaks.
+            if (currentDashboardMode === 'maintenance' || currentDashboardMode === 'silage') return;
 
             // FARMWALK and SATELLITE have a BREAKS ON/OFF button. There the breaks
             // are only drawn to look at: they let taps through to the paddock
