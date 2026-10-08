@@ -684,6 +684,13 @@
             loadedAt: 0,      // when it answered
             syncing: false,
             error: '',
+            partial: false,        // the daily read holds only the open treatments
+            histTreatments: [],    // every treatment on this farm, for History only
+            histDoses: [],
+            histLoaded: false,
+            histLoading: false,
+            histAt: 0,
+            histError: '',
             otherTreatments: [],   // other farms' records, for History only
             otherDoses: [],
             otherLoaded: false,
@@ -1054,12 +1061,16 @@
 
         /** How long ago the sheet answered, for the line under the title. */
         function freshness() {
-            if (!state.loadedAt) return '';
-            const mins = Math.floor((Date.now() - state.loadedAt) / 60000);
+            return ago(state.loadedAt);
+        }
+
+        function ago(at) {
+            if (!at) return '';
+            const mins = Math.floor((Date.now() - at) / 60000);
             if (mins < 1) return 'just now';
             if (mins === 1) return '1 minute ago';
             if (mins < 60) return mins + ' minutes ago';
-            return fmtDayTime(state.loadedAt);
+            return fmtDayTime(at);
         }
 
         /**
@@ -1086,6 +1097,13 @@
          */
         function applyServer(data) {
             if (!data || data.status !== 'success') return false;
+            // The short reply to a save that was only "seen" ticks. It carries
+            // the ticks and nothing else, so leave everything else as it is.
+            if (data.seenOnly) {
+                state.seen = data.seen || [];
+                state.error = '';
+                return true;
+            }
             if (Array.isArray(data.cows)) {
                 state.cows = data.cows;
                 state.cowsVersion = String(data.cowsVersion || '');
@@ -1097,6 +1115,7 @@
             state.drugs = (data.drugs || []).map(fillOldWithholds);
             state.treatments = (data.treatments || []).map(fillOldWithholds);
             state.doses = data.doses || [];
+            state.partial = data.scope === 'open';
             state.seen = data.seen || [];
             state.flags = data.flags || {};
             state.managers = data.managers || '';
@@ -1128,7 +1147,9 @@
             renderAll();
             let ok = false;
             try {
-                const data = await fetchJson(SCRIPT_URL + '?type=live&t=' + Date.now(), { cache: 'no-store' });
+                // scope=open: only the treatments that can be on a daily list.
+                // History fetches the rest when it is opened (loadHistory).
+                const data = await fetchJson(SCRIPT_URL + '?type=live&scope=open&t=' + Date.now(), { cache: 'no-store' });
                 if (applyServer(data)) {
                     setSync('Sheet read ' + freshness());
                     ok = true;
@@ -1147,6 +1168,7 @@
             }
             renderAll();
             if (ok) await refreshCowsIfChanged(false);
+            if (ok && historyShowing()) loadHistory(false);
             return ok;
         }
 
@@ -1227,7 +1249,9 @@
             try {
                 const data = await fetchJson(SCRIPT_URL, {
                     method: 'POST',
-                    body: JSON.stringify({ type: 'batch', items: batch })
+                    // seenReply: if the batch is only "seen" ticks, the sheet
+                    // sends back just the ticks, not a full ten-second re-read.
+                    body: JSON.stringify({ type: 'batch', items: batch, seenReply: true, scope: 'open' })
                 });
                 if (data && data.status === 'success') {
                     const sent = {};
@@ -1235,13 +1259,16 @@
                     state.queue = state.queue.filter(q => !sent[q.clientId]);
                     saveQueue();
                     applyServer(data);
+                    // A save can change an old record too (Undo clear, Delete),
+                    // so History reads the old records again next time it shows.
+                    if (!data.seenOnly) state.histAt = 0;
                     const failed = (data.results || []).filter(r => !r.ok);
                     if (failed.length) {
                         state.error = failed.length + ' change(s) were rejected by the sheet. See the console.';
                         setSync(state.error, 'bad');
                         console.error('Rejected items:', failed);
                     } else {
-                        setSync('Saved and re-read ' + freshness());
+                        setSync(data.seenOnly ? 'Saved' : 'Saved and re-read ' + freshness());
                         ok = true;
                     }
                 } else {
@@ -1260,7 +1287,90 @@
             // More may have arrived while this batch was in the air. Each pass
             // removes what it sent, so this always moves forward.
             if (ok && state.queue.length) return flushQueue();
+            if (ok && historyShowing()) loadHistory(false);
             return ok;
+        }
+
+        /**
+         * THE OLD RECORDS, FOR HISTORY ONLY.
+         *
+         * The daily read (?type=live&scope=open) carries only the treatments that
+         * can still be on Treated Cows, Doses Today, To Clear or Meat Withhold.
+         * Sending every treatment of the season on every read made the sheet slow
+         * enough to time out. History and the register need the rest, so they
+         * ask for it here, when they are opened - never from a copy kept on the
+         * phone. The open treatments always come from the daily read, which is
+         * the newer of the two.
+         */
+        async function loadHistory(force) {
+            if (!SCRIPT_URL || state.histLoading) return;
+            // An older sheet script sends everything in the daily read already.
+            if (state.loaded && !state.partial) return;
+            if (!force && state.histLoaded && Date.now() - state.histAt < STALE_MS) return;
+
+            // Never race this farm's own read: Google answers them one at a time.
+            if (state.syncing || state.loadingCows || !state.loaded) {
+                if (state.syncing || state.loadingCows) setTimeout(() => loadHistory(force), 1500);
+                return;
+            }
+
+            state.histLoading = true;
+            state.histError = '';
+            renderAll();
+            try {
+                const data = await fetchJson(SCRIPT_URL + '?type=treatments&t=' + Date.now(), { cache: 'no-store' });
+                if (data && data.status === 'success') {
+                    state.histTreatments = (data.treatments || []).map(t => {
+                        t._old = true;            // its doses are in histDoses
+                        return fillOldWithholds(t);
+                    });
+                    state.histDoses = data.doses || [];
+                    state.histLoaded = true;
+                    state.histAt = Date.now();
+                } else {
+                    state.histError = 'The sheet said: ' + ((data && data.message) || 'unknown error');
+                }
+            } catch (err) {
+                state.histError = err && err.name === 'AbortError'
+                    ? 'The older records took too long. Press ⟳ to try again.'
+                    : 'Could not read the older records. Press ⟳ to try again.';
+            } finally {
+                state.histLoading = false;
+            }
+            renderAll();
+            renderReport();   // the register may be open and waiting on this
+        }
+
+        function historyShowing() {
+            return currentTab === 'history' || !$('report').classList.contains('hidden');
+        }
+
+        /** The finished treatments that are not in the daily read. */
+        function oldTreatments() {
+            if (!state.partial) return [];
+            const open = new Set(state.treatments.map(t => String(t.ID)));
+            return state.histTreatments.filter(t => !open.has(String(t.ID)));
+        }
+
+        /** Every treatment on this farm: the open ones fresh, plus the old ones. */
+        function allTreatments() {
+            return state.treatments.concat(oldTreatments());
+        }
+
+        /** One of this farm's treatments, open or old. Never another farm's. */
+        function findOwn(id) {
+            return allTreatments().find(x => String(x.ID) === String(id));
+        }
+
+        /** The line History and the register show while the old records load. */
+        function historyNote() {
+            if (!state.partial) return '';
+            const text = state.histLoading ? 'Reading the older records…'
+                : state.histError ? esc(state.histError)
+                : state.histLoaded ? 'Older records read ' + ago(state.histAt) + '.'
+                : 'Loading the older records…';
+            return `<div class="muted" style="font-size:12px; margin-top:4px;${state.histError ? ' color:var(--red);' : ''}">${text}
+                <button class="btn small grey" style="margin-left:6px;" onclick="loadHistory(true)">⟳ Older records</button></div>`;
         }
 
         window.addEventListener('online', () => refreshAll(false));
@@ -1322,7 +1432,7 @@
 
         /** Doses live in a different list for another farm's treatments. */
         function dosesFor(t) {
-            return t._farm ? state.otherDoses : state.doses;
+            return t._farm ? state.otherDoses : t._old ? state.histDoses : state.doses;
         }
 
         /* ===================== DERIVED TREATMENT STATE ===================== */
@@ -1649,8 +1759,9 @@
             renderAll();
             window.scrollTo(0, 0);
             maybeRefresh();
-            // The other farms are only needed for History, so they load on arrival.
-            if (id === 'history') loadOtherFarms(false);
+            // The old records and the other farms are only needed for History,
+            // so they load on arrival.
+            if (id === 'history') { loadHistory(false); loadOtherFarms(false); }
         }
 
         /* ===================== RENDER ===================== */
@@ -2670,7 +2781,7 @@
         }
 
         function giveDose(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t) return;
             const i = info(t);
             if (!i.dueSlot) { toast('No dose is due today'); return; }
@@ -2693,7 +2804,7 @@
          * on this app that puts milk in the vat before it should be there.
          */
         function giveDoseEarlier(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t || !isManager()) return;
             const i = info(t);
 
@@ -2740,7 +2851,7 @@
         }
 
         function confirmDoseEarlier(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t) return;
             const i = info(t);
             const doseNo = num($('dose-no').value, 0);
@@ -2760,7 +2871,7 @@
         }
 
         function undoDose(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t) return;
             const i = info(t);
             if (!i.given) return;
@@ -2772,7 +2883,7 @@
         }
 
         function endTreatment(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t) return;
             const i = info(t);
             if (!confirm(`Stop the treatment for cow ${byTag(t)} after ${i.given} of ${i.total} doses?\n\nThe withhold still counts from the last dose given.`)) return;
@@ -2782,7 +2893,7 @@
 
         /** Ask first. Clearing a cow puts her milk back in the vat. */
         function clearCow(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t) return;
             const i = info(t);
 
@@ -2811,7 +2922,7 @@
         }
 
         function confirmClearCow(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t) return;
             const i = info(t);
             closeModal();
@@ -2823,7 +2934,7 @@
 
         /** Put a cow back on the red list if someone hit Clear by mistake. */
         function unclearCow(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t) return;
             if (!confirm(`Undo the clear for cow ${byTag(t)}?\n\nShe goes back to the Treated Cows list and her milk is withheld again.`)) return;
             closeModal();
@@ -2886,7 +2997,7 @@
 
             // A cow that moved farms carries her record with her, so History is
             // this farm's treatments plus every other farm's.
-            let rows = state.treatments.concat(state.otherTreatments)
+            let rows = allTreatments().concat(state.otherTreatments)
                 .map(t => ({ t, i: info(t) }));
 
             // Spaces ignored so a pasted EID matches; text fields searched too, but
@@ -2900,6 +3011,7 @@
             const head = listHeader(
                 `${plural(rows.length, 'treatment')}${q ? ' found' : ' recorded'}, newest first.`
                 + (fromOthers ? ` <b>${fromOthers}</b> from ${esc(others)}.` : '')
+                + historyNote()
                 + (others ? `<div class="muted" style="font-size:12px; margin-top:4px;">${
                     state.otherLoading ? 'Reading ' + esc(others) + '…'
                     : state.otherError ? esc(state.otherError)
@@ -2975,7 +3087,8 @@
                 $('rep-to').value = isoDay(new Date());
             }
 
-            // The other farm's records are only here if History has fetched them.
+            // The old records and the other farm's are fetched when the register opens.
+            loadHistory(false);
             loadOtherFarms(false);
 
             $('report').classList.remove('hidden');
@@ -2994,7 +3107,7 @@
             const drug = $('rep-drug').value;
             const withOthers = $('rep-others').checked;
 
-            let list = state.treatments.slice();
+            let list = allTreatments();
             if (withOthers) list = list.concat(state.otherTreatments);
 
             return list
@@ -3012,7 +3125,7 @@
         }
 
         function fillReportFilters() {
-            const all = state.treatments.concat($('rep-others').checked ? state.otherTreatments : []);
+            const all = allTreatments().concat($('rep-others').checked ? state.otherTreatments : []);
             const opts = (sel, values, label) => {
                 const keep = sel.value;
                 sel.innerHTML = '<option value="">All ' + label + '</option>'
@@ -3119,7 +3232,7 @@
         /* ---------- treatment detail sheet ---------- */
 
         function openTreatment(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id))
+            const t = findOwn(id)
                 || state.otherTreatments.find(x => String(x.ID) === String(id));
             if (!t) return;
             const i = info(t);
@@ -3227,7 +3340,7 @@
         }
 
         function deleteTreatment(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t || !isManager()) return;
             const i = info(t);
             if (!confirm(`Delete the treatment for cow ${byTag(t)}?\n\n`
@@ -3245,7 +3358,7 @@
          * one is written. Nothing is ever half-edited.
          */
         function replaceTreatment(id) {
-            const t = state.treatments.find(x => String(x.ID) === String(id));
+            const t = findOwn(id);
             if (!t || !isManager()) return;
             const i = info(t);
             if (!confirm(`Replace the treatment for cow ${byTag(t)}?\n\n`
