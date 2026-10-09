@@ -81,6 +81,11 @@
             <select id="sess" onchange="S.sess = this.value; render();"></select>
         </div>
         <div class="row" style="margin-top:10px;">
+            <span class="muted">From</span><input type="time" id="tfrom" onchange="setTimes()" style="width:auto;">
+            <span class="muted">to</span><input type="time" id="tto" onchange="setTimes()" style="width:auto;">
+            <button class="btn small ghost" onclick="clearTimes()" title="All times">✕</button>
+        </div>
+        <div class="row" style="margin-top:10px;">
             <input type="search" id="q" placeholder="Search a cow: tag or EID (looks in every loaded day)" oninput="S.q = this.value; render();">
         </div>
         <div class="row" style="margin-top:10px;">
@@ -251,6 +256,7 @@ const S = {
     live: { treatments: [], doses: [], seen: [] },
     liveOk: false, liveAt: 0,
     day: '', sess: 'all', view: 'cows', q: '', fTx: false, fAct: false, newest: true,
+    tFrom: '', tTo: '',         // "13:00" - only reads between these times on the chosen day ('' = no limit)
     items: [], busy: false, err: '', updatedAt: 0
 };
 
@@ -418,8 +424,44 @@ function currentSession() {
     return sessionOf(t, offsetAt(t), mins);
 }
 
+/**
+ * The cows of the chosen day and milking. With a From/To time (Juani, 2026-10-09) only the reads between those
+ * times on that day count, and each cow's first/last/reads are worked out from those reads only.
+ * To earlier than From = past midnight.
+ */
+function timeRange() {
+    if (!S.tFrom && !S.tTo) return null;
+    const base = dayStart(S.day).getTime();
+    const mins = v => { const p = String(v).split(':').map(Number); return (p[0] || 0) * 60 + (p[1] || 0); };
+    const from = base + (S.tFrom ? mins(S.tFrom) : 0) * 60000;
+    let to = base + (S.tTo ? mins(S.tTo) + 1 : 24 * 60) * 60000;          // To 16:00 includes 16:00:59
+    if (to <= from) to += 86400000;
+    return { from, to };
+}
+
 function inView() {
-    return S.items.filter(it => it.w.day === S.day && (S.sess === 'all' || it.w.time === S.sess));
+    const r = timeRange();
+    const items = S.items.filter(it => (r || it.w.day === S.day) && (S.sess === 'all' || it.w.time === S.sess));
+    if (!r) return items;
+    const out = [];
+    items.forEach(it => {
+        const rows = it.rows.filter(x => x.t >= r.from && x.t < r.to);
+        if (!rows.length) return;
+        out.push(Object.assign({}, it, { rows, reads: rows.length,
+            first: Math.min(...rows.map(x => x.t)), last: Math.max(...rows.map(x => x.t)) }));
+    });
+    return out;
+}
+
+function setTimes() {
+    S.tFrom = $('tfrom').value;
+    S.tTo = $('tto').value;
+    render();
+}
+
+function clearTimes() {
+    $('tfrom').value = ''; $('tto').value = '';
+    setTimes();
 }
 
 function applyFilters(list) {
