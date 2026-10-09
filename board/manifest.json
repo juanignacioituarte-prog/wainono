@@ -1,1 +1,29 @@
-{"version":"20260920-0712-3f9c10","files":{"shed.html.gz":{"size":55447,"sha256":"3f9c100ecd801b7ab971efcef3808b68f95400722baa7d27f28bad773962e444"}}}
+{
+ "version": "2026-10-09 14:54 706b32",
+ "files": {
+  "app.mpy": {
+   "size": 10073,
+   "sha256": "8b07a3f03fea4c81a81286c89a8df6aae9feeddc844e243f4c6faf63aaa3fded"
+  },
+  "net.mpy": {
+   "size": 2377,
+   "sha256": "f08a99a85c114bfdad4ecaa3ae188429f234992219c78d2535a0855f66089842"
+  },
+  "page2.mpy": {
+   "size": 2764,
+   "sha256": "5c6b6b6c617a25434a191992af6ded93505f9ccfaad4dd11964ed55fdd56424d"
+  },
+  "eidparse.mpy": {
+   "size": 249,
+   "sha256": "e019c562984dd58feb921b0c16416a70882fde3e22a0ee8bc00f94fc775d8e76"
+  },
+  "update.mpy": {
+   "size": 3821,
+   "sha256": "2f79a4cdd4f04e587aca837a14078481eb9fc4ce34b82cd00fc932dfb2109360"
+  },
+  "shed.html.gz": {
+   "size": 57999,
+   "sha256": "f20cd627816e0cf149b5858e0cbe046856039c83eccc5613b4583b291c445443"
+  }
+ }
+}
