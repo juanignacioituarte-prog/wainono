@@ -1,25 +1,25 @@
 {
- "version": "2026-10-09 17:08 3d313a",
+ "version": "2026-10-10 09:38 aa5909",
  "files": {
   "app.mpy": {
-   "size": 10842,
-   "sha256": "fd8509c789fd789a364c7cbdc32c2f5cacd7c4ebf844937fcfa65a3cec65788f"
+   "size": 11001,
+   "sha256": "a636af36addc45cbbdb724fa9e59dd0edbe89409ab24e237a099fa998413b919"
   },
   "net.mpy": {
-   "size": 2385,
-   "sha256": "660600c504a0dc551ca83b52a76fc98c5ed47e3b603d1ba5ce61111eed9fd7ff"
+   "size": 2338,
+   "sha256": "a36d84359f7113eaca77bc735ad0e080011440b775dce93c2db81e19501613a7"
   },
   "page2.mpy": {
-   "size": 2764,
-   "sha256": "5c6b6b6c617a25434a191992af6ded93505f9ccfaad4dd11964ed55fdd56424d"
+   "size": 2717,
+   "sha256": "2a3908207bbee37e4264ec448412b3518c9280c3f7afa1aa5efc449aa6cfde50"
   },
   "eidparse.mpy": {
-   "size": 249,
-   "sha256": "e019c562984dd58feb921b0c16416a70882fde3e22a0ee8bc00f94fc775d8e76"
+   "size": 202,
+   "sha256": "dcde646f847b876a0ce9ec8656457a7720dc0eb75c041eb499f3e17523815e46"
   },
   "update.mpy": {
-   "size": 3821,
-   "sha256": "2f79a4cdd4f04e587aca837a14078481eb9fc4ce34b82cd00fc932dfb2109360"
+   "size": 3774,
+   "sha256": "85d356f27768b9f437eb099df4b683ff9c038861b5e530bfd70494a771d1a436"
   },
   "shed.html.gz": {
    "size": 60480,
