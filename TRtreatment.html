@@ -148,10 +148,15 @@
         .flag.big { width: 34px; height: 34px; font-size: 16px; border-radius: 7px; }
         .flag-S { background: #e67e22; }
         .flag-3T { background: #2980b9; }
+        /* wider than the square marks, it has more to say */
+        .flag-old3T { width: auto; padding: 0 6px; background: #d6eaf8; color: #1f618d;
+                      font-size: 11px; letter-spacing: 0; box-shadow: inset 0 0 0 1.5px #2980b9; }
+        .flag-old3T.big { width: auto; font-size: 14px; }
         .tcard .flag { box-shadow: 0 0 0 2px rgba(255, 255, 255, .55); }
         /* the history row lines its items up on the text baseline, which drops a
            box to the floor, so the marks centre themselves instead */
         .hrow .hd .flag { align-self: center; width: 23px; height: 23px; font-size: 12px; }
+        .hrow .hd .flag-old3T { width: auto; font-size: 10px; }
 
         .pill {
             display: inline-block; padding: 2px 8px; border-radius: 10px;
@@ -1583,9 +1588,13 @@
          * a list per condition, and every cow on one carries a small square mark
          * wherever her number is shown, so nobody has to remember.
          */
+        // cls is the CSS class (no spaces). unless: a cow on that list shows only
+        // that mark - "Old 3 Titter" is three teats from before this season, and
+        // a cow found three-teated again this season is just 3T.
         const FLAG_LOOK = {
-            'Staph aureus': { code: 'S', title: 'Staph aureus' },
-            '3 Titter': { code: '3T', title: 'Three teats' }
+            'Staph aureus': { code: 'S', cls: 'S', title: 'Staph aureus' },
+            '3 Titter': { code: '3T', cls: '3T', title: 'Three teats' },
+            'Old 3 Titter': { code: 'old 3T', cls: 'old3T', title: 'Three teats, from before this season', unless: '3 Titter' }
         };
 
         /** Which lists this cow is on. Matched on her tag. */
@@ -1597,9 +1606,10 @@
         }
 
         function flagMarks(tag, big) {
-            return flagsForCow(tag).map(name => {
+            const lists = flagsForCow(tag);
+            return lists.filter(name => lists.indexOf(FLAG_LOOK[name].unless) === -1).map(name => {
                 const f = FLAG_LOOK[name];
-                return `<span class="flag flag-${f.code}${big ? ' big' : ''}" title="${esc(f.title)}">${f.code}</span>`;
+                return `<span class="flag flag-${f.cls}${big ? ' big' : ''}" title="${esc(f.title)}">${f.code}</span>`;
             }).join('');
         }
 
@@ -3416,10 +3426,10 @@
             $('cfg-flags').innerHTML = Object.keys(FLAG_LOOK).map(name => {
                 const f = FLAG_LOOK[name];
                 const on = state.flags[name] || [];
-                const id = 'flag-' + f.code;
+                const id = 'flag-' + f.cls;
                 return `<div style="border-top:1px solid var(--line); padding-top:10px; margin-top:10px;">
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span class="flag flag-${f.code}">${f.code}</span>
+                        <span class="flag flag-${f.cls}">${f.code}</span>
                         <b>${esc(name)}</b>
                         <span class="muted" style="margin-left:auto;">${plural(on.length, 'cow')}</span>
                     </div>
@@ -3754,7 +3764,7 @@
                 .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
             const f = FLAG_LOOK[name];
             openModal(`
-                <h3><span class="flag flag-${f.code}">${f.code}</span> ${esc(name)}</h3>
+                <h3><span class="flag flag-${f.cls}">${f.code}</span> ${esc(name)}</h3>
                 <p class="muted">${plural(on.length, 'cow')} on this list.</p>
                 <div style="max-height:50vh; overflow:auto; font-size:15px; line-height:2;">
                     ${on.length ? on.map(c => esc(c)).join(', ') : 'Nobody yet.'}
