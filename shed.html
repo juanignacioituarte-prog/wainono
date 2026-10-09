@@ -36,8 +36,12 @@
         .stat { background: #fff; border-radius: 12px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
         .stat b { display: block; font-size: 26px; line-height: 1.1; }
         .stat span { font-size: 12px; color: var(--muted); }
-        .live { background: var(--accent-dark); color: #fff; border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-        .live b { font-size: 22px; }
+        .live { background: var(--accent-dark); color: #fff; border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; }
+        .live-h { font-size: 14px; font-weight: 700; opacity: .95; }
+        .live-n { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 4px; }
+        .live-n b { display: block; font-size: 24px; line-height: 1.1; }
+        .live-n span { font-size: 12px; opacity: .85; }
+        .live-s { font-size: 12px; opacity: .85; }
         .cow { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
         .cow .tag { font-size: 30px; font-weight: 900; min-width: 70px; line-height: 1; }
         .cow .tag small { display: block; font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .5px; }
@@ -65,6 +69,7 @@
 
 <div class="wrap">
     <div id="err"></div>
+    <div id="live"></div>          <!-- this milking: cows, first cow, last cow. At the top (Juani, 2026-10-09) -->
 
     <div class="card">
         <div class="row">
@@ -91,7 +96,6 @@
         </div>
     </div>
 
-    <div id="live"></div>
     <div id="stats" class="stats" style="margin-bottom:10px;"></div>
     <div id="list"></div>
 
@@ -478,17 +482,33 @@ function render() {
     const exact = it => (searching && String(it.tag).toLowerCase() === qq) ? 0 : 1;      // an exact tag comes first
     const list = applyFilters(base).sort((a, b) => exact(a) - exact(b) || (S.newest ? b.first - a.first : a.first - b.first));
 
-    // the milking that is running now: live counter, only when looking at it
+    // The card at the top (Juani, 2026-10-09): this milking's cows, first cow and last cow. It shows the milking
+    // running now; before its first cow, the last milking that had cows. Only when looking at today.
     const cur = currentSession();
-    const live = !searching && S.day === cur.day && (S.sess === 'all' || S.sess === cur.time);
-    const nowItems = S.items.filter(it => it.w.label === cur.label);
+    let label = cur.label, nowItems = S.items.filter(it => it.w.label === label);
+    if (!nowItems.length && S.items.length) {
+        const latest = S.items.reduce((a, b) => (b.last > a.last ? b : a));
+        label = latest.w.label;
+        nowItems = S.items.filter(it => it.w.label === label);
+    }
+    const nowW = nowItems.length ? nowItems[0].w : cur;
+    const live = !searching && S.day === nowW.day && (S.sess === 'all' || S.sess === nowW.time);
     if (live && nowItems.length) {
-        const first = Math.min(...nowItems.map(i => i.first));
-        $('live').innerHTML = `<div class="live"><span>● Milking now (from ${esc(cur.time)})</span>
-            <span><b>${nowItems.length}</b> cows</span><span>⏱ <b id="live-t">${fmtDur((Date.now() - first) / 1000)}</b> since first cow</span>
-            <span>${nowItems.filter(i => i.onTx).length} on treatment</span></div>`;
-        window._liveFirst = first;
-    } else { $('live').innerHTML = ''; window._liveFirst = 0; }
+        const first = Math.min(...nowItems.map(i => i.first)), last = Math.max(...nowItems.map(i => i.last));
+        const running = label === cur.label && Date.now() - last < 15 * 60000;   // a read in the last 15 min
+        const agoMin = Math.floor((Date.now() - last) / 60000);
+        $('live').innerHTML = `<div class="live">
+            <div class="live-h">${running ? '● Milking now' : 'Last milking'} · ${esc(nice(nowW.day))}, from ${esc(nowW.time)}</div>
+            <div class="live-n">
+                <div><b>${nowItems.length}</b><span>cows</span></div>
+                <div><b>${hm(first)}</b><span>first cow</span></div>
+                <div><b>${hm(last)}</b><span>last cow</span></div>
+                <div><b>${fmtDur((last - first) / 1000).replace(/:\d\d$/, '')}</b><span>first to last</span></div>
+            </div>
+            <div class="live-s">${nowItems.filter(i => i.onTx).length} on treatment${running
+                ? ' · last read ' + (agoMin < 1 ? 'just now' : agoMin + ' min ago') : ''}</div></div>`;
+    } else { $('live').innerHTML = ''; }
+    window._liveFirst = 0;
 
     // numbers for the day / milking being looked at (not for a search)
     if (!searching) {
