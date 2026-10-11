@@ -183,10 +183,15 @@ and how many hectares, so two devices can be compared.
     farmwalk box clears it and opens "Take out of rotation". SAVE FARMWALK,
     BRING BACK, the walk HISTORY editor and "Update Covers" all refuse 0.
   - Old paddocks out by a cover of 0 in the farmwalk are shown in the list
-    with a note. To bring one back, change that latest cover: "+ Farmwalk",
-    hold the card 1 second, "Latest", Update Covers. Juani does this by hand.
-    BACK IN in Farm Configuration does not write a cover: a cover for today
-    would look like a walk of one paddock and move the farm average.
+    with a note. **BACK IN** on one of them asks for a cover and changes the 0
+    in its last farmwalk (`restoreZeroCover`, sent as
+    `update_paddock_history`). It never adds a cover for today: that would
+    look like a walk of one paddock and move the farm average.
+  - **BRING BACK in the farmwalk** only opens a box for the cover on the day
+    of the walk being entered (Juani, 12 Oct 2026). It does not touch old
+    walks.
+  - Changing a 0 on a day when only that paddock was walked (Q3 on 26 Sept)
+    makes that day count as a walk for growth.
   - `save_out` writes the whole tab, so every change first reads the live
     tab (`?type=out`), makes the change on it, then saves (`changeOutTab`).
 - **Paddocks**: rename, merge, split, reshape, add, delete boundaries.

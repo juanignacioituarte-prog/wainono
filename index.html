@@ -5323,7 +5323,7 @@
                 return `
                 <div id="out-row-${escUnit(normName(r.paddock))}" style="background:${picked ? '#fef5e7' : '#fff'}; border:1px solid ${picked ? '#e67e22' : '#ddd'}; border-left:6px solid ${outStatusColor(r.status)}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(r.paddock)}
-                        ${r.walk ? `<div style="font-weight:normal; font-size:10px; color:#7f8c8d;">cover 0 in the farmwalk of ${escUnit(r.walk)}. To bring it back, change that latest cover.</div>` : ''}</div>
+                        ${r.walk ? `<div style="font-weight:normal; font-size:10px; color:#7f8c8d;">cover 0 in the farmwalk of ${escUnit(r.walk)}. BACK IN changes that cover.</div>` : ''}</div>
                     <select onchange="setOutStatus('${escUnit(r.paddock)}', this.value)"
                         style="padding:5px; border:1px solid #ccc; border-radius:4px; font-size:11px; font-weight:bold; color:${outStatusColor(r.status)};">${opts}</select>
                     <button onclick="returnToRotation('${escUnit(r.paddock)}')"
@@ -5406,12 +5406,16 @@
             // typed in a farmwalk takes that away. A cover saved from here would
             // make today look like a walk of one paddock and move the farm average.
             const p = (manualModeData || []).find(d => normName(d.name) === normName(paddock));
-            const zeroCover = !!(p && p.latest && p.latest.ts && p.latest.cover === 0);
-            if (!outTabHas(paddock)) {
-                return alert(`"${paddock}" is out because its last farmwalk cover is 0.\n\nTo bring it back, change that latest cover: in FARMWALK tap "+ Farmwalk", hold the paddock's card for 1 second, type the cover in "Latest", then tap Update Covers.`);
+            if (hasZeroLatestCover(p)) {
+                // Its last farmwalk says 0: that cover is changed, no new walk.
+                const cover = askCoverForZeroWalk(p);
+                if (cover === null) return;
+                if (outTabHas(paddock)) changeOutTab(rows => rows.filter(r => normName(r.paddock) !== normName(paddock)));
+                restoreZeroCover(p.name, cover);
+                refreshAfterOutChange();
+                return;
             }
-            if (!confirm(`Put "${paddock}" back into rotation?` +
-                (zeroCover ? `\n\nIts last farmwalk cover is 0, so it stays out until a farmwalk gives it a cover.` : ''))) return;
+            if (!confirm(`Put "${paddock}" back into rotation?`)) return;
             changeOutTab(rows => rows.filter(r => normName(r.paddock) !== normName(paddock)));
         }
 
@@ -7321,6 +7325,42 @@
             renderDashboard();
             updateGeoStyles();
             syncPaddockEntriesToCloud(pName);
+        }
+
+        // A paddock out by a cover of 0: bring it back by changing that 0 in its
+        // last farmwalk. No new walk is made, so the farm average and the walk
+        // dates stay as they are.
+        function hasZeroLatestCover(p) {
+            return !!(p && p.latest && p.latest.ts && p.latest.cover === 0);
+        }
+
+        function askCoverForZeroWalk(p) {
+            const typed = prompt(`Bring "${p.name}" back into rotation.\n\nIn the farmwalk of ${p.latest.formattedDate} its cover is 0. Type the cover for that walk (kg DM/ha):`, '');
+            if (typed === null) return null;
+            const cover = parseFloat(typed);
+            if (!(cover > 0)) { alert('Type a cover bigger than 0.'); return null; }
+            return cover;
+        }
+
+        function restoreZeroCover(pName, cover) {
+            const p = manualModeData.find(d => d.name === pName) ||
+                      manualModeData.find(d => normName(d.name) === normName(pName));
+            if (!hasZeroLatestCover(p) || !(cover > 0)) return false;
+            p.latest.cover = cover;
+            if (p.entries && p.entries[0] && p.entries[0].dateObj &&
+                p.entries[0].dateObj.getTime() === p.latest.ts) {
+                p.entries[0].cover = cover;
+                p.entries[0].reason = '';
+            }
+            p.isOut = false;
+            p.reason = '';
+            p.growthRate = coverGrowthRate(p.latest.cover, p.previous ? p.previous.cover : null,
+                p.latest.ts, p.previous ? p.previous.ts : null, false);
+            updateFarmStats();
+            renderDashboard();
+            updateGeoStyles();
+            syncPaddockEditToCloud(p.name);
+            return true;
         }
 
         async function syncPaddockEditToCloud(pName) {
