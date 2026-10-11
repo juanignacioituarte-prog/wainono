@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 3 October 2026. App version: **v1.1.14**,
-service worker cache `wn-farm-v1.1.28`, Apps Script `2026-10-03-b`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.15**,
+service worker cache `wn-farm-v1.1.29`, Apps Script `2026-10-03-b`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`.
 
@@ -167,7 +167,24 @@ and how many hectares, so two devices can be compared.
 
 ### Farm Configuration (admin)
 - **Farm units**: which paddocks belong to which unit.
-- **Paddocks out**: the `out` tab.
+- **Paddocks out**: the `out` tab. This is the one list of paddocks out of
+  rotation (v1.1.15).
+  - "Take a paddock out": pick it in the list or tap it on the map, then tap
+    the reason (CROP / SILAGE / OTHER).
+  - Each reason has its own colour on every map, the cards and the list:
+    Crop `#d35400`, Silage `#8e44ad`, Other `#e74c3c` (`OUT_STATUSES`).
+    Old reasons such as `OUT` or lower case ones count as Other.
+  - A paddock on the tab is out in FARMWALK too, whatever its last cover
+    (`applyOutTabToWalk`). Before v1.1.15 the tab only counted for paddocks
+    with no covers.
+  - "Take out of rotation" in the farmwalk now writes to the tab. It no longer
+    writes a cover of 0. BRING BACK writes the cover and takes it off the tab.
+  - Old paddocks out by a cover of 0 in the farmwalk are shown in the list
+    with a note. They only come back with a cover typed in a farmwalk. A
+    cover saved from Farm Configuration would make today look like a walk of
+    one paddock and move the farm average.
+  - `save_out` writes the whole tab, so every change first reads the live
+    tab (`?type=out`), makes the change on it, then saves (`changeOutTab`).
 - **Paddocks**: rename, merge, split, reshape, add, delete boundaries.
   A merge moves the covers of the parts onto the merged paddock (averaged by
   area). A split gives both halves the parent's covers. A rename moves the
@@ -385,3 +402,10 @@ Added 3 October 2026:
 - The names with `wainono` in them (repo, live address, cache name, the word in
   the app, the title of this file) stay until Juani says. A farm setup system
   is planned and the names will be handled there.
+
+Added 12 October 2026:
+
+- Paddocks out reworked (v1.1.15, see Farm Configuration). No script change.
+- On 12 Oct the out tab had 22 paddocks, all OTHER. Q3, 30a, U1 and U2 were
+  out only by a cover of 0 in the farmwalk (26 and 30 Sept). Juani will sort
+  these by hand: **do not change the sheet data for them**.

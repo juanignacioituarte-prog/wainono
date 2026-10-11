@@ -1470,7 +1470,13 @@
                     </div>
                     <hr style="border:0; border-top:1px solid #eee; margin:8px 0;">
                     <div class="legend-item">
-                        <div class="legend-color" style="background:#ff7675"></div> Out of Rotation
+                        <div class="legend-color" style="background:#d35400"></div> Out: Crop
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background:#8e44ad"></div> Out: Silage
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background:#e74c3c"></div> Out: Other
                     </div>
                 </div>
             </div>
@@ -1679,7 +1685,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.14</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.15</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1692,7 +1698,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.14</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.15</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1841,9 +1847,16 @@
             <div id="fc-section-out" style="display:none;">
                 <h4 style="margin:0 0 4px; font-size:13px; color:#2c3e50;">Paddocks Out of Rotation</h4>
                 <p style="font-size:12px; color:#666; margin:0 0 12px;">
-                    Change why a paddock is out, or put it back in rotation. A paddock stops
-                    appearing in Crop Management as soon as it is no longer on crop.
+                    Take a paddock out, change why it is out, or put it back in rotation. A paddock
+                    stops appearing in Crop Management as soon as it is no longer on crop.
                 </p>
+                <div style="background:#fdf6ee; border:1px solid #f0d2b0; border-radius:6px; padding:8px 10px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:12px; font-weight:bold; color:#2c3e50;">Take a paddock out</div>
+                    <div style="font-size:11px; color:#666;">Pick the paddock in the list or tap it on the map. Then tap the reason.</div>
+                    <select id="out-add-paddock" onchange="pickOutPaddock(this.value)"
+                        style="padding:8px; border:1px solid #ccc; border-radius:4px; font-size:13px; font-weight:bold;"></select>
+                    <div id="out-add-reasons" style="display:flex; gap:6px;"></div>
+                </div>
                 <div id="out-paddock-list" style="display:flex; flex-direction:column; gap:8px;"></div>
                 <div id="out-sync-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
             </div>
@@ -5252,11 +5265,33 @@
         }
 
         /* ---- Paddocks out of rotation ---- */
+        // Each reason has its own colour, on the map, the cards and this list.
         const OUT_STATUSES = [
-            { value: 'CROP', label: 'Crop' },
-            { value: 'SILAGE', label: 'Silage' },
-            { value: 'OTHER', label: 'Other' }
+            { value: 'CROP', label: 'Crop', color: '#d35400' },
+            { value: 'SILAGE', label: 'Silage', color: '#8e44ad' },
+            { value: 'OTHER', label: 'Other', color: '#e74c3c' }
         ];
+
+        // The farmwalk wrote reasons in lower case, and old rows say just "OUT".
+        // Anything that is not a known reason counts as Other.
+        function outStatusInfo(status) {
+            const s = String(status || '').trim().toUpperCase();
+            return OUT_STATUSES.find(o => o.value === s) || OUT_STATUSES[OUT_STATUSES.length - 1];
+        }
+        function outStatusColor(status) { return outStatusInfo(status).color; }
+
+        let outPickName = ''; // the paddock picked in "Take a paddock out"
+
+        function outTabHas(name) {
+            return outRows.some(r => normName(r.paddock) === normName(name));
+        }
+
+        // A paddock is also out when its latest farmwalk cover is 0. Those are
+        // shown in the list too, so the list is every paddock out of rotation.
+        function walkOutPaddocks() {
+            return (manualModeData || []).filter(p =>
+                p.latest && p.latest.ts && p.latest.cover === 0 && !outTabHas(p.name));
+        }
 
         function setOutSyncStatus(text, color) {
             const el = document.getElementById('out-sync-status');
@@ -5269,7 +5304,13 @@
             const box = document.getElementById('out-paddock-list');
             if (!box) return;
 
-            const rows = outRows.slice().sort((a, b) => a.paddock.localeCompare(b.paddock));
+            const byName = (a, b) => a.paddock.localeCompare(b.paddock, undefined, { numeric: true });
+            const rows = outRows.map(r => ({ paddock: r.paddock, status: outStatusInfo(r.status).value, walk: null }))
+                .concat(walkOutPaddocks().map(p => ({ paddock: p.name, status: outStatusInfo(p.reason).value, walk: p.latest.formattedDate })))
+                .sort(byName);
+
+            renderOutAddBox(rows);
+
             if (rows.length === 0) {
                 box.innerHTML = `<div style="font-size:12px; color:#7f8c8d;">No paddocks are out of rotation.</div>`;
                 return;
@@ -5278,16 +5319,65 @@
             box.innerHTML = rows.map(r => {
                 const opts = OUT_STATUSES.map(s =>
                     `<option value="${s.value}" ${r.status === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
+                const picked = outPickName && normName(outPickName) === normName(r.paddock);
                 return `
-                <div style="background:#fff; border:1px solid #ddd; border-left:4px solid ${r.status === 'CROP' ? '#d35400' : (r.status === 'SILAGE' ? '#e67e22' : '#7f8c8d')}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                    <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(r.paddock)}</div>
+                <div id="out-row-${escUnit(normName(r.paddock))}" style="background:${picked ? '#fef5e7' : '#fff'}; border:1px solid ${picked ? '#e67e22' : '#ddd'}; border-left:6px solid ${outStatusColor(r.status)}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(r.paddock)}
+                        ${r.walk ? `<div style="font-weight:normal; font-size:10px; color:#7f8c8d;">cover 0 in the farmwalk of ${escUnit(r.walk)}</div>` : ''}</div>
                     <select onchange="setOutStatus('${escUnit(r.paddock)}', this.value)"
-                        style="padding:5px; border:1px solid #ccc; border-radius:4px; font-size:11px; font-weight:bold;">${opts}</select>
+                        style="padding:5px; border:1px solid #ccc; border-radius:4px; font-size:11px; font-weight:bold; color:${outStatusColor(r.status)};">${opts}</select>
                     <button onclick="returnToRotation('${escUnit(r.paddock)}')"
                         style="margin-left:auto; background:#27ae60; color:#fff; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">
                         ↩ BACK IN</button>
                 </div>`;
             }).join('');
+        }
+
+        // The "Take a paddock out" box: every paddock still in rotation, and one
+        // button per reason.
+        function renderOutAddBox(outList) {
+            const sel = document.getElementById('out-add-paddock');
+            const btns = document.getElementById('out-add-reasons');
+            if (!sel || !btns) return;
+
+            const out = new Set(outList.map(r => normName(r.paddock)));
+            const names = Object.keys(paddockMap || {}).length ? Object.keys(paddockMap) : Object.keys(areaLookup || {});
+            const inRotation = names.filter(n => n && !out.has(normName(n)))
+                .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            if (outPickName && !inRotation.some(n => normName(n) === normName(outPickName))) outPickName = '';
+
+            sel.innerHTML = `<option value="">— pick a paddock —</option>` + inRotation.map(n =>
+                `<option value="${escUnit(n)}" ${normName(n) === normName(outPickName) ? 'selected' : ''}>${escUnit(n)}</option>`).join('');
+
+            btns.innerHTML = OUT_STATUSES.map(s =>
+                `<button onclick="takePaddockOut(outPickName, '${s.value}')"
+                    style="flex:1; background:${s.color}; color:#fff; border:none; padding:9px 4px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">${s.label.toUpperCase()}</button>`).join('');
+        }
+
+        // From the list or from a tap on the map.
+        function pickOutPaddock(name) {
+            const p = String(name || '');
+            const isOut = outTabHas(p) || walkOutPaddocks().some(w => normName(w.name) === normName(p));
+            outPickName = p;
+            renderOutManager();
+            updateGeoStyles();
+            if (isOut) {
+                // Already out: show its line in the list instead.
+                const row = document.getElementById('out-row-' + escUnit(normName(p)));
+                if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function takePaddockOut(name, status) {
+            if (!name) return alert('Pick a paddock first: in the list, or tap it on the map.');
+            if (!requireUnitAdmin()) return;
+            const value = outStatusInfo(status).value;
+            outPickName = '';
+            changeOutTab(rows => {
+                const row = rows.find(r => normName(r.paddock) === normName(name));
+                if (row) row.status = value;
+                else rows.push({ paddock: name, status: value });
+            });
         }
 
         function refreshAfterOutChange() {
@@ -5298,20 +5388,56 @@
             updateGeoStyles();
         }
 
+        // A paddock out by a 0 cover in the farmwalk goes onto the out tab when
+        // its reason is changed, so the reason is kept.
         function setOutStatus(paddock, status) {
             if (!requireUnitAdmin()) return renderOutManager();
-            const row = outRows.find(r => normName(r.paddock) === normName(paddock));
-            if (!row) return;
-            row.status = status;
-            refreshAfterOutChange();
-            saveOutRows();
+            const value = outStatusInfo(status).value;
+            changeOutTab(rows => {
+                const row = rows.find(r => normName(r.paddock) === normName(paddock));
+                if (row) row.status = value;
+                else rows.push({ paddock: paddock, status: value });
+            });
         }
 
         function returnToRotation(paddock) {
             if (!requireUnitAdmin()) return;
-            if (!confirm(`Put "${paddock}" back into rotation?`)) return;
-            outRows = outRows.filter(r => normName(r.paddock) !== normName(paddock));
+            // A latest farmwalk cover of 0 keeps the paddock out. Only a cover
+            // typed in a farmwalk takes that away. A cover saved from here would
+            // make today look like a walk of one paddock and move the farm average.
+            const p = (manualModeData || []).find(d => normName(d.name) === normName(paddock));
+            const zeroCover = !!(p && p.latest && p.latest.ts && p.latest.cover === 0);
+            if (!outTabHas(paddock)) {
+                return alert(`"${paddock}" is out because its last farmwalk cover is 0.\n\nTo bring it back, type its cover in the next farmwalk (BRING BACK).`);
+            }
+            if (!confirm(`Put "${paddock}" back into rotation?` +
+                (zeroCover ? `\n\nIts last farmwalk cover is 0, so it stays out until a farmwalk gives it a cover.` : ''))) return;
+            changeOutTab(rows => rows.filter(r => normName(r.paddock) !== normName(paddock)));
+        }
+
+        /* Every change to the out tab goes through here.
+         *
+         * save_out writes the whole tab, so a phone with an old copy would put
+         * back what another phone just changed. The change is shown at once,
+         * then made again on a fresh copy of the tab before it is saved.
+         * change(rows) changes the rows in place, or returns new rows. */
+        async function changeOutTab(change) {
+            const apply = rows => { const r = change(rows); return Array.isArray(r) ? r : rows; };
+
+            applyOutRows(apply(outRows.map(r => ({ paddock: r.paddock, status: r.status }))));
             refreshAfterOutChange();
+
+            if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
+                setOutSyncStatus('Saving to sheet...', '#7f8c8d');
+                try {
+                    const res = await fetch(GOOGLE_SCRIPT_URL + '?type=out&t=' + Date.now());
+                    const data = await res.json();
+                    if (data && data.status === 'success' && Array.isArray(data.out)) {
+                        applyOutRows(apply(data.out.map(r => ({ paddock: r.paddock, status: r.status }))));
+                        refreshAfterOutChange();
+                    }
+                } catch (e) { console.warn('Could not read the out tab before saving; saving this phone\'s copy.', e); }
+            }
             saveOutRows();
         }
 
@@ -6589,6 +6715,7 @@
 
                     manualModeData = parsedData;
                     addNeverWalkedPaddocks();
+                    applyOutTabToWalk();
 
                     const mWalk = latestWalkInfo(manualModeData);
                     let tWGrowth = 0, tAreaG = 0;
@@ -7482,6 +7609,19 @@
             let val = parseFloat(inp ? inp.value : '1500');
             if (isNaN(val) || val <= 0) val = 1500;
             savePaddockCover(pName, val, '');
+            if (outTabHas(pName)) changeOutTab(rows => rows.filter(r => normName(r.paddock) !== normName(pName)));
+        }
+
+        // "Take out of rotation" in the farmwalk. It goes on the out tab, the
+        // same list as Farm Configuration > Paddocks out. No cover of 0 is
+        // written: a paddock out of rotation is simply not walked.
+        function farmwalkTakeOut(pName, status) {
+            const value = outStatusInfo(status).value;
+            changeOutTab(rows => {
+                const row = rows.find(r => normName(r.paddock) === normName(pName));
+                if (row) row.status = value;
+                else rows.push({ paddock: pName, status: value });
+            });
         }
 
         async function savePaddockCover(pName, coverOverride, reasonOverride) {
@@ -7603,16 +7743,40 @@
             });
             try { localStorage.setItem('out_paddocks', JSON.stringify(rows)); } catch (e) {}
 
-            /* The OUT tab can land after the farmwalk. A paddock with no covers
-             * is then already in the list as "not walked yet", so put it out
-             * now that we know it is out. */
-            if (Array.isArray(manualModeData)) {
-                manualModeData.forEach(p => {
-                    if (!p.neverWalked) return;
-                    const status = excludedPaddocks.get(normName(p.name));
-                    if (status) { p.isOut = true; p.neverWalked = false; p.reason = status; }
-                });
-            }
+            applyOutTabToWalk();
+        }
+
+        /* The out tab decides which paddocks are out in the farmwalk too.
+         *
+         * It used to count only for paddocks with no covers, so a paddock taken
+         * out in Farm Configuration still showed in rotation in FARMWALK. A
+         * paddock on the tab is out with the tab's reason, whatever its last
+         * cover. One that leaves the tab goes back to what its covers say. The
+         * tab can land before or after the farmwalk, and the farmwalk code sets
+         * isOut from the cover, so this runs again whenever the stats are
+         * worked out. */
+        function applyOutTabToWalk() {
+            if (!Array.isArray(manualModeData)) return;
+            manualModeData.forEach(p => {
+                const status = excludedPaddocks.get(normName(p.name));
+                const walked = !!(p.latest && p.latest.ts);
+                const before = p.isOut;
+                if (status) {
+                    p.isOut = true; p.neverWalked = false; p.reason = status;
+                    p._outByTab = true;
+                } else if (p._outByTab) {
+                    p._outByTab = false;
+                    p.isOut = walked && p.latest.cover === 0;
+                    p.neverWalked = !walked;
+                    if (!p.isOut) p.reason = '';
+                }
+                if (p.isOut !== before) {
+                    p.growthRate = walked
+                        ? coverGrowthRate(p.latest.cover, p.previous ? p.previous.cover : null,
+                                          p.latest.ts, p.previous ? p.previous.ts : null, p.isOut)
+                        : null;
+                }
+            });
         }
 
         async function loadStatusSheets() {
@@ -8237,6 +8401,13 @@
                             if (unitEditingId && currentDashboardMode === 'farm_config') {
                                 L.DomEvent.stopPropagation(e);
                                 togglePaddockInUnit(pName);
+                                return;
+                            }
+
+                            // Paddocks out: a tap picks the paddock to take out
+                            if (currentDashboardMode === 'farm_config' && farmConfigSection === 'out') {
+                                L.DomEvent.stopPropagation(e);
+                                pickOutPaddock(pName);
                                 return;
                             }
 
@@ -9182,6 +9353,7 @@
         }
 
         function updateFarmStats() {
+            applyOutTabToWalk();
             const data = getCurrentModeData();
             const walk = latestWalkInfo(data);
 
@@ -9336,7 +9508,7 @@
                 div.id = `card-${p.name.replace(/\s+/g, '-')}`;
 
                 let badges = "";
-                if (p.isOut) badges += `<span class="badge" style="background:${p.reason && p.reason.toUpperCase() === 'CROP' ? 'var(--warning)' : 'var(--out)'}">${(p.reason || 'OUT').toUpperCase()}</span>`;
+                if (p.isOut) badges += `<span class="badge" style="background:${outStatusColor(p.reason)}">OUT: ${outStatusInfo(p.reason).label.toUpperCase()}</span>`;
                 if (isUnmeasuredInLatest) badges += `<span class="badge" style="background:#f39c12;">UNMEASURED</span>`;
 
                 if (currentDashboardMode === 'satellite' && p.manual && calibrationModel) {
@@ -9368,9 +9540,7 @@
                                 <div style="display:flex; flex-direction:column; gap:4px;">
                                     <button onclick="toggleOutRotationMenu('${p.name}')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Take out of rotation ▾</button>
                                     <div id="out-menu-${p.name}" style="display:none; gap:6px; margin-top:4px;">
-                                        <button onclick="savePaddockCover('${p.name}', 0, 'silage')" style="flex:1; background:#e67e22; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Silage</button>
-                                        <button onclick="savePaddockCover('${p.name}', 0, 'crop')" style="flex:1; background:#d35400; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Crop</button>
-                                        <button onclick="savePaddockCover('${p.name}', 0, 'other')" style="flex:1; background:#7f8c8d; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">Other</button>
+                                        ${OUT_STATUSES.map(s => `<button onclick="farmwalkTakeOut('${p.name}', '${s.value}')" style="flex:1; background:${s.color}; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">${s.label}</button>`).join('')}
                                     </div>
                                 </div>
                             </div>
@@ -9492,6 +9662,20 @@
                     const tipEl = layer.getTooltip() && layer.getTooltip().getElement();
                     if (tipEl) tipEl.classList.toggle('show-label', at !== -1);
                     layer._walkOrderLabel = true;
+                } else if (currentDashboardMode === 'farm_config' && farmConfigSection === 'out') {
+                    // Paddocks out: each out paddock in the colour of its reason.
+                    // The farmwalk is the record here, whatever mode the data is in.
+                    const tabStatus = excludedPaddocks.get(normName(pName));
+                    const wp = walkOutPaddocks().find(w => normName(w.name) === normName(pName));
+                    const status = tabStatus || (wp ? (wp.reason || 'OTHER') : '');
+                    const picked = outPickName && normName(outPickName) === normName(pName);
+                    layer.setStyle({
+                        fillColor: status ? outStatusColor(status) : (picked ? '#f1c40f' : '#95a5a6'),
+                        fillOpacity: status ? 0.8 : (picked ? 0.7 : 0.2),
+                        color: 'white', opacity: 1, weight: picked ? 4 : 1
+                    });
+                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div>` +
+                        (status ? `<div style="font-size:11px; color:${outStatusColor(status)};">OUT: ${outStatusInfo(status).label}</div>` : ''));
                 } else if (currentDashboardMode === 'farm_config') {
                     // Unit editor: every paddock wears its unit's colour, grey if unassigned.
                     const owner = unitForPaddock(pName);
@@ -9512,7 +9696,7 @@
                     // Yellow means "not walked this time". Colouring it by the old
                     // cover makes the map look measured when it is not.
                     let color = skippedInLatestWalk(p, walk) ? SKIPPED_WALK_COLOR : getCoverColor(p.latest.cover);
-                    if (p.isOut) color = '#ff7675';
+                    if (p.isOut) color = outStatusColor(p.reason);
                     layer.setStyle({ fillColor: color, fillOpacity: 0.8, color: 'white', opacity: 1, weight: 1 });
                 } else {
                     layer.setStyle({ fillColor: 'transparent', fillOpacity: 0.1, color: 'white', opacity: 1, weight: 1.5 });
