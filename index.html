@@ -5323,7 +5323,7 @@
                 return `
                 <div id="out-row-${escUnit(normName(r.paddock))}" style="background:${picked ? '#fef5e7' : '#fff'}; border:1px solid ${picked ? '#e67e22' : '#ddd'}; border-left:6px solid ${outStatusColor(r.status)}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(r.paddock)}
-                        ${r.walk ? `<div style="font-weight:normal; font-size:10px; color:#7f8c8d;">cover 0 in the farmwalk of ${escUnit(r.walk)}</div>` : ''}</div>
+                        ${r.walk ? `<div style="font-weight:normal; font-size:10px; color:#7f8c8d;">cover 0 in the farmwalk of ${escUnit(r.walk)}. To bring it back, change that latest cover.</div>` : ''}</div>
                     <select onchange="setOutStatus('${escUnit(r.paddock)}', this.value)"
                         style="padding:5px; border:1px solid #ccc; border-radius:4px; font-size:11px; font-weight:bold; color:${outStatusColor(r.status)};">${opts}</select>
                     <button onclick="returnToRotation('${escUnit(r.paddock)}')"
@@ -5408,7 +5408,7 @@
             const p = (manualModeData || []).find(d => normName(d.name) === normName(paddock));
             const zeroCover = !!(p && p.latest && p.latest.ts && p.latest.cover === 0);
             if (!outTabHas(paddock)) {
-                return alert(`"${paddock}" is out because its last farmwalk cover is 0.\n\nTo bring it back, type its cover in the next farmwalk (BRING BACK).`);
+                return alert(`"${paddock}" is out because its last farmwalk cover is 0.\n\nTo bring it back, change that latest cover: in FARMWALK tap "+ Farmwalk", hold the paddock's card for 1 second, type the cover in "Latest", then tap Update Covers.`);
             }
             if (!confirm(`Put "${paddock}" back into rotation?` +
                 (zeroCover ? `\n\nIts last farmwalk cover is 0, so it stays out until a farmwalk gives it a cover.` : ''))) return;
@@ -6827,6 +6827,24 @@
             } catch (e) {}
         }
 
+        /* A cover of 0 is never saved. A paddock with no grass to measure is
+         * out of rotation, so typing 0 opens "Take out of rotation" instead. */
+        function farmwalkCoverInput(name, el) {
+            const v = el.value.trim();
+            const n = parseFloat(v);
+            const zero = v !== '' && isFinite(n) && n <= 0;
+            const hint = document.getElementById(`zero-hint-${name}`);
+            if (hint) hint.style.display = zero ? 'block' : 'none';
+            if (zero) {
+                el.value = '';
+                rememberFarmwalkDraft(name, '');
+                const menu = document.getElementById(`out-menu-${name}`);
+                if (menu) menu.style.display = 'flex';
+                return;
+            }
+            rememberFarmwalkDraft(name, el.value);
+        }
+
         function rememberFarmwalkDraft(name, value) {
             if (value === '' || value === null || value === undefined) delete farmwalkDraft[name];
             else farmwalkDraft[name] = value;
@@ -7122,14 +7140,18 @@
             const d = new Date(key);
             const nzDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 
-            const entries = [];
+            const entries = [], zero = [];
             document.querySelectorAll('#fw-history-edit input[data-paddock]').forEach(inp => {
                 const v = inp.value.trim();
                 if (v === '') return;                       // cleared: drop it from this walk
                 const n = parseFloat(v);
                 if (!isFinite(n)) return;
+                if (n <= 0) { zero.push(inp.dataset.paddock); return; }
                 entries.push({ paddock: inp.dataset.paddock, cover: n, reason: '' });
             });
+            if (zero.length) {
+                return alert(`A cover cannot be 0: ${zero.join(', ')}.\n\nClear the box to take the paddock off this walk. To take a paddock out of rotation, use Farm Configuration > Paddocks out.`);
+            }
 
             if (!confirm(`Save ${entries.length} covers for ${fmtNZ(d)}?\n\nThis replaces that day only. Other walks are untouched.`)) return;
 
@@ -7216,6 +7238,11 @@
         function updateCovers(pName) {
             const inpLatest = document.getElementById(`inp-edit-latest-cover-${pName}`);
             const inpPrev = document.getElementById(`inp-edit-prev-cover-${pName}`);
+
+            const isZero = inp => inp && inp.value.trim() !== '' && parseFloat(inp.value) <= 0;
+            if (isZero(inpLatest) || isZero(inpPrev)) {
+                return alert('A cover cannot be 0. To take a paddock out of rotation, use "Take out of rotation" or Farm Configuration > Paddocks out.');
+            }
 
             let p = manualModeData.find(d => d.name === pName);
             if (p) {
@@ -7472,6 +7499,7 @@
             const dateObj = new Date(dateVal + 'T12:00:00');
 
             const entriesToSave = [];
+            const broughtBack = [];
 
             manualModeData.forEach(p => {
                 const inp = document.getElementById(`inp-cover-${p.name}`);
@@ -7480,8 +7508,9 @@
                 let valStr = inp ? inp.value.trim() : (inpReturn ? inpReturn.value.trim() : '');
                 if (valStr !== '') {
                     let coverVal = parseFloat(valStr);
-                    if (!isNaN(coverVal)) {
-                        let reasonVal = coverVal === 0 ? (p.reason || 'out') : '';
+                    // A cover of 0 is never saved; out of rotation is the out tab.
+                    if (!isNaN(coverVal) && coverVal > 0) {
+                        let reasonVal = '';
 
                         if (p.latest && p.latest.ts && dateObj.getTime() > p.latest.ts) {
                             p.previous = { cover: p.latest.cover, formattedDate: p.latest.formattedDate, ts: p.latest.ts };
@@ -7514,9 +7543,16 @@
                             cover: coverVal,
                             reason: p.reason || ''
                         });
+                        // A cover in the "Bring back" box brings the paddock back.
+                        if (!inp && inpReturn && outTabHas(p.name)) broughtBack.push(p.name);
                     }
                 }
             });
+
+            if (broughtBack.length) {
+                const back = new Set(broughtBack.map(normName));
+                changeOutTab(rows => rows.filter(r => !back.has(normName(r.paddock))));
+            }
 
             // Into the sheet in walking order. The next walk with no order set
             // follows this one, and the paddocks above were in cover order.
@@ -7607,7 +7643,8 @@
         function savePaddockReturn(pName) {
             const inp = document.getElementById(`inp-return-cover-${pName}`);
             let val = parseFloat(inp ? inp.value : '1500');
-            if (isNaN(val) || val <= 0) val = 1500;
+            if (!isNaN(val) && val <= 0) return alert('A cover cannot be 0. Type the cover the paddock has now.');
+            if (isNaN(val)) val = 1500;
             savePaddockCover(pName, val, '');
             if (outTabHas(pName)) changeOutTab(rows => rows.filter(r => normName(r.paddock) !== normName(pName)));
         }
@@ -7627,7 +7664,8 @@
         async function savePaddockCover(pName, coverOverride, reasonOverride) {
             const dateVal = document.getElementById('farmwalk-entry-date')?.value || toDateInputValue(new Date());
             let coverVal = (coverOverride !== undefined) ? coverOverride : parseFloat(document.getElementById(`inp-cover-${pName}`)?.value);
-            if (isNaN(coverVal)) coverVal = 0;
+            // A cover of 0 is never saved; out of rotation is the out tab.
+            if (isNaN(coverVal) || coverVal <= 0) return;
 
             const reasonVal = reasonOverride || (coverVal === 0 ? 'out' : '');
             const dateObj = new Date(dateVal + 'T12:00:00');
@@ -9530,7 +9568,7 @@
                                         <span style="font-size:10px;"> kgDM &middot; ${lastWalk ? fmtNZ(lastWalk.dateObj) : '--'}</span></span>
                                 </div>
                                 <input type="number" inputmode="numeric" id="inp-cover-${p.name}" placeholder="New cover kgDM" value="${farmwalkDraft[p.name] !== undefined ? farmwalkDraft[p.name] : ''}"
-                                    oninput="rememberFarmwalkDraft('${p.name}', this.value)"
+                                    oninput="farmwalkCoverInput('${p.name}', this)"
                                     onkeydown="if(event.key==='Enter'){event.preventDefault(); farmwalkStep('${p.name}', 1);}"
                                     style="width:100%; padding:10px 8px; border:1px solid #ccc; border-radius:5px; font-size:16px; font-weight:bold; text-align:center;" />
                                 <div style="display:flex; gap:6px;">
@@ -9539,6 +9577,7 @@
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:4px;">
                                     <button onclick="toggleOutRotationMenu('${p.name}')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Take out of rotation ▾</button>
+                                    <div id="zero-hint-${p.name}" style="display:none; font-size:11px; font-weight:bold; color:#c0392b; margin-top:2px;">A cover cannot be 0. To take this paddock out, tap why:</div>
                                     <div id="out-menu-${p.name}" style="display:none; gap:6px; margin-top:4px;">
                                         ${OUT_STATUSES.map(s => `<button onclick="farmwalkTakeOut('${p.name}', '${s.value}')" style="flex:1; background:${s.color}; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">${s.label}</button>`).join('')}
                                     </div>

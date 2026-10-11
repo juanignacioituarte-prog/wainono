@@ -179,10 +179,14 @@ and how many hectares, so two devices can be compared.
     with no covers.
   - "Take out of rotation" in the farmwalk now writes to the tab. It no longer
     writes a cover of 0. BRING BACK writes the cover and takes it off the tab.
+  - **A cover of 0 is never saved** (Juani, 12 Oct 2026). Typing 0 in a
+    farmwalk box clears it and opens "Take out of rotation". SAVE FARMWALK,
+    BRING BACK, the walk HISTORY editor and "Update Covers" all refuse 0.
   - Old paddocks out by a cover of 0 in the farmwalk are shown in the list
-    with a note. They only come back with a cover typed in a farmwalk. A
-    cover saved from Farm Configuration would make today look like a walk of
-    one paddock and move the farm average.
+    with a note. To bring one back, change that latest cover: "+ Farmwalk",
+    hold the card 1 second, "Latest", Update Covers. Juani does this by hand.
+    BACK IN in Farm Configuration does not write a cover: a cover for today
+    would look like a walk of one paddock and move the farm average.
   - `save_out` writes the whole tab, so every change first reads the live
     tab (`?type=out`), makes the change on it, then saves (`changeOutTab`).
 - **Paddocks**: rename, merge, split, reshape, add, delete boundaries.
