@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.22**,
-service worker cache `wn-farm-v1.1.36`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.23**,
+service worker cache `wn-farm-v1.1.37`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -177,6 +177,9 @@ The app **opens on BREAKS with the plain satellite picture**.
   were drawn in it after the walk. A paddock with no walk above 0 says "not
   walked yet". The break cards' EST. KG/COW use the same estimate, on the day
   the break was drawn; the card's hover text gives walk, est. growth and days.
+- BREAKS with **COVER MAP** on colours each paddock by its estimated cover
+  (`getCoverColor`, same scale as FARMWALK); out paddocks keep their reason
+  colour, paddocks with no walk stay clear (v1.1.23).
 - SATELLITE keeps the satellite cover ("≈ ... estimated · satellite <date>").
 
 ### Growth from measured weather (v1.1.22)
@@ -407,8 +410,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.22/v1.1.23/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.36/wn-farm-v1.1.37/" sw.js
+sed -i "s/v1\.1\.23/v1.1.24/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.37/wn-farm-v1.1.38/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -525,3 +528,4 @@ Added 12 October 2026:
   (v1.1.21).
 - BREAKS uses last walk + estimated growth from measured weather, not the
   satellite (v1.1.22). GROWTH button opens gr.html in the app.
+- BREAKS COVER MAP colours paddocks by the estimated cover (v1.1.23).

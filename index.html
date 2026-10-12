@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.22</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.23</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.22</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.23</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -9585,7 +9585,8 @@
                     document.getElementById('legend').style.display = 'none';
                 } else if (mode === 'breaks') {
                     setLayerMode(currentViewMode);
-                    document.getElementById('legend').style.display = 'none';
+                    // The cover key stays when COVER MAP is on (estimated covers).
+                    document.getElementById('legend').style.display = currentViewMode === 'cover' ? 'block' : 'none';
                     updateGeoStyles();
                     renderBreaksDashboard();
                     renderBreaksOnMap();
@@ -10712,6 +10713,14 @@
                     // its reason, so nobody draws a break in it by mistake. Light
                     // enough that the photo and any old break still show through.
                     layer.setStyle({ fillColor: outStatusColor(outStatus), fillOpacity: 0.45, color: 'white', opacity: 0.8, weight: 1.5 });
+                } else if (currentDashboardMode === 'breaks' && currentViewMode === 'cover') {
+                    // BREAKS with COVER MAP on: each paddock in the colour of its
+                    // ESTIMATED cover (last walk + growth from measured weather),
+                    // the same number its label shows. No walk, no colour.
+                    const est = estimateCover(pName, new Date());
+                    layer.setStyle(est
+                        ? { fillColor: getCoverColor(est.cover), fillOpacity: 0.7, color: 'white', opacity: 0.8, weight: 1 }
+                        : { fillColor: 'transparent', fillOpacity: 0, color: 'white', opacity: 0.8, weight: 1.5 });
                 } else if (currentDashboardMode === 'breaks' || currentDashboardMode === 'maintenance' || currentDashboardMode === 'silage') {
                     layer.setStyle({ fillColor: 'transparent', fillOpacity: 0, color: 'white', opacity: 0.8, weight: 1.5 });
                 } else if (activeUnit && !unitHasPaddock(activeUnit, pName)) {
