@@ -1469,14 +1469,10 @@
                         <div class="legend-color" style="background:#a1d99b"></div> < 1,600
                     </div>
                     <hr style="border:0; border-top:1px solid #eee; margin:8px 0;">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background:#d35400"></div> Out: Crop
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background:#8e44ad"></div> Out: Silage
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background:#e74c3c"></div> Out: Other
+                    <div id="legend-out-reasons">
+                        <div class="legend-item"><div class="legend-color" style="background:#d35400"></div> Out: Crop</div>
+                        <div class="legend-item"><div class="legend-color" style="background:#8e44ad"></div> Out: Silage</div>
+                        <div class="legend-item"><div class="legend-color" style="background:#e74c3c"></div> Out: Other</div>
                     </div>
                 </div>
             </div>
@@ -1589,6 +1585,11 @@
                 <div id="plan-scope-note" style="font-size:11px; color:#7f8c8d; margin-top:8px;"></div>
             </div>
 
+            <div class="feed-card" id="plan-area-card">
+                <div class="feed-title">Farm Area</div>
+                <div id="plan-area-body" style="margin-top:8px;"></div>
+            </div>
+
             <div class="feed-card">
                 <div class="feed-title">Feed Wedge & Demand</div>
                 <div class="chart-box">
@@ -1685,7 +1686,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.16</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.17</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1698,7 +1699,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.16</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.17</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1856,8 +1857,21 @@
                     <select id="out-add-paddock" onchange="pickOutPaddock(this.value); this.value = '';"
                         style="padding:8px; border:1px solid #ccc; border-radius:4px; font-size:13px; font-weight:bold;"></select>
                     <div id="out-add-picked" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
-                    <div id="out-add-reasons" style="display:flex; gap:6px;"></div>
+                    <div id="out-add-reasons" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
                 </div>
+                <details id="out-reasons-box" style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; margin-bottom:12px;">
+                    <summary style="font-size:12px; font-weight:bold; color:#2c3e50; cursor:pointer;">Reasons (add, colour, delete)</summary>
+                    <div style="font-size:11px; color:#666; margin:6px 0;">Tap a colour to change it. Saved to the sheet for everybody. Other is always kept.</div>
+                    <div id="out-reasons-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+                    <div style="display:flex; gap:6px; margin-top:8px; align-items:center;">
+                        <input type="text" id="out-reason-new" placeholder="New reason, e.g. Regrass" maxlength="30"
+                            style="flex:1; min-width:0; padding:7px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                        <input type="color" id="out-reason-new-color" value="#16a085" title="Colour"
+                            style="width:38px; height:32px; padding:0; border:1px solid #ccc; border-radius:4px; background:#fff;">
+                        <button onclick="addOutReason()" style="background:#e67e22; color:#fff; border:none; padding:8px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">＋ ADD</button>
+                    </div>
+                    <div id="out-reasons-status" style="font-size:11px; font-weight:bold; margin-top:6px;"></div>
+                </details>
                 <div id="out-paddock-list" style="display:flex; flex-direction:column; gap:8px;"></div>
                 <div id="out-sync-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
             </div>
@@ -5266,18 +5280,80 @@
         }
 
         /* ---- Paddocks out of rotation ---- */
-        // Each reason has its own colour, on the map, the cards and this list.
-        const OUT_STATUSES = [
+        /* Each reason has its own colour, on the map, the cards and this list.
+         * The reasons are managed in Farm Configuration > Paddocks out and kept
+         * in the "out reasons" tab. They reach the phone with the feed settings
+         * read at start-up, and with every read of the out tab. Until the tab
+         * has a list, these three are used. Other is always there: it is what
+         * any reason the phone does not know is shown as. */
+        const OUT_DEFAULT_REASONS = [
             { value: 'CROP', label: 'Crop', color: '#d35400' },
             { value: 'SILAGE', label: 'Silage', color: '#8e44ad' },
             { value: 'OTHER', label: 'Other', color: '#e74c3c' }
         ];
+        const OUT_REASON_PALETTE = ['#16a085', '#2980b9', '#f39c12', '#c0392b', '#27ae60', '#7f8c8d', '#e84393', '#2c3e50'];
+
+        function normalizeOutReasons(list) {
+            const out = [];
+            (Array.isArray(list) ? list : []).forEach(r => {
+                const label = String((r && (r.reason || r.label)) || '').trim();
+                const value = label.toUpperCase();
+                if (!label || value === 'OUT' || out.some(o => o.value === value)) return;
+                const color = /^#[0-9a-f]{6}$/i.test(String(r.color || '')) ? r.color : '#7f8c8d';
+                out.push({ value: value, label: label, color: color });
+            });
+            if (!out.some(o => o.value === 'OTHER')) out.push(Object.assign({}, OUT_DEFAULT_REASONS[2]));
+            // Other goes last, after the reasons that say something.
+            return out.filter(o => o.value !== 'OTHER').concat(out.filter(o => o.value === 'OTHER'));
+        }
+
+        let OUT_STATUSES = (() => {
+            try {
+                const saved = JSON.parse(localStorage.getItem('out_reasons') || 'null');
+                if (Array.isArray(saved) && saved.length) return normalizeOutReasons(saved);
+            } catch (e) {}
+            return OUT_DEFAULT_REASONS.map(r => Object.assign({}, r));
+        })();
+        let outReasonsTouchedAt = 0;   // when this phone last changed the list
+
+        // A list from the sheet. One asked for before this phone's own change
+        // is older than the change and must not undo it.
+        function applyOutReasons(list, askedAt) {
+            if (!Array.isArray(list) || list.length === 0) return;
+            if (askedAt && outReasonsTouchedAt > askedAt) return;
+            const next = normalizeOutReasons(list);
+            if (JSON.stringify(next) === JSON.stringify(OUT_STATUSES)) return;
+            OUT_STATUSES = next;
+            try { localStorage.setItem('out_reasons', JSON.stringify(OUT_STATUSES)); } catch (e) {}
+            refreshOutReasonViews();
+        }
+
+        function refreshOutReasonViews() {
+            renderOutLegend();
+            if (document.getElementById('out-paddock-list')) renderOutManager();
+            if (typeof renderDashboard === 'function' && typeof manualModeData !== 'undefined') renderDashboard();
+            if (typeof updateGeoStyles === 'function') updateGeoStyles();
+        }
+
+        // The map key under the cover colours.
+        function renderOutLegend() {
+            const box = document.getElementById('legend-out-reasons');
+            if (!box) return;
+            box.innerHTML = OUT_STATUSES.map(s =>
+                `<div class="legend-item"><div class="legend-color" style="background:${s.color}"></div> Out: ${escUnit(s.label)}</div>`).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', renderOutLegend);
 
         // The farmwalk wrote reasons in lower case, and old rows say just "OUT".
-        // Anything that is not a known reason counts as Other.
+        // "OUT" and empty count as Other. A reason this phone does not know yet
+        // keeps its own name, in the colour of Other.
         function outStatusInfo(status) {
             const s = String(status || '').trim().toUpperCase();
-            return OUT_STATUSES.find(o => o.value === s) || OUT_STATUSES[OUT_STATUSES.length - 1];
+            const other = OUT_STATUSES.find(o => o.value === 'OTHER') || OUT_STATUSES[OUT_STATUSES.length - 1];
+            if (!s || s === 'OUT') return other;
+            return OUT_STATUSES.find(o => o.value === s)
+                || { value: s, label: s.charAt(0) + s.slice(1).toLowerCase(), color: other.color };
         }
         function outStatusColor(status) { return outStatusInfo(status).color; }
 
@@ -5314,6 +5390,7 @@
                 .sort(byName);
 
             renderOutAddBox(rows);
+            renderOutReasonsBox(rows);
 
             if (rows.length === 0) {
                 box.innerHTML = `<div style="font-size:12px; color:#7f8c8d;">No paddocks are out of rotation.</div>`;
@@ -5360,7 +5437,9 @@
 
             if (chips) {
                 const picked = [...outPicked.values()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-                chips.innerHTML = picked.map(p =>
+                const pickedHa = picked.reduce((sum, p) => sum + (Number(paddockAreaFor(p)) || 0), 0);
+                chips.innerHTML = (n ? `<div style="flex-basis:100%; font-size:12px; font-weight:bold; color:#2c3e50;">${n} paddock${n === 1 ? '' : 's'} picked &middot; ${(Math.round(pickedHa * 10) / 10).toFixed(1)} ha</div>` : '') +
+                    picked.map(p =>
                     `<span style="display:inline-flex; align-items:center; gap:4px; background:#f1c40f; color:#2c3e50; border-radius:12px; padding:3px 4px 3px 9px; font-size:11px; font-weight:bold;">${escUnit(p)}
                         <b onclick="pickOutPaddock('${escUnit(p)}')" style="cursor:pointer; padding:0 5px;">×</b></span>`).join('') +
                     (n > 1 ? `<span onclick="clearOutPicked()" style="cursor:pointer; border:1px solid #95a5a6; color:#7f8c8d; border-radius:12px; padding:3px 9px; font-size:11px; font-weight:bold;">CLEAR</span>` : '');
@@ -5368,7 +5447,7 @@
 
             btns.innerHTML = OUT_STATUSES.map(s =>
                 `<button onclick="takePickedPaddocksOut('${s.value}')"
-                    style="flex:1; background:${s.color}; color:#fff; border:none; padding:9px 4px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; opacity:${n ? 1 : 0.5};">${s.label.toUpperCase()}${n > 1 ? ' (' + n + ')' : ''}</button>`).join('');
+                    style="flex:1 1 30%; background:${s.color}; color:#fff; border:none; padding:9px 4px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; opacity:${n ? 1 : 0.5};">${escUnit(s.label.toUpperCase())}${n > 1 ? ' (' + n + ')' : ''}</button>`).join('');
         }
 
         // From the list or from a tap on the map. A paddock in rotation is
@@ -5413,6 +5492,105 @@
                     else rows.push({ paddock: name, status: value });
                 });
             });
+        }
+
+        /* ---- the reasons themselves ---- */
+        function setOutReasonsStatus(text, color) {
+            const el = document.getElementById('out-reasons-status');
+            if (el) { el.textContent = text || ''; el.style.color = color || '#7f8c8d'; }
+        }
+
+        function renderOutReasonsBox(rows) {
+            const box = document.getElementById('out-reasons-list');
+            if (!box) return;
+            const used = {};
+            (rows || []).forEach(r => { const v = outStatusInfo(r.status).value; used[v] = (used[v] || 0) + 1; });
+            box.innerHTML = OUT_STATUSES.map((s, i) => `
+                <div style="display:flex; align-items:center; gap:8px; padding:3px 0; border-bottom:1px solid #f3f3f3;">
+                    <input type="color" value="${s.color}" onchange="setOutReasonColor(${i}, this.value)" title="Change the colour"
+                        style="width:30px; height:26px; padding:0; border:1px solid #ccc; border-radius:4px; background:#fff;">
+                    <span style="flex:1; font-size:12px; font-weight:bold; color:${s.color};">${escUnit(s.label)}
+                        <span style="font-weight:normal; font-size:10px; color:#95a5a6;">${used[s.value] || 0} paddock${used[s.value] === 1 ? '' : 's'}</span></span>
+                    ${s.value === 'OTHER' ? '<span style="font-size:10px; color:#95a5a6;">always kept</span>'
+                        : `<button onclick="removeOutReason(${i})" style="background:#fdeceb; color:#c0392b; border:none; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">🗑</button>`}
+                </div>`).join('');
+            // The next new reason gets a colour nobody uses yet.
+            const pick = document.getElementById('out-reason-new-color');
+            const name = document.getElementById('out-reason-new');
+            if (pick && name && document.activeElement !== pick && name.value === '') {
+                const free = OUT_REASON_PALETTE.find(c => !OUT_STATUSES.some(s => s.color.toLowerCase() === c));
+                if (free) pick.value = free;
+            }
+        }
+
+        /* Every change to the reasons goes through here, the same way the out
+         * tab does: shown at once, then made again on the sheet's own list
+         * before the whole list is saved, so two phones do not undo each other. */
+        async function changeOutReasons(change, okMsg) {
+            if (!requireUnitAdmin()) return renderOutManager();
+            const apply = list => normalizeOutReasons(change(list.map(r => ({ reason: r.label, color: r.color }))));
+            OUT_STATUSES = apply(OUT_STATUSES);
+            outReasonsTouchedAt = Date.now();
+            try { localStorage.setItem('out_reasons', JSON.stringify(OUT_STATUSES)); } catch (e) {}
+            refreshOutReasonViews();
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.length < 5) return;
+            setOutReasonsStatus('Saving to sheet...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + '?type=out&t=' + Date.now());
+                const data = await res.json();
+                if (data && Array.isArray(data.reasons) && data.reasons.length) {
+                    OUT_STATUSES = apply(normalizeOutReasons(data.reasons));
+                    try { localStorage.setItem('out_reasons', JSON.stringify(OUT_STATUSES)); } catch (e) {}
+                    refreshOutReasonViews();
+                }
+            } catch (e) { console.warn('Could not read the reasons before saving; saving this phone list.', e); }
+
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'save_out_reasons', reasons: OUT_STATUSES.map(r => ({ reason: r.label, color: r.color })) })
+                });
+                const data = await res.json();
+                if (!data || data.status !== 'success') {
+                    const msg = (data && data.message) ? data.message : 'the sheet refused it';
+                    throw new Error(/unknown payload type/i.test(msg) ? 'the Apps Script needs updating' : msg);
+                }
+                setOutReasonsStatus(okMsg || '✓ Saved to the sheet', '#27ae60');
+            } catch (e) {
+                setOutReasonsStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
+        }
+
+        function addOutReason() {
+            const inp = document.getElementById('out-reason-new');
+            const label = inp.value.trim();
+            if (!label) return setOutReasonsStatus('Type a name for the reason.', '#e74c3c');
+            if (label.toUpperCase() === 'OUT' || OUT_STATUSES.some(s => s.value === label.toUpperCase())) {
+                return setOutReasonsStatus('That reason is already there.', '#e74c3c');
+            }
+            const color = document.getElementById('out-reason-new-color').value;
+            inp.value = '';
+            changeOutReasons(list => list.concat([{ reason: label, color: color }]), `✓ ${label} added.`);
+        }
+
+        function setOutReasonColor(index, color) {
+            const r = OUT_STATUSES[index];
+            if (!r) return;
+            changeOutReasons(list => list.map(x => x.reason.toUpperCase() === r.value ? { reason: x.reason, color: color } : x),
+                `✓ ${r.label} colour changed.`);
+        }
+
+        function removeOutReason(index) {
+            const r = OUT_STATUSES[index];
+            if (!r || r.value === 'OTHER') return;
+            const inUse = outRows.filter(o => outStatusInfo(o.status).value === r.value).length
+                + walkOutPaddocks().filter(p => outStatusInfo(p.reason).value === r.value).length;
+            if (inUse > 0) {
+                return setOutReasonsStatus(`${inUse} paddock${inUse === 1 ? ' is' : 's are'} out for ${r.label}. Change ${inUse === 1 ? 'its' : 'their'} reason or bring ${inUse === 1 ? 'it' : 'them'} back first.`, '#e74c3c');
+            }
+            if (!confirm(`Delete the reason "${r.label}"?`)) return;
+            changeOutReasons(list => list.filter(x => x.reason.toUpperCase() !== r.value), `✓ ${r.label} deleted.`);
         }
 
         function refreshAfterOutChange() {
@@ -5469,8 +5647,10 @@
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                 setOutSyncStatus('Saving to sheet...', '#7f8c8d');
                 try {
+                    const askedAt = Date.now();
                     const res = await fetch(GOOGLE_SCRIPT_URL + '?type=out&t=' + Date.now());
                     const data = await res.json();
+                    if (data && Array.isArray(data.reasons)) applyOutReasons(data.reasons, askedAt);
                     if (data && data.status === 'success' && Array.isArray(data.out)) {
                         applyOutRows(apply(data.out.map(r => ({ paddock: r.paddock, status: r.status }))));
                         refreshAfterOutChange();
@@ -7923,9 +8103,11 @@
             // 2. Try to fetch from Apps Script (Cloud) if configured
             if (GOOGLE_SCRIPT_URL && GOOGLE_SCRIPT_URL.length > 5) {
                 try {
+                    const askedAt = Date.now();
                     const res = await fetch(GOOGLE_SCRIPT_URL);
                     const data = await res.json();
                     if (data) {
+                        if (Array.isArray(data.outReasons)) applyOutReasons(data.outReasons, askedAt);
                         // Cloud data found, update UI
                         setFeedInputs(data);
                         loadLocalFeedSettings();
@@ -9433,13 +9615,46 @@
                 : Object.keys(areaLookup).map(n => ({ name: n, area: Number(areaLookup[n]) || 0 }));
 
             let all = 0, out = 0;
+            const byReason = {};   // reason value -> ha out for it
             source.forEach(p => {
                 if (!p.name || p.area <= 0) return;
                 if (unit && !unitHasPaddock(unit, p.name)) return;
                 all += p.area;
-                if (excludedPaddocks.get(normName(p.name))) out += p.area;
+                const status = excludedPaddocks.get(normName(p.name));
+                if (status) {
+                    out += p.area;
+                    const v = outStatusInfo(status).value;
+                    byReason[v] = (byReason[v] || 0) + p.area;
+                }
             });
-            return { all: all, out: out, inRotation: Math.max(0, all - out) };
+            return { all: all, out: out, inRotation: Math.max(0, all - out), byReason: byReason };
+        }
+
+        // PLAN: how the land is split, for the whole farm or the unit shown.
+        function renderPlanAreaCard(rot, unit) {
+            const body = document.getElementById('plan-area-body');
+            if (!body) return;
+            const ha = v => (Math.round(v * 10) / 10).toFixed(1);
+            const silage = OUT_STATUSES.find(o => o.value === 'SILAGE');
+            const box = (label, value, color) => `
+                <div style="flex:1 1 45%; background:#f8f9fa; border-radius:6px; padding:8px 10px;">
+                    <div style="font-size:10px; font-weight:bold; color:#7f8c8d; text-transform:uppercase;">${label}</div>
+                    <div style="font-size:20px; font-weight:bold; color:${color};">${ha(value)} <small style="font-size:11px; color:#7f8c8d;">ha</small></div>
+                </div>`;
+            const others = OUT_STATUSES.filter(o => o.value !== 'SILAGE' && (rot.byReason[o.value] || 0) > 0);
+            // A reason the phone does not know yet still has its hectares counted.
+            Object.keys(rot.byReason).forEach(v => {
+                if (v !== 'SILAGE' && !OUT_STATUSES.some(o => o.value === v)) others.push(outStatusInfo(v));
+            });
+            body.innerHTML =
+                `<div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    ${box(unit ? escUnit(unit.name) + ' area' : 'Total area', rot.all, '#2c3e50')}
+                    ${box('In rotation', rot.inRotation, '#27ae60')}
+                    ${box('Out of rotation', rot.out, '#e74c3c')}
+                    ${box('Out for ' + escUnit(silage ? silage.label : 'Silage'), rot.byReason.SILAGE || 0, silage ? silage.color : '#8e44ad')}
+                </div>` +
+                (others.length ? `<div style="font-size:11px; color:#7f8c8d; margin-top:8px;">Also out: ${others.map(o =>
+                    `<b style="color:${o.color};">${escUnit(o.label)}</b> ${ha(rot.byReason[o.value] || 0)} ha`).join(' &middot; ')}</div>` : '');
         }
 
         /* Weighted cover and growth over a set of paddocks.
@@ -9542,6 +9757,7 @@
             }
 
             const rot = rotationAreas(pUnit);
+            renderPlanAreaCard(rot, pUnit);
             const elFeedAreaOut = document.getElementById('feed-area-out');
             if (elFeedAreaOut) elFeedAreaOut.innerText = rot.out.toFixed(1);
 
@@ -9653,8 +9869,8 @@
                                 <div style="display:flex; flex-direction:column; gap:4px;">
                                     <button onclick="toggleOutRotationMenu('${p.name}')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Take out of rotation ▾</button>
                                     <div id="zero-hint-${p.name}" style="display:none; font-size:11px; font-weight:bold; color:#c0392b; margin-top:2px;">A cover cannot be 0. To take this paddock out, tap why:</div>
-                                    <div id="out-menu-${p.name}" style="display:none; gap:6px; margin-top:4px;">
-                                        ${OUT_STATUSES.map(s => `<button onclick="farmwalkTakeOut('${p.name}', '${s.value}')" style="flex:1; background:${s.color}; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">${s.label}</button>`).join('')}
+                                    <div id="out-menu-${p.name}" style="display:none; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                                        ${OUT_STATUSES.map(s => `<button onclick="farmwalkTakeOut('${p.name}', '${s.value}')" style="flex:1 1 30%; background:${s.color}; color:white; border:none; padding:5px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">${s.label}</button>`).join('')}
                                     </div>
                                 </div>
                             </div>

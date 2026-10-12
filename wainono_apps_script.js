@@ -24,12 +24,16 @@
  *      doGet 'silage' and 'silage_log'; doPost 'save_silage_location',
  *      'silage_stock', 'delete_silage_location' and 'save_silage_products'.
  *      New sheets "silage", "silage products" and "silage log".
+ *   9. Reasons for paddocks out are a list kept in the sheet "out reasons"
+ *      (reason | color), managed from the app: doPost 'save_out_reasons'.
+ *      The list goes to the app with the feed settings (outReasons) and with
+ *      ?type=out (reasons).
  * Everything else is byte-identical to what you had.
  */
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-03-b";
+var SCRIPT_VERSION = "2026-10-12-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -114,6 +118,8 @@ function doPost(e) {
       return deleteMaintenanceJob(payload.id);
     } else if (type === 'save_maintenance_categories') {
       return saveMaintenanceCategories(payload.categories);
+    } else if (type === 'save_out_reasons') {
+      return saveOutReasons(payload.reasons);
     } else if (type === 'save_silage_location') {
       return saveSilageLocation(payload);
     } else if (type === 'silage_stock') {
@@ -312,6 +318,11 @@ function getFeedSettings() {
   } else {
     delete settings.customHerds;
   }
+
+  // Every phone reads this at start-up, so the reasons travel with it rather
+  // than costing another read of the sheet.
+  var reasons = readOutReasons();
+  if (reasons.length > 0) settings.outReasons = reasons;
 
   return jsonResponse(settings);
 }
@@ -652,13 +663,54 @@ function getUnits() {
 }
 
 /* ================== PADDOCKS OUT OF ROTATION ================== */
-// Sheet "out": paddock | status   (status is CROP, SILAGE or OTHER)
+// Sheet "out": paddock | status   (status is one of the reasons, upper case)
 // Row 1 is a header, matching how the app's CSV reader skips the first line.
+//
+// Sheet "out reasons": reason | color. The reasons are managed from the app.
+// While the sheet is empty the app uses its own three: Crop, Silage, Other.
+
+function readOutReasons() {
+  var sheet = getOrCreateSheet("out reasons");
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var out = [];
+  var seen = {};
+  sheet.getRange(2, 1, lastRow - 1, 2).getValues().forEach(function(r) {
+    var label = String(r[0] == null ? "" : r[0]).trim();
+    if (!label || seen[label.toUpperCase()]) return;
+    seen[label.toUpperCase()] = true;
+    out.push({ reason: label, color: String(r[1] == null ? "" : r[1]).trim() });
+  });
+  return out;
+}
+
+// The whole list, written in one go (it is short and changes rarely).
+function saveOutReasons(list) {
+  if (!Array.isArray(list)) return errorResponse("Payload reasons must be array");
+  var rows = [];
+  var seen = {};
+  list.forEach(function(r) {
+    if (!r) return;
+    var label = String(r.reason == null ? "" : r.reason).trim();
+    var color = String(r.color == null ? "" : r.color).trim();
+    if (!label || seen[label.toUpperCase()]) return;
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) color = "#7f8c8d";
+    seen[label.toUpperCase()] = true;
+    rows.push([label, color]);
+  });
+  if (rows.length === 0) return errorResponse("Empty reason list - nothing saved");
+
+  var sheet = getOrCreateSheet("out reasons");
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, 2).setValues([["reason", "color"]]);
+  sheet.getRange(2, 1, rows.length, 2).setValues(rows);
+  return jsonResponse({ status: "success", count: rows.length, reasons: readOutReasons() });
+}
 
 function getOut() {
   var sheet = getOrCreateSheet("out");
   var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return jsonResponse({ status: "success", out: [] });
+  if (lastRow < 2) return jsonResponse({ status: "success", out: [], reasons: readOutReasons() });
 
   var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
   var out = [];
@@ -670,7 +722,7 @@ function getOut() {
       status: String(row[1] || "OUT").trim().toUpperCase()
     });
   });
-  return jsonResponse({ status: "success", out: out });
+  return jsonResponse({ status: "success", out: out, reasons: readOutReasons() });
 }
 
 function saveOut(outList) {

@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.16**,
-service worker cache `wn-farm-v1.1.30`, Apps Script `2026-10-03-b`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.17**,
+service worker cache `wn-farm-v1.1.31`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -183,9 +183,21 @@ and how many hectares, so two devices can be compared.
     12 Oct 2026). A second tap takes a paddock off the pick; picked ones are
     yellow on the map and shown as chips with x and CLEAR (`outPicked`,
     `takePickedPaddocksOut`). A tap on a paddock that is already out only
-    shows its line in the list (`outFocusName`).
-  - Each reason has its own colour on every map, the cards and the list:
-    Crop `#d35400`, Silage `#8e44ad`, Other `#e74c3c` (`OUT_STATUSES`).
+    shows its line in the list (`outFocusName`). The box shows how many
+    paddocks are picked and their hectares (v1.1.17).
+  - **Reasons are managed in the app** (v1.1.17, Juani 12 Oct 2026): the
+    "Reasons" box under it adds a reason with a colour, changes a colour, or
+    deletes a reason. Kept in the sheet tab `out reasons` (`reason | color`),
+    saved whole with `save_out_reasons`. The list reaches every phone with the
+    feed settings read at start-up (`outReasons`) and with `?type=out`
+    (`reasons`); the phone keeps a copy in `out_reasons`. Until the tab has a
+    list the app uses Crop, Silage, Other. **Other is always kept**: it is the
+    fallback for "OUT" and empty. A reason a phone does not know yet keeps its
+    own name, in the colour of Other. A reason that paddocks still use cannot
+    be deleted. The out tab stores the reason in upper case (`REGRASS`).
+    `OUT_STATUSES` is now a `let`, built by `normalizeOutReasons`.
+  - Each reason has its own colour on every map, the cards, the map key and
+    the list. Defaults: Crop `#d35400`, Silage `#8e44ad`, Other `#e74c3c`.
     Old reasons such as `OUT` or lower case ones count as Other.
   - A paddock on the tab is out in FARMWALK too, whatever its last cover
     (`applyOutTabToWalk`). Before v1.1.15 the tab only counted for paddocks
@@ -331,8 +343,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.16/v1.1.17/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.30/wn-farm-v1.1.31/" sw.js
+sed -i "s/v1\.1\.17/v1.1.18/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.31/wn-farm-v1.1.32/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -434,3 +446,9 @@ Added 12 October 2026:
 
 - Paddocks out: several paddocks can be picked and taken out together
   (v1.1.16). No script change.
+- Reasons for paddocks out are managed in the app (v1.1.17, Apps Script
+  `2026-10-12-a`, new tab `out reasons`). Paste the script before pushing.
+- PLAN has a "Farm Area" card: total area, in rotation, out of rotation, out
+  for Silage, and the other reasons (`renderPlanAreaCard`, from
+  `rotationAreas`, which now also gives `byReason`). It follows the unit
+  picked in PLAN. The areas come from the paddock boundaries and the out tab.
