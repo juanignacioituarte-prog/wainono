@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.20**,
-service worker cache `wn-farm-v1.1.34`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.21**,
+service worker cache `wn-farm-v1.1.35`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -166,6 +166,15 @@ The app **opens on BREAKS with the plain satellite picture**.
   averages. They work in FARMWALK and in SATELLITE.
 - SATELLITE sits inside this bar (next to PLAN and HISTORY).
 - BREAKS ON/OFF button shows or hides the breaks on these two screens.
+
+### Where the cover on a map label comes from (v1.1.21, Juani 12 Oct 2026)
+FARMWALK, FEED and PLAN use the farmwalk (`manualModeData`): the label shows
+the measured cover and the walk date ("2586 kgDM · walk 30 Sept"). Every
+other screen, BREAKS among them, uses `satellitePaddockData`: the NDVI of the
+last satellite picture turned into kgDM by the calibration fitted to past
+walks. That is an **estimate**, and the label says so: "≈ 3162 kgDM
+estimated · satellite 4 Oct". The break cards' EST. KG/COW also start from
+the satellite cover, plus the farm growth since the picture date.
 
 ### Farm average
 Area weighted average of the paddocks walked in the latest walk:
@@ -372,8 +381,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.20/v1.1.21/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.34/wn-farm-v1.1.35/" sw.js
+sed -i "s/v1\.1\.21/v1.1.22/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.35/wn-farm-v1.1.36/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -485,3 +494,6 @@ Added 12 October 2026:
 - Map labels of paddocks out say "OUT: <reason>" in FARMWALK and BREAKS too
   (v1.1.19).
 - BREAKS: paddocks out are filled in their reason colour (v1.1.20).
+- Map labels say where the cover comes from: measured with the walk date in
+  FARMWALK; "≈ ... estimated · satellite <date>" in BREAKS and the rest
+  (v1.1.21).

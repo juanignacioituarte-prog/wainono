@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.20</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.21</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.20</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.21</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -10363,8 +10363,20 @@
                 const outStatus = outReasonOf(pName);
                 const outLine = outStatus
                     ? `<div style="font-size:11px; font-weight:bold; color:${outStatusColor(outStatus)};">OUT: ${escUnit(outStatusInfo(outStatus).label)}</div>` : '';
-                if (p && !p.neverWalked) {
-                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM</div>${outLine}`);
+                /* Where the cover comes from. FARMWALK, FEED and PLAN show the
+                 * cover measured in the farmwalk. Every other screen (BREAKS
+                 * among them) shows the satellite cover: the NDVI of the last
+                 * picture turned into kgDM by a formula fitted to past walks.
+                 * That is an estimate, so the label says so, with the date. */
+                const fromWalk = currentData === manualModeData;
+                const coverTs = p && p.latest ? (p.latest.dateObj || (p.latest.ts ? new Date(p.latest.ts) : null)) : null;
+                const coverDate = coverTs && isFinite(coverTs.getTime()) ? fmtNZ(coverTs) : '';
+                if (p && !p.neverWalked && p.latest && isFinite(Number(p.latest.cover))) {
+                    const coverLine = fromWalk
+                        ? `<div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM${coverDate ? ' &middot; walk ' + coverDate : ''}</div>`
+                        : `<div style="font-size:11px; color:#2980b9;">&asymp; ${p.latest.cover} kgDM <i>estimated</i></div>` +
+                          `<div style="font-size:10px; color:#7f8c8d;">satellite${coverDate ? ' ' + coverDate : ''}</div>`;
+                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div>${coverLine}${outLine}`);
                 } else {
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div><div style="font-size:11px; color:#95a5a6;">-- kgDM</div>${outLine}`);
                 }
