@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.25**,
-service worker cache `wn-farm-v1.1.39`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.26**,
+service worker cache `wn-farm-v1.1.40`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -188,6 +188,15 @@ The app **opens on BREAKS with the plain satellite picture**.
 - BREAKS with **COVER MAP** on colours each paddock by its estimated cover
   (`getCoverColor`, same scale as FARMWALK); out paddocks keep their reason
   colour, paddocks with no walk stay clear (v1.1.23).
+- **📈 EST. FW** in the FARMWALK bar (v1.1.26, Juani 12 Oct 2026): the paddock
+  ranking on the estimated cover, like FARMWALK and SATELLITE, with all the
+  filters (unit chips, search, sort COVER / GROWTH, BREAKS ON/OFF) and the map
+  in estimated-cover colours. Mode `estimate`; `buildEstimatedPaddockData()`
+  shapes each paddock like a farmwalk row (cover = estimate, dated today,
+  "previous" = what it started from: the walk, or 1500 after a break). The
+  farm average at the top is the estimated average ("estimated today").
+  Entering a walk is hidden there. GROWTH sort uses the average growth since
+  the start, which is about the same for every paddock (one farm figure).
 - SATELLITE keeps the satellite cover ("≈ ... estimated · satellite <date>").
 
 ### Growth from measured weather (v1.1.22)
@@ -418,8 +427,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.25/v1.1.26/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.39/wn-farm-v1.1.40/" sw.js
+sed -i "s/v1\.1\.26/v1.1.27/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.40/wn-farm-v1.1.41/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -540,3 +549,4 @@ Added 12 October 2026:
 - Estimated cover after breaks: 1500 + growth since the last break (v1.1.24).
 - After a break: 1500 on the day after the last break, growth from the next
   day (v1.1.25).
+- EST. FW: paddock ranking on the estimated cover, with all filters (v1.1.26).

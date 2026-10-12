@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.25</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.26</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.25</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.26</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1783,6 +1783,9 @@
                     </button>
                     <button id="btn-satellite" onclick="toggleSatelliteView()" style="background:#2471a3; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         🛰 SATELLITE
+                    </button>
+                    <button id="btn-estimate" onclick="toggleEstimateView()" style="background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                        📈 EST. FW
                     </button>
                     <button id="btn-growth" onclick="openGrowthPage()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         🌱 GROWTH
@@ -2965,9 +2968,9 @@
             return false;
         }
 
-        // The unit chips filter FARMWALK and SATELLITE.
+        // The unit chips filter FARMWALK, SATELLITE and EST. FW.
         function unitFilterApplies() {
-            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite';
+            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite' || currentDashboardMode === 'estimate';
         }
 
         function getActiveUnit() {
@@ -3255,6 +3258,8 @@
                 GR.daily.set(d.iso, (fIrr * d.potirr + (1 - fIrr) * d.potdry) * months[d.date.getMonth() + 1]);
             });
             GR.ready = true; GR.error = '';
+            estimatedBuiltAt = 0;
+            if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
             if (typeof updateGeoStyles === 'function') updateGeoStyles();
             if (typeof renderBreaksDashboard === 'function') renderBreaksDashboard();
         }
@@ -3310,6 +3315,40 @@
             const from = date ? date.getTime() : 0;
             return (savedBreaks || []).filter(b => !b.isDeleted && !b.isCropBreak && b.paddock &&
                 normName(b.paddock) === normName(pName) && b.createdAt && new Date(b.createdAt).getTime() > from);
+        }
+
+        /* ---- EST. FW: the ranking list on the estimated cover ----
+         * Every paddock as a farmwalk card, its cover being the estimate
+         * (last walk, or 1500 after its last break, + est. growth). Shaped like
+         * the farmwalk rows so the list, the unit chips, search, sort, the map
+         * colours and the farm average all work as they do on FARMWALK. Every
+         * row is dated today, so none counts as skipped. */
+        let estimatedPaddockData = [];
+        let estimatedBuiltAt = 0;
+        function buildEstimatedPaddockData() {
+            // Rebuilt at most every few seconds; the list and the map ask often.
+            if (Date.now() - estimatedBuiltAt < 3000 && estimatedPaddockData.length) return estimatedPaddockData;
+            const today = new Date();
+            const todayTs = grDayOf(today).getTime();
+            estimatedPaddockData = (manualModeData || []).map(p => {
+                const est = estimateCover(p.name, today);
+                const from = est ? (est.fromBreak ? `${GR_RESIDUAL} on ${fmtNZ(est.startDate)}` : `walk ${fmtNZ(est.walkDate)}`) : '';
+                return {
+                    name: p.name, area: p.area || 0, isOut: p.isOut, reason: p.reason, neverWalked: !est,
+                    latest: { cover: est ? est.cover : 0, ts: todayTs,
+                              formattedDate: est ? `est. today: ${from} + ${est.growth} growth` : '' },
+                    previous: est ? { cover: est.fromBreak ? GR_RESIDUAL : est.walkCover,
+                                      formattedDate: est.fromBreak ? `after break ${fmtNZ(est.breakDate)}` : `walk ${fmtNZ(est.walkDate)}` } : null,
+                    growthRate: est && est.days > 0 ? Math.round(est.growth / est.days) : null,
+                    est: est
+                };
+            });
+            estimatedBuiltAt = Date.now();
+            return estimatedPaddockData;
+        }
+
+        function toggleEstimateView() {
+            switchDashboardMode(currentDashboardMode === 'estimate' ? 'manual' : 'estimate');
         }
 
         /* ---- the GROWTH page (gr.html), inside the app ---- */
@@ -9413,7 +9452,7 @@
             selectedBreakIds.clear();
             currentDashboardMode = mode;
             // SATELLITE now lives inside FARMWALK, so FARMWALK stays lit for both.
-            document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual' || mode === 'satellite');
+            document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual' || mode === 'satellite' || mode === 'estimate');
             document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
             document.getElementById('btn-mode-breaks').classList.toggle('active', mode === 'breaks');
 
@@ -9429,7 +9468,7 @@
             }
 
             // UI Toggles
-            document.getElementById('farmwalk-entry-bar').style.display = (mode === 'manual' || mode === 'satellite') ? 'flex' : 'none';
+            document.getElementById('farmwalk-entry-bar').style.display = (mode === 'manual' || mode === 'satellite' || mode === 'estimate') ? 'flex' : 'none';
             updateFarmwalkBarForMode(mode);
             document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'flex' : 'none';
@@ -9459,10 +9498,10 @@
                 if (silagePlacing) cancelSilagePlacing();
                 clearSilageStockFromMap();    // so does the silage
             }
-            document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'breaks') ? 'block' : 'none';
+            document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'estimate' || mode === 'breaks') ? 'block' : 'none';
             // Sorting only means something where paddock cards are listed.
             const sortBar = document.getElementById('sort-bar');
-            if (sortBar) sortBar.style.display = (mode === 'satellite' || mode === 'manual') ? 'flex' : 'none';
+            if (sortBar) sortBar.style.display = (mode === 'satellite' || mode === 'manual' || mode === 'estimate') ? 'flex' : 'none';
 
             const farmConfigView = document.getElementById('farm-config-view');
             if (farmConfigView) farmConfigView.style.display = (mode === 'farm_config') ? 'block' : 'none';
@@ -9600,6 +9639,13 @@
                     renderUnitChips();
                     setLayerMode('ndvi');
                     document.getElementById('legend').style.display = 'none';
+                } else if (mode === 'estimate') {
+                    // EST. FW: the map in the colours of the estimated covers.
+                    if (ndviLayer) map.removeLayer(ndviLayer);
+                    estimatedBuiltAt = 0;
+                    renderUnitChips();
+                    setLayerMode('cover');
+                    document.getElementById('legend').style.display = 'block';
                 } else if (mode === 'breaks') {
                     setLayerMode(currentViewMode);
                     // The cover key stays when COVER MAP is on (estimated covers).
@@ -9754,7 +9800,8 @@
         }
 
         function updateFarmwalkBarForMode(mode) {
-            const isSat = (mode === 'satellite');
+            // Entering a walk only makes sense on FARMWALK itself.
+            const isSat = (mode === 'satellite' || mode === 'estimate');
             const entryBtn = document.getElementById('btn-farmwalk-entry');
             if (entryBtn) entryBtn.style.display = isSat ? 'none' : 'flex';
             // The walk controls belong to entering covers, not to the satellite view.
@@ -9765,15 +9812,20 @@
             });
             const satBtn = document.getElementById('btn-satellite');
             if (satBtn) {
-                satBtn.innerHTML = isSat ? '✕ SATELLITE' : '🛰 SATELLITE';
-                satBtn.style.background = isSat ? '#34495e' : '#2471a3';
+                satBtn.innerHTML = mode === 'satellite' ? '✕ SATELLITE' : '🛰 SATELLITE';
+                satBtn.style.background = mode === 'satellite' ? '#34495e' : '#2471a3';
+            }
+            const estBtn = document.getElementById('btn-estimate');
+            if (estBtn) {
+                estBtn.innerHTML = mode === 'estimate' ? '✕ EST. FW' : '📈 EST. FW';
+                estBtn.style.background = mode === 'estimate' ? '#34495e' : '#2980b9';
             }
             updateBreaksToggleButton();
         }
 
         /* ---- Breaks on the map: show / hide on FARMWALK and SATELLITE ---- */
         function breakToggleApplies() {
-            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite';
+            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite' || currentDashboardMode === 'estimate';
         }
 
         function toggleBreaksOnMap() {
@@ -9801,6 +9853,7 @@
             // PLAN was split out of FEED and never added here, so it was reading
             // satellite covers while its own wedge was drawn from the farmwalk.
             // Planning is done off the farmwalk, the same as FEED.
+            if (currentDashboardMode === 'estimate') return buildEstimatedPaddockData();
             return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentDashboardMode === 'plan')
                 ? manualModeData : satellitePaddockData;
         }
@@ -10402,9 +10455,10 @@
             const elBasis = document.getElementById('stats-basis');
             if (elBasis) {
                 const counted = scoped.filter(p => (p.area || 0) > 0 && !p.isOut && !skippedInLatestWalk(p, walk)).length;
-                elBasis.innerText = walk.maxTs
-                    ? ` · walk ${fmtNZ(new Date(walk.maxTs))} · ${counted} paddocks · ${tAreaC.toFixed(1)} ha`
-                    : '';
+                elBasis.innerText = !walk.maxTs ? ''
+                    : currentDashboardMode === 'estimate'
+                        ? ` · estimated today · ${counted} paddocks · ${tAreaC.toFixed(1)} ha`
+                        : ` · walk ${fmtNZ(new Date(walk.maxTs))} · ${counted} paddocks · ${tAreaC.toFixed(1)} ha`;
             }
 
             const rot = rotationAreas(pUnit);
@@ -10421,7 +10475,7 @@
 
         /* Rendering */
         function renderDashboard() {
-            if (currentDashboardMode !== 'manual' && currentDashboardMode !== 'satellite') return;
+            if (currentDashboardMode !== 'manual' && currentDashboardMode !== 'satellite' && currentDashboardMode !== 'estimate') return;
             const data = getCurrentModeData();
 
             // Farm stats and feed logic stay whole-farm on purpose — a unit only
@@ -10566,8 +10620,8 @@
                 div.innerHTML = `
             <div style="display:flex; justify-content:space-between; margin-bottom:8px"><b>${p.name} ${badges}</b><span style="font-size:11px; background:#eee; padding:2px 5px; border-radius:3px">${p.area.toFixed(1)} ha</span></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
-                <div><span class="label">Latest Cover</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.neverWalked ? '#95a5a6' : 'var(--accent)')}">${p.neverWalked ? '--' : p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.neverWalked ? 'not walked yet' : p.latest.formattedDate}</small>${manualHtml}</div>
-                ${p.previous ? `<div><span class="label">Previous</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
+                <div><span class="label">${currentDashboardMode === 'estimate' ? 'Est. Cover' : 'Latest Cover'}</span><span class="val" style="color:${p.isOut ? 'var(--out)' : (p.neverWalked ? '#95a5a6' : 'var(--accent)')}">${p.neverWalked ? '--' : p.latest.cover}<span class="unit">kgDM/ha</span></span><br><small style="color:#95a5a6">${p.neverWalked ? 'not walked yet' : p.latest.formattedDate}</small>${manualHtml}</div>
+                ${p.previous ? `<div><span class="label">${currentDashboardMode === 'estimate' ? 'Started from' : 'Previous'}</span><span class="val prev">${p.previous.cover}</span><br><small style="color:#95a5a6">${p.previous.formattedDate}</small></div>` : '<div></div>'}
             </div>
             <div style="position:absolute; top:14px; right:60px; text-align:right; display:flex; flex-direction:column; align-items:flex-end;">
                 ${(p.growthRate && growthIsComparable(p, walkInfo)) ? `<div><span style="color:var(--growth); font-weight:bold">${p.growthRate > 0 ? '+' : ''}${p.growthRate}</span><br><small style="font-size:9px; color:#95a5a6">kg/day</small></div>` : ''}
