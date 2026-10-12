@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.17**,
-service worker cache `wn-farm-v1.1.31`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.18**,
+service worker cache `wn-farm-v1.1.32`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -148,7 +148,7 @@ fetch(URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
 
 Top buttons: **FARMWALK**, **FEED**, **BREAKS**. The ⋮ menu holds Health &
 Safety, Roster, Weather, Vehicle Maintenance, **Farm Maintenance**,
-**Silage**, Farm Configuration (admin only), Audio & Map Settings, Weekly Area
+**Silage**, **Print Map**, Farm Configuration (admin only), Audio & Map Settings, Weekly Area
 Report.
 
 The app **opens on BREAKS with the plain satellite picture**.
@@ -285,6 +285,30 @@ Row in the `silage log` tab:
 `id | timestamp | location id | location | product | form | from | to |
 change | user | note`.
 
+### Print Map (⋮ menu)
+Print the farm map, all of it or part, with the paddock names, after marking
+paddocks in colours (v1.1.18, Juani 12 Oct 2026).
+- Tap a colour, then tap paddocks to paint them. A second tap with the same
+  colour, or the ERASER, clears one. CLEAR ALL clears every mark.
+- Six colours, each with a name typed by the user (e.g. "Regrass"). Next to
+  each: how many paddocks and their hectares; under them the total marked.
+- The marking map always shows the satellite photo. BACKGROUND only sets the
+  printed page: **PLAIN** (no picture, the default), SATELLITE, NDVI (the
+  latest NDVI picture, needs SATELLITE > NDVI opened once), COVER (paddocks in
+  their last cover colours, as in FARMWALK, with the cover key).
+- What is printed: the paddocks that can be seen on the screen, whole, filling
+  the page. WHOLE FARM fits the whole farm. Option: area under each name.
+- Paper A4 / A3, landscape / portrait. PRINT PREVIEW builds the page in mm
+  (`pmOpenSheet`) with its own Leaflet map, shown scaled down on screen; PRINT
+  calls the normal print window, which can also save as PDF.
+- The page: title, date, the map with names and a scale, and a key with each
+  used colour: name, hectares, number of paddocks and their names, and the
+  total marked.
+- The marks, names and choices are kept **on this device only**
+  (`print_map_state`). Nothing goes to the sheet.
+- Labels are given their small size before their content, so Leaflet centres
+  them on the paddock; otherwise they sat beside it.
+
 ### Vehicle Maintenance
 Fleet list, service checks with a checklist per vehicle type.
 **Service Several** does many vehicles in one go: tick the vehicles (or "all"
@@ -343,8 +367,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.17/v1.1.18/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.31/wn-farm-v1.1.32/" sw.js
+sed -i "s/v1\.1\.18/v1.1.19/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.32/wn-farm-v1.1.33/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -452,3 +476,4 @@ Added 12 October 2026:
   for Silage, and the other reasons (`renderPlanAreaCard`, from
   `rotationAreas`, which now also gives `byReason`). It follows the unit
   picked in PLAN. The areas come from the paddock boundaries and the out tab.
+- Print Map in the menu (v1.1.18). No script change. Marks stay on the device.
