@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.15**,
-service worker cache `wn-farm-v1.1.29`, Apps Script `2026-10-03-b`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.16**,
+service worker cache `wn-farm-v1.1.30`, Apps Script `2026-10-03-b`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -177,8 +177,13 @@ and how many hectares, so two devices can be compared.
 - **Farm units**: which paddocks belong to which unit.
 - **Paddocks out**: the `out` tab. This is the one list of paddocks out of
   rotation (v1.1.15).
-  - "Take a paddock out": pick it in the list or tap it on the map, then tap
-    the reason (CROP / SILAGE / OTHER).
+  - "Take paddocks out": pick **one or more** paddocks in the list or by
+    tapping them on the map, then tap the reason (CROP / SILAGE / OTHER).
+    All the picked paddocks go out together, in one save (v1.1.16, Juani
+    12 Oct 2026). A second tap takes a paddock off the pick; picked ones are
+    yellow on the map and shown as chips with x and CLEAR (`outPicked`,
+    `takePickedPaddocksOut`). A tap on a paddock that is already out only
+    shows its line in the list (`outFocusName`).
   - Each reason has its own colour on every map, the cards and the list:
     Crop `#d35400`, Silage `#8e44ad`, Other `#e74c3c` (`OUT_STATUSES`).
     Old reasons such as `OUT` or lower case ones count as Other.
@@ -326,8 +331,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.14/v1.1.15/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.28/wn-farm-v1.1.29/" sw.js
+sed -i "s/v1\.1\.16/v1.1.17/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.30/wn-farm-v1.1.31/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -426,3 +431,6 @@ Added 12 October 2026:
 - On 12 Oct the out tab had 22 paddocks, all OTHER. Q3, 30a, U1 and U2 were
   out only by a cover of 0 in the farmwalk (26 and 30 Sept). Juani will sort
   these by hand: **do not change the sheet data for them**.
+
+- Paddocks out: several paddocks can be picked and taken out together
+  (v1.1.16). No script change.

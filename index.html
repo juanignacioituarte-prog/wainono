@@ -1685,7 +1685,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.15</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.16</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1698,7 +1698,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.15</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.16</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1851,10 +1851,11 @@
                     stops appearing in Crop Management as soon as it is no longer on crop.
                 </p>
                 <div style="background:#fdf6ee; border:1px solid #f0d2b0; border-radius:6px; padding:8px 10px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px;">
-                    <div style="font-size:12px; font-weight:bold; color:#2c3e50;">Take a paddock out</div>
-                    <div style="font-size:11px; color:#666;">Pick the paddock in the list or tap it on the map. Then tap the reason.</div>
-                    <select id="out-add-paddock" onchange="pickOutPaddock(this.value)"
+                    <div style="font-size:12px; font-weight:bold; color:#2c3e50;">Take paddocks out</div>
+                    <div style="font-size:11px; color:#666;">Pick one or more paddocks in the list or tap them on the map. Then tap the reason.</div>
+                    <select id="out-add-paddock" onchange="pickOutPaddock(this.value); this.value = '';"
                         style="padding:8px; border:1px solid #ccc; border-radius:4px; font-size:13px; font-weight:bold;"></select>
+                    <div id="out-add-picked" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
                     <div id="out-add-reasons" style="display:flex; gap:6px;"></div>
                 </div>
                 <div id="out-paddock-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -5280,7 +5281,10 @@
         }
         function outStatusColor(status) { return outStatusInfo(status).color; }
 
-        let outPickName = ''; // the paddock picked in "Take a paddock out"
+        // The paddocks picked in "Take paddocks out" (normName -> name). One tap
+        // on a reason takes them all out together.
+        let outPicked = new Map();
+        let outFocusName = '';  // a paddock already out, tapped on the map: its line is shown
 
         function outTabHas(name) {
             return outRows.some(r => normName(r.paddock) === normName(name));
@@ -5319,7 +5323,7 @@
             box.innerHTML = rows.map(r => {
                 const opts = OUT_STATUSES.map(s =>
                     `<option value="${s.value}" ${r.status === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
-                const picked = outPickName && normName(outPickName) === normName(r.paddock);
+                const picked = outFocusName && normName(outFocusName) === normName(r.paddock);
                 return `
                 <div id="out-row-${escUnit(normName(r.paddock))}" style="background:${picked ? '#fef5e7' : '#fff'}; border:1px solid ${picked ? '#e67e22' : '#ddd'}; border-left:6px solid ${outStatusColor(r.status)}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                     <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(r.paddock)}
@@ -5333,50 +5337,81 @@
             }).join('');
         }
 
-        // The "Take a paddock out" box: every paddock still in rotation, and one
-        // button per reason.
+        // The "Take paddocks out" box: every paddock still in rotation, the
+        // paddocks picked so far, and one button per reason.
         function renderOutAddBox(outList) {
             const sel = document.getElementById('out-add-paddock');
             const btns = document.getElementById('out-add-reasons');
+            const chips = document.getElementById('out-add-picked');
             if (!sel || !btns) return;
 
             const out = new Set(outList.map(r => normName(r.paddock)));
             const names = Object.keys(paddockMap || {}).length ? Object.keys(paddockMap) : Object.keys(areaLookup || {});
             const inRotation = names.filter(n => n && !out.has(normName(n)))
                 .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-            if (outPickName && !inRotation.some(n => normName(n) === normName(outPickName))) outPickName = '';
+            // A picked paddock that is out now (another phone, or just saved) is dropped.
+            const inSet = new Set(inRotation.map(normName));
+            [...outPicked.keys()].forEach(k => { if (!inSet.has(k)) outPicked.delete(k); });
 
-            sel.innerHTML = `<option value="">— pick a paddock —</option>` + inRotation.map(n =>
-                `<option value="${escUnit(n)}" ${normName(n) === normName(outPickName) ? 'selected' : ''}>${escUnit(n)}</option>`).join('');
+            const n = outPicked.size;
+            sel.innerHTML = `<option value="">${n ? '— add another paddock —' : '— pick a paddock —'}</option>` + inRotation.map(p =>
+                `<option value="${escUnit(p)}">${outPicked.has(normName(p)) ? '✓ ' : ''}${escUnit(p)}</option>`).join('');
+            sel.value = '';
+
+            if (chips) {
+                const picked = [...outPicked.values()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+                chips.innerHTML = picked.map(p =>
+                    `<span style="display:inline-flex; align-items:center; gap:4px; background:#f1c40f; color:#2c3e50; border-radius:12px; padding:3px 4px 3px 9px; font-size:11px; font-weight:bold;">${escUnit(p)}
+                        <b onclick="pickOutPaddock('${escUnit(p)}')" style="cursor:pointer; padding:0 5px;">×</b></span>`).join('') +
+                    (n > 1 ? `<span onclick="clearOutPicked()" style="cursor:pointer; border:1px solid #95a5a6; color:#7f8c8d; border-radius:12px; padding:3px 9px; font-size:11px; font-weight:bold;">CLEAR</span>` : '');
+            }
 
             btns.innerHTML = OUT_STATUSES.map(s =>
-                `<button onclick="takePaddockOut(outPickName, '${s.value}')"
-                    style="flex:1; background:${s.color}; color:#fff; border:none; padding:9px 4px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">${s.label.toUpperCase()}</button>`).join('');
+                `<button onclick="takePickedPaddocksOut('${s.value}')"
+                    style="flex:1; background:${s.color}; color:#fff; border:none; padding:9px 4px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; opacity:${n ? 1 : 0.5};">${s.label.toUpperCase()}${n > 1 ? ' (' + n + ')' : ''}</button>`).join('');
         }
 
-        // From the list or from a tap on the map.
+        // From the list or from a tap on the map. A paddock in rotation is
+        // added to the pick, or taken off it if it was picked already.
         function pickOutPaddock(name) {
             const p = String(name || '');
+            if (!p) return;
             const isOut = outTabHas(p) || walkOutPaddocks().some(w => normName(w.name) === normName(p));
-            outPickName = p;
-            renderOutManager();
-            updateGeoStyles();
             if (isOut) {
                 // Already out: show its line in the list instead.
+                outFocusName = p;
+                renderOutManager();
+                updateGeoStyles();
                 const row = document.getElementById('out-row-' + escUnit(normName(p)));
                 if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
             }
+            outFocusName = '';
+            const key = normName(p);
+            if (outPicked.has(key)) outPicked.delete(key); else outPicked.set(key, p);
+            renderOutManager();
+            updateGeoStyles();
         }
 
-        function takePaddockOut(name, status) {
-            if (!name) return alert('Pick a paddock first: in the list, or tap it on the map.');
+        function clearOutPicked() {
+            outPicked.clear();
+            renderOutManager();
+            updateGeoStyles();
+        }
+
+        // Every picked paddock goes out for this reason, in one save.
+        function takePickedPaddocksOut(status) {
+            const names = [...outPicked.values()];
+            if (names.length === 0) return alert('Pick a paddock first: in the list, or tap it on the map.');
             if (!requireUnitAdmin()) return;
             const value = outStatusInfo(status).value;
-            outPickName = '';
+            outPicked.clear();
             changeOutTab(rows => {
-                const row = rows.find(r => normName(r.paddock) === normName(name));
-                if (row) row.status = value;
-                else rows.push({ paddock: name, status: value });
+                names.forEach(name => {
+                    const row = rows.find(r => normName(r.paddock) === normName(name));
+                    if (row) row.status = value;
+                    else rows.push({ paddock: name, status: value });
+                });
             });
         }
 
@@ -8482,7 +8517,7 @@
                                 return;
                             }
 
-                            // Paddocks out: a tap picks the paddock to take out
+                            // Paddocks out: a tap adds the paddock to the pick, or takes it off
                             if (currentDashboardMode === 'farm_config' && farmConfigSection === 'out') {
                                 L.DomEvent.stopPropagation(e);
                                 pickOutPaddock(pName);
@@ -9747,7 +9782,7 @@
                     const tabStatus = excludedPaddocks.get(normName(pName));
                     const wp = walkOutPaddocks().find(w => normName(w.name) === normName(pName));
                     const status = tabStatus || (wp ? (wp.reason || 'OTHER') : '');
-                    const picked = outPickName && normName(outPickName) === normName(pName);
+                    const picked = outPicked.has(normName(pName)) || (outFocusName && normName(outFocusName) === normName(pName));
                     layer.setStyle({
                         fillColor: status ? outStatusColor(status) : (picked ? '#f1c40f' : '#95a5a6'),
                         fillOpacity: status ? 0.8 : (picked ? 0.7 : 0.2),
