@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.21</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.22</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.21</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.22</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1783,6 +1783,9 @@
                     </button>
                     <button id="btn-satellite" onclick="toggleSatelliteView()" style="background:#2471a3; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         🛰 SATELLITE
+                    </button>
+                    <button id="btn-growth" onclick="openGrowthPage()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                        🌱 GROWTH
                     </button>
                     <div style="flex-basis:100%; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                         <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
@@ -3073,6 +3076,242 @@
             }
             updateGeoStyles();
         }
+
+        /* ===================== GROWTH FROM MEASURED WEATHER =====================
+         * Estimated cover = last farmwalk cover + the farm average growth of
+         * every day since, from MEASURED weather. Used on BREAKS and every
+         * screen that is not the farmwalk itself (Juani, 12 Oct 2026), in place
+         * of the satellite estimate. The SATELLITE screen still shows the
+         * satellite.
+         *
+         * The model is COPIED from Apps\pasture-growth\gr.html (MODEL, gddOf,
+         * smoothGdd, mFactor, runWaterBalance, potential, computeCalibration
+         * with no NDVI split). If gr.html's model changes, change this copy too.
+         * Farm average only: the irrigated and dryland runs are blended by area,
+         * using the irrigation setting gr.html keeps (gr_irrigation_class, same
+         * website, so the same browser storage). Growth per paddock is not used.
+         *
+         * Weather: Open-Meteo archive (measured) up to 2 days ago, and the
+         * forecast endpoint's past days for yesterday and today. Read once a day
+         * and kept on the phone (growth_weather_v1).
+         */
+        const GR_FARM = { lat: -44.119, lon: 170.852 };
+        const GR_MODEL = {
+            MAX_GROWTH: 85, T_BASE: 4, GDD_OPT: 16, GDD_CLIP: 25, GDD_SMOOTH: 5, T_EXP: 0.7,
+            RAD_OPT: 25, R_EXP: 0.5, KC: 0.95, RAIN_SCALE: 1,
+            FC_MM: 75, REFILL_MM: 45, WILT_MM: 33, STRESS_P: 0.5,
+            IRR_TRIGGER: 54, IRR_MM_DAY: 6, IRR_MONTHS: [9, 10, 11, 12, 1, 2, 3, 4],
+            SPINUP_YEARS: 2, CAL_MIN_DAYS: 5, CAL_MAX_DAYS: 35, CAL_MIN_N: 3, CAL_CLAMP: [0.3, 3.0]
+        };
+        const GR_DAY = 86400000;
+        let FARMWALK_HISTORY = {};      // normName -> { name, entries: [{dateObj, cover, reason}] }
+        let GR = { weatherRows: null, histWalks: {}, daily: new Map(), cal: null, ready: false, error: '' };
+
+        const grClamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        // Local date, never toISOString(): New Zealand is ahead of UTC.
+        const grIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const grDayOf = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        function grMedian(a) { if (!a.length) return NaN; const s = a.slice().sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+        function grGdd(tmax, tmin) { if (tmax == null || tmin == null) return null; return grClamp((tmax + tmin) / 2 - GR_MODEL.T_BASE, 0, GR_MODEL.GDD_CLIP); }
+        const grT = g => Math.pow(grClamp(g / GR_MODEL.GDD_OPT, 0, 1), GR_MODEL.T_EXP);
+        const grR = rad => Math.pow(grClamp(rad / GR_MODEL.RAD_OPT, 0, 1), GR_MODEL.R_EXP);
+        function grM(sw) {
+            const taw = GR_MODEL.FC_MM - GR_MODEL.WILT_MM, rw = GR_MODEL.STRESS_P * taw, dep = GR_MODEL.FC_MM - sw;
+            return dep <= rw ? 1 : grClamp((taw - dep) / (taw - rw), 0, 1);
+        }
+        function grIrrClass(name) {
+            try { return (JSON.parse(localStorage.getItem('gr_irrigation_class') || '{}') || {})[normName(name)] === 'dry' ? 'dry' : 'irr'; }
+            catch (e) { return 'irr'; }
+        }
+
+        async function grFetchJson(url, ms) {
+            const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), ms || 25000);
+            try { const r = await fetch(url, { signal: ac.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
+            finally { clearTimeout(timer); }
+        }
+
+        async function grLoadWeather() {
+            const today = grDayOf(new Date());
+            try {
+                const c = JSON.parse(localStorage.getItem('growth_weather_v1') || 'null');
+                if (c && c.fetched === grIso(today) && Array.isArray(c.rows) && c.rows.length > 300) return c.rows;
+            } catch (e) {}
+            const start = new Date(today.getFullYear() - GR_MODEL.SPINUP_YEARS, today.getMonth(), today.getDate());
+            const arcEnd = new Date(today.getTime() - 2 * GR_DAY);   // the archive refuses yesterday
+            const vars = 'temperature_2m_max,temperature_2m_min,precipitation_sum,shortwave_radiation_sum,et0_fao_evapotranspiration';
+            const base = `latitude=${GR_FARM.lat}&longitude=${GR_FARM.lon}&daily=${vars}&timezone=Pacific%2FAuckland`;
+            const [arc, fc] = await Promise.all([
+                grFetchJson(`https://archive-api.open-meteo.com/v1/archive?${base}&start_date=${grIso(start)}&end_date=${grIso(arcEnd)}`),
+                grFetchJson(`https://api.open-meteo.com/v1/forecast?${base}&past_days=60&forecast_days=1`)
+            ]);
+            const rows = new Map();
+            const soak = (j, isForecast) => {
+                const D = j && j.daily; if (!D || !D.time) return;
+                for (let i = 0; i < D.time.length; i++) {
+                    const tmax = D.temperature_2m_max[i], tmin = D.temperature_2m_min[i], rad = D.shortwave_radiation_sum[i];
+                    if (tmax == null || tmin == null || rad == null) continue;
+                    const key = D.time[i];
+                    if (rows.has(key) && !rows.get(key).f) continue;      // the archive wins
+                    rows.set(key, { iso: key, tmax, tmin, rad, rain: D.precipitation_sum[i] || 0,
+                                    pet: D.et0_fao_evapotranspiration[i] || 0, f: isForecast });
+                }
+            };
+            soak(arc, false); soak(fc, true);
+            const list = Array.from(rows.values()).sort((a, b) => a.iso < b.iso ? -1 : 1);
+            if (list.length < 300) throw new Error('not enough weather came back');
+            try { localStorage.setItem('growth_weather_v1', JSON.stringify({ fetched: grIso(today), rows: list })); } catch (e) {}
+            return list;
+        }
+
+        // Last season's walks, bundled next to the app (same file gr.html uses).
+        async function grLoadHistWalks() {
+            const r = await fetch('fairlie_history.csv');
+            if (!r.ok) return {};
+            const rows = (await r.text()).trim().split('\n').map(x => x.split(','));
+            const cut = new Date(2025, 4, 19);   // the first two columns are setup placeholders
+            const cols = rows[0].slice(1).map(h => { const m = h.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null; });
+            const by = {};
+            rows.slice(1).forEach(row => {
+                const name = (row[0] || '').trim(); if (!name) return;
+                const e = [];
+                for (let i = 1; i < row.length; i++) {
+                    const d = cols[i - 1]; if (!d || d < cut) continue;
+                    const v = parseFloat(row[i]); if (isFinite(v) && v > 0) e.push({ dateObj: d, cover: Math.round(v), reason: '' });
+                }
+                if (e.length) by[normName(name)] = e;
+            });
+            return by;
+        }
+
+        async function loadGrowthModel() {
+            try {
+                const [rows, hist] = await Promise.all([grLoadWeather(), grLoadHistWalks().catch(() => ({}))]);
+                GR.weatherRows = rows; GR.histWalks = hist;
+                grBuild();
+            } catch (e) {
+                GR.error = e.message || String(e);
+                console.warn('Growth model not loaded:', GR.error);
+                if (typeof updateGeoStyles === 'function') updateGeoStyles();
+            }
+        }
+
+        // The model, run over the weather, then calibrated by month on the walks.
+        function grBuild() {
+            const days = GR.weatherRows.map(r => ({ iso: r.iso, date: new Date(+r.iso.slice(0, 4), +r.iso.slice(5, 7) - 1, +r.iso.slice(8, 10)),
+                rain: r.rain, pet: r.pet, rad: r.rad, gdd: grGdd(r.tmax, r.tmin), f: r.f }));
+            const win = [];
+            days.forEach(d => { win.push(d.gdd == null ? 0 : d.gdd); while (win.length > GR_MODEL.GDD_SMOOTH) win.shift(); d.gddSm = win.reduce((a, b) => a + b, 0) / win.length; });
+            [['irr', true], ['dry', false]].forEach(([k, irrigated]) => {
+                let sw = GR_MODEL.FC_MM;
+                days.forEach(d => {
+                    sw += d.rain * GR_MODEL.RAIN_SCALE - d.pet * GR_MODEL.KC;
+                    if (irrigated && GR_MODEL.IRR_MONTHS.indexOf(d.date.getMonth() + 1) !== -1 && sw < GR_MODEL.IRR_TRIGGER) sw += GR_MODEL.IRR_MM_DAY;
+                    sw = grClamp(sw, GR_MODEL.WILT_MM, GR_MODEL.FC_MM);
+                    d['pot' + k] = (d.rad == null) ? null : GR_MODEL.MAX_GROWTH * grT(d.gddSm) * grM(sw) * grR(d.rad);
+                });
+            });
+
+            // Month calibration: walk pairs where cover went up, 5-35 days apart.
+            const pot = { irr: {}, dry: {} };
+            days.forEach(d => { if (d.potirr != null) pot.irr[d.iso] = d.potirr; if (d.potdry != null) pot.dry[d.iso] = d.potdry; });
+            const names = new Set([...Object.keys(FARMWALK_HISTORY), ...Object.keys(GR.histWalks)]);
+            const kept = [];
+            names.forEach(k => {
+                const seen = {};
+                (GR.histWalks[k] || []).forEach(e => { seen[grIso(e.dateObj)] = e; });
+                ((FARMWALK_HISTORY[k] && FARMWALK_HISTORY[k].entries) || []).forEach(e => { if (e.dateObj && e.cover > 0) seen[grIso(e.dateObj)] = e; });
+                const list = Object.keys(seen).sort().map(x => seen[x]);
+                const pk = pot[grIrrClass(k)];
+                for (let i = 1; i < list.length; i++) {
+                    const a = list[i - 1], b = list[i];
+                    const n = Math.round((grDayOf(b.dateObj) - grDayOf(a.dateObj)) / GR_DAY);
+                    if (n < GR_MODEL.CAL_MIN_DAYS || n > GR_MODEL.CAL_MAX_DAYS || !(b.cover > a.cover)) continue;
+                    if (/graz|silage|hay|mow|topp|cut|crop|out|break|shut/i.test((a.reason || '') + ' ' + (b.reason || ''))) continue;
+                    let pred = 0, have = 0;
+                    for (let t = grDayOf(a.dateObj).getTime() + GR_DAY; t <= grDayOf(b.dateObj).getTime(); t += GR_DAY) {
+                        const v = pk[grIso(new Date(t))]; if (v != null) { pred += v; have++; }
+                    }
+                    if (have < n * 0.8 || pred <= 1) continue;
+                    const f = (b.cover - a.cover) / pred;
+                    if (isFinite(f) && f > 0) kept.push({ f, month: grDayOf(a.dateObj).getMonth() + 1 });
+                }
+            });
+            const sum = arr => arr.length < GR_MODEL.CAL_MIN_N ? null : grClamp(grMedian(arr), GR_MODEL.CAL_CLAMP[0], GR_MODEL.CAL_CLAMP[1]);
+            const overall = sum(kept.map(x => x.f));
+            const months = {};
+            for (let mo = 1; mo <= 12; mo++) { const f = sum(kept.filter(x => x.month === mo).map(x => x.f)); months[mo] = f != null ? f : (overall != null ? overall : 1); }
+            GR.cal = { months, n: kept.length };
+
+            // The farm average: irrigated and dryland blended by area, paddocks out left out.
+            let aIrr = 0, aDry = 0;
+            Object.keys(areaLookup || {}).forEach(n => {
+                if (excludedPaddocks.get(normName(n))) return;
+                if (grIrrClass(n) === 'dry') aDry += areaLookup[n] || 0; else aIrr += areaLookup[n] || 0;
+            });
+            const fIrr = (aIrr + aDry) > 0 ? aIrr / (aIrr + aDry) : 1;
+            GR.daily = new Map();
+            days.forEach(d => {
+                if (d.potirr == null || d.potdry == null) return;
+                GR.daily.set(d.iso, (fIrr * d.potirr + (1 - fIrr) * d.potdry) * months[d.date.getMonth() + 1]);
+            });
+            GR.ready = true; GR.error = '';
+            if (typeof updateGeoStyles === 'function') updateGeoStyles();
+            if (typeof renderBreaksDashboard === 'function') renderBreaksDashboard();
+        }
+
+        // The farm average growth on one day, kgDM/ha/day.
+        function growthOn(date) { return GR.daily.get(grIso(date)); }
+
+        // The last walk of a paddock with a real cover, on or before a date.
+        function grLastWalk(pName, date) {
+            const h = FARMWALK_HISTORY[normName(pName)];
+            if (!h) return null;
+            const day = grDayOf(date).getTime();
+            let best = null;
+            h.entries.forEach(e => { if (e.dateObj && e.cover > 0 && grDayOf(e.dateObj).getTime() <= day && (!best || e.dateObj > best.dateObj)) best = e; });
+            return best;
+        }
+
+        /* Estimated cover of a paddock on a day: its last walk before that day,
+         * plus the farm average growth of every day after the walk up to it. */
+        function estimateCover(pName, date) {
+            if (!GR.ready) return null;
+            const walk = grLastWalk(pName, date || new Date());
+            if (!walk) return null;
+            const to = grDayOf(date || new Date()).getTime();
+            let growth = 0, days = 0, missing = 0;
+            for (let t = grDayOf(walk.dateObj).getTime() + GR_DAY; t <= to; t += GR_DAY) {
+                const g = GR.daily.get(grIso(new Date(t)));
+                if (g != null) { growth += g; days++; } else missing++;
+            }
+            return { cover: Math.round(walk.cover + growth), walkCover: walk.cover, walkDate: walk.dateObj,
+                     growth: Math.round(growth), days: days + missing, missing };
+        }
+
+        // Breaks drawn in a paddock since a date: the grass there is not all standing.
+        function breaksSince(pName, date) {
+            const from = date ? date.getTime() : 0;
+            return (savedBreaks || []).filter(b => !b.isDeleted && !b.isCropBreak && b.paddock &&
+                normName(b.paddock) === normName(pName) && b.createdAt && new Date(b.createdAt).getTime() > from);
+        }
+
+        /* ---- the GROWTH page (gr.html), inside the app ---- */
+        function openGrowthPage() {
+            closeGrowthPage();
+            const t = growthOn(new Date());
+            const wrap = document.createElement('div');
+            wrap.id = 'growth-page-wrap';
+            wrap.style.cssText = 'position:fixed; inset:0; z-index:20000; background:#fff; display:flex; flex-direction:column;';
+            wrap.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:#27ae60; color:#fff; flex:0 0 auto;">
+                    <button onclick="closeGrowthPage()" style="background:#fff; color:#27ae60; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">✕ BACK</button>
+                    <b style="font-size:14px;">🌱 Pasture growth</b>
+                    <span style="font-size:11px; opacity:0.9;">${t != null ? `Farm average today: <b>${Math.round(t)}</b> kgDM/ha/day (measured weather)` : ''}</span>
+                </div>
+                <iframe src="gr.html" title="Pasture growth" style="flex:1; width:100%; border:0;"></iframe>`;
+            document.body.appendChild(wrap);
+        }
+        function closeGrowthPage() { const w = document.getElementById('growth-page-wrap'); if (w) w.remove(); }
 
         /* ===================== PRINT MAP =====================
          * Mark paddocks in one or more colours, give each colour a name, and
@@ -7198,6 +7437,11 @@
                         }
                     }
 
+                    // Every walk of every paddock, for the growth estimate and its
+                    // month calibration.
+                    FARMWALK_HISTORY = paddockMap;
+                    if (GR.weatherRows) grBuild();
+
                     // Check for locally cached manual entries
                     let localSavedData = {};
                     try {
@@ -8898,6 +9142,7 @@
             await Promise.all([loadStatusSheets(), loadManualSheet()]);
             loadCSV();
             loadManualRankCSV();
+            loadGrowthModel();          // measured weather growth, in the background
             await loadGeoJSON();
 
             const calibHoverArea = document.getElementById('calib-hover-area');
@@ -10371,7 +10616,27 @@
                 const fromWalk = currentData === manualModeData;
                 const coverTs = p && p.latest ? (p.latest.dateObj || (p.latest.ts ? new Date(p.latest.ts) : null)) : null;
                 const coverDate = coverTs && isFinite(coverTs.getTime()) ? fmtNZ(coverTs) : '';
-                if (p && !p.neverWalked && p.latest && isFinite(Number(p.latest.cover))) {
+                /* Off the farmwalk screens (BREAKS and the rest, not SATELLITE):
+                 * the last walk plus the farm average growth since, from measured
+                 * weather. The satellite is only used on the SATELLITE screen. */
+                const useGrowth = !fromWalk && currentDashboardMode !== 'satellite';
+                if (useGrowth) {
+                    const est = estimateCover(pName, new Date());
+                    const walk = grLastWalk(pName, new Date());
+                    let lines;
+                    if (est) {
+                        const grazed = breaksSince(pName, est.walkDate);
+                        lines = `<div style="font-size:11px; color:#2980b9;">&asymp; ${est.cover} kgDM <i>estimated</i></div>` +
+                            `<div style="font-size:10px; color:#7f8c8d;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` +
+                            (grazed.length ? `<div style="font-size:10px; font-weight:bold; color:#e67e22;">grazed since: ${grazed.length} break${grazed.length === 1 ? '' : 's'}</div>` : '');
+                    } else if (walk) {
+                        lines = `<div style="font-size:11px; color:#27ae60;">${walk.cover} kgDM &middot; walk ${fmtNZ(walk.dateObj)}</div>` +
+                            `<div style="font-size:10px; color:#95a5a6;">${GR.error ? 'growth not available' : 'growth loading...'}</div>`;
+                    } else {
+                        lines = `<div style="font-size:11px; color:#95a5a6;">-- not walked yet</div>`;
+                    }
+                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div>${lines}${outLine}`);
+                } else if (p && !p.neverWalked && p.latest && isFinite(Number(p.latest.cover))) {
                     const coverLine = fromWalk
                         ? `<div style="font-size:11px; color:#27ae60;">${p.latest.cover} kgDM${coverDate ? ' &middot; walk ' + coverDate : ''}</div>`
                         : `<div style="font-size:11px; color:#2980b9;">&asymp; ${p.latest.cover} kgDM <i>estimated</i></div>` +
@@ -13462,24 +13727,16 @@
                     centerLng /= brk.vertices.length;
                     paddockName = getPaddockFromPoint({ lat: centerLat, lng: centerLng });
                 }
-                const p = satellitePaddockData.find(pd => pd && pd.name === paddockName);
-                if (p && p.latest) {
-                    const createdTs = new Date(brk.createdAt).getTime();
-                    const imgTs = p.latest.dateObj ? p.latest.dateObj.getTime() : selectedSceneTs;
-                    
-                    if (imgTs) {
-                        const daysSince = (createdTs - imgTs) / 86400000;
-                        // Calculate Satellite mode GROWTH rate
-                        let tWGrowth = 0, tAreaG = 0;
-                        satellitePaddockData.forEach(sp => {
-                            if (sp.area > 0 && !sp.isOut && sp.growthRate && sp.growthRate > 0) {
-                                tWGrowth += (sp.growthRate * sp.area);
-                                tAreaG += sp.area;
-                            }
-                        });
-                        const grower = tAreaG > 0 ? Math.round(tWGrowth / tAreaG) : 0;
-                        const baseCover = parseFloat(p.latest.cover) || 0;
-                        const estimatedCover = baseCover + (grower * daysSince);
+                /* The cover the cows went into: the paddock's last walk before
+                 * the break, plus the estimated farm average growth from measured
+                 * weather up to the day the break was drawn (no satellite). */
+                const est = paddockName ? estimateCover(paddockName, new Date(brk.createdAt)) : null;
+                if (est) {
+                    {
+                        const baseCover = est.walkCover;
+                        const daysSince = est.days;
+                        const grower = est.days > 0 ? est.growth / est.days : 0;
+                        const estimatedCover = est.cover;
                         const residual = brk.hasOwnProperty('manualResidual') ? brk.manualResidual : (parseFloat(localStorage.getItem('feed_residual')) || 1500);
                         const savedHerdCows = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
                         const cowNum = savedHerdCows[brk.group] || 0;
@@ -13489,10 +13746,9 @@
                             valStr = (totalKg / cowNum).toFixed(1) + ' kg';
                             
                             calcParamsText = `Paddock: ${paddockName || 'Unknown'}\n` +
-                                `Base Cover: ${baseCover.toFixed(0)} kgDM/ha\n` +
-                                `Growth: ${grower.toFixed(1)} kgDM/ha/day\n` +
-                                `Days Since Image: ${daysSince.toFixed(1)} days\n` +
-                                `Sat. Est. Cover: ${estimatedCover.toFixed(0)} kgDM/ha\n` +
+                                `Last walk: ${baseCover.toFixed(0)} kgDM/ha on ${fmtNZ(est.walkDate)}\n` +
+                                `Est. growth since walk: ${est.growth} kgDM/ha over ${daysSince} days (avg ${grower.toFixed(1)}/day, measured weather)\n` +
+                                `Est. Cover: ${estimatedCover.toFixed(0)} kgDM/ha\n` +
                                 `Residual Target: ${residual} kgDM/ha\n` +
                                 `Area: ${brk.areaHa.toFixed(2)} ha\n` +
                                 `Cows: ${cowNum}`;

@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.21**,
-service worker cache `wn-farm-v1.1.35`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.22**,
+service worker cache `wn-farm-v1.1.36`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -167,14 +167,40 @@ The app **opens on BREAKS with the plain satellite picture**.
 - SATELLITE sits inside this bar (next to PLAN and HISTORY).
 - BREAKS ON/OFF button shows or hides the breaks on these two screens.
 
-### Where the cover on a map label comes from (v1.1.21, Juani 12 Oct 2026)
-FARMWALK, FEED and PLAN use the farmwalk (`manualModeData`): the label shows
-the measured cover and the walk date ("2586 kgDM · walk 30 Sept"). Every
-other screen, BREAKS among them, uses `satellitePaddockData`: the NDVI of the
-last satellite picture turned into kgDM by the calibration fitted to past
-walks. That is an **estimate**, and the label says so: "≈ 3162 kgDM
-estimated · satellite 4 Oct". The break cards' EST. KG/COW also start from
-the satellite cover, plus the farm growth since the picture date.
+### Where the cover on a map label comes from (v1.1.22, Juani 12 Oct 2026)
+- FARMWALK, FEED and PLAN: the farmwalk (`manualModeData`). The label shows the
+  measured cover and the walk date ("2586 kgDM · walk 30 Sept").
+- **BREAKS and every other screen except SATELLITE: estimated cover = the
+  paddock's last walk + the farm average growth of every day since, from
+  measured weather.** The label says "≈ 3449 kgDM estimated / walk 30 Sept:
+  2586 + est. growth 863 (12 days)", and "grazed since: N breaks" when breaks
+  were drawn in it after the walk. A paddock with no walk above 0 says "not
+  walked yet". The break cards' EST. KG/COW use the same estimate, on the day
+  the break was drawn; the card's hover text gives walk, est. growth and days.
+- SATELLITE keeps the satellite cover ("≈ ... estimated · satellite <date>").
+
+### Growth from measured weather (v1.1.22)
+- The model is a **copy of `Apps\pasture-growth\gr.html`'s** (MODEL constants,
+  GDD smoothing, FAO-56 moisture factor, water balance, radiation, month
+  calibration from farmwalk pairs). **If gr.html's model changes, change the
+  copy in `index.html` too** (`GR_MODEL`, `grBuild`).
+- Farm average only (Juani, 12 Oct 2026): irrigated and dryland runs blended by
+  area, using gr.html's per-paddock setting `gr_irrigation_class` (same
+  website, same browser storage). No NDVI split, so the calibration is the
+  flat one: on 12 Oct October = 1.89 from 1,042 walk intervals, the same as
+  gr.html's flat figure. gr.html uses its NDVI calibration (1.78) by default,
+  so its farm number is about 6% lower.
+- Weather: Open-Meteo archive (measured) for 2 years up to 2 days ago, and the
+  forecast endpoint's past days for yesterday and today. Read once a day,
+  kept in `growth_weather_v1`. The walks: `FARMWALK_HISTORY` (every walk, from
+  the same CSV as FARMWALK) plus `fairlie_history.csv` (last season).
+- `estimateCover(name, date)`, `growthOn(date)`, `grLastWalk(name, date)`.
+  (The app already had a `lastWalkBefore` for the cards; do not reuse that name.)
+- On 12 Oct the model gave 72-100 kgDM/ha/day for early October. That is the
+  model's number (gr.html agrees); whether it is too high is a question for
+  the pasture growth project.
+- **🌱 GROWTH** in the FARMWALK bar, next to SATELLITE, opens `gr.html` inside
+  the app with a BACK bar and today's farm average.
 
 ### Farm average
 Area weighted average of the paddocks walked in the latest walk:
@@ -381,8 +407,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.21/v1.1.22/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.35/wn-farm-v1.1.36/" sw.js
+sed -i "s/v1\.1\.22/v1.1.23/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.36/wn-farm-v1.1.37/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -497,3 +523,5 @@ Added 12 October 2026:
 - Map labels say where the cover comes from: measured with the walk date in
   FARMWALK; "≈ ... estimated · satellite <date>" in BREAKS and the rest
   (v1.1.21).
+- BREAKS uses last walk + estimated growth from measured weather, not the
+  satellite (v1.1.22). GROWTH button opens gr.html in the app.
