@@ -4,7 +4,15 @@ Everything needed to carry on working on this app from another computer.
 Written 2 October 2026, updated 12 October 2026. App version: **v1.1.15**,
 service worker cache `wn-farm-v1.1.29`, Apps Script `2026-10-03-b`.
 
-The index of all projects and the rules is `G:\My Drive\Apps\README.md`.
+The index of all projects and the rules is `G:\My Drive\Apps\README.md`
+(`G:\Mi unidad\Apps\README.md` on the Zenbook).
+
+**Two computers work on this repo: the Zenbook and the TUF A16 (`TUF16`).**
+Start every session with `git pull` in `C:\dev\onefarm`; end it with a commit
+(files by name) and a push. A push from one computer does not reach the other
+until it pulls. The TUF16 has no GitHub login yet, so push from the Zenbook if
+a push there fails. Every rule Juani gives goes into this file in the same
+commit as the code.
 
 ---
 
