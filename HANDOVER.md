@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.18**,
-service worker cache `wn-farm-v1.1.32`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.19**,
+service worker cache `wn-farm-v1.1.33`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -197,7 +197,9 @@ and how many hectares, so two devices can be compared.
     be deleted. The out tab stores the reason in upper case (`REGRASS`).
     `OUT_STATUSES` is now a `let`, built by `normalizeOutReasons`.
   - Each reason has its own colour on every map, the cards, the map key and
-    the list. Defaults: Crop `#d35400`, Silage `#8e44ad`, Other `#e74c3c`.
+    the list. On every map (FARMWALK, BREAKS and the rest) the label of a
+    paddock that is out has a line "OUT: <reason>" in that colour (v1.1.19,
+    Juani 12 Oct 2026), from the out tab or an old cover of 0. Defaults: Crop `#d35400`, Silage `#8e44ad`, Other `#e74c3c`.
     Old reasons such as `OUT` or lower case ones count as Other.
   - A paddock on the tab is out in FARMWALK too, whatever its last cover
     (`applyOutTabToWalk`). Before v1.1.15 the tab only counted for paddocks
@@ -367,8 +369,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.18/v1.1.19/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.32/wn-farm-v1.1.33/" sw.js
+sed -i "s/v1\.1\.19/v1.1.20/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.33/wn-farm-v1.1.34/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -477,3 +479,5 @@ Added 12 October 2026:
   `rotationAreas`, which now also gives `byReason`). It follows the unit
   picked in PLAN. The areas come from the paddock boundaries and the out tab.
 - Print Map in the menu (v1.1.18). No script change. Marks stay on the device.
+- Map labels of paddocks out say "OUT: <reason>" in FARMWALK and BREAKS too
+  (v1.1.19).
