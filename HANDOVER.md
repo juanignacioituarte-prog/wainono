@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.23**,
-service worker cache `wn-farm-v1.1.37`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.24**,
+service worker cache `wn-farm-v1.1.38`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -173,10 +173,17 @@ The app **opens on BREAKS with the plain satellite picture**.
 - **BREAKS and every other screen except SATELLITE: estimated cover = the
   paddock's last walk + the farm average growth of every day since, from
   measured weather.** The label says "≈ 3449 kgDM estimated / walk 30 Sept:
-  2586 + est. growth 863 (12 days)", and "grazed since: N breaks" when breaks
-  were drawn in it after the walk. A paddock with no walk above 0 says "not
-  walked yet". The break cards' EST. KG/COW use the same estimate, on the day
-  the break was drawn; the card's hover text gives walk, est. growth and days.
+  2586 + est. growth 863 (12 days)". A paddock with no walk above 0 says "not
+  walked yet".
+- **Breaks since the walk (Juani, 12 Oct 2026):** if breaks were drawn in the
+  paddock after its last walk, it was grazed, so the estimate is **1500
+  (`GR_RESIDUAL`) + the est. growth of every day after the LAST break's date**.
+  Label: "grazed 6 Oct (break): 1500 + est. growth 452 (6 days) / walk 30
+  Sept: 2586 · 3 breaks since". The COVER MAP uses the same number (v1.1.24).
+  On 12 Oct: 47 paddocks from a break, 60 from their walk.
+- The break cards' EST. KG/COW use **walk + growth only** (`ignoreBreaks`), on
+  the day the break was drawn: a new break is a strip not grazed yet, and the
+  1500 rule would give about 0 kg/cow for every second break in a paddock.
 - BREAKS with **COVER MAP** on colours each paddock by its estimated cover
   (`getCoverColor`, same scale as FARMWALK); out paddocks keep their reason
   colour, paddocks with no walk stay clear (v1.1.23).
@@ -410,8 +417,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.23/v1.1.24/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.37/wn-farm-v1.1.38/" sw.js
+sed -i "s/v1\.1\.24/v1.1.25/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.38/wn-farm-v1.1.39/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -529,3 +536,4 @@ Added 12 October 2026:
 - BREAKS uses last walk + estimated growth from measured weather, not the
   satellite (v1.1.22). GROWTH button opens gr.html in the app.
 - BREAKS COVER MAP colours paddocks by the estimated cover (v1.1.23).
+- Estimated cover after breaks: 1500 + growth since the last break (v1.1.24).

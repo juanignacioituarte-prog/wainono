@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.23</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.24</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.23</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.24</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3272,20 +3272,35 @@
             return best;
         }
 
-        /* Estimated cover of a paddock on a day: its last walk before that day,
-         * plus the farm average growth of every day after the walk up to it. */
-        function estimateCover(pName, date) {
+        /* Estimated cover of a paddock on a day.
+         * - No break since its last walk: the walk cover, plus the farm average
+         *   growth of every day after the walk.
+         * - Breaks drawn in it since the walk (Juani, 12 Oct 2026): it was
+         *   grazed, so it starts again at GR_RESIDUAL (1500) on the day of the
+         *   LAST break, plus the growth of every day after that.
+         * opts.ignoreBreaks: walk + growth only. The break cards use it: a new
+         *   break is a strip that was not grazed yet. */
+        const GR_RESIDUAL = 1500;
+        function estimateCover(pName, date, opts) {
             if (!GR.ready) return null;
-            const walk = grLastWalk(pName, date || new Date());
+            const at = date || new Date();
+            const walk = grLastWalk(pName, at);
             if (!walk) return null;
-            const to = grDayOf(date || new Date()).getTime();
+            let startCover = walk.cover, startDate = grDayOf(walk.dateObj), lastBreak = null, breakCount = 0;
+            if (!(opts && opts.ignoreBreaks)) {
+                const grazed = breaksSince(pName, grDayOf(walk.dateObj)).filter(b => new Date(b.createdAt).getTime() <= at.getTime());
+                breakCount = grazed.length;
+                grazed.forEach(b => { if (!lastBreak || new Date(b.createdAt) > new Date(lastBreak.createdAt)) lastBreak = b; });
+                if (lastBreak) { startCover = GR_RESIDUAL; startDate = grDayOf(new Date(lastBreak.createdAt)); }
+            }
+            const to = grDayOf(at).getTime();
             let growth = 0, days = 0, missing = 0;
-            for (let t = grDayOf(walk.dateObj).getTime() + GR_DAY; t <= to; t += GR_DAY) {
+            for (let t = startDate.getTime() + GR_DAY; t <= to; t += GR_DAY) {
                 const g = GR.daily.get(grIso(new Date(t)));
                 if (g != null) { growth += g; days++; } else missing++;
             }
-            return { cover: Math.round(walk.cover + growth), walkCover: walk.cover, walkDate: walk.dateObj,
-                     growth: Math.round(growth), days: days + missing, missing };
+            return { cover: Math.round(startCover + growth), startCover, startDate, fromBreak: !!lastBreak, breakCount,
+                     walkCover: walk.cover, walkDate: walk.dateObj, growth: Math.round(growth), days: days + missing, missing };
         }
 
         // Breaks drawn in a paddock since a date: the grass there is not all standing.
@@ -10626,10 +10641,11 @@
                     const walk = grLastWalk(pName, new Date());
                     let lines;
                     if (est) {
-                        const grazed = breaksSince(pName, est.walkDate);
                         lines = `<div style="font-size:11px; color:#2980b9;">&asymp; ${est.cover} kgDM <i>estimated</i></div>` +
-                            `<div style="font-size:10px; color:#7f8c8d;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` +
-                            (grazed.length ? `<div style="font-size:10px; font-weight:bold; color:#e67e22;">grazed since: ${grazed.length} break${grazed.length === 1 ? '' : 's'}</div>` : '');
+                            (est.fromBreak
+                                ? `<div style="font-size:10px; color:#e67e22;">grazed ${fmtNZ(est.startDate)} (break): ${GR_RESIDUAL} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` +
+                                  `<div style="font-size:10px; color:#95a5a6;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} &middot; ${est.breakCount} break${est.breakCount === 1 ? '' : 's'} since</div>`
+                                : `<div style="font-size:10px; color:#7f8c8d;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>`);
                     } else if (walk) {
                         lines = `<div style="font-size:11px; color:#27ae60;">${walk.cover} kgDM &middot; walk ${fmtNZ(walk.dateObj)}</div>` +
                             `<div style="font-size:10px; color:#95a5a6;">${GR.error ? 'growth not available' : 'growth loading...'}</div>`;
@@ -13739,7 +13755,7 @@
                 /* The cover the cows went into: the paddock's last walk before
                  * the break, plus the estimated farm average growth from measured
                  * weather up to the day the break was drawn (no satellite). */
-                const est = paddockName ? estimateCover(paddockName, new Date(brk.createdAt)) : null;
+                const est = paddockName ? estimateCover(paddockName, new Date(brk.createdAt), { ignoreBreaks: true }) : null;
                 if (est) {
                     {
                         const baseCover = est.walkCover;
