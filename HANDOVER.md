@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.38**,
-service worker cache `wn-farm-v1.1.52`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.39**,
+service worker cache `wn-farm-v1.1.53`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -266,10 +266,20 @@ Four rows, so real and estimated covers are not mixed up:
   farmwalk to test the estimate. Groups, from the walks BEFORE today
   (`checkInfo`): **A** not grazed since its last walk, walked 7+ days ago
   (tests growth); **B** last break 7+ days ago (tests residual + growth); **C**
-  last break **today** or 1-2 days ago (tests the residual; measure inside the
-  grazed strip; today's added v1.1.38, Juani 13 Oct 2026). Always shown in the
-  order A, B, C (Juani). Grey: out, never walked, walked under 7 days ago, or
-  a break 3-6 days ago. The map
+  **24 to 72 hours after the last break** (the 24-hour rule: a break is
+  grazed out 24 hours after it is drawn; v1.1.39, Juani 13 Oct 2026); tests
+  the residual, measured inside the grazed strip. Always shown in the order
+  A, B, C (Juani). Grey: out, never walked, walked under 7 days ago, a break
+  under 24 hours ago (label: "being grazed: residual check from <time>"), or a
+  break 3-6 days ago.
+  **High cover moves to A** (v1.1.39, Juani): breaks are sometimes drawn the
+  day before the cows go in, and a "cows go in" date was rejected (people
+  forget it). So when a cover is typed for a B or C paddock, it is compared
+  with the grazed estimate and the not-grazed one (last real cover + growth,
+  breaks ignored); if it is closer to not-grazed, the paddock becomes A, is
+  compared with the not-grazed estimate and saved as A (so the residual median
+  is not spoilt). Not decided when the two estimates are under 300 apart
+  (`CHECK_RECLASS_MIN`). The map
   shows the groups (A green, B blue, C orange) and the breaks. A tap on a
   paddock goes to its card (lit up, box open); a tap on a card zooms the map
   to the paddock and shows its label (v1.1.28). Each typed cover shows
@@ -513,8 +523,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.38/v1.1.39/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.52/wn-farm-v1.1.53/" sw.js
+sed -i "s/v1\.1\.39/v1.1.40/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.53/wn-farm-v1.1.54/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -657,3 +667,5 @@ Added 12 October 2026:
   is now + PARTIAL (v1.1.36).
 - ACTUAL vs ESTIMATED: % diff column (v1.1.37).
 - + PARTIAL: paddocks with a break today are in group C (v1.1.38).
+- + PARTIAL: C is 24-72 hours after the last break (replaces "today is C");
+  a high measured cover moves a B or C paddock to A (v1.1.39).

@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.38</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.39</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.38</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.39</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2171,7 +2171,7 @@
                 Walk some paddocks today and type what you measure. It is saved in the <b>partial walk</b> tab, not in the farmwalk: FARMWALK and the last full farmwalk do not change.<br>
                 <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
                 <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests residual + growth.<br>
-                <b style="color:#e67e22;">C</b> being grazed today, or grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
+                <b style="color:#e67e22;">C</b> 24 to 72 hours after the last break (a break is grazed out 24 hours after it is drawn): measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
                 <span style="color:#7f8c8d;">Grey on the map: do not use.</span>
             </p>
             <div id="chk-summary" style="margin-bottom:8px;"></div>
@@ -3394,6 +3394,7 @@
             }
             return { cover: Math.round(startCover + growth), startCover, startDate, fromBreak: !!lastBreak, breakCount,
                      breakDate: lastBreak ? grDayOf(new Date(lastBreak.createdAt)) : null, walkSource: walk.source,
+                     breakAt: lastBreak ? new Date(lastBreak.createdAt) : null,
                      walkCover: walk.cover, walkDate: walk.dateObj, growth: Math.round(growth), days: days + missing, missing };
         }
 
@@ -3639,9 +3640,9 @@
          * Groups (Juani, 13 Oct 2026), worked out from the walks BEFORE today:
          *   A  not grazed since its last walk, walked 7+ days ago: tests growth
          *   B  last break 7+ days ago: tests residual + growth
-         *   C  last break today or 1-2 days ago: tests the residual (measure in the grazed strip)
-         *   X  grey: out, never walked, walked under 7 days ago, or a break
-         *      3-6 days ago (too soon to tell)
+         *   C  24 to 72 hours after the last break: tests the residual (measure in the grazed strip)
+         *   X  grey: out, never walked, walked under 7 days ago, a break less
+         *      than 24 hours ago (still being grazed), or 3-6 days ago (too soon)
          * What is typed is compared with the estimate for today, and saved in
          * the sheet tab "partial walk" (save_partial_walk), NEVER in Farmwalks
          * (Juani, 13 Oct 2026): FARMWALK, its average and the last full walk do
@@ -3681,7 +3682,25 @@
             try { localStorage.setItem('check_walk_draft', JSON.stringify({ date: grIso(new Date()), covers: checkDraft })); } catch (e) {}
         }
 
+        /* A break can be drawn the day before the cows go in, so a paddock
+         * can look grazed when it is not (Juani, 13 Oct 2026). Once a cover is
+         * measured for a B or C paddock, it is compared with two estimates:
+         * grazed (residual + growth) and not grazed (last real cover + growth,
+         * breaks ignored). If it is closer to "not grazed", the paddock moves
+         * to group A and is compared and saved as A. When the two estimates
+         * are less than CHECK_RECLASS_MIN apart nothing is decided. */
+        const CHECK_RECLASS_MIN = 300;
         function checkInfo(name) {
+            const c = checkInfoBase(name);
+            if ((c.group !== 'B' && c.group !== 'C') || c.measured == null) return c;
+            const before = new Date(grDayOf(new Date()).getTime() - 1);
+            const ungrazed = estimateCover(name, new Date(), { walkBefore: before, ignoreBreaks: true });
+            if (!ungrazed || ungrazed.cover - c.est.cover < CHECK_RECLASS_MIN) return c;
+            if (c.measured <= (c.est.cover + ungrazed.cover) / 2) return c;
+            return Object.assign({}, c, { group: 'A', est: ungrazed, movedFrom: c.group, grazedEstimate: c.est.cover });
+        }
+
+        function checkInfoBase(name) {
             const today = grDayOf(new Date());
             const before = new Date(today.getTime() - 1);   // walks before today
             const isOut = outTabHas(name) || walkOutPaddocks().some(w => normName(w.name) === normName(name));
@@ -3698,8 +3717,16 @@
                 return Object.assign(info, d < 7 ? { group: 'X', why: `walked ${d} days ago` } : { group: 'A', sinceDays: d });
             }
             const d = Math.round((today - est.breakDate) / GR_DAY);
-            // Being grazed today, or 1-2 days ago: check the residual (Juani, 13 Oct 2026).
-            if (d <= 2) return Object.assign(info, { group: 'C', sinceDays: d });
+            /* The 24-hour rule (Juani, 13 Oct 2026): a break is grazed out 24
+             * hours after it is drawn, so the residual can be checked from then
+             * until 72 hours after it. */
+            const hrs = (Date.now() - est.breakAt.getTime()) / 3600000;
+            if (hrs < 24) {
+                const from = new Date(est.breakAt.getTime() + 24 * 3600000);
+                const at = from.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' });
+                return Object.assign(info, { group: 'X', why: `being grazed: residual check from ${fmtNZ(from)} ${at}` });
+            }
+            if (hrs < 72) return Object.assign(info, { group: 'C', sinceDays: d });
             if (d < 7) return Object.assign(info, { group: 'X', why: `grazed ${d} days ago: too soon` });
             return Object.assign(info, { group: 'B', sinceDays: d });
         }
@@ -3712,10 +3739,16 @@
         // The result line for one paddock.
         function checkResultHtml(c) {
             if (c.measured == null) return '';
+            const moved = c.movedFrom ? `<div style="color:#27ae60; font-weight:bold;">Moved to A (was ${c.movedFrom}): the cover is too high for a grazed paddock (grazed estimate ${c.grazedEstimate}).</div>` : '';
             const diff = c.measured - c.est.cover;
             const sign = v => (v > 0 ? '+' : '') + Math.round(v);
             if (c.group === 'C') {
                 return `Residual measured <b>${c.measured}</b> · estimate ${c.est.cover} · <b style="color:${Math.abs(diff) < 150 ? '#27ae60' : '#c0392b'};">${sign(diff)}</b>`;
+            }
+            if (moved) {
+                const perDay0 = c.est.days > 0 ? diff / c.est.days : null;
+                return moved + `Measured <b>${c.measured}</b> − not-grazed estimate ${c.est.cover} = <b style="color:${Math.abs(diff) < 150 ? '#27ae60' : '#c0392b'};">${sign(diff)}</b>` +
+                    (perDay0 != null ? ` · <b>${sign(perDay0)}</b> kgDM/ha/day` : '');
             }
             const perDay = c.est.days > 0 ? diff / c.est.days : null;
             return `Measured <b>${c.measured}</b> − estimate ${c.est.cover} = <b style="color:${Math.abs(diff) < 150 ? '#27ae60' : '#c0392b'};">${sign(diff)}</b>` +
@@ -3785,6 +3818,12 @@
             const c = checkInfo(name);
             const el = document.getElementById('chk-res-' + escUnit(normName(name)));
             if (el) el.innerHTML = checkResultHtml(c);
+            const card = document.getElementById('chk-card-' + escUnit(normName(name)));
+            if (card) {
+                card.style.borderLeftColor = CHECK_COLORS[c.group];
+                const badge = card.querySelector('b span');
+                if (badge) { badge.textContent = c.group; badge.style.background = CHECK_COLORS[c.group]; }
+            }
             const unit = getActiveUnit();
             renderCheckSummary((manualModeData || []).map(p => ({ p, c: checkInfo(p.name) })).filter(r => !unit || unitHasPaddock(unit, r.p.name)));
             updateGeoStyles();
@@ -11329,7 +11368,7 @@
                                      color: 'white', opacity: 0.9, weight: c.measured != null ? 3 : 1.5 });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div>` + (c.group === 'X'
                         ? `<div style="font-size:11px; color:#7f8c8d;">not for the check: ${c.why}</div>`
-                        : `<div style="font-size:11px; font-weight:bold; color:${CHECK_COLORS[c.group]};">Group ${c.group}</div>` +
+                        : `<div style="font-size:11px; font-weight:bold; color:${CHECK_COLORS[c.group]};">Group ${c.group}${c.movedFrom ? ' (moved from ' + c.movedFrom + ': cover too high)' : ''}</div>` +
                           `<div style="font-size:10px; color:#7f8c8d;">${checkStartText(c)}</div>` +
                           `<div style="font-size:11px;">est. today ${c.est.cover}${c.measured != null ? ' · measured <b>' + c.measured + '</b>' : ''}</div>`));
                 } else if (currentDashboardMode === 'farm_config' && farmConfigSection === 'paddocks') {
