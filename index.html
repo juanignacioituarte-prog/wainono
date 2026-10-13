@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.49</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.50</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.49</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.50</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3314,7 +3314,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.49) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.50) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -3425,10 +3425,10 @@
             });
             return n ? { actual: a / w, estimated: e / w, n: n } : null;
         }
-        function partialGrowthHtml(g, small) {
+        function partialGrowthHtml(g, small, corrected) {
             if (!g) return '';
             const pc = g.actual > 0 ? (g.estimated - g.actual) / g.actual * 100 : null;
-            return `<div style="font-size:${small ? 11 : 12}px;"><b>Growth</b> (A + B, ${g.n} paddock${g.n === 1 ? '' : 's'}, by area): actual <b style="color:#27ae60;">${Math.round(g.actual)}</b> · estimated <b style="color:#2980b9;">${Math.round(g.estimated)}</b> kgDM/ha/day${pc != null ? ` · <b style="color:${Math.abs(pc) < 10 ? '#27ae60' : '#c0392b'};">${pc > 0 ? '+' : ''}${Math.round(pc)}%</b>` : ''}</div>`;
+            return `<div style="font-size:${small ? 11 : 12}px;"><b>Growth</b> (A + B, ${g.n} paddock${g.n === 1 ? '' : 's'}, by area): actual <b style="color:#27ae60;">${Math.round(g.actual)}</b> · ${corrected ? 'corrected estimate' : 'estimated'} <b style="color:#2980b9;">${Math.round(g.estimated)}</b> kgDM/ha/day${pc != null ? ` · <b style="color:${Math.abs(pc) < 10 ? '#27ae60' : '#c0392b'};">${pc > 0 ? '+' : ''}${Math.round(pc)}%</b>` : ''}</div>`;
         }
 
         function grUpdateResidual() {
@@ -3549,6 +3549,18 @@
             const rows = (typeof PARTIAL_WALKS !== 'undefined' ? PARTIAL_WALKS : []).slice();
             const dates = [...new Set(rows.map(r => r.date))].sort().reverse();
             const sign = v => (v > 0 ? '+' : '') + Math.round(v);
+            /* The corrected estimate (Juani, 13 Oct 2026: "show the corrected
+             * estimate, it's what I'm going to end up using"): redone today with
+             * the growth correction and the residual in use now, from the last
+             * real cover BEFORE that day and the breaks drawn 24+ hours before the
+             * row was saved (the 24-hour rule). Only shown, never saved. Falls back to the estimate saved with the row. */
+            const corrected = r => {
+                const d = grPartialDate(r.date);
+                const e = d ? estimateCover(r.paddock, d, { walkBefore: new Date(d.getTime() - GR_DAY),
+                    breaksUntil: new Date((r.savedAt ? new Date(r.savedAt).getTime() : d.getTime() + GR_DAY - 1) - GR_DAY) }) : null;
+                return e ? { cover: e.cover, start: e.startCover, days: e.days } : { cover: Number(r.estimate) || null, start: Number(r.start), days: Number(r.days) };
+            };
+            rows.forEach(r => { r._ce = corrected(r); });
             const body = !dates.length ? '<div style="color:#7f8c8d; font-size:12px; padding:10px 0;">No partial walk saved yet. Use + PARTIAL in the FARMWALK bar.</div>'
                 : dates.map(d => {
                     const list = rows.filter(r => r.date === d).sort((a, b) => (a.group || '').localeCompare(b.group || '') || String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }));
@@ -3558,12 +3570,12 @@
                             <b style="font-size:13px;">${dd ? fmtNZ(dd) : escUnit(d)} · ${list.length} paddock${list.length === 1 ? '' : 's'}</b>
                         </div>
                         ${partialGrowthHtml(partialGrowth(list.filter(r => r.group === 'A' || r.group === 'B')
-                            .map(r => ({ name: r.paddock, cover: Number(r.cover), start: Number(r.start), estimate: Number(r.estimate), days: Number(r.days) }))), true)}
+                            .map(r => ({ name: r.paddock, cover: Number(r.cover), start: r._ce.start, estimate: r._ce.cover, days: r._ce.days }))), true, true)}
                         <table style="width:100%; font-size:11px; border-collapse:collapse; margin-top:4px;">
-                            <tr style="color:#7f8c8d;"><td>Paddock</td><td>Group</td><td style="text-align:right;">Measured</td><td style="text-align:right;">Estimate</td><td style="text-align:right;">Diff</td></tr>
+                            <tr style="color:#7f8c8d;"><td>Paddock</td><td>Group</td><td style="text-align:right;">Measured</td><td style="text-align:right;">Corrected<br>estimate</td><td style="text-align:right;">Diff</td></tr>
                             ${list.map(r => `<tr${r.group === 'C' && !partialIsResidual(r) ? ' style="opacity:0.55;" title="Not a residual: more than ' + GR_RESIDUAL_MAX_OVER + ' above the estimate. Left out of the residual."' : ''}><td>${escUnit(r.paddock)}</td><td style="color:${CHECK_COLORS[r.group] || '#7f8c8d'}; font-weight:bold;">${escUnit(r.group || '')}${r.group === 'C' && !partialIsResidual(r) ? ' <span style="color:#c0392b; font-weight:normal; font-size:10px;">not a residual</span>' : ''}</td>
-                                <td style="text-align:right; font-weight:bold;">${r.cover}</td><td style="text-align:right;">${r.estimate || '--'}</td>
-                                <td style="text-align:right; color:${Math.abs(r.cover - r.estimate) < 150 ? '#27ae60' : '#c0392b'};">${r.estimate ? sign(r.cover - r.estimate) : ''}</td></tr>`).join('')}
+                                <td style="text-align:right; font-weight:bold;">${r.cover}</td><td style="text-align:right;">${r._ce.cover || '--'}</td>
+                                <td style="text-align:right; color:${Math.abs(r.cover - r._ce.cover) < 150 ? '#27ae60' : '#c0392b'};">${r._ce.cover ? sign(r.cover - r._ce.cover) : ''}</td></tr>`).join('')}
                         </table></div>`;
                 }).join('');
             const wrap = document.createElement('div');
@@ -3572,7 +3584,7 @@
             wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📋 Partial walks</h3>
                 <button onclick="closePartialWalks()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
-                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 6px;">Measured in a partial walk, against what the app estimated that day.</div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 6px;">Measured in a partial walk, against what the app estimates now for that day (with today's growth correction ${GR.corr.applied ? '×' + GR.corr.factor.toFixed(2) : ''} and residual ${GR_RESIDUAL}).</div>
                 ${body}</div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closePartialWalks(); });
             document.body.appendChild(wrap);

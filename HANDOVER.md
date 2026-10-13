@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.49**,
-service worker cache `wn-farm-v1.1.63`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.50**,
+service worker cache `wn-farm-v1.1.64`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -559,8 +559,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.49/v1.1.50/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.63/wn-farm-v1.1.64/" sw.js
+sed -i "s/v1\.1\.50/v1.1.51/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.64/wn-farm-v1.1.65/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -735,3 +735,9 @@ Added 12 October 2026:
   not-grazed pairs (v1.1.49). On 13 Oct: 12 paddocks (8 + 4), measured 64,
   model 75, ×0.86 (was ×0.93 without B). Grazed pairs pull it down because
   regrowth is slow in the first days after grazing.
+- PARTIAL WALKS list shows the CORRECTED estimate, redone when the list opens
+  (v1.1.50, Juani: "it is what I am going to end up using"): today's growth
+  correction and residual, from the last real cover before that day, breaks
+  drawn 24+ hours before the row was saved. Display only: the estimate saved
+  in the "partial walk" sheet is never changed. The original estimate is not
+  shown.
