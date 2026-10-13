@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.35</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.36</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.35</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.36</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1782,34 +1782,41 @@
                 </div>
                 <div class="sync-note">Synchronized on <span id="sync-time">...</span><span id="stats-basis"></span></div>
 
-                <div id="farmwalk-entry-bar" style="margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                    <button id="btn-farmwalk-entry" onclick="toggleFarmwalkEntryMode()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
-                        <span>+</span> Farmwalk
-                    </button>
-                    <input type="date" id="farmwalk-entry-date" onchange="onFarmwalkDateChange()" style="display:none; padding:6px 10px; border-radius:6px; border:1px solid #27ae60; font-size:12px; font-weight:bold; color:#2c3e50;" />
-                    <button id="btn-save-farmwalk-all" onclick="saveEntireFarmwalk()" style="display:none; background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; transition:0.2s;">
-                        💾 SAVE FARMWALK
-                    </button>
-                    <span id="farmwalk-progress" style="display:none; font-size:12px; font-weight:bold; color:#27ae60;"></span>
-                    <button id="btn-plan" onclick="switchDashboardMode('plan')" style="background:#8e44ad; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
-                        📊 PLAN
-                    </button>
-                    <button id="btn-farmwalk-history" onclick="switchDashboardMode('farmwalk_history')" style="background:#16a085; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
-                        🕘 HISTORY
-                    </button>
-                    <button id="btn-satellite" onclick="toggleSatelliteView()" style="background:#2471a3; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
-                        🛰 SATELLITE
-                    </button>
-                    <button id="btn-estimate" onclick="toggleEstimateView()" style="background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
-                        📈 EST. FW
-                    </button>
-                    <button id="btn-growth" onclick="openGrowthPage()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
-                        🌱 GROWTH
-                    </button>
-                    <button id="btn-check" onclick="toggleCheckView()" style="background:#c0392b; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
-                        🎯 CHECK
-                    </button>
-                    <div style="flex-basis:100%; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <div id="farmwalk-entry-bar" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
+                    <!-- VIEW: which covers are shown -->
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="flex:0 0 44px; font-size:9px; font-weight:bold; color:#95a5a6; letter-spacing:0.5px;">VIEW</span>
+                        <div style="display:flex; flex:1; border:1.5px solid #2c3e50; border-radius:8px; overflow:hidden;">
+                            <button id="fw-view-manual" onclick="setCoverView('manual')" style="flex:1; padding:8px 4px; font-size:11px; font-weight:bold; cursor:pointer; border:none; transition:0.15s;">MEASURED</button>
+                            <button id="fw-view-estimate" onclick="setCoverView('estimate')" style="flex:1; padding:8px 4px; font-size:11px; font-weight:bold; cursor:pointer; border:none; transition:0.15s; border-left:1px solid #ccc;">ESTIMATED</button>
+                            <button id="fw-view-satellite" onclick="setCoverView('satellite')" style="flex:1; padding:8px 4px; font-size:11px; font-weight:bold; cursor:pointer; border:none; transition:0.15s; border-left:1px solid #ccc;">SATELLITE</button>
+                        </div>
+                    </div>
+                    <!-- ADD: entering real covers -->
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <span style="flex:0 0 44px; font-size:9px; font-weight:bold; color:#95a5a6; letter-spacing:0.5px;">ADD</span>
+                        <button id="btn-farmwalk-entry" onclick="farmwalkButton()" style="background:#27ae60; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                            <span>+</span> Farmwalk
+                        </button>
+                        <button id="btn-check" onclick="toggleCheckView()" style="background:#c0392b; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                            + PARTIAL
+                        </button>
+                        <input type="date" id="farmwalk-entry-date" onchange="onFarmwalkDateChange()" style="display:none; padding:6px 10px; border-radius:6px; border:1px solid #27ae60; font-size:12px; font-weight:bold; color:#2c3e50;" />
+                        <button id="btn-save-farmwalk-all" onclick="saveEntireFarmwalk()" style="display:none; background:#2980b9; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; transition:0.2s;">
+                            💾 SAVE FARMWALK
+                        </button>
+                        <span id="farmwalk-progress" style="display:none; font-size:12px; font-weight:bold; color:#27ae60;"></span>
+                    </div>
+                    <!-- TOOLS -->
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <span style="flex:0 0 44px; font-size:9px; font-weight:bold; color:#95a5a6; letter-spacing:0.5px;">TOOLS</span>
+                        <button id="btn-plan" onclick="switchDashboardMode('plan')" style="background:#8e44ad; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">📊 PLAN</button>
+                        <button id="btn-farmwalk-history" onclick="switchDashboardMode('farmwalk_history')" style="background:#16a085; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">🕘 HISTORY</button>
+                        <button id="btn-growth" onclick="openGrowthPage()" style="background:#27ae60; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">🌱 GROWTH</button>
+                    </div>
+                    <!-- FILTER -->
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                        <span style="flex:0 0 44px; font-size:9px; font-weight:bold; color:#95a5a6; letter-spacing:0.5px;">FILTER</span>
                         <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
                         <button id="btn-toggle-breaks" onclick="toggleBreaksOnMap()" style="padding:5px 11px; border-radius:14px; font-size:11px; font-weight:bold; cursor:pointer; white-space:nowrap; border:1.5px solid #e67e22; transition:0.15s;">BREAKS ON</button>
                     </div>
@@ -2159,7 +2166,7 @@
 
         <!-- CHECK: a partial farmwalk to test the estimate -->
         <div id="check-view" style="display:none; padding:12px 15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
-            <h3 style="margin:0 0 4px;">🎯 Check the estimate</h3>
+            <h3 style="margin:0 0 4px;">+ Partial walk <span style="font-size:12px; font-weight:normal; color:#7f8c8d;">check the estimate</span></h3>
             <p style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
                 Walk some paddocks today and type what you measure. It is saved in the <b>partial walk</b> tab, not in the farmwalk: FARMWALK and the last full farmwalk do not change.<br>
                 <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
@@ -3474,7 +3481,7 @@
                 const perDay = m.filter(r => r.days > 0); const pd = perDay.length ? perDay.reduce((a, r) => a + (r.cover - r.estimate) / r.days, 0) / perDay.length : null;
                 return `<span style="color:${CHECK_COLORS[g]};"><b>${g}</b> ${sign(diff)}${pd != null ? ` (${sign(pd)}/day)` : ''} (${m.length})</span>`;
             };
-            const body = !dates.length ? '<div style="color:#7f8c8d; font-size:12px; padding:10px 0;">No partial walk saved yet. Use 🎯 CHECK in the FARMWALK bar.</div>'
+            const body = !dates.length ? '<div style="color:#7f8c8d; font-size:12px; padding:10px 0;">No partial walk saved yet. Use + PARTIAL in the FARMWALK bar.</div>'
                 : dates.map(d => {
                     const list = rows.filter(r => r.date === d).sort((a, b) => (a.group || '').localeCompare(b.group || '') || String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }));
                     const dd = grPartialDate(d);
@@ -3496,7 +3503,7 @@
             wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📋 Partial walks</h3>
                 <button onclick="closePartialWalks()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
-                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 6px;">Measured in CHECK, against what the app estimated that day. A: growth · B: residual + growth · C: residual.</div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 6px;">Measured in a partial walk (+ PARTIAL), against what the app estimated that day. A: growth · B: residual + growth · C: residual.</div>
                 ${body}</div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closePartialWalks(); });
             document.body.appendChild(wrap);
@@ -10332,31 +10339,48 @@
             switchDashboardMode(currentDashboardMode === 'satellite' ? 'manual' : 'satellite');
         }
 
+        /* The FARMWALK bar (Juani, 13 Oct 2026): VIEW (MEASURED / ESTIMATED /
+         * SATELLITE, which covers are shown), ADD (+ Farmwalk, + PARTIAL),
+         * TOOLS (PLAN, HISTORY, GROWTH) and FILTER (units, breaks). */
+        function setCoverView(view) {
+            if (view === 'manual' && currentDashboardMode === 'manual') return;
+            switchDashboardMode(view);
+        }
+        // + Farmwalk works from any view: it goes to MEASURED and starts the walk.
+        function farmwalkButton() {
+            if (currentDashboardMode !== 'manual') {
+                switchDashboardMode('manual');
+                if (!isFarmwalkEntryActive) toggleFarmwalkEntryMode();
+                return;
+            }
+            toggleFarmwalkEntryMode();
+        }
+
         function updateFarmwalkBarForMode(mode) {
             // Entering a walk only makes sense on FARMWALK itself.
             const isSat = (mode === 'satellite' || mode === 'estimate' || mode === 'check');
             const entryBtn = document.getElementById('btn-farmwalk-entry');
-            if (entryBtn) entryBtn.style.display = isSat ? 'none' : 'flex';
+            if (entryBtn) entryBtn.style.display = 'flex';
+            if (entryBtn && isSat && isFarmwalkEntryActive) { entryBtn.innerHTML = '<span>+</span> Farmwalk'; entryBtn.style.background = '#27ae60'; }
+            else if (entryBtn && !isSat && isFarmwalkEntryActive) { entryBtn.innerHTML = '<span>✕</span> Cancel Entry'; entryBtn.style.background = '#e74c3c'; }
+            const views = { manual: '#27ae60', estimate: '#2980b9', satellite: '#2471a3' };
+            Object.keys(views).forEach(v => {
+                const b = document.getElementById('fw-view-' + v);
+                if (!b) return;
+                const on = mode === v;
+                b.style.background = on ? views[v] : '#fff';
+                b.style.color = on ? '#fff' : '#2c3e50';
+            });
             // The walk controls belong to entering covers, not to the satellite view.
             const walkOn = !isSat && isFarmwalkEntryActive;
             ['farmwalk-entry-date', 'btn-save-farmwalk-all', 'farmwalk-progress'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = walkOn ? 'inline-block' : 'none';
             });
-            const satBtn = document.getElementById('btn-satellite');
-            if (satBtn) {
-                satBtn.innerHTML = mode === 'satellite' ? '✕ SATELLITE' : '🛰 SATELLITE';
-                satBtn.style.background = mode === 'satellite' ? '#34495e' : '#2471a3';
-            }
             const chkBtn = document.getElementById('btn-check');
             if (chkBtn) {
-                chkBtn.innerHTML = mode === 'check' ? '✕ CHECK' : '🎯 CHECK';
+                chkBtn.innerHTML = mode === 'check' ? '✕ PARTIAL' : '+ PARTIAL';
                 chkBtn.style.background = mode === 'check' ? '#34495e' : '#c0392b';
-            }
-            const estBtn = document.getElementById('btn-estimate');
-            if (estBtn) {
-                estBtn.innerHTML = mode === 'estimate' ? '✕ EST. FW' : '📈 EST. FW';
-                estBtn.style.background = mode === 'estimate' ? '#34495e' : '#2980b9';
             }
             updateBreaksToggleButton();
         }

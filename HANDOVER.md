@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.35**,
-service worker cache `wn-farm-v1.1.49`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.36**,
+service worker cache `wn-farm-v1.1.50`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -152,6 +152,18 @@ Safety, Roster, Weather, Vehicle Maintenance, **Farm Maintenance**,
 Report.
 
 The app **opens on BREAKS with the plain satellite picture**.
+
+### The FARMWALK bar (v1.1.36, Juani 13 Oct 2026)
+Four rows, so real and estimated covers are not mixed up:
+- **VIEW** MEASURED / ESTIMATED / SATELLITE: one switch, the view in use is
+  lit (`setCoverView`; modes `manual`, `estimate`, `satellite`). ESTIMATED is
+  what was called EST. FW.
+- **ADD** + Farmwalk (works from any view: goes to MEASURED and starts the
+  walk, `farmwalkButton`) and **+ PARTIAL** (the partial walk screen, mode
+  `check`, which was called CHECK). The walk date, SAVE FARMWALK and the
+  progress appear in this row while a walk is entered.
+- **TOOLS** PLAN, HISTORY, GROWTH.
+- **FILTER** the unit chips and BREAKS ON/OFF.
 
 ### FARMWALK
 - Cards per paddock: latest cover, previous, growth, area.
@@ -498,8 +510,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.35/v1.1.36/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.49/wn-farm-v1.1.50/" sw.js
+sed -i "s/v1\.1\.36/v1.1.37/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.50/wn-farm-v1.1.51/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -637,3 +649,6 @@ Added 12 October 2026:
 - PLAN: Rotation Parameters follow the MEASURED / ESTIMATED switch (v1.1.34).
 - PLAN: residual, rotation length (breaks of the last 4 days, changeable)
   and actual pre-grazing cover are automatic (v1.1.35).
+- FARMWALK bar in four rows: VIEW (MEASURED / ESTIMATED / SATELLITE), ADD
+  (+ Farmwalk, + PARTIAL), TOOLS, FILTER. EST. FW is now ESTIMATED and CHECK
+  is now + PARTIAL (v1.1.36).
