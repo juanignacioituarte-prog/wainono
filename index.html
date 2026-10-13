@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.42</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.43</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.42</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.43</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3393,10 +3393,18 @@
         const GR_RESIDUAL_DEFAULT = 1500, GR_RESIDUAL_DAYS = 30, GR_RESIDUAL_MIN_N = 3;
         let GR_RESIDUAL = GR_RESIDUAL_DEFAULT;
         let GR_RESIDUAL_INFO = { n: 0, fromChecks: false };
+        /* A saved C row more than GR_RESIDUAL_MAX_OVER above its estimate is not a
+         * residual (Juani, 13 Oct 2026: paddock 39, saved as C at 2964 while
+         * breaks drawn by mistake were still on the map). Such rows are left out
+         * of the residual median and the C average, and marked in the list. */
+        const GR_RESIDUAL_MAX_OVER = 500;
+        function partialIsResidual(r) {
+            return r.group === 'C' && Number(r.cover) > 0 && !(Number(r.estimate) > 0 && Number(r.cover) - Number(r.estimate) > GR_RESIDUAL_MAX_OVER);
+        }
         function grUpdateResidual() {
             const since = grDayOf(new Date()).getTime() - GR_RESIDUAL_DAYS * GR_DAY;
             const vals = (typeof PARTIAL_WALKS !== 'undefined' ? PARTIAL_WALKS : []).filter(r => {
-                if (r.group !== 'C' || !(Number(r.cover) > 0) || !r.date) return false;
+                if (!partialIsResidual(r) || !r.date) return false;
                 const d = new Date(+String(r.date).slice(0, 4), +String(r.date).slice(5, 7) - 1, +String(r.date).slice(8, 10));
                 return d.getTime() >= since;
             }).map(r => Number(r.cover));
@@ -3512,7 +3520,7 @@
             const dates = [...new Set(rows.map(r => r.date))].sort().reverse();
             const sign = v => (v > 0 ? '+' : '') + Math.round(v);
             const groupLine = (list, g) => {
-                const m = list.filter(r => r.group === g && r.cover > 0 && r.estimate > 0);
+                const m = list.filter(r => r.group === g && r.cover > 0 && r.estimate > 0 && (g !== 'C' || partialIsResidual(r)));
                 if (!m.length) return '';
                 const diff = m.reduce((a, r) => a + (r.cover - r.estimate), 0) / m.length;
                 if (g === 'C') return `<span style="color:${CHECK_COLORS.C};"><b>C</b> residual ${Math.round(m.reduce((a, r) => a + r.cover, 0) / m.length)} (${m.length})</span>`;
@@ -3530,7 +3538,7 @@
                         </div>
                         <table style="width:100%; font-size:11px; border-collapse:collapse; margin-top:4px;">
                             <tr style="color:#7f8c8d;"><td>Paddock</td><td>Group</td><td style="text-align:right;">Measured</td><td style="text-align:right;">Estimate</td><td style="text-align:right;">Diff</td></tr>
-                            ${list.map(r => `<tr><td>${escUnit(r.paddock)}</td><td style="color:${CHECK_COLORS[r.group] || '#7f8c8d'}; font-weight:bold;">${escUnit(r.group || '')}</td>
+                            ${list.map(r => `<tr${r.group === 'C' && !partialIsResidual(r) ? ' style="opacity:0.55;" title="Not a residual: more than ' + GR_RESIDUAL_MAX_OVER + ' above the estimate. Left out of the residual."' : ''}><td>${escUnit(r.paddock)}</td><td style="color:${CHECK_COLORS[r.group] || '#7f8c8d'}; font-weight:bold;">${escUnit(r.group || '')}${r.group === 'C' && !partialIsResidual(r) ? ' <span style="color:#c0392b; font-weight:normal; font-size:10px;">not a residual</span>' : ''}</td>
                                 <td style="text-align:right; font-weight:bold;">${r.cover}</td><td style="text-align:right;">${r.estimate || '--'}</td>
                                 <td style="text-align:right; color:${Math.abs(r.cover - r.estimate) < 150 ? '#27ae60' : '#c0392b'};">${r.estimate ? sign(r.cover - r.estimate) : ''}</td></tr>`).join('')}
                         </table></div>`;

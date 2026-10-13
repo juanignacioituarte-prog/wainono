@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.42**,
-service worker cache `wn-farm-v1.1.56`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.43**,
+service worker cache `wn-farm-v1.1.57`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -200,6 +200,11 @@ Four rows, so real and estimated covers are not mixed up:
   next day it shows 1500. Label: "last break 6 Oct · 1500 on 7 Oct + est.
   growth 399 (5 days) / walk 30 Sept: 2586 · 3 breaks since". The COVER MAP
   uses the same number. On 12 Oct: 47 paddocks from a break, 60 from a walk.
+- A saved C row more than **500 above its estimate is not a residual**
+  (v1.1.43, `partialIsResidual`): left out of the residual median and the C
+  averages, marked "not a residual" in PARTIAL WALKS. (Paddock 39 on 13 Oct
+  was saved as C at 2964 while two breaks drawn by mistake were still on the
+  map; re-saving it in + PARTIAL now replaces the row as group A.)
 - **The residual** (Juani, 13 Oct 2026, v1.1.30) is the **median of the group
   C checks** in the `partial walk` tab from the last 30 days, once there are
   at least 3 (`grUpdateResidual`); until then **1500**. The tab is read when
@@ -544,8 +549,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.42/v1.1.43/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.56/wn-farm-v1.1.57/" sw.js
+sed -i "s/v1\.1\.43/v1.1.44/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.57/wn-farm-v1.1.58/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -696,3 +701,5 @@ Added 12 October 2026:
   paddock first grazed today is A (v1.1.41).
 - Growth corrected by actual / model over the last 30 days of walk pairs
   (v1.1.42).
+- C rows more than 500 above their estimate are not counted as residuals
+  (v1.1.43).
