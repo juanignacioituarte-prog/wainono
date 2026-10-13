@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.45**,
-service worker cache `wn-farm-v1.1.59`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.46**,
+service worker cache `wn-farm-v1.1.60`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -556,8 +556,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.45/v1.1.46/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.59/wn-farm-v1.1.60/" sw.js
+sed -i "s/v1\.1\.46/v1.1.47/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.60/wn-farm-v1.1.61/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -718,3 +718,7 @@ Added 12 October 2026:
   plain words, then 1. paddocks NOT grazed between two walks and 2. paddocks
   grazed then measured, one line per date. Columns: Dates, Paddocks, Measured
   kg/day, Estimated kg/day, Estimate is. Under 5 paddocks = grey "(few)".
+- The + PARTIAL summary box is two lines only (v1.1.46, Juani 13 Oct 2026):
+  Growth: actual · estimated · % (A + B by area); Residual: actual (average of
+  today's C checks, outliers left out) · in use · %. The per-group A/B/C lines
+  were removed.
