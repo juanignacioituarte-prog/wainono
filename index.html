@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.43</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.44</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.43</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.44</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3401,6 +3401,30 @@
         function partialIsResidual(r) {
             return r.group === 'C' && Number(r.cover) > 0 && !(Number(r.estimate) > 0 && Number(r.cover) - Number(r.estimate) > GR_RESIDUAL_MAX_OVER);
         }
+        /* The average growth of a partial walk (Juani, 13 Oct 2026): A and B
+         * paddocks only (C is a residual, OTHER is not clean), at least
+         * PW_GROWTH_MIN_DAYS days since their start. Actual per day =
+         * (measured - start) / days; estimated per day = (estimate - start) /
+         * days; both weighted by paddock area. items: {name, cover, start,
+         * estimate, days}. */
+        const PW_GROWTH_MIN_DAYS = 3;
+        function partialGrowth(items) {
+            let a = 0, e = 0, w = 0, n = 0;
+            items.forEach(it => {
+                if (!(it.days >= PW_GROWTH_MIN_DAYS) || !(it.start > 0) || !(it.cover > 0) || !(it.estimate > 0)) return;
+                const area = Number(paddockAreaFor(it.name)) || 1;
+                a += (it.cover - it.start) / it.days * area;
+                e += (it.estimate - it.start) / it.days * area;
+                w += area; n++;
+            });
+            return n ? { actual: a / w, estimated: e / w, n: n } : null;
+        }
+        function partialGrowthHtml(g, small) {
+            if (!g) return '';
+            const pc = g.actual > 0 ? (g.estimated - g.actual) / g.actual * 100 : null;
+            return `<div style="font-size:${small ? 11 : 12}px;"><b>Growth</b> (A + B, ${g.n} paddock${g.n === 1 ? '' : 's'}, by area): actual <b style="color:#27ae60;">${Math.round(g.actual)}</b> · estimated <b style="color:#2980b9;">${Math.round(g.estimated)}</b> kgDM/ha/day${pc != null ? ` · <b style="color:${Math.abs(pc) < 10 ? '#27ae60' : '#c0392b'};">${pc > 0 ? '+' : ''}${Math.round(pc)}%</b>` : ''}</div>`;
+        }
+
         function grUpdateResidual() {
             const since = grDayOf(new Date()).getTime() - GR_RESIDUAL_DAYS * GR_DAY;
             const vals = (typeof PARTIAL_WALKS !== 'undefined' ? PARTIAL_WALKS : []).filter(r => {
@@ -3536,6 +3560,8 @@
                             <b style="font-size:13px;">${dd ? fmtNZ(dd) : escUnit(d)} · ${list.length} paddock${list.length === 1 ? '' : 's'}</b>
                             <span style="font-size:11px; display:flex; gap:8px;">${['A', 'B', 'C'].map(g => groupLine(list, g)).filter(Boolean).join('')}</span>
                         </div>
+                        ${partialGrowthHtml(partialGrowth(list.filter(r => r.group === 'A' || r.group === 'B')
+                            .map(r => ({ name: r.paddock, cover: Number(r.cover), start: Number(r.start), estimate: Number(r.estimate), days: Number(r.days) }))), true)}
                         <table style="width:100%; font-size:11px; border-collapse:collapse; margin-top:4px;">
                             <tr style="color:#7f8c8d;"><td>Paddock</td><td>Group</td><td style="text-align:right;">Measured</td><td style="text-align:right;">Estimate</td><td style="text-align:right;">Diff</td></tr>
                             ${list.map(r => `<tr${r.group === 'C' && !partialIsResidual(r) ? ' style="opacity:0.55;" title="Not a residual: more than ' + GR_RESIDUAL_MAX_OVER + ' above the estimate. Left out of the residual."' : ''}><td>${escUnit(r.paddock)}</td><td style="color:${CHECK_COLORS[r.group] || '#7f8c8d'}; font-weight:bold;">${escUnit(r.group || '')}${r.group === 'C' && !partialIsResidual(r) ? ' <span style="color:#c0392b; font-weight:normal; font-size:10px;">not a residual</span>' : ''}</td>
@@ -3828,7 +3854,10 @@
                 const word = avgDay >= 0 ? 'too low' : 'too high';
                 return `<div style="font-size:12px;"><b style="color:${CHECK_COLORS[g]};">${g}</b> ${label}: estimate ${Math.abs(Math.round(avgDiff))} ${word} · <b>${Math.abs(avgDay).toFixed(1)} kgDM/ha/day ${word}</b> · ${m.length} paddock${m.length === 1 ? '' : 's'}</div>`;
             };
+            const pg = partialGrowth(rows.filter(r => (r.c.group === 'A' || r.c.group === 'B') && r.c.measured != null && r.c.est)
+                .map(r => ({ name: r.p.name, cover: r.c.measured, start: r.c.est.startCover, estimate: r.c.est.cover, days: r.c.est.days })));
             box.innerHTML = `<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:3px;">
+                ${pg ? partialGrowthHtml(pg) : `<div style="font-size:11px; color:#7f8c8d;"><b>Growth:</b> measure A or B paddocks (${PW_GROWTH_MIN_DAYS}+ days since their start) to see it.</div>`}
                 <div style="font-size:11px; color:#7f8c8d; border-bottom:1px solid #eee; padding-bottom:3px; margin-bottom:2px;">Residual in use: <b style="color:#2c3e50;">${GR_RESIDUAL}</b> (${grResidualText()})</div>
                 ${line('A', 'growth')}${line('B', 'residual + growth')}${line('C', 'residual')}</div>`;
         }

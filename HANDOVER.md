@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.43**,
-service worker cache `wn-farm-v1.1.57`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.44**,
+service worker cache `wn-farm-v1.1.58`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -200,6 +200,13 @@ Four rows, so real and estimated covers are not mixed up:
   next day it shows 1500. Label: "last break 6 Oct · 1500 on 7 Oct + est.
   growth 399 (5 days) / walk 30 Sept: 2586 · 3 breaks since". The COVER MAP
   uses the same number. On 12 Oct: 47 paddocks from a break, 60 from a walk.
+- **Average growth of a partial walk** (v1.1.44, Juani 13 Oct 2026,
+  `partialGrowth`): A and B paddocks, at least 3 days since their start;
+  actual per day = (measured - start) / days, estimated per day = (estimate -
+  start) / days, both weighted by paddock area. Shown live at the top of
+  + PARTIAL (today's corrected estimate) and per date in PARTIAL WALKS (the
+  estimate saved with the rows). On 13 Oct: actual 69 / estimated 75 (+9%),
+  14 paddocks.
 - A saved C row more than **500 above its estimate is not a residual**
   (v1.1.43, `partialIsResidual`): left out of the residual median and the C
   averages, marked "not a residual" in PARTIAL WALKS. (Paddock 39 on 13 Oct
@@ -549,8 +556,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.43/v1.1.44/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.57/wn-farm-v1.1.58/" sw.js
+sed -i "s/v1\.1\.44/v1.1.45/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.58/wn-farm-v1.1.59/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -703,3 +710,5 @@ Added 12 October 2026:
   (v1.1.42).
 - C rows more than 500 above their estimate are not counted as residuals
   (v1.1.43).
+- Partial walk average growth (A + B, by area) against the estimate
+  (v1.1.44).
