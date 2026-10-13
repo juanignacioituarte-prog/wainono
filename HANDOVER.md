@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.30**,
-service worker cache `wn-farm-v1.1.44`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.31**,
+service worker cache `wn-farm-v1.1.45`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -175,6 +175,12 @@ The app **opens on BREAKS with the plain satellite picture**.
   measured weather.** The label says "≈ 3449 kgDM estimated / walk 30 Sept:
   2586 + est. growth 863 (12 days)". A paddock with no walk above 0 says "not
   walked yet".
+- **The newest real cover wins** (Juani, 13 Oct 2026, v1.1.31): the start is
+  the paddock's newest real cover, from a full farmwalk OR a partial walk
+  (`grLastWalk` reads `FARMWALK_HISTORY` and `PARTIAL_WALKS`; on the same day
+  the full walk is kept). Labels say "walk 30 Sept" or "partial walk 13 Oct".
+  The break cards (EST. KG/COW) leave out group C partial rows: those measure
+  only a grazed strip. FARMWALK itself never changes.
 - **Breaks since the walk (Juani, 12 Oct 2026):** if breaks were drawn in the
   paddock after its last walk, it was grazed. **The day after the LAST break
   was drawn it is the residual (`GR_RESIDUAL`), and the est. growth counts
@@ -203,6 +209,14 @@ The app **opens on BREAKS with the plain satellite picture**.
   farm average at the top is the estimated average ("estimated today").
   Entering a walk is hidden there. GROWTH sort uses the average growth since
   the start, which is about the same for every paddock (one farm figure).
+  A stats box at the top (v1.1.31, `buildEstimateStatsBox`): est. average
+  cover, growth today and the 7-day average, **pre-grazing = average of the
+  top 5 paddocks** (newest real or estimated cover), the residual in use,
+  feed above the residual (t DM), and **📋 PARTIAL WALKS**: every partial walk
+  by date, measured against the estimate, with the group averages.
+- **PLAN wedge: MEASURED / ESTIMATED** switch (v1.1.31, `wedgeSource`, kept in
+  `plan_wedge_source`). ESTIMATED draws today's estimated covers (blue bars);
+  the demand line and targets are the same as MEASURED.
 - **🎯 CHECK** in the FARMWALK bar (v1.1.27, Juani 13 Oct 2026): a partial
   farmwalk to test the estimate. Groups, from the walks BEFORE today
   (`checkInfo`): **A** not grazed since its last walk, walked 7+ days ago
@@ -453,8 +467,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.30/v1.1.31/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.44/wn-farm-v1.1.45/" sw.js
+sed -i "s/v1\.1\.31/v1.1.32/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.45/wn-farm-v1.1.46/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -584,3 +598,5 @@ Added 12 October 2026:
   Script `2026-10-13-a`). Paste the script; until then a save is refused.
 - Residual = median of the C checks of the last 30 days (3 or more), else
   1500 (v1.1.30). No script change.
+- Estimated farmwalk: newest real cover (walk or partial walk) wins; EST. FW
+  stats box and partial walks list; PLAN wedge MEASURED / ESTIMATED (v1.1.31).

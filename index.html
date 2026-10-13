@@ -1613,7 +1613,14 @@
             </div>
 
             <div class="feed-card">
-                <div class="feed-title">Feed Wedge & Demand</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <div class="feed-title" id="wedge-title" style="margin:0;">Feed Wedge & Demand</div>
+                    <div style="display:flex; gap:4px;">
+                        <button id="wedge-src-measured" onclick="setWedgeSource('measured')" style="padding:5px 10px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid #27ae60;">MEASURED</button>
+                        <button id="wedge-src-estimated" onclick="setWedgeSource('estimated')" style="padding:5px 10px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid #2980b9;">ESTIMATED</button>
+                    </div>
+                </div>
+                <div id="wedge-note" style="font-size:10px; color:#7f8c8d; margin-top:4px;"></div>
                 <div class="chart-box">
                     <canvas id="wedgeChart"></canvas>
                 </div>
@@ -1708,7 +1715,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.30</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.31</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1729,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.30</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.31</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3281,6 +3288,7 @@
             GR.ready = true; GR.error = '';
             estimatedBuiltAt = 0;
             if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
+            if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') calculateFeedLogic();
             if (typeof updateGeoStyles === 'function') updateGeoStyles();
             if (typeof renderBreaksDashboard === 'function') renderBreaksDashboard();
         }
@@ -3289,14 +3297,34 @@
         function growthOn(date) { return GR.daily.get(grIso(date)); }
 
         // The last walk of a paddock with a real cover, on or before a date.
-        function grLastWalk(pName, date) {
-            const h = FARMWALK_HISTORY[normName(pName)];
-            if (!h) return null;
+        /* The newest REAL cover of a paddock on or before a date (Juani, 13 Oct
+         * 2026): a full farmwalk or a partial walk, whichever is newer. On the
+         * same day the full walk is kept. opts.skipGroupC leaves out partial
+         * rows of group C (a residual measured in a grazed strip only). */
+        function grPartialDate(v) {
+            const t = String(v || '');
+            return /^\d{4}-\d{2}-\d{2}/.test(t) ? new Date(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) : null;
+        }
+        function grLastWalk(pName, date, opts) {
             const day = grDayOf(date).getTime();
             let best = null;
-            h.entries.forEach(e => { if (e.dateObj && e.cover > 0 && grDayOf(e.dateObj).getTime() <= day && (!best || e.dateObj > best.dateObj)) best = e; });
+            const h = FARMWALK_HISTORY[normName(pName)];
+            if (h) h.entries.forEach(e => {
+                if (e.dateObj && e.cover > 0 && grDayOf(e.dateObj).getTime() <= day && (!best || grDayOf(e.dateObj) > grDayOf(best.dateObj)))
+                    best = { dateObj: e.dateObj, cover: e.cover, source: 'walk' };
+            });
+            const partials = (typeof PARTIAL_WALKS !== 'undefined') ? PARTIAL_WALKS : [];
+            partials.forEach(r => {
+                if (normName(r.paddock) !== normName(pName) || !(Number(r.cover) > 0)) return;
+                if (opts && opts.skipGroupC && r.group === 'C') return;
+                const d = grPartialDate(r.date);
+                if (d && d.getTime() <= day && (!best || d > grDayOf(best.dateObj)))
+                    best = { dateObj: d, cover: Number(r.cover), source: 'partial', group: r.group };
+            });
             return best;
         }
+        // "walk 30 Sept" or "partial walk 13 Oct"
+        const grWalkWord = w => (w && w.source === 'partial') ? 'partial walk' : 'walk';
 
         /* Estimated cover of a paddock on a day.
          * - No break since its last walk: the walk cover, plus the farm average
@@ -3333,7 +3361,7 @@
         function estimateCover(pName, date, opts) {
             if (!GR.ready) return null;
             const at = date || new Date();
-            const walk = grLastWalk(pName, (opts && opts.walkBefore) || at);
+            const walk = grLastWalk(pName, (opts && opts.walkBefore) || at, { skipGroupC: !!(opts && opts.ignoreBreaks) });
             if (!walk) return null;
             let startCover = walk.cover, startDate = grDayOf(walk.dateObj), lastBreak = null, breakCount = 0;
             if (!(opts && opts.ignoreBreaks)) {
@@ -3349,7 +3377,7 @@
                 if (g != null) { growth += g; days++; } else missing++;
             }
             return { cover: Math.round(startCover + growth), startCover, startDate, fromBreak: !!lastBreak, breakCount,
-                     breakDate: lastBreak ? grDayOf(new Date(lastBreak.createdAt)) : null,
+                     breakDate: lastBreak ? grDayOf(new Date(lastBreak.createdAt)) : null, walkSource: walk.source,
                      walkCover: walk.cover, walkDate: walk.dateObj, growth: Math.round(growth), days: days + missing, missing };
         }
 
@@ -3375,13 +3403,13 @@
             const todayTs = grDayOf(today).getTime();
             estimatedPaddockData = (manualModeData || []).map(p => {
                 const est = estimateCover(p.name, today);
-                const from = est ? (est.fromBreak ? `${est.startCover} on ${fmtNZ(est.startDate)}` : `walk ${fmtNZ(est.walkDate)}`) : '';
+                const from = est ? (est.fromBreak ? `${est.startCover} on ${fmtNZ(est.startDate)}` : `${grWalkWord({ source: est.walkSource })} ${fmtNZ(est.walkDate)}`) : '';
                 return {
                     name: p.name, area: p.area || 0, isOut: p.isOut, reason: p.reason, neverWalked: !est,
                     latest: { cover: est ? est.cover : 0, ts: todayTs,
                               formattedDate: est ? `est. today: ${from} + ${est.growth} growth` : '' },
                     previous: est ? { cover: est.fromBreak ? est.startCover : est.walkCover,
-                                      formattedDate: est.fromBreak ? `after break ${fmtNZ(est.breakDate)}` : `walk ${fmtNZ(est.walkDate)}` } : null,
+                                      formattedDate: est.fromBreak ? `after break ${fmtNZ(est.breakDate)}` : `${grWalkWord({ source: est.walkSource })} ${fmtNZ(est.walkDate)}` } : null,
                     growthRate: est && est.days > 0 ? Math.round(est.growth / est.days) : null,
                     est: est
                 };
@@ -3389,6 +3417,79 @@
             estimatedBuiltAt = Date.now();
             return estimatedPaddockData;
         }
+
+        /* The box at the top of EST. FW: the numbers behind the ranking. */
+        function buildEstimateStatsBox(paddocks) {
+            const box = document.createElement('div');
+            box.style.cssText = 'background:#fff; border:1px solid #d6e4f0; border-left:5px solid #2980b9; border-radius:8px; padding:10px 12px; margin-bottom:10px;';
+            const today = new Date();
+            const live = paddocks.filter(p => !p.isOut && p.est && (p.area || 0) > 0);
+            const area = live.reduce((a, p) => a + p.area, 0);
+            const avg = area > 0 ? live.reduce((a, p) => a + p.latest.cover * p.area, 0) / area : 0;
+            const gToday = growthOn(today);
+            const last7 = []; for (let k = 0; k < 7; k++) { const g = growthOn(new Date(today.getTime() - k * GR_DAY)); if (g != null) last7.push(g); }
+            const g7 = last7.length ? last7.reduce((a, b) => a + b, 0) / last7.length : null;
+            const top = live.slice().sort((a, b) => b.latest.cover - a.latest.cover).slice(0, 5);
+            const pre = top.length ? top.reduce((a, p) => a + p.latest.cover, 0) / top.length : 0;
+            const feed = live.reduce((a, p) => a + Math.max(0, p.latest.cover - GR_RESIDUAL) * p.area, 0);
+            const measuredToday = live.filter(p => p.est.days === 0 && !p.est.fromBreak).length;
+            const cell = (label, value, sub) => `<div style="flex:1 1 30%; min-width:90px;"><div style="font-size:9px; font-weight:bold; color:#7f8c8d; text-transform:uppercase;">${label}</div>
+                <div style="font-size:16px; font-weight:bold; color:#2c3e50;">${value}</div><div style="font-size:9px; color:#95a5a6;">${sub || ''}</div></div>`;
+            const nPartial = (typeof PARTIAL_WALKS !== 'undefined') ? new Set(PARTIAL_WALKS.map(r => r.date)).size : 0;
+            box.innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    ${cell('Est. avg cover', Math.round(avg), `${live.length} paddocks · ${area.toFixed(1)} ha`)}
+                    ${cell('Growth today', gToday != null ? Math.round(gToday) : '--', 'kgDM/ha/day, measured weather')}
+                    ${cell('Growth 7 days', g7 != null ? Math.round(g7) : '--', 'average kgDM/ha/day')}
+                    ${cell('Pre-grazing', Math.round(pre), `average of the top ${top.length}: ${top.map(p => escUnit(p.name)).join(', ')}`)}
+                    ${cell('Residual', GR_RESIDUAL, grResidualText())}
+                    ${cell('Feed above residual', Math.round(feed / 1000) + ' t DM', measuredToday ? `${measuredToday} measured today` : 'estimated today')}
+                </div>
+                <button onclick="openPartialWalks()" style="margin-top:8px; width:100%; background:#ecf0f1; color:#2c3e50; border:none; padding:8px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">📋 PARTIAL WALKS (${nPartial} date${nPartial === 1 ? '' : 's'})</button>`;
+            return box;
+        }
+
+        /* Every partial walk saved, by date: measured against the estimate. */
+        function openPartialWalks() {
+            closePartialWalks();
+            const rows = (typeof PARTIAL_WALKS !== 'undefined' ? PARTIAL_WALKS : []).slice();
+            const dates = [...new Set(rows.map(r => r.date))].sort().reverse();
+            const sign = v => (v > 0 ? '+' : '') + Math.round(v);
+            const groupLine = (list, g) => {
+                const m = list.filter(r => r.group === g && r.cover > 0 && r.estimate > 0);
+                if (!m.length) return '';
+                const diff = m.reduce((a, r) => a + (r.cover - r.estimate), 0) / m.length;
+                if (g === 'C') return `<span style="color:${CHECK_COLORS.C};"><b>C</b> residual ${Math.round(m.reduce((a, r) => a + r.cover, 0) / m.length)} (${m.length})</span>`;
+                const perDay = m.filter(r => r.days > 0); const pd = perDay.length ? perDay.reduce((a, r) => a + (r.cover - r.estimate) / r.days, 0) / perDay.length : null;
+                return `<span style="color:${CHECK_COLORS[g]};"><b>${g}</b> ${sign(diff)}${pd != null ? ` (${sign(pd)}/day)` : ''} (${m.length})</span>`;
+            };
+            const body = !dates.length ? '<div style="color:#7f8c8d; font-size:12px; padding:10px 0;">No partial walk saved yet. Use 🎯 CHECK in the FARMWALK bar.</div>'
+                : dates.map(d => {
+                    const list = rows.filter(r => r.date === d).sort((a, b) => (a.group || '').localeCompare(b.group || '') || String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }));
+                    const dd = grPartialDate(d);
+                    return `<div style="border-top:1px solid #eee; padding:8px 0;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;">
+                            <b style="font-size:13px;">${dd ? fmtNZ(dd) : escUnit(d)} · ${list.length} paddock${list.length === 1 ? '' : 's'}</b>
+                            <span style="font-size:11px; display:flex; gap:8px;">${['A', 'B', 'C'].map(g => groupLine(list, g)).filter(Boolean).join('')}</span>
+                        </div>
+                        <table style="width:100%; font-size:11px; border-collapse:collapse; margin-top:4px;">
+                            <tr style="color:#7f8c8d;"><td>Paddock</td><td>Group</td><td style="text-align:right;">Measured</td><td style="text-align:right;">Estimate</td><td style="text-align:right;">Diff</td></tr>
+                            ${list.map(r => `<tr><td>${escUnit(r.paddock)}</td><td style="color:${CHECK_COLORS[r.group] || '#7f8c8d'}; font-weight:bold;">${escUnit(r.group || '')}</td>
+                                <td style="text-align:right; font-weight:bold;">${r.cover}</td><td style="text-align:right;">${r.estimate || '--'}</td>
+                                <td style="text-align:right; color:${Math.abs(r.cover - r.estimate) < 150 ? '#27ae60' : '#c0392b'};">${r.estimate ? sign(r.cover - r.estimate) : ''}</td></tr>`).join('')}
+                        </table></div>`;
+                }).join('');
+            const wrap = document.createElement('div');
+            wrap.id = 'partial-walks-modal';
+            wrap.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; display:flex; align-items:center; justify-content:center; padding:15px;';
+            wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📋 Partial walks</h3>
+                <button onclick="closePartialWalks()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 6px;">Measured in CHECK, against what the app estimated that day. A: growth · B: residual + growth · C: residual.</div>
+                ${body}</div>`;
+            wrap.addEventListener('click', e => { if (e.target === wrap) closePartialWalks(); });
+            document.body.appendChild(wrap);
+        }
+        function closePartialWalks() { const w = document.getElementById('partial-walks-modal'); if (w) w.remove(); }
 
         function toggleEstimateView() {
             switchDashboardMode(currentDashboardMode === 'estimate' ? 'manual' : 'estimate');
@@ -3423,6 +3524,7 @@
             grUpdateResidual();
             if (currentDashboardMode === 'check') renderCheckView();
             if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
+            if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') calculateFeedLogic();
             if (typeof updateGeoStyles === 'function') updateGeoStyles();
         }
         function partialSavedToday(name) {
@@ -3464,7 +3566,7 @@
 
         function checkStartText(c) {
             return c.est.fromBreak ? `last break ${fmtNZ(c.est.breakDate)} · ${c.est.startCover} on ${fmtNZ(c.est.startDate)}`
-                                   : `walk ${fmtNZ(c.walk.dateObj)}: ${c.walk.cover}`;
+                                   : `${grWalkWord(c.walk)} ${fmtNZ(c.walk.dateObj)}: ${c.walk.cover}`;
         }
 
         // The result line for one paddock.
@@ -10838,6 +10940,7 @@
             renderPaddockSortButtons();
 
             const list = document.getElementById('list'); list.innerHTML = "";
+            if (currentDashboardMode === 'estimate') list.appendChild(buildEstimateStatsBox(sorted));
 
             if (activeUnit && sorted.length === 0) {
                 list.innerHTML = `<div style="padding:20px; text-align:center; color:#7f8c8d; font-size:12px;">
@@ -11012,10 +11115,10 @@
                             (est.fromBreak
                                 ? `<div style="font-size:10px; color:#e67e22;">last break ${fmtNZ(est.breakDate)} &middot; ${est.startCover} on ${fmtNZ(est.startDate)} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` +
                                   `<div style="font-size:9px; color:#95a5a6;">residual ${est.startCover}: ${grResidualText()}</div>` +
-                                  `<div style="font-size:10px; color:#95a5a6;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} &middot; ${est.breakCount} break${est.breakCount === 1 ? '' : 's'} since</div>`
-                                : `<div style="font-size:10px; color:#7f8c8d;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>`);
+                                  `<div style="font-size:10px; color:#95a5a6;">${grWalkWord({ source: est.walkSource })} ${fmtNZ(est.walkDate)}: ${est.walkCover} &middot; ${est.breakCount} break${est.breakCount === 1 ? '' : 's'} since</div>`
+                                : `<div style="font-size:10px; color:#7f8c8d;">${grWalkWord({ source: est.walkSource })} ${fmtNZ(est.walkDate)}: ${est.walkCover} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>`);
                     } else if (walk) {
-                        lines = `<div style="font-size:11px; color:#27ae60;">${walk.cover} kgDM &middot; walk ${fmtNZ(walk.dateObj)}</div>` +
+                        lines = `<div style="font-size:11px; color:#27ae60;">${walk.cover} kgDM &middot; ${grWalkWord(walk)} ${fmtNZ(walk.dateObj)}</div>` +
                             `<div style="font-size:10px; color:#95a5a6;">${GR.error ? 'growth not available' : 'growth loading...'}</div>`;
                     } else {
                         lines = `<div style="font-size:11px; color:#95a5a6;">-- not walked yet</div>`;
@@ -11917,10 +12020,32 @@
             }
 
             renderPlanScope();
-            renderFeedWedge(planScopedPaddocks(manualModeData), preGrazeTarget, residual);
+            // MEASURED: the farmwalk, as always. ESTIMATED: today's estimated
+            // covers (newest real cover + growth), paddocks with no cover left out.
+            const useEst = wedgeSource === 'estimated' && GR.ready;
+            renderWedgeSourceButtons(useEst);
+            renderFeedWedge(planScopedPaddocks(useEst ? buildEstimatedPaddockData().filter(p => !p.neverWalked) : manualModeData), preGrazeTarget, residual, useEst);
         }
 
-        function renderFeedWedge(paddockData, targetPre, targetRes) {
+        let wedgeSource = (() => { try { return localStorage.getItem('plan_wedge_source') === 'estimated' ? 'estimated' : 'measured'; } catch (e) { return 'measured'; } })();
+        function setWedgeSource(src) {
+            wedgeSource = src === 'estimated' ? 'estimated' : 'measured';
+            try { localStorage.setItem('plan_wedge_source', wedgeSource); } catch (e) {}
+            calculateFeedLogic();
+        }
+        function renderWedgeSourceButtons(useEst) {
+            const paint = (id, on, col) => { const b = document.getElementById(id); if (b) { b.style.background = on ? col : '#fff'; b.style.color = on ? '#fff' : col; } };
+            paint('wedge-src-measured', wedgeSource === 'measured', '#27ae60');
+            paint('wedge-src-estimated', wedgeSource === 'estimated', '#2980b9');
+            const t = document.getElementById('wedge-title');
+            if (t) t.textContent = useEst ? 'Feed Wedge & Demand (estimated today)' : 'Feed Wedge & Demand';
+            const n = document.getElementById('wedge-note');
+            if (n) n.textContent = wedgeSource === 'estimated'
+                ? (useEst ? `Covers estimated for today: newest real cover (walk or partial walk), or the residual (${GR_RESIDUAL}) after a break, plus the growth from measured weather.` : 'The growth model is still loading: showing the measured wedge.')
+                : 'Covers measured in the farmwalk.';
+        }
+
+        function renderFeedWedge(paddockData, targetPre, targetRes, estimated) {
             const ctx = document.getElementById('wedgeChart').getContext('2d');
 
             // Filter out 'out' paddocks and sort by cover high to low
@@ -11959,9 +12084,9 @@
                         },
                         {
                             type: 'bar',
-                            label: 'Cover (kgDM/ha)',
+                            label: estimated ? 'Est. cover (kgDM/ha)' : 'Cover (kgDM/ha)',
                             data: dataCover,
-                            backgroundColor: '#2ecc71',
+                            backgroundColor: estimated ? '#5dade2' : '#2ecc71',
                             borderRadius: 3,
                             barPercentage: 0.95,
                             categoryPercentage: 0.95
@@ -14149,7 +14274,7 @@
                             valStr = (totalKg / cowNum).toFixed(1) + ' kg';
                             
                             calcParamsText = `Paddock: ${paddockName || 'Unknown'}\n` +
-                                `Last walk: ${baseCover.toFixed(0)} kgDM/ha on ${fmtNZ(est.walkDate)}\n` +
+                                `Last real cover: ${baseCover.toFixed(0)} kgDM/ha (${grWalkWord({ source: est.walkSource })} ${fmtNZ(est.walkDate)})\n` +
                                 `Est. growth since walk: ${est.growth} kgDM/ha over ${daysSince} days (avg ${grower.toFixed(1)}/day, measured weather)\n` +
                                 `Est. Cover: ${estimatedCover.toFixed(0)} kgDM/ha\n` +
                                 `Residual Target: ${residual} kgDM/ha\n` +
