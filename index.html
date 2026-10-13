@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.47</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.48</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.47</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.48</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3311,26 +3311,30 @@
             if (typeof renderBreaksDashboard === 'function') renderBreaksDashboard();
         }
 
-        /* The recent correction (Juani, 13 Oct 2026): the partial walks and the
-         * full walks correct the model's growth. Factor = actual growth / model
-         * growth over the walk-to-walk pairs (full or partial walk, no grazing
-         * between; grazing pairs are left out as they also carry the residual)
-         * that ended in the last GR_CORR_DAYS days. Used with GR_CORR_MIN_N pairs
-         * or more, kept within GR_CORR_CLAMP. Every estimate uses model x factor
-         * (GR.daily); GR.dailyRaw keeps the model's own numbers, which ACTUAL vs
-         * ESTIMATED compares against so the model is still tested honestly. */
-        const GR_CORR_DAYS = 30, GR_CORR_MIN_N = 5, GR_CORR_CLAMP = [0.5, 1.5];
-        GR.corr = { factor: 1, n: 0, applied: false };
+        /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
+         * newest walk date (full or partial) with GR_CORR_MIN_N or more clean
+         * pairs (no grazing between two real covers) sets the factor = actual
+         * growth / model growth on those pairs, weighted by days, kept within
+         * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
+         * new one, e.g. "the model was 9% high on 13 Oct, so use x0.91 until the
+         * next walk". Every estimate uses model x factor (GR.daily); GR.dailyRaw
+         * keeps the model's own numbers, which GROWTH CHECK compares against. */
+        const GR_CORR_MIN_N = 5, GR_CORR_CLAMP = [0.5, 1.5];
+        GR.corr = { factor: 1, n: 0, applied: false, date: null, actual: null, model: null };
         function grApplyCorrection(quiet) {
             if (!GR.dailyRaw) return;
-            const since = grDayOf(new Date()).getTime() - GR_CORR_DAYS * GR_DAY;
-            const pairs = growthCompareIntervals().filter(r => r.kind === 'walk' && r.to.getTime() >= since);
+            const byDate = {};
+            growthCompareIntervals().filter(r => r.kind === 'walk').forEach(r => { (byDate[grIso(r.to)] = byDate[grIso(r.to)] || []).push(r); });
+            const last = Object.keys(byDate).sort().reverse().find(d => byDate[d].length >= GR_CORR_MIN_N);
+            const pairs = last ? byDate[last] : [];
             const act = pairs.reduce((a, r) => a + r.actual * r.days, 0);
             const est = pairs.reduce((a, r) => a + r.estimated * r.days, 0);
+            const days = pairs.reduce((a, r) => a + r.days, 0);
             const ok = pairs.length >= GR_CORR_MIN_N && est > 0;
             const factor = ok ? Math.max(GR_CORR_CLAMP[0], Math.min(GR_CORR_CLAMP[1], act / est)) : 1;
             const changed = Math.abs(factor - GR.corr.factor) > 0.001 || ok !== GR.corr.applied;
-            GR.corr = { factor: factor, n: pairs.length, applied: ok };
+            GR.corr = { factor: factor, n: pairs.length, applied: ok, date: ok ? pairs[0].to : null,
+                actual: ok ? act / days : null, model: ok ? est / days : null };
             GR.daily = new Map();
             GR.dailyRaw.forEach((v, k) => GR.daily.set(k, v * factor));
             estimatedBuiltAt = 0;
@@ -3341,8 +3345,8 @@
         }
         function grCorrText() {
             return GR.corr.applied
-                ? `growth corrected ×${GR.corr.factor.toFixed(2)} from ${GR.corr.n} pairs (last ${GR_CORR_DAYS} days)`
-                : `growth not corrected yet: ${GR.corr.n} pair${GR.corr.n === 1 ? '' : 's'} in the last ${GR_CORR_DAYS} days, needs ${GR_CORR_MIN_N}`;
+                ? `growth corrected ×${GR.corr.factor.toFixed(2)} from the walk on ${fmtNZ(GR.corr.date)} (${GR.corr.n} paddocks)`
+                : `growth not corrected yet: no walk with ${GR_CORR_MIN_N} or more clean paddocks`;
         }
 
         // The farm average growth on one day, kgDM/ha/day (corrected).
@@ -3524,7 +3528,7 @@
             const nPartial = (typeof PARTIAL_WALKS !== 'undefined') ? new Set(PARTIAL_WALKS.map(r => r.date)).size : 0;
             box.innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:8px;">
                     ${cell('Est. avg cover', Math.round(avg), `${live.length} paddocks · ${area.toFixed(1)} ha`)}
-                    ${cell('Growth today', gToday != null ? Math.round(gToday) : '--', GR.corr.applied ? `measured weather ×${GR.corr.factor.toFixed(2)} (${GR.corr.n} pairs)` : 'measured weather, not corrected yet')}
+                    ${cell('Growth today', gToday != null ? Math.round(gToday) : '--', GR.corr.applied ? `measured weather ×${GR.corr.factor.toFixed(2)} (walk ${fmtNZ(GR.corr.date)})` : 'measured weather, not corrected yet')}
                     ${cell('Growth 7 days', g7 != null ? Math.round(g7) : '--', 'average kgDM/ha/day')}
                     ${cell('Pre-grazing', Math.round(pre), `average of the top ${top.length}: ${top.map(p => escUnit(p.name)).join(', ')}`)}
                     ${cell('Residual', GR_RESIDUAL, grResidualText())}
@@ -3673,13 +3677,10 @@
             const walkGroups = byKey(walkRows, r => grIso(r.to) + '|' + grIso(r.from));
             const grazeGroups = byKey(grazeRows, r => grIso(r.to));
 
-            // Headline: the last 30 days, not grazed between.
-            const since = grDayOf(new Date()).getTime() - GR_CORR_DAYS * GR_DAY;
-            const recent = walkRows.filter(r => r.to.getTime() >= since);
-            const headline = recent.length
-                ? (() => { const real = avg(recent, r => r.actual), model = avg(recent, r => r.estimated);
-                    return `<b>Last ${GR_CORR_DAYS} days:</b> the grass grew <b>${Math.round(real)}</b> kg/day (measured). The app estimated <b>${Math.round(model)}</b> kg/day. The estimate is ${verdict(real, model)}.`; })()
-                : `Not enough measurements in the last ${GR_CORR_DAYS} days yet.`;
+            // Headline: the last measurement, which sets the correction in use.
+            const headline = GR.corr.applied
+                ? `<b>Last walk with enough paddocks (${fmtNZ(GR.corr.date)}, ${GR.corr.n} paddocks):</b> the grass grew <b>${Math.round(GR.corr.actual)}</b> kg/day (measured). The app estimated <b>${Math.round(GR.corr.model)}</b> kg/day. The estimate is ${verdict(GR.corr.actual, GR.corr.model)}.`
+                : `No walk with ${GR_CORR_MIN_N} or more paddocks not grazed between two measurements yet.`;
 
             const section = (title, note, groups, label) => !groups.length ? '' : `
                 <div style="margin-top:12px; font-size:13px; font-weight:bold; color:#2c3e50;">${title}</div>
@@ -3708,7 +3709,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📈 Growth: measured vs estimated</h3>
                 <button onclick="closeGrowthCompare()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
                 <div style="font-size:13px; margin:8px 0 4px; line-height:1.4;">${headline}</div>
-                <div style="font-size:12px; color:#2980b9; font-weight:bold;">${GR.corr.applied ? `So the app now multiplies its estimate by <b>${GR.corr.factor.toFixed(2)}</b> to fix it.` : 'The app does not correct its estimate yet (needs ' + GR_CORR_MIN_N + ' paddocks).'}</div>
+                <div style="font-size:12px; color:#2980b9; font-weight:bold;">${GR.corr.applied ? `So the app now multiplies its estimate by <b>${GR.corr.factor.toFixed(2)}</b> until the next walk or partial walk.` : 'The app does not correct its estimate yet.'}</div>
                 <div style="font-size:10px; color:#95a5a6; margin-top:2px;">kg DM/ha/day. The estimates below are before that fix. Grey lines with "few" have under ${FEW} paddocks, too few to judge.</div>
                 ${body}</div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closeGrowthCompare(); });

@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.47**,
-service worker cache `wn-farm-v1.1.61`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.48**,
+service worker cache `wn-farm-v1.1.62`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -332,11 +332,14 @@ Four rows, so real and estimated covers are not mixed up:
   forecast endpoint's past days for yesterday and today. Read once a day,
   kept in `growth_weather_v1`. The walks: `FARMWALK_HISTORY` (every walk, from
   the same CSV as FARMWALK) plus `fairlie_history.csv` (last season).
-- **Recent growth correction** (v1.1.42, Juani 13 Oct 2026, `grApplyCorrection`):
-  factor = actual growth / model growth over the walk-to-walk pairs (full or
-  partial walk, no grazing between; grazing pairs left out because they also
-  carry the residual) that ended in the last 30 days; used with 5 pairs or
-  more, kept within ×0.5-×1.5. `GR.daily` = model × factor (used by every
+- **Growth correction from the LAST walk** (v1.1.48, Juani 13 Oct 2026,
+  `grApplyCorrection`; before v1.1.48 it was the last 30 days of pairs):
+  the newest walk date (full or partial) with 5 or more walk-to-walk pairs
+  (no grazing between; grazing pairs left out because they also carry the
+  residual) sets factor = actual growth / model growth on those pairs,
+  weighted by days. It stays in use until the next walk or partial walk with
+  5+ pairs ("the model was 8% high on 13 Oct, so ×0.93 until the next
+  walk"). Kept within ×0.5-×1.5. `GR.daily` = model × factor (used by every
   estimate); `GR.dailyRaw` = the model's own numbers (used by ACTUAL vs
   ESTIMATED, so that table still tests the model). Redone when walks, partial
   walks or breaks load, and after a partial walk is saved. Shown in the
@@ -556,8 +559,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.47/v1.1.48/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.61/wn-farm-v1.1.62/" sw.js
+sed -i "s/v1\.1\.48/v1.1.49/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.62/wn-farm-v1.1.63/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -725,3 +728,6 @@ Added 12 October 2026:
 - PARTIAL WALKS list: the A/B/C average line per date was removed (v1.1.47,
   Juani said it was confusing). Each date shows the Growth line and the
   paddock table only.
+- The growth correction comes from the LAST walk or partial walk with 5+
+  clean pairs, kept until the next one (v1.1.48). GROWTH CHECK headline shows
+  that walk. On 13 Oct: 8 paddocks, measured 68, model 74, ×0.93.
