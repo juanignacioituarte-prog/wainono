@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.27**,
-service worker cache `wn-farm-v1.1.41`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.28**,
+service worker cache `wn-farm-v1.1.42`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -200,11 +200,13 @@ The app **opens on BREAKS with the plain satellite picture**.
 - **🎯 CHECK** in the FARMWALK bar (v1.1.27, Juani 13 Oct 2026): a partial
   farmwalk to test the estimate. Groups, from the walks BEFORE today
   (`checkInfo`): **A** not grazed since its last walk, walked 7+ days ago
-  (tests growth); **C** last break 1-2 days ago (tests the 1500 residual;
-  measure inside the grazed strip); **B** last break 7+ days ago (tests 1500 +
-  growth); grey: out, never walked, walked under 7 days ago, a break today, or
-  a break 3-6 days ago. The map shows the groups (A green, C orange, B blue)
-  and the breaks; a tap goes to the paddock's box. Each typed cover shows
+  (tests growth); **B** last break 7+ days ago (tests 1500 + growth); **C**
+  last break 1-2 days ago (tests the 1500 residual; measure inside the grazed
+  strip). Always shown in the order A, B, C (Juani). Grey: out, never walked,
+  walked under 7 days ago, a break today, or a break 3-6 days ago. The map
+  shows the groups (A green, B blue, C orange) and the breaks. A tap on a
+  paddock goes to its card (lit up, box open); a tap on a card zooms the map
+  to the paddock and shows its label (v1.1.28). Each typed cover shows
   measured − estimate and per day; the top box averages each group.
   **Saved as a real partial farmwalk for today** (Juani): `farmwalk_load`,
   mode `merge`, only the measured paddocks, the same save as SAVE FARMWALK.
@@ -443,8 +445,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.27/v1.1.28/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.41/wn-farm-v1.1.42/" sw.js
+sed -i "s/v1\.1\.28/v1.1.29/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.42/wn-farm-v1.1.43/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -568,3 +570,5 @@ Added 12 October 2026:
 - EST. FW: paddock ranking on the estimated cover, with all filters (v1.1.26).
 - CHECK: partial farmwalk with groups A / B / C to test the estimate, saved
   as a real farmwalk (v1.1.27).
+- CHECK: groups in the order A, B, C; card and map paddock linked both ways
+  (v1.1.28).
