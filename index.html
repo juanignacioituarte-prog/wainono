@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.36</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.37</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.36</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.37</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3582,6 +3582,12 @@
             rows.forEach(r => { const key = r.kind === 'graze' ? 'g|' + grIso(r.to) + '|' + r.source : 'w|' + grIso(r.from) + '|' + grIso(r.to) + '|' + r.source; (groups[key] = groups[key] || []).push(r); });
             const walkRows = rows.filter(r => r.kind === 'walk'), grazeRows = rows.filter(r => r.kind === 'graze');
             const avg = (list, f) => list.reduce((a, r) => a + f(r), 0) / list.length;
+            // (estimated - actual) / actual: + means the estimate is too high.
+            const pctCell = (act, est) => {
+                if (!(act > 0)) return '<td style="text-align:right; color:#95a5a6;">--</td>';
+                const pc = (est - act) / act * 100;
+                return `<td style="text-align:right; font-weight:bold; color:${Math.abs(pc) < 10 ? '#27ae60' : '#c0392b'};">${pc > 0 ? '+' : ''}${Math.round(pc)}%</td>`;
+            };
             const line = (label, list, sub) => {
                 const act = avg(list, r => r.actual), est = avg(list, r => r.estimated), diff = est - act;
                 const word = diff >= 0 ? 'too high' : 'too low';
@@ -3590,13 +3596,14 @@
                     <td style="text-align:right;">${list.length}</td>
                     <td style="text-align:right; font-weight:bold; color:#27ae60;">${Math.round(act)}</td>
                     <td style="text-align:right; font-weight:bold; color:#2980b9;">${Math.round(est)}</td>
-                    <td style="text-align:right; font-weight:bold; color:${Math.abs(diff) < 5 ? '#27ae60' : '#c0392b'};">${Math.abs(Math.round(diff))} ${word}</td></tr>`;
+                    <td style="text-align:right; font-weight:bold; color:${Math.abs(diff) < 5 ? '#27ae60' : '#c0392b'};">${Math.abs(Math.round(diff))} ${word}</td>
+                    ${pctCell(act, est)}</tr>`;
             };
             const keys = Object.keys(groups).sort().reverse();
             const table = !rows.length
                 ? `<div style="font-size:12px; color:#7f8c8d; padding:10px 0;">${GR.ready ? `No pair of real covers in the last ${GC_LOOKBACK_DAYS} days fits (${GC_MIN_DAYS}-${GC_MAX_DAYS} days apart, no break between). A partial walk on group A paddocks will add some.` : 'The growth model is still loading.'}</div>`
                 : `<table style="width:100%; font-size:12px; border-collapse:collapse;">
-                    <tr style="font-size:10px; color:#7f8c8d;"><td>From → to</td><td style="text-align:right;">Paddocks</td><td style="text-align:right;">Actual<br>/day</td><td style="text-align:right;">Estimated<br>/day</td><td style="text-align:right;">Estimate</td></tr>
+                    <tr style="font-size:10px; color:#7f8c8d;"><td>From → to</td><td style="text-align:right;">Paddocks</td><td style="text-align:right;">Actual<br>/day</td><td style="text-align:right;">Estimated<br>/day</td><td style="text-align:right;">Estimate</td><td style="text-align:right;">%<br>diff</td></tr>
                     ${line(`All, last ${GC_LOOKBACK_DAYS} days`, rows, 'every pair below together')}
                     ${walkRows.length ? line('Walk to walk', walkRows, 'not grazed between two real covers') : ''}
                     ${grazeRows.length ? line('After a grazing', grazeRows, `from the residual ${GR_RESIDUAL} (${grResidualText()}) to the next real cover`) : ''}
@@ -3607,9 +3614,9 @@
                    </table>
                    <details style="margin-top:8px;"><summary style="font-size:11px; font-weight:bold; cursor:pointer;">Every paddock (${rows.length})</summary>
                    <table style="width:100%; font-size:11px; border-collapse:collapse; margin-top:4px;">
-                    <tr style="color:#7f8c8d;"><td>Paddock</td><td>From → to</td><td style="text-align:right;">Start</td><td style="text-align:right;">Actual</td><td style="text-align:right;">Est.</td></tr>
+                    <tr style="color:#7f8c8d;"><td>Paddock</td><td>From → to</td><td style="text-align:right;">Start</td><td style="text-align:right;">Actual</td><td style="text-align:right;">Est.</td><td style="text-align:right;">% diff</td></tr>
                     ${rows.slice().sort((a, b) => b.to - a.to || String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }))
-                        .map(r => `<tr><td>${escUnit(r.paddock)}</td><td>${r.kind === 'graze' ? 'grazed, ' : ''}${fmtNZ(r.from)} → ${fmtNZ(r.to)}</td><td style="text-align:right;">${r.startCover}</td><td style="text-align:right;">${Math.round(r.actual)}</td><td style="text-align:right;">${Math.round(r.estimated)}</td></tr>`).join('')}
+                        .map(r => `<tr><td>${escUnit(r.paddock)}</td><td>${r.kind === 'graze' ? 'grazed, ' : ''}${fmtNZ(r.from)} → ${fmtNZ(r.to)}</td><td style="text-align:right;">${r.startCover}</td><td style="text-align:right;">${Math.round(r.actual)}</td><td style="text-align:right;">${Math.round(r.estimated)}</td>${pctCell(r.actual, r.estimated)}</tr>`).join('')}
                    </table></details>`;
             const wrap = document.createElement('div');
             wrap.id = 'growth-compare-modal';
@@ -3617,7 +3624,7 @@
             wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:600px; max-height:88vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📈 Actual growth vs estimated</h3>
                 <button onclick="closeGrowthCompare()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
-                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px; line-height:1.4;">kgDM/ha/day. Actual: two real covers of the same paddock (full or partial walk), ${GC_MIN_DAYS}-${GC_MAX_DAYS} days apart, with no break drawn between them; or, after a grazing, from the residual in use (${GR_RESIDUAL}) the day after the last break to the next real cover. Estimated: the app's growth from measured weather over the same days. Walk-to-walk pairs were also used to tune the model's month factors, so the partial walks are the fairer test.</div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px; line-height:1.4;">kgDM/ha/day. % diff = (estimated − actual) ÷ actual: + means the estimate is too high. Actual: two real covers of the same paddock (full or partial walk), ${GC_MIN_DAYS}-${GC_MAX_DAYS} days apart, with no break drawn between them; or, after a grazing, from the residual in use (${GR_RESIDUAL}) the day after the last break to the next real cover. Estimated: the app's growth from measured weather over the same days. Walk-to-walk pairs were also used to tune the model's month factors, so the partial walks are the fairer test.</div>
                 ${table}</div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closeGrowthCompare(); });
             document.body.appendChild(wrap);

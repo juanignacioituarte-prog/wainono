@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.36**,
-service worker cache `wn-farm-v1.1.50`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.37**,
+service worker cache `wn-farm-v1.1.51`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -237,6 +237,8 @@ Four rows, so real and estimated covers are not mixed up:
   the day after the last break before a real cover, to that cover; 5-35
   days; only when grazed since the cover before. Shown as its own total and
   one line per end date. On 13 Oct: 55 pairs, actual 35 / estimated 30.
+  Last column **% diff** = (estimated − actual) ÷ actual, + = estimate too
+  high, green under 10% (v1.1.37); also in the per-paddock list.
   Walk-to-walk pairs also tuned the month factors, so the partial walks are
   the fairer test.
 - **PLAN wedge: MEASURED / ESTIMATED** switch (v1.1.31, `wedgeSource`, kept in
@@ -510,8 +512,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.36/v1.1.37/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.50/wn-farm-v1.1.51/" sw.js
+sed -i "s/v1\.1\.37/v1.1.38/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.51/wn-farm-v1.1.52/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -652,3 +654,4 @@ Added 12 October 2026:
 - FARMWALK bar in four rows: VIEW (MEASURED / ESTIMATED / SATELLITE), ADD
   (+ Farmwalk, + PARTIAL), TOOLS, FILTER. EST. FW is now ESTIMATED and CHECK
   is now + PARTIAL (v1.1.36).
+- ACTUAL vs ESTIMATED: % diff column (v1.1.37).
