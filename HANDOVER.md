@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.29**,
-service worker cache `wn-farm-v1.1.43`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.30**,
+service worker cache `wn-farm-v1.1.44`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -177,11 +177,17 @@ The app **opens on BREAKS with the plain satellite picture**.
   walked yet".
 - **Breaks since the walk (Juani, 12 Oct 2026):** if breaks were drawn in the
   paddock after its last walk, it was grazed. **The day after the LAST break
-  was drawn it is 1500 (`GR_RESIDUAL`), and the est. growth counts from the
-  day after that** (Juani, 12 Oct 2026, v1.1.25). On the break day and the
+  was drawn it is the residual (`GR_RESIDUAL`), and the est. growth counts
+  from the day after that** (Juani, 12 Oct 2026, v1.1.25). On the break day and the
   next day it shows 1500. Label: "last break 6 Oct · 1500 on 7 Oct + est.
   growth 399 (5 days) / walk 30 Sept: 2586 · 3 breaks since". The COVER MAP
   uses the same number. On 12 Oct: 47 paddocks from a break, 60 from a walk.
+- **The residual** (Juani, 13 Oct 2026, v1.1.30) is the **median of the group
+  C checks** in the `partial walk` tab from the last 30 days, once there are
+  at least 3 (`grUpdateResidual`); until then **1500**. The tab is read when
+  the app opens (kept on the phone as `partial_walks_cache`), when CHECK
+  opens and after a save. Labels and CHECK say which residual is used and
+  where it came from ("1700: median of 3 C checks, last 30 days").
 - The break cards' EST. KG/COW use **walk + growth only** (`ignoreBreaks`), on
   the day the break was drawn: a new break is a strip not grazed yet, and the
   1500 rule would give about 0 kg/cow for every second break in a paddock.
@@ -447,8 +453,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.28/v1.1.29/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.42/wn-farm-v1.1.43/" sw.js
+sed -i "s/v1\.1\.30/v1.1.31/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.44/wn-farm-v1.1.45/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -576,3 +582,5 @@ Added 12 October 2026:
   (v1.1.28).
 - CHECK saves to the new `partial walk` tab, not Farmwalks (v1.1.29, Apps
   Script `2026-10-13-a`). Paste the script; until then a save is refused.
+- Residual = median of the C checks of the last 30 days (3 or more), else
+  1500 (v1.1.30). No script change.

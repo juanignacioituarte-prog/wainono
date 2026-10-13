@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.29</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.30</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.29</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.30</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2147,8 +2147,8 @@
             <p style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
                 Walk some paddocks today and type what you measure. It is saved in the <b>partial walk</b> tab, not in the farmwalk: FARMWALK and the last full farmwalk do not change.<br>
                 <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
-                <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests 1500 + growth.<br>
-                <b style="color:#e67e22;">C</b> grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the 1500 residual.<br>
+                <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests residual + growth.<br>
+                <b style="color:#e67e22;">C</b> grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
                 <span style="color:#7f8c8d;">Grey on the map: do not use.</span>
             </p>
             <div id="chk-summary" style="margin-bottom:8px;"></div>
@@ -3302,12 +3302,34 @@
          * - No break since its last walk: the walk cover, plus the farm average
          *   growth of every day after the walk.
          * - Breaks drawn in it since the walk (Juani, 12 Oct 2026): it was
-         *   grazed. The day AFTER the last break was drawn it is GR_RESIDUAL
-         *   (1500); the growth counts from the day after that. On the break day
-         *   and the next day it shows 1500 with no growth.
+         *   grazed. The day AFTER the last break was drawn it is GR_RESIDUAL;
+         *   the growth counts from the day after that. On the break day and the
+         *   next day it shows the residual with no growth.
+         * GR_RESIDUAL (Juani, 13 Oct 2026) is the MEDIAN of the group C checks
+         *   saved in the partial walk tab in the last 30 days, once there are
+         *   at least 3; until then 1500. See grUpdateResidual().
          * opts.ignoreBreaks: walk + growth only. The break cards use it: a new
          *   break is a strip that was not grazed yet. */
-        const GR_RESIDUAL = 1500;
+        const GR_RESIDUAL_DEFAULT = 1500, GR_RESIDUAL_DAYS = 30, GR_RESIDUAL_MIN_N = 3;
+        let GR_RESIDUAL = GR_RESIDUAL_DEFAULT;
+        let GR_RESIDUAL_INFO = { n: 0, fromChecks: false };
+        function grUpdateResidual() {
+            const since = grDayOf(new Date()).getTime() - GR_RESIDUAL_DAYS * GR_DAY;
+            const vals = (typeof PARTIAL_WALKS !== 'undefined' ? PARTIAL_WALKS : []).filter(r => {
+                if (r.group !== 'C' || !(Number(r.cover) > 0) || !r.date) return false;
+                const d = new Date(+String(r.date).slice(0, 4), +String(r.date).slice(5, 7) - 1, +String(r.date).slice(8, 10));
+                return d.getTime() >= since;
+            }).map(r => Number(r.cover));
+            const fromChecks = vals.length >= GR_RESIDUAL_MIN_N;
+            GR_RESIDUAL = fromChecks ? Math.round(grMedian(vals)) : GR_RESIDUAL_DEFAULT;
+            GR_RESIDUAL_INFO = { n: vals.length, fromChecks: fromChecks };
+            estimatedBuiltAt = 0;
+        }
+        function grResidualText() {
+            return GR_RESIDUAL_INFO.fromChecks
+                ? `median of ${GR_RESIDUAL_INFO.n} C checks, last ${GR_RESIDUAL_DAYS} days`
+                : `default; ${GR_RESIDUAL_INFO.n} C check${GR_RESIDUAL_INFO.n === 1 ? '' : 's'} in the last ${GR_RESIDUAL_DAYS} days, needs ${GR_RESIDUAL_MIN_N}`;
+        }
         function estimateCover(pName, date, opts) {
             if (!GR.ready) return null;
             const at = date || new Date();
@@ -3353,12 +3375,12 @@
             const todayTs = grDayOf(today).getTime();
             estimatedPaddockData = (manualModeData || []).map(p => {
                 const est = estimateCover(p.name, today);
-                const from = est ? (est.fromBreak ? `${GR_RESIDUAL} on ${fmtNZ(est.startDate)}` : `walk ${fmtNZ(est.walkDate)}`) : '';
+                const from = est ? (est.fromBreak ? `${est.startCover} on ${fmtNZ(est.startDate)}` : `walk ${fmtNZ(est.walkDate)}`) : '';
                 return {
                     name: p.name, area: p.area || 0, isOut: p.isOut, reason: p.reason, neverWalked: !est,
                     latest: { cover: est ? est.cover : 0, ts: todayTs,
                               formattedDate: est ? `est. today: ${from} + ${est.growth} growth` : '' },
-                    previous: est ? { cover: est.fromBreak ? GR_RESIDUAL : est.walkCover,
+                    previous: est ? { cover: est.fromBreak ? est.startCover : est.walkCover,
                                       formattedDate: est.fromBreak ? `after break ${fmtNZ(est.breakDate)}` : `walk ${fmtNZ(est.walkDate)}` } : null,
                     growthRate: est && est.days > 0 ? Math.round(est.growth / est.days) : null,
                     est: est
@@ -3375,8 +3397,8 @@
         /* ---- CHECK: a partial farmwalk to test the estimate ----
          * Groups (Juani, 13 Oct 2026), worked out from the walks BEFORE today:
          *   A  not grazed since its last walk, walked 7+ days ago: tests growth
-         *   B  last break 7+ days ago: tests 1500 + growth
-         *   C  last break 1-2 days ago: tests the 1500 residual (measure in the strip)
+         *   B  last break 7+ days ago: tests residual + growth
+         *   C  last break 1-2 days ago: tests the residual (measure in the strip)
          *   X  grey: out, never walked, walked under 7 days ago, a break today
          *      (cows may be in it) or 3-6 days ago (too soon to tell)
          * What is typed is compared with the estimate for today, and saved in
@@ -3386,12 +3408,22 @@
         let PARTIAL_WALKS = [];           // rows of the partial walk tab
         let partialWalksLoaded = false;
         async function loadPartialWalks() {
+            if (!partialWalksLoaded && !PARTIAL_WALKS.length) {
+                try { const c = JSON.parse(localStorage.getItem('partial_walks_cache') || '[]'); if (Array.isArray(c)) { PARTIAL_WALKS = c; grUpdateResidual(); } } catch (e) {}
+            }
             try {
                 const r = await fetch(GOOGLE_SCRIPT_URL + '?type=partial_walk&t=' + Date.now(), { cache: 'no-store' });
                 const d = await r.json();
-                if (d && Array.isArray(d.entries)) { PARTIAL_WALKS = d.entries; partialWalksLoaded = true; }
+                if (d && Array.isArray(d.entries)) {
+                    PARTIAL_WALKS = d.entries; partialWalksLoaded = true;
+                    try { localStorage.setItem('partial_walks_cache', JSON.stringify(PARTIAL_WALKS)); } catch (e) {}
+                }
             } catch (e) { console.warn('Partial walks not loaded', e); }
-            if (currentDashboardMode === 'check') { renderCheckView(); updateGeoStyles(); }
+            // The residual follows the checks, so every estimate is redone.
+            grUpdateResidual();
+            if (currentDashboardMode === 'check') renderCheckView();
+            if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
+            if (typeof updateGeoStyles === 'function') updateGeoStyles();
         }
         function partialSavedToday(name) {
             const today = grIso(new Date());
@@ -3431,7 +3463,7 @@
         }
 
         function checkStartText(c) {
-            return c.est.fromBreak ? `last break ${fmtNZ(c.est.breakDate)} · 1500 on ${fmtNZ(c.est.startDate)}`
+            return c.est.fromBreak ? `last break ${fmtNZ(c.est.breakDate)} · ${c.est.startCover} on ${fmtNZ(c.est.startDate)}`
                                    : `walk ${fmtNZ(c.walk.dateObj)}: ${c.walk.cover}`;
         }
 
@@ -3464,7 +3496,8 @@
                 return `<div style="font-size:12px;"><b style="color:${CHECK_COLORS[g]};">${g}</b> ${label}: estimate ${Math.abs(Math.round(avgDiff))} ${word} · <b>${Math.abs(avgDay).toFixed(1)} kgDM/ha/day ${word}</b> · ${m.length} paddock${m.length === 1 ? '' : 's'}</div>`;
             };
             box.innerHTML = `<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:3px;">
-                ${line('A', 'growth')}${line('B', '1500 + growth')}${line('C', 'residual')}</div>`;
+                <div style="font-size:11px; color:#7f8c8d; border-bottom:1px solid #eee; padding-bottom:3px; margin-bottom:2px;">Residual in use: <b style="color:#2c3e50;">${GR_RESIDUAL}</b> (${grResidualText()})</div>
+                ${line('A', 'growth')}${line('B', 'residual + growth')}${line('C', 'residual')}</div>`;
         }
 
         function renderCheckView() {
@@ -3575,7 +3608,7 @@
                     type: 'save_partial_walk', user: localStorage.getItem('auth_name') || '',
                     entries: entries.map(({ p, c, cover }) => ({
                         date: dateVal, paddock: p.name, cover: cover, group: c.group, estimate: c.est.cover,
-                        start: c.est.fromBreak ? GR_RESIDUAL : c.walk.cover,
+                        start: c.est.fromBreak ? c.est.startCover : c.walk.cover,
                         startDate: grIso(c.est.fromBreak ? c.est.startDate : c.walk.dateObj), days: c.est.days }))
                 }) });
                 const d = await res.json();
@@ -3591,6 +3624,8 @@
                     delete checkDraft[p.name];
                 });
                 saveCheckDraft();
+                try { localStorage.setItem('partial_walks_cache', JSON.stringify(PARTIAL_WALKS)); } catch (e) {}
+                grUpdateResidual();
                 status.textContent = `✓ ${entries.length} paddock${entries.length === 1 ? '' : 's'} saved in the partial walk.`; status.style.color = '#27ae60';
             } else {
                 status.textContent = `⚠ NOT saved: ${why}. What you typed is kept on this phone.`; status.style.color = '#c0392b';
@@ -9448,6 +9483,7 @@
             loadCSV();
             loadManualRankCSV();
             loadGrowthModel();          // measured weather growth, in the background
+            loadPartialWalks();         // the residual comes from the C checks
             await loadGeoJSON();
 
             const calibHoverArea = document.getElementById('calib-hover-area');
@@ -10974,7 +11010,8 @@
                     if (est) {
                         lines = `<div style="font-size:11px; color:#2980b9;">&asymp; ${est.cover} kgDM <i>estimated</i></div>` +
                             (est.fromBreak
-                                ? `<div style="font-size:10px; color:#e67e22;">last break ${fmtNZ(est.breakDate)} &middot; ${GR_RESIDUAL} on ${fmtNZ(est.startDate)} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` +
+                                ? `<div style="font-size:10px; color:#e67e22;">last break ${fmtNZ(est.breakDate)} &middot; ${est.startCover} on ${fmtNZ(est.startDate)} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` +
+                                  `<div style="font-size:9px; color:#95a5a6;">residual ${est.startCover}: ${grResidualText()}</div>` +
                                   `<div style="font-size:10px; color:#95a5a6;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} &middot; ${est.breakCount} break${est.breakCount === 1 ? '' : 's'} since</div>`
                                 : `<div style="font-size:10px; color:#7f8c8d;">walk ${fmtNZ(est.walkDate)}: ${est.walkCover} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>`);
                     } else if (walk) {
