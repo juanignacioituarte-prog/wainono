@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.31**,
-service worker cache `wn-farm-v1.1.45`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.32**,
+service worker cache `wn-farm-v1.1.46`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -214,6 +214,14 @@ The app **opens on BREAKS with the plain satellite picture**.
   top 5 paddocks** (newest real or estimated cover), the residual in use,
   feed above the residual (t DM), and **📋 PARTIAL WALKS**: every partial walk
   by date, measured against the estimate, with the group averages.
+  **📈 ACTUAL vs ESTIMATED** (v1.1.32, Juani 13 Oct 2026,
+  `growthCompareIntervals`): pairs of real covers of one paddock (full or
+  partial walk, group C left out), 5-35 days apart, no break drawn between,
+  not a fall of more than 100, ending in the last 60 days. Actual growth per
+  day against the app's growth over the same days; one line per pair of
+  dates and a total. On 13 Oct: 186 pairs, actual 25 / estimated 28 per day.
+  Walk-to-walk pairs also tuned the month factors, so the partial walks are
+  the fairer test.
 - **PLAN wedge: MEASURED / ESTIMATED** switch (v1.1.31, `wedgeSource`, kept in
   `plan_wedge_source`). ESTIMATED draws today's estimated covers (blue bars);
   the demand line and targets are the same as MEASURED.
@@ -467,8 +475,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.31/v1.1.32/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.45/wn-farm-v1.1.46/" sw.js
+sed -i "s/v1\.1\.32/v1.1.33/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.46/wn-farm-v1.1.47/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -600,3 +608,4 @@ Added 12 October 2026:
   1500 (v1.1.30). No script change.
 - Estimated farmwalk: newest real cover (walk or partial walk) wins; EST. FW
   stats box and partial walks list; PLAN wedge MEASURED / ESTIMATED (v1.1.31).
+- EST. FW: ACTUAL vs ESTIMATED growth table (v1.1.32).
