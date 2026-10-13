@@ -1648,7 +1648,8 @@
                     </div>
                     <div class="input-group">
                         <label>Post Grazing Residual</label>
-                        <input type="number" id="inp-residual" value="1500" oninput="saveAndRecalc()">
+                        <input type="number" id="inp-residual" value="1500" readonly style="background:#f2f4f4; color:#2c3e50; font-weight:bold;">
+                        <div id="auto-residual-note" style="font-size:9px; color:#7f8c8d; margin-top:2px;"></div>
                     </div>
                 </div>
                 <div class="calc-grid" style="margin-top:15px;">
@@ -1667,7 +1668,13 @@
                     </div>
                     <div class="input-group">
                         <label>Rotation Length (days)</label>
-                        <input type="number" id="inp-round" value="25" oninput="saveAndRecalc()">
+                        <input type="number" id="inp-round" value="25" readonly style="background:#f2f4f4; color:#2c3e50; font-weight:bold;">
+                        <div style="font-size:9px; color:#7f8c8d; margin-top:2px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                            from the breaks of the last
+                            <input type="number" id="inp-round-days" min="1" max="30" value="4" oninput="setRoundDays(this.value)"
+                                style="width:42px; padding:1px 3px; font-size:10px; border:1px solid #ccc; border-radius:3px;"> days
+                        </div>
+                        <div id="auto-round-note" style="font-size:9px; color:#7f8c8d;"></div>
                     </div>
                 </div>
             </div>
@@ -1698,8 +1705,9 @@
                         <div id="feed-target-copy" class="ro-val">0</div>
                     </div>
                     <div class="input-group">
-                        <label>Actual Pre-grazing Cover (User)</label>
-                        <input type="number" id="inp-actual-pre" value="2800" oninput="saveAndRecalc()">
+                        <label>Actual Pre-grazing Cover</label>
+                        <input type="number" id="inp-actual-pre" value="2800" readonly style="background:#f2f4f4; color:#2c3e50; font-weight:bold;">
+                        <div id="auto-pre-note" style="font-size:9px; color:#7f8c8d; margin-top:2px;"></div>
                     </div>
                     <div class="result-highlight" style="border-color:var(--warning); background:#fffaf0;">
                         <h3 id="res-supp" style="color:var(--warning)">0</h3>
@@ -1716,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.34</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.35</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1730,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.34</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.35</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -11831,7 +11839,62 @@
             if (!quiet) triggerAutoSave();
         }
 
+        /* PLAN's inputs come from the data (Juani, 13 Oct 2026), for both the
+         * MEASURED and the ESTIMATED wedge. Only the average daily intake and
+         * the in-shed / crop supplement are typed.
+         * - Post grazing residual: the residual in use (median of the recent
+         *   C checks, 1500 until there are 3).
+         * - Rotation length: feed area / (break area of the last N days / N),
+         *   N = 4 by default, set in the box under it. Crop breaks left out;
+         *   a PLAN unit counts only its own herds' breaks.
+         * - Actual pre-grazing cover: the average of the top 5 paddocks in
+         *   rotation, measured or estimated as the wedge shows. */
+        let feedRoundDays = (() => { try { const v = parseInt(localStorage.getItem('feed_round_days'), 10); return v >= 1 && v <= 30 ? v : 4; } catch (e) { return 4; } })();
+        function setRoundDays(v) {
+            const n = parseInt(v, 10);
+            if (!(n >= 1 && n <= 30)) return;
+            feedRoundDays = n;
+            try { localStorage.setItem('feed_round_days', String(n)); } catch (e) {}
+            calculateFeedLogic();
+        }
+        function applyAutoFeedInputs() {
+            const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && isFinite(v)) el.value = Math.round(v); };
+            const note = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+            const daysBox = document.getElementById('inp-round-days');
+            if (daysBox && document.activeElement !== daysBox) daysBox.value = feedRoundDays;
+
+            // Residual
+            set('inp-residual', GR_RESIDUAL);
+            note('auto-residual-note', `from the C checks: ${grResidualText()}`);
+
+            // Rotation length from the breaks
+            const herdIds = new Set(planScopedHerds().map(g => g.id));
+            const since = Date.now() - feedRoundDays * 86400000;
+            const recent = (savedBreaks || []).filter(b => !b.isDeleted && !b.isCropBreak && b.group !== 'crops' && b.createdAt &&
+                new Date(b.createdAt).getTime() >= since && (!planUnit() || herdIds.has(b.group || '1st')));
+            const ha = recent.reduce((a, b) => a + (Number(b.areaHa) || 0), 0);
+            const perDay = ha / feedRoundDays;
+            const area = safeNum(document.getElementById('feed-area-total').innerText);
+            if (perDay > 0 && area > 0) {
+                set('inp-round', area / perDay);
+                note('auto-round-note', `${recent.length} breaks, ${ha.toFixed(1)} ha = ${perDay.toFixed(2)} ha/day over ${area.toFixed(1)} ha`);
+            } else {
+                note('auto-round-note', `no breaks in the last ${feedRoundDays} days: keeping ${document.getElementById('inp-round').value}`);
+            }
+
+            // Actual pre-grazing cover: the top 5 in rotation
+            const est = typeof wedgeSource !== 'undefined' && wedgeSource === 'estimated' && GR.ready;
+            const src = planScopedPaddocks(est ? buildEstimatedPaddockData() : manualModeData)
+                .filter(p => !p.isOut && !p.neverWalked && p.latest && p.latest.cover > 0)
+                .sort((a, b) => b.latest.cover - a.latest.cover).slice(0, 5);
+            if (src.length) {
+                set('inp-actual-pre', src.reduce((a, p) => a + p.latest.cover, 0) / src.length);
+                note('auto-pre-note', `${est ? 'estimated' : 'measured'}: average of the top ${src.length} (${src.map(p => p.name).join(', ')})`);
+            }
+        }
+
         function calculateFeedLogic() {
+            applyAutoFeedInputs();
             // Inputs
             const residual = safeNum(document.getElementById('inp-residual').value);
             const cows = safeNum(document.getElementById('inp-cows').value);

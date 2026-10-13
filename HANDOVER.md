@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.34**,
-service worker cache `wn-farm-v1.1.48`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.35**,
+service worker cache `wn-farm-v1.1.49`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -235,6 +235,19 @@ The app **opens on BREAKS with the plain satellite picture**.
   7-day average from measured weather (in `updateFarmStats`, `planEstimated`).
   The pre-grazing target does not change: it comes from cows, intake, round
   and the residual target, not from the covers.
+- **PLAN inputs come from the data** (v1.1.35, Juani 13 Oct 2026; MEASURED and
+  ESTIMATED alike; `applyAutoFeedInputs`, run at the start of
+  `calculateFeedLogic`). The boxes are grey, read only, with a note of where
+  each number came from:
+  - Post grazing residual = the residual in use (median of the recent C
+    checks, 1500 until 3).
+  - Rotation length = feed area / (break area of the last N days / N); N = 4,
+    changed in the box under it (`feed_round_days`). Crop breaks left out; a
+    PLAN unit counts only its own herds' breaks. With no breaks the old value
+    stays.
+  - Actual pre-grazing cover = average of the top 5 paddocks in rotation,
+    measured or estimated as the wedge shows.
+  - Only Avg Daily Intake and In-Shed / Crop Supplement are typed.
 - **🎯 CHECK** in the FARMWALK bar (v1.1.27, Juani 13 Oct 2026): a partial
   farmwalk to test the estimate. Groups, from the walks BEFORE today
   (`checkInfo`): **A** not grazed since its last walk, walked 7+ days ago
@@ -485,8 +498,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.34/v1.1.35/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.48/wn-farm-v1.1.49/" sw.js
+sed -i "s/v1\.1\.35/v1.1.36/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.49/wn-farm-v1.1.50/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -622,3 +635,5 @@ Added 12 October 2026:
 - ACTUAL vs ESTIMATED also counts regrowth after a grazing, from the residual
   in use (v1.1.33).
 - PLAN: Rotation Parameters follow the MEASURED / ESTIMATED switch (v1.1.34).
+- PLAN: residual, rotation length (breaks of the last 4 days, changeable)
+  and actual pre-grazing cover are automatic (v1.1.35).
