@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.40**,
-service worker cache `wn-farm-v1.1.54`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.41**,
+service worker cache `wn-farm-v1.1.55`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -270,9 +270,12 @@ Four rows, so real and estimated covers are not mixed up:
   grazed out 24 hours after it is drawn, v1.1.39; the window was cut from 72
   to 48 hours in v1.1.40 so regrowth does not push the residual up, Juani 13
   Oct 2026); tests the residual, measured inside the grazed strip. Always shown in the order
-  A, B, C (Juani). Grey: out, never walked, walked under 7 days ago, a break
-  under 24 hours ago (label: "being grazed: residual check from <time>"), or a
-  break 2-6 days ago.
+  A, B, C (Juani). **Breaks under 24 hours old are left out when the group
+  is chosen** (v1.1.41, `breaksUntil`): by the 24-hour rule they are not
+  grazed out yet, so a paddock whose first break since its walk is today is
+  still **A** ("Break drawn in the last 24 h: measure the part not grazed
+  yet"); one with an older break 24-48 h ago is C. Grey: out, never walked,
+  walked under 7 days ago, or a break 2-6 days ago.
   **OTHER** (v1.1.40, Juani): the grey paddocks **in rotation** can be measured
   too, under the OTHER chip (each shows its reason; a tap on it on the map
   opens its box; ALL also shows any that has a cover typed). Saved in the
@@ -530,8 +533,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.40/v1.1.41/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.54/wn-farm-v1.1.55/" sw.js
+sed -i "s/v1\.1\.41/v1.1.42/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.55/wn-farm-v1.1.56/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -678,3 +681,5 @@ Added 12 October 2026:
   a high measured cover moves a B or C paddock to A (v1.1.39).
 - + PARTIAL: C is 24-48 hours after the last break; grey paddocks in rotation
   can be measured under OTHER (saved as X) (v1.1.40).
+- + PARTIAL: breaks under 24 hours old are left out of the group choice, so a
+  paddock first grazed today is A (v1.1.41).

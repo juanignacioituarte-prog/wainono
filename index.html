@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.40</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.41</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.40</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.41</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3381,7 +3381,8 @@
             if (!walk) return null;
             let startCover = walk.cover, startDate = grDayOf(walk.dateObj), lastBreak = null, breakCount = 0;
             if (!(opts && opts.ignoreBreaks)) {
-                const grazed = breaksSince(pName, grDayOf(walk.dateObj)).filter(b => new Date(b.createdAt).getTime() <= at.getTime());
+                const until = (opts && opts.breaksUntil) ? opts.breaksUntil.getTime() : at.getTime();
+                const grazed = breaksSince(pName, grDayOf(walk.dateObj)).filter(b => new Date(b.createdAt).getTime() <= until);
                 breakCount = grazed.length;
                 grazed.forEach(b => { if (!lastBreak || new Date(b.createdAt) > new Date(lastBreak.createdAt)) lastBreak = b; });
                 if (lastBreak) { startCover = GR_RESIDUAL; startDate = new Date(grDayOf(new Date(lastBreak.createdAt)).getTime() + GR_DAY); }
@@ -3711,8 +3712,14 @@
             const measured = draft > 0 ? draft : (savedRow ? savedRow.cover : null);
             const walk = grLastWalk(name, before);
             if (!walk) return { group: 'X', why: 'never walked', est: null, walk: null, saved: !!savedRow, measured };
-            const est = estimateCover(name, new Date(), { walkBefore: before });
-            const info = { est, walk, saved: !!savedRow, measured };
+            /* The 24-hour rule (Juani, 13 Oct 2026): a break drawn less than 24
+             * hours ago is not grazed out yet, so it is left out when the group
+             * is chosen. A paddock whose first break since its walk is today is
+             * still group A: measure the part not grazed yet. */
+            const cut = new Date(Date.now() - 24 * 3600000);
+            const est = estimateCover(name, new Date(), { walkBefore: before, breaksUntil: cut });
+            const newBreaks = breaksSince(name, grDayOf(walk.dateObj)).filter(b => new Date(b.createdAt).getTime() > cut.getTime());
+            const info = { est, walk, saved: !!savedRow, measured, newBreak: newBreaks.length > 0 };
             if (!est.fromBreak) {
                 const d = Math.round((today - grDayOf(walk.dateObj)) / GR_DAY);
                 return Object.assign(info, d < 7 ? { group: 'X', why: `walked ${d} days ago` } : { group: 'A', sinceDays: d });
@@ -3812,6 +3819,7 @@
                         <b style="font-size:13px;">${escUnit(p.name)} <span style="background:${CHECK_COLORS[c.group]}; color:#fff; border-radius:4px; padding:1px 5px; font-size:10px;">${c.group === 'X' ? 'OTHER' : c.group}</span></b>
                         <span style="font-size:11px; color:#7f8c8d;">${(p.area || 0).toFixed(1)} ha</span>
                     </div>
+                    ${c.newBreak && c.group !== 'X' ? `<div style="font-size:11px; font-weight:bold; color:#e67e22; margin-top:2px;">Break drawn in the last 24 h: measure the part not grazed yet.</div>` : ''}
                     <div style="font-size:11px; color:#7f8c8d; margin:3px 0 5px;">${c.group === 'X' ? `<b style="color:#7f8c8d;">${escUnit(c.why)}</b> · ` : ''}${checkStartText(c)}${c.est ? ` · <b style="color:#2c3e50;">est. today ${c.est.cover}</b> (${c.est.growth} growth, ${c.est.days} days)` : ''}</div>
                     <input type="number" inputmode="numeric" min="1" placeholder="${c.group === 'C' ? 'Residual in the grazed strip' : 'Measured cover'}" value="${c.measured != null ? c.measured : ''}"
                         oninput="checkInput('${escUnit(p.name)}', this.value)" onclick="event.stopPropagation();"
