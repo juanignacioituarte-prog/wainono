@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.41</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.42</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.41</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.42</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3296,12 +3296,14 @@
                 if (grIrrClass(n) === 'dry') aDry += areaLookup[n] || 0; else aIrr += areaLookup[n] || 0;
             });
             const fIrr = (aIrr + aDry) > 0 ? aIrr / (aIrr + aDry) : 1;
-            GR.daily = new Map();
+            GR.dailyRaw = new Map();
             days.forEach(d => {
                 if (d.potirr == null || d.potdry == null) return;
-                GR.daily.set(d.iso, (fIrr * d.potirr + (1 - fIrr) * d.potdry) * months[d.date.getMonth() + 1]);
+                GR.dailyRaw.set(d.iso, (fIrr * d.potirr + (1 - fIrr) * d.potdry) * months[d.date.getMonth() + 1]);
             });
+            GR.daily = new Map(GR.dailyRaw);
             GR.ready = true; GR.error = '';
+            grApplyCorrection(true);
             estimatedBuiltAt = 0;
             if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
             if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') { updateFarmStats(); calculateFeedLogic(); }
@@ -3309,7 +3311,41 @@
             if (typeof renderBreaksDashboard === 'function') renderBreaksDashboard();
         }
 
-        // The farm average growth on one day, kgDM/ha/day.
+        /* The recent correction (Juani, 13 Oct 2026): the partial walks and the
+         * full walks correct the model's growth. Factor = actual growth / model
+         * growth over the walk-to-walk pairs (full or partial walk, no grazing
+         * between; grazing pairs are left out as they also carry the residual)
+         * that ended in the last GR_CORR_DAYS days. Used with GR_CORR_MIN_N pairs
+         * or more, kept within GR_CORR_CLAMP. Every estimate uses model x factor
+         * (GR.daily); GR.dailyRaw keeps the model's own numbers, which ACTUAL vs
+         * ESTIMATED compares against so the model is still tested honestly. */
+        const GR_CORR_DAYS = 30, GR_CORR_MIN_N = 5, GR_CORR_CLAMP = [0.5, 1.5];
+        GR.corr = { factor: 1, n: 0, applied: false };
+        function grApplyCorrection(quiet) {
+            if (!GR.dailyRaw) return;
+            const since = grDayOf(new Date()).getTime() - GR_CORR_DAYS * GR_DAY;
+            const pairs = growthCompareIntervals().filter(r => r.kind === 'walk' && r.to.getTime() >= since);
+            const act = pairs.reduce((a, r) => a + r.actual * r.days, 0);
+            const est = pairs.reduce((a, r) => a + r.estimated * r.days, 0);
+            const ok = pairs.length >= GR_CORR_MIN_N && est > 0;
+            const factor = ok ? Math.max(GR_CORR_CLAMP[0], Math.min(GR_CORR_CLAMP[1], act / est)) : 1;
+            const changed = Math.abs(factor - GR.corr.factor) > 0.001 || ok !== GR.corr.applied;
+            GR.corr = { factor: factor, n: pairs.length, applied: ok };
+            GR.daily = new Map();
+            GR.dailyRaw.forEach((v, k) => GR.daily.set(k, v * factor));
+            estimatedBuiltAt = 0;
+            if (changed && !quiet) {
+                if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
+                if (typeof updateGeoStyles === 'function') updateGeoStyles();
+            }
+        }
+        function grCorrText() {
+            return GR.corr.applied
+                ? `growth corrected ×${GR.corr.factor.toFixed(2)} from ${GR.corr.n} pairs (last ${GR_CORR_DAYS} days)`
+                : `growth not corrected yet: ${GR.corr.n} pair${GR.corr.n === 1 ? '' : 's'} in the last ${GR_CORR_DAYS} days, needs ${GR_CORR_MIN_N}`;
+        }
+
+        // The farm average growth on one day, kgDM/ha/day (corrected).
         function growthOn(date) { return GR.daily.get(grIso(date)); }
 
         // The last walk of a paddock with a real cover, on or before a date.
@@ -3456,7 +3492,7 @@
             const nPartial = (typeof PARTIAL_WALKS !== 'undefined') ? new Set(PARTIAL_WALKS.map(r => r.date)).size : 0;
             box.innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:8px;">
                     ${cell('Est. avg cover', Math.round(avg), `${live.length} paddocks · ${area.toFixed(1)} ha`)}
-                    ${cell('Growth today', gToday != null ? Math.round(gToday) : '--', 'kgDM/ha/day, measured weather')}
+                    ${cell('Growth today', gToday != null ? Math.round(gToday) : '--', GR.corr.applied ? `measured weather ×${GR.corr.factor.toFixed(2)} (${GR.corr.n} pairs)` : 'measured weather, not corrected yet')}
                     ${cell('Growth 7 days', g7 != null ? Math.round(g7) : '--', 'average kgDM/ha/day')}
                     ${cell('Pre-grazing', Math.round(pre), `average of the top ${top.length}: ${top.map(p => escUnit(p.name)).join(', ')}`)}
                     ${cell('Residual', GR_RESIDUAL, grResidualText())}
@@ -3541,7 +3577,8 @@
                 const list = Object.keys(byDay).sort().map(x => byDay[x]);
                 const brs = (savedBreaks || []).filter(br => !br.isDeleted && !br.isCropBreak && br.paddock && normName(br.paddock) === k && br.createdAt)
                     .map(br => grDayOf(new Date(br.createdAt)).getTime()).sort((x, y) => x - y);
-                const estOver = (fromT, toT) => { let e = 0, hv = 0; for (let t = fromT + GR_DAY; t <= toT; t += GR_DAY) { const g = GR.daily.get(grIso(new Date(t))); if (g != null) { e += g; hv++; } } return { e, hv }; };
+                const raw = GR.dailyRaw || GR.daily;
+                const estOver = (fromT, toT) => { let e = 0, hv = 0; for (let t = fromT + GR_DAY; t <= toT; t += GR_DAY) { const g = raw.get(grIso(new Date(t))); if (g != null) { e += g; hv++; } } return { e, hv }; };
                 // From a grazing to the next real cover.
                 list.forEach((b, i) => {
                     if (b.d.getTime() < since) return;
@@ -3568,7 +3605,7 @@
                         new Date(br.createdAt).getTime() >= a.d.getTime() && new Date(br.createdAt).getTime() < b.d.getTime() + GR_DAY);
                     if (grazed) continue;
                     let est = 0, have = 0;
-                    for (let t = a.d.getTime() + GR_DAY; t <= b.d.getTime(); t += GR_DAY) { const g = GR.daily.get(grIso(new Date(t))); if (g != null) { est += g; have++; } }
+                    for (let t = a.d.getTime() + GR_DAY; t <= b.d.getTime(); t += GR_DAY) { const g = raw.get(grIso(new Date(t))); if (g != null) { est += g; have++; } }
                     if (have < days * 0.8) continue;
                     out.push({ paddock: b.name || a.name, from: a.d, to: b.d, days, source: b.source, kind: 'walk',
                                startCover: a.cover, actual: (b.cover - a.cover) / days, estimated: est / have });
@@ -3626,7 +3663,8 @@
             wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:600px; max-height:88vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📈 Actual growth vs estimated</h3>
                 <button onclick="closeGrowthCompare()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
-                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px; line-height:1.4;">kgDM/ha/day. % diff = (estimated − actual) ÷ actual: + means the estimate is too high. Actual: two real covers of the same paddock (full or partial walk), ${GC_MIN_DAYS}-${GC_MAX_DAYS} days apart, with no break drawn between them; or, after a grazing, from the residual in use (${GR_RESIDUAL}) the day after the last break to the next real cover. Estimated: the app's growth from measured weather over the same days. Walk-to-walk pairs were also used to tune the model's month factors, so the partial walks are the fairer test.</div>
+                <div style="font-size:12px; font-weight:bold; color:#2980b9; margin:6px 0 2px;">Now in use: ${grCorrText()}.</div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px; line-height:1.4;">kgDM/ha/day. "Estimated" here is the model before the correction, so this table tests the model itself. % diff = (estimated − actual) ÷ actual: + means the estimate is too high. Actual: two real covers of the same paddock (full or partial walk), ${GC_MIN_DAYS}-${GC_MAX_DAYS} days apart, with no break drawn between them; or, after a grazing, from the residual in use (${GR_RESIDUAL}) the day after the last break to the next real cover. Estimated: the app's growth from measured weather over the same days. Walk-to-walk pairs were also used to tune the model's month factors, so the partial walks are the fairer test.</div>
                 ${table}</div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closeGrowthCompare(); });
             document.body.appendChild(wrap);
@@ -3662,8 +3700,10 @@
                     try { localStorage.setItem('partial_walks_cache', JSON.stringify(PARTIAL_WALKS)); } catch (e) {}
                 }
             } catch (e) { console.warn('Partial walks not loaded', e); }
-            // The residual follows the checks, so every estimate is redone.
+            // The residual follows the checks, so every estimate is redone;
+            // the growth correction follows the new real covers.
             grUpdateResidual();
+            grApplyCorrection();
             if (currentDashboardMode === 'check') renderCheckView();
             if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
             if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') { updateFarmStats(); calculateFeedLogic(); }
@@ -3932,6 +3972,7 @@
                 saveCheckDraft();
                 try { localStorage.setItem('partial_walks_cache', JSON.stringify(PARTIAL_WALKS)); } catch (e) {}
                 grUpdateResidual();
+                grApplyCorrection();
                 status.textContent = `✓ ${entries.length} paddock${entries.length === 1 ? '' : 's'} saved in the partial walk.`; status.style.color = '#27ae60';
             } else {
                 status.textContent = `⚠ NOT saved: ${why}. What you typed is kept on this phone.`; status.style.color = '#c0392b';
@@ -3952,7 +3993,7 @@
                 <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:#27ae60; color:#fff; flex:0 0 auto;">
                     <button onclick="closeGrowthPage()" style="background:#fff; color:#27ae60; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">✕ BACK</button>
                     <b style="font-size:14px;">🌱 Pasture growth</b>
-                    <span style="font-size:11px; opacity:0.9;">${t != null ? `Farm average today: <b>${Math.round(t)}</b> kgDM/ha/day (measured weather)` : ''}</span>
+                    <span style="font-size:11px; opacity:0.9;">${t != null ? `App's farm average today: <b>${Math.round(t)}</b> kgDM/ha/day (measured weather${GR.corr.applied ? `, corrected ×${GR.corr.factor.toFixed(2)}` : ''})` : ''}</span>
                 </div>
                 <iframe src="gr.html" title="Pasture growth" style="flex:1; width:100%; border:0;"></iframe>`;
             document.body.appendChild(wrap);
@@ -8086,7 +8127,7 @@
                     // Every walk of every paddock, for the growth estimate and its
                     // month calibration.
                     FARMWALK_HISTORY = paddockMap;
-                    if (GR.weatherRows) grBuild();
+                    if (GR.weatherRows) grBuild();      // also redoes the correction
 
                     // Check for locally cached manual entries
                     let localSavedData = {};
@@ -12590,6 +12631,7 @@
                             
                             savedBreaks = finalBreaks;
                             localStorage.setItem('farm_breaks', JSON.stringify(savedBreaks));
+                            if (GR.ready) grApplyCorrection();   // the pairs depend on the breaks
                             
                             if (currentDashboardMode === 'breaks') {
                                 renderBreaksDashboard();
