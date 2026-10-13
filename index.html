@@ -1628,6 +1628,7 @@
 
             <div class="feed-card">
                 <div class="feed-title">Rotation Parameters</div>
+                <div id="rotation-params-note" style="font-size:10px; color:#7f8c8d; margin:-4px 0 8px;"></div>
                 <div class="calc-grid">
                     <div class="input-group">
                         <label>Total Area (Rotation)</label>
@@ -1715,7 +1716,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.33</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.34</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1729,7 +1730,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.33</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.34</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3288,7 +3289,7 @@
             GR.ready = true; GR.error = '';
             estimatedBuiltAt = 0;
             if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
-            if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') calculateFeedLogic();
+            if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') { updateFarmStats(); calculateFeedLogic(); }
             if (typeof updateGeoStyles === 'function') updateGeoStyles();
             if (typeof renderBreaksDashboard === 'function') renderBreaksDashboard();
         }
@@ -3641,7 +3642,7 @@
             grUpdateResidual();
             if (currentDashboardMode === 'check') renderCheckView();
             if (currentDashboardMode === 'estimate' && typeof renderDashboard === 'function') renderDashboard();
-            if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') calculateFeedLogic();
+            if (currentDashboardMode === 'plan' && wedgeSource === 'estimated' && typeof calculateFeedLogic === 'function') { updateFarmStats(); calculateFeedLogic(); }
             if (typeof updateGeoStyles === 'function') updateGeoStyles();
         }
         function partialSavedToday(name) {
@@ -10960,7 +10961,26 @@
             // numbers drive the wedge and the rotation, so they are worked out
             // from whatever PLAN is showing, not from what FARMWALK is showing.
             const pUnit = planUnit();
-            const planStats = pUnit ? weightedFarmStats(planScopedPaddocks(data), walk) : whole;
+            /* With the wedge on ESTIMATED, the rotation parameters follow it:
+             * today's estimated covers instead of the farmwalk, and the growth
+             * is the model's 7-day average from measured weather. */
+            const planEstimated = (typeof wedgeSource !== 'undefined') && wedgeSource === 'estimated' && GR.ready &&
+                (currentDashboardMode === 'plan' || currentDashboardMode === 'feed');
+            let planStats;
+            if (planEstimated) {
+                const estData = planScopedPaddocks(buildEstimatedPaddockData().filter(p => !p.neverWalked));
+                planStats = weightedFarmStats(estData, latestWalkInfo(estData));
+                const last7 = [];
+                for (let k = 0; k < 7; k++) { const g = growthOn(new Date(Date.now() - k * GR_DAY)); if (g != null) last7.push(g); }
+                const g7 = last7.length ? last7.reduce((a, b) => a + b, 0) / last7.length : 0;
+                planStats = Object.assign({}, planStats, { wGrowth: g7 * planStats.areaC, areaG: planStats.areaC });
+            } else {
+                planStats = pUnit ? weightedFarmStats(planScopedPaddocks(data), walk) : whole;
+            }
+            const rpNote = document.getElementById('rotation-params-note');
+            if (rpNote) rpNote.textContent = planEstimated
+                ? 'Estimated today (newest real cover + growth); growth = 7-day average from measured weather.'
+                : 'From the farmwalk.';
             // The feed area leaves out what is under a crop break. The average
             // cover does not: it is the average of the paddocks that were walked.
             const wholeAreaC = Math.max(0, planStats.areaC - cropBreakArea(pUnit ? (n => n && unitHasPaddock(pUnit, n)) : null));
@@ -12148,6 +12168,7 @@
         function setWedgeSource(src) {
             wedgeSource = src === 'estimated' ? 'estimated' : 'measured';
             try { localStorage.setItem('plan_wedge_source', wedgeSource); } catch (e) {}
+            updateFarmStats();          // the rotation parameters follow the switch
             calculateFeedLogic();
         }
         function renderWedgeSourceButtons(useEst) {

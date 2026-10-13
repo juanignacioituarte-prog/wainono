@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.33**,
-service worker cache `wn-farm-v1.1.47`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.34**,
+service worker cache `wn-farm-v1.1.48`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -229,7 +229,12 @@ The app **opens on BREAKS with the plain satellite picture**.
   the fairer test.
 - **PLAN wedge: MEASURED / ESTIMATED** switch (v1.1.31, `wedgeSource`, kept in
   `plan_wedge_source`). ESTIMATED draws today's estimated covers (blue bars);
-  the demand line and targets are the same as MEASURED.
+  the demand line and targets are the same as MEASURED. **The Rotation
+  Parameters follow the switch** (v1.1.34): on ESTIMATED the farm average
+  cover is the estimated one and the farm average growth is the model's
+  7-day average from measured weather (in `updateFarmStats`, `planEstimated`).
+  The pre-grazing target does not change: it comes from cows, intake, round
+  and the residual target, not from the covers.
 - **🎯 CHECK** in the FARMWALK bar (v1.1.27, Juani 13 Oct 2026): a partial
   farmwalk to test the estimate. Groups, from the walks BEFORE today
   (`checkInfo`): **A** not grazed since its last walk, walked 7+ days ago
@@ -480,8 +485,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.33/v1.1.34/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.47/wn-farm-v1.1.48/" sw.js
+sed -i "s/v1\.1\.34/v1.1.35/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.48/wn-farm-v1.1.49/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -616,3 +621,4 @@ Added 12 October 2026:
 - EST. FW: ACTUAL vs ESTIMATED growth table (v1.1.32).
 - ACTUAL vs ESTIMATED also counts regrowth after a grazing, from the residual
   in use (v1.1.33).
+- PLAN: Rotation Parameters follow the MEASURED / ESTIMATED switch (v1.1.34).
