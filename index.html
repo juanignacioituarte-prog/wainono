@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.27</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.28</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.27</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.28</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2147,8 +2147,8 @@
             <p style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
                 Walk some paddocks today and type what you measure. It is saved as a real partial farmwalk.<br>
                 <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
-                <b style="color:#e67e22;">C</b> grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the 1500 residual.<br>
                 <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests 1500 + growth.<br>
+                <b style="color:#e67e22;">C</b> grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the 1500 residual.<br>
                 <span style="color:#7f8c8d;">Grey on the map: do not use.</span>
             </p>
             <div id="chk-summary" style="margin-bottom:8px;"></div>
@@ -3375,8 +3375,8 @@
         /* ---- CHECK: a partial farmwalk to test the estimate ----
          * Groups (Juani, 13 Oct 2026), worked out from the walks BEFORE today:
          *   A  not grazed since its last walk, walked 7+ days ago: tests growth
-         *   C  last break 1-2 days ago: tests the 1500 residual (measure in the strip)
          *   B  last break 7+ days ago: tests 1500 + growth
+         *   C  last break 1-2 days ago: tests the 1500 residual (measure in the strip)
          *   X  grey: out, never walked, walked under 7 days ago, a break today
          *      (cows may be in it) or 3-6 days ago (too soon to tell)
          * What is typed is compared with the estimate for today, and saved as a
@@ -3451,7 +3451,7 @@
                 return `<div style="font-size:12px;"><b style="color:${CHECK_COLORS[g]};">${g}</b> ${label}: estimate ${Math.abs(Math.round(avgDiff))} ${word} · <b>${Math.abs(avgDay).toFixed(1)} kgDM/ha/day ${word}</b> · ${m.length} paddock${m.length === 1 ? '' : 's'}</div>`;
             };
             box.innerHTML = `<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:3px;">
-                ${line('A', 'growth')}${line('C', 'residual')}${line('B', '1500 + growth')}</div>`;
+                ${line('A', 'growth')}${line('B', '1500 + growth')}${line('C', 'residual')}</div>`;
         }
 
         function renderCheckView() {
@@ -3466,9 +3466,9 @@
             rows.forEach(r => { if (counts[r.c.group] !== undefined) counts[r.c.group]++; });
             const chip = (g, label, col) => `<button onclick="setCheckGroup('${g}')" style="flex:1; padding:6px 4px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid ${col}; background:${checkGroupFilter === g ? col : '#fff'}; color:${checkGroupFilter === g ? '#fff' : col};">${label}</button>`;
             document.getElementById('chk-groups').innerHTML = chip('all', 'ALL', '#2c3e50') +
-                chip('A', `A (${counts.A})`, CHECK_COLORS.A) + chip('C', `C (${counts.C})`, CHECK_COLORS.C) + chip('B', `B (${counts.B})`, CHECK_COLORS.B);
+                chip('A', `A (${counts.A})`, CHECK_COLORS.A) + chip('B', `B (${counts.B})`, CHECK_COLORS.B) + chip('C', `C (${counts.C})`, CHECK_COLORS.C);
 
-            const order = { A: 0, C: 1, B: 2 };
+            const order = { A: 0, B: 1, C: 2 };
             const shown = rows.filter(r => r.c.group !== 'X' && (checkGroupFilter === 'all' || r.c.group === checkGroupFilter))
                 .sort((a, b) => order[a.c.group] - order[b.c.group] || (b.c.est.fromBreak ? 0 : b.c.walk.cover) - (a.c.est.fromBreak ? 0 : a.c.walk.cover) || a.p.name.localeCompare(b.p.name, undefined, { numeric: true }));
             if (!shown.length) {
@@ -3476,14 +3476,14 @@
                 return;
             }
             list.innerHTML = shown.map(({ p, c }) => `
-                <div id="chk-card-${escUnit(normName(p.name))}" style="background:#fff; border:1px solid #ddd; border-left:6px solid ${CHECK_COLORS[c.group]}; border-radius:6px; padding:8px 10px; margin-bottom:6px;">
+                <div id="chk-card-${escUnit(normName(p.name))}" onclick="checkGoToPaddock('${escUnit(p.name)}')" style="background:#fff; border:1px solid #ddd; border-left:6px solid ${CHECK_COLORS[c.group]}; border-radius:6px; padding:8px 10px; margin-bottom:6px; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                         <b style="font-size:13px;">${escUnit(p.name)} <span style="background:${CHECK_COLORS[c.group]}; color:#fff; border-radius:4px; padding:1px 5px; font-size:10px;">${c.group}</span></b>
                         <span style="font-size:11px; color:#7f8c8d;">${(p.area || 0).toFixed(1)} ha</span>
                     </div>
                     <div style="font-size:11px; color:#7f8c8d; margin:3px 0 5px;">${checkStartText(c)} · <b style="color:#2c3e50;">est. today ${c.est.cover}</b> (${c.est.growth} growth, ${c.est.days} days)</div>
                     <input type="number" inputmode="numeric" min="1" placeholder="${c.group === 'C' ? 'Residual in the grazed strip' : 'Measured cover'}" value="${c.measured != null ? c.measured : ''}" ${c.saved ? 'disabled' : ''}
-                        oninput="checkInput('${escUnit(p.name)}', this.value)"
+                        oninput="checkInput('${escUnit(p.name)}', this.value)" onclick="event.stopPropagation();"
                         style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:5px; font-size:15px; font-weight:bold; text-align:center;">
                     <div id="chk-res-${escUnit(normName(p.name))}" style="font-size:11px; margin-top:4px;">${checkResultHtml(c)}${c.saved ? ' <span style="color:#27ae60; font-weight:bold;">· saved</span>' : ''}</div>
                 </div>`).join('');
@@ -3502,12 +3502,34 @@
             updateGeoStyles();
         }
 
+        // Light up one card for a moment, so the eye finds it.
+        function checkFlashCard(card) {
+            card.style.boxShadow = '0 0 0 3px #f1c40f';
+            setTimeout(() => { card.style.boxShadow = ''; }, 1800);
+        }
+
+        // From the map to the card: scroll to it, light it up, open its box.
         function checkFocus(name) {
             const card = document.getElementById('chk-card-' + escUnit(normName(name)));
             if (!card) return;
             card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            checkFlashCard(card);
             const inp = card.querySelector('input');
-            if (inp && !inp.disabled) setTimeout(() => inp.focus(), 300);
+            if (inp && !inp.disabled) setTimeout(() => inp.focus({ preventScroll: true }), 400);
+        }
+
+        // From the card to the map: zoom to the paddock and show its label.
+        function checkGoToPaddock(name) {
+            const layer = paddockMap[name];
+            if (!layer) return;
+            const c = checkInfo(name);
+            focusPaddockOnMap(name, CHECK_COLORS[c.group] || '#f1c40f');
+            layer.setStyle({ color: '#f1c40f', weight: 4 });
+            hideAllPaddockLabels();
+            const tip = layer.getTooltip() && layer.getTooltip().getElement();
+            if (tip) { tip.classList.add('show-label'); setTimeout(() => tip.classList.remove('show-label'), 4000); }
+            const card = document.getElementById('chk-card-' + escUnit(normName(name)));
+            if (card) checkFlashCard(card);
         }
 
         function toggleCheckView() {
