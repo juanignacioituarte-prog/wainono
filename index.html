@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.39</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.40</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.39</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.40</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2171,7 +2171,7 @@
                 Walk some paddocks today and type what you measure. It is saved in the <b>partial walk</b> tab, not in the farmwalk: FARMWALK and the last full farmwalk do not change.<br>
                 <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
                 <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests residual + growth.<br>
-                <b style="color:#e67e22;">C</b> 24 to 72 hours after the last break (a break is grazed out 24 hours after it is drawn): measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
+                <b style="color:#e67e22;">C</b> 24 to 48 hours after the last break (a break is grazed out 24 hours after it is drawn): measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
                 <span style="color:#7f8c8d;">Grey on the map: do not use.</span>
             </p>
             <div id="chk-summary" style="margin-bottom:8px;"></div>
@@ -3640,7 +3640,7 @@
          * Groups (Juani, 13 Oct 2026), worked out from the walks BEFORE today:
          *   A  not grazed since its last walk, walked 7+ days ago: tests growth
          *   B  last break 7+ days ago: tests residual + growth
-         *   C  24 to 72 hours after the last break: tests the residual (measure in the grazed strip)
+         *   C  24 to 48 hours after the last break: tests the residual (measure in the grazed strip)
          *   X  grey: out, never walked, walked under 7 days ago, a break less
          *      than 24 hours ago (still being grazed), or 3-6 days ago (too soon)
          * What is typed is compared with the estimate for today, and saved in
@@ -3704,14 +3704,15 @@
             const today = grDayOf(new Date());
             const before = new Date(today.getTime() - 1);   // walks before today
             const isOut = outTabHas(name) || walkOutPaddocks().some(w => normName(w.name) === normName(name));
-            if (isOut) return { group: 'X', why: 'out of rotation' };
+            if (isOut) return { group: 'X', why: 'out of rotation', out: true };
             if (!GR.ready) return { group: 'X', why: GR.error ? 'growth not available' : 'growth loading' };
-            const walk = grLastWalk(name, before);
-            if (!walk) return { group: 'X', why: 'never walked' };
-            const est = estimateCover(name, new Date(), { walkBefore: before });
             const savedRow = partialSavedToday(name);
             const draft = checkDraft[name] !== undefined && checkDraft[name] !== '' ? Number(checkDraft[name]) : null;
-            const info = { est, walk, saved: !!savedRow, measured: draft > 0 ? draft : (savedRow ? savedRow.cover : null) };
+            const measured = draft > 0 ? draft : (savedRow ? savedRow.cover : null);
+            const walk = grLastWalk(name, before);
+            if (!walk) return { group: 'X', why: 'never walked', est: null, walk: null, saved: !!savedRow, measured };
+            const est = estimateCover(name, new Date(), { walkBefore: before });
+            const info = { est, walk, saved: !!savedRow, measured };
             if (!est.fromBreak) {
                 const d = Math.round((today - grDayOf(walk.dateObj)) / GR_DAY);
                 return Object.assign(info, d < 7 ? { group: 'X', why: `walked ${d} days ago` } : { group: 'A', sinceDays: d });
@@ -3726,12 +3727,13 @@
                 const at = from.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' });
                 return Object.assign(info, { group: 'X', why: `being grazed: residual check from ${fmtNZ(from)} ${at}` });
             }
-            if (hrs < 72) return Object.assign(info, { group: 'C', sinceDays: d });
+            if (hrs < 48) return Object.assign(info, { group: 'C', sinceDays: d });   // 24-48 h: little regrowth in the reading (Juani)
             if (d < 7) return Object.assign(info, { group: 'X', why: `grazed ${d} days ago: too soon` });
             return Object.assign(info, { group: 'B', sinceDays: d });
         }
 
         function checkStartText(c) {
+            if (!c.est) return 'no walk yet, so no estimate';
             return c.est.fromBreak ? `last break ${fmtNZ(c.est.breakDate)} · ${c.est.startCover} on ${fmtNZ(c.est.startDate)}`
                                    : `${grWalkWord(c.walk)} ${fmtNZ(c.walk.dateObj)}: ${c.walk.cover}`;
         }
@@ -3739,6 +3741,7 @@
         // The result line for one paddock.
         function checkResultHtml(c) {
             if (c.measured == null) return '';
+            if (!c.est) return `Measured <b>${c.measured}</b> (no estimate to compare)`;
             const moved = c.movedFrom ? `<div style="color:#27ae60; font-weight:bold;">Moved to A (was ${c.movedFrom}): the cover is too high for a grazed paddock (grazed estimate ${c.grazedEstimate}).</div>` : '';
             const diff = c.measured - c.est.cover;
             const sign = v => (v > 0 ? '+' : '') + Math.round(v);
@@ -3783,15 +3786,22 @@
                 .filter(r => !unit || unitHasPaddock(unit, r.p.name));
             renderCheckSummary(rows);
 
-            const counts = { A: 0, B: 0, C: 0 };
-            rows.forEach(r => { if (counts[r.c.group] !== undefined) counts[r.c.group]++; });
+            const counts = { A: 0, B: 0, C: 0, X: 0 };
+            // OTHER: grey paddocks in rotation. Out of rotation is left out (Juani).
+            const isOther = r => r.c.group === 'X' && !r.c.out;
+            rows.forEach(r => { if (r.c.out) return; if (counts[r.c.group] !== undefined) counts[r.c.group]++; });
             const chip = (g, label, col) => `<button onclick="setCheckGroup('${g}')" style="flex:1; padding:6px 4px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid ${col}; background:${checkGroupFilter === g ? col : '#fff'}; color:${checkGroupFilter === g ? '#fff' : col};">${label}</button>`;
             document.getElementById('chk-groups').innerHTML = chip('all', 'ALL', '#2c3e50') +
-                chip('A', `A (${counts.A})`, CHECK_COLORS.A) + chip('B', `B (${counts.B})`, CHECK_COLORS.B) + chip('C', `C (${counts.C})`, CHECK_COLORS.C);
+                chip('A', `A (${counts.A})`, CHECK_COLORS.A) + chip('B', `B (${counts.B})`, CHECK_COLORS.B) + chip('C', `C (${counts.C})`, CHECK_COLORS.C) +
+                chip('X', `OTHER (${counts.X})`, CHECK_COLORS.X);
 
-            const order = { A: 0, B: 1, C: 2 };
-            const shown = rows.filter(r => r.c.group !== 'X' && (checkGroupFilter === 'all' || r.c.group === checkGroupFilter))
-                .sort((a, b) => order[a.c.group] - order[b.c.group] || (b.c.est.fromBreak ? 0 : b.c.walk.cover) - (a.c.est.fromBreak ? 0 : a.c.walk.cover) || a.p.name.localeCompare(b.p.name, undefined, { numeric: true }));
+            const order = { A: 0, B: 1, C: 2, X: 3 };
+            const startOf = c => (c.est && !c.est.fromBreak && c.walk) ? c.walk.cover : 0;
+            // ALL: A, B, C, and any OTHER paddock that already has a cover typed.
+            const shown = rows.filter(r => !r.c.out && (checkGroupFilter === 'all'
+                    ? (r.c.group !== 'X' || r.c.measured != null)
+                    : r.c.group === checkGroupFilter))
+                .sort((a, b) => order[a.c.group] - order[b.c.group] || startOf(b.c) - startOf(a.c) || a.p.name.localeCompare(b.p.name, undefined, { numeric: true }));
             if (!shown.length) {
                 list.innerHTML = `<div style="font-size:12px; color:#7f8c8d; padding:10px 0;">${GR.ready ? 'No paddock fits this group now.' : 'Loading the growth model...'}</div>`;
                 return;
@@ -3799,10 +3809,10 @@
             list.innerHTML = shown.map(({ p, c }) => `
                 <div id="chk-card-${escUnit(normName(p.name))}" onclick="checkGoToPaddock('${escUnit(p.name)}')" style="background:#fff; border:1px solid #ddd; border-left:6px solid ${CHECK_COLORS[c.group]}; border-radius:6px; padding:8px 10px; margin-bottom:6px; cursor:pointer;">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                        <b style="font-size:13px;">${escUnit(p.name)} <span style="background:${CHECK_COLORS[c.group]}; color:#fff; border-radius:4px; padding:1px 5px; font-size:10px;">${c.group}</span></b>
+                        <b style="font-size:13px;">${escUnit(p.name)} <span style="background:${CHECK_COLORS[c.group]}; color:#fff; border-radius:4px; padding:1px 5px; font-size:10px;">${c.group === 'X' ? 'OTHER' : c.group}</span></b>
                         <span style="font-size:11px; color:#7f8c8d;">${(p.area || 0).toFixed(1)} ha</span>
                     </div>
-                    <div style="font-size:11px; color:#7f8c8d; margin:3px 0 5px;">${checkStartText(c)} · <b style="color:#2c3e50;">est. today ${c.est.cover}</b> (${c.est.growth} growth, ${c.est.days} days)</div>
+                    <div style="font-size:11px; color:#7f8c8d; margin:3px 0 5px;">${c.group === 'X' ? `<b style="color:#7f8c8d;">${escUnit(c.why)}</b> · ` : ''}${checkStartText(c)}${c.est ? ` · <b style="color:#2c3e50;">est. today ${c.est.cover}</b> (${c.est.growth} growth, ${c.est.days} days)` : ''}</div>
                     <input type="number" inputmode="numeric" min="1" placeholder="${c.group === 'C' ? 'Residual in the grazed strip' : 'Measured cover'}" value="${c.measured != null ? c.measured : ''}"
                         oninput="checkInput('${escUnit(p.name)}', this.value)" onclick="event.stopPropagation();"
                         style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:5px; font-size:15px; font-weight:bold; text-align:center;">
@@ -3837,7 +3847,14 @@
 
         // From the map to the card: scroll to it, light it up, open its box.
         function checkFocus(name) {
-            const card = document.getElementById('chk-card-' + escUnit(normName(name)));
+            let card = document.getElementById('chk-card-' + escUnit(normName(name)));
+            if (!card) {
+                const c = checkInfo(name);
+                if (c.out) return;
+                checkGroupFilter = c.group;
+                renderCheckView();
+                card = document.getElementById('chk-card-' + escUnit(normName(name)));
+            }
             if (!card) return;
             card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             checkFlashCard(card);
@@ -3876,7 +3893,7 @@
                 const v = Number(checkDraft[p.name]);
                 if (!(v > 0)) return;      // a cover of 0 is never saved
                 const c = checkInfo(p.name);
-                if (c.group === 'X') return;
+                if (c.out || (c.group === 'X' && !GR.ready)) return;
                 entries.push({ p, c, cover: Math.round(v) });
             });
             if (!entries.length) { status.textContent = 'Type at least one measured cover first.'; status.style.color = '#c0392b'; return; }
@@ -3888,9 +3905,9 @@
                 const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({
                     type: 'save_partial_walk', user: localStorage.getItem('auth_name') || '',
                     entries: entries.map(({ p, c, cover }) => ({
-                        date: dateVal, paddock: p.name, cover: cover, group: c.group, estimate: c.est.cover,
-                        start: c.est.fromBreak ? c.est.startCover : c.walk.cover,
-                        startDate: grIso(c.est.fromBreak ? c.est.startDate : c.walk.dateObj), days: c.est.days }))
+                        date: dateVal, paddock: p.name, cover: cover, group: c.group, estimate: c.est ? c.est.cover : '',
+                        start: c.est ? (c.est.fromBreak ? c.est.startCover : c.walk.cover) : '',
+                        startDate: c.est ? grIso(c.est.fromBreak ? c.est.startDate : c.walk.dateObj) : '', days: c.est ? c.est.days : '' }))
                 }) });
                 const d = await res.json();
                 ok = !!(d && d.status === 'success');
@@ -3901,7 +3918,7 @@
                 // Kept here too, so the list shows them saved before the next read.
                 entries.forEach(({ p, c, cover }) => {
                     PARTIAL_WALKS = PARTIAL_WALKS.filter(r => !(r.date === dateVal && normName(r.paddock) === normName(p.name)));
-                    PARTIAL_WALKS.push({ date: dateVal, paddock: p.name, cover: cover, group: c.group, estimate: c.est.cover });
+                    PARTIAL_WALKS.push({ date: dateVal, paddock: p.name, cover: cover, group: c.group, estimate: c.est ? c.est.cover : 0 });
                     delete checkDraft[p.name];
                 });
                 saveCheckDraft();
@@ -11367,7 +11384,7 @@
                     layer.setStyle({ fillColor: CHECK_COLORS[c.group], fillOpacity: c.group === 'X' ? 0.15 : (c.measured != null ? 0.85 : 0.5),
                                      color: 'white', opacity: 0.9, weight: c.measured != null ? 3 : 1.5 });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div>` + (c.group === 'X'
-                        ? `<div style="font-size:11px; color:#7f8c8d;">not for the check: ${c.why}</div>`
+                        ? `<div style="font-size:11px; color:#7f8c8d;">${c.out ? 'out of rotation' : 'OTHER: ' + c.why}${c.measured != null ? ' · measured <b>' + c.measured + '</b>' : ''}</div>`
                         : `<div style="font-size:11px; font-weight:bold; color:${CHECK_COLORS[c.group]};">Group ${c.group}${c.movedFrom ? ' (moved from ' + c.movedFrom + ': cover too high)' : ''}</div>` +
                           `<div style="font-size:10px; color:#7f8c8d;">${checkStartText(c)}</div>` +
                           `<div style="font-size:11px;">est. today ${c.est.cover}${c.measured != null ? ' · measured <b>' + c.measured + '</b>' : ''}</div>`));
