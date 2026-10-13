@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.32**,
-service worker cache `wn-farm-v1.1.46`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.33**,
+service worker cache `wn-farm-v1.1.47`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -220,6 +220,11 @@ The app **opens on BREAKS with the plain satellite picture**.
   not a fall of more than 100, ending in the last 60 days. Actual growth per
   day against the app's growth over the same days; one line per pair of
   dates and a total. On 13 Oct: 186 pairs, actual 25 / estimated 28 per day.
+  **Regrowth after a grazing is counted too** (v1.1.33, Juani 13 Oct 2026):
+  from the residual in use (median of the recent C checks, 1500 until 3) on
+  the day after the last break before a real cover, to that cover; 5-35
+  days; only when grazed since the cover before. Shown as its own total and
+  one line per end date. On 13 Oct: 55 pairs, actual 35 / estimated 30.
   Walk-to-walk pairs also tuned the month factors, so the partial walks are
   the fairer test.
 - **PLAN wedge: MEASURED / ESTIMATED** switch (v1.1.31, `wedgeSource`, kept in
@@ -475,8 +480,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.32/v1.1.33/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.46/wn-farm-v1.1.47/" sw.js
+sed -i "s/v1\.1\.33/v1.1.34/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.47/wn-farm-v1.1.48/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -609,3 +614,5 @@ Added 12 October 2026:
 - Estimated farmwalk: newest real cover (walk or partial walk) wins; EST. FW
   stats box and partial walks list; PLAN wedge MEASURED / ESTIMATED (v1.1.31).
 - EST. FW: ACTUAL vs ESTIMATED growth table (v1.1.32).
+- ACTUAL vs ESTIMATED also counts regrowth after a grazing, from the residual
+  in use (v1.1.33).

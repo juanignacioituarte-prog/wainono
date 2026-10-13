@@ -1715,7 +1715,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.32</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.33</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1729,7 +1729,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.32</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.33</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3500,7 +3500,11 @@
          * 5 to 35 days apart, with no break drawn in the paddock between them.
          * A fall of more than 100 is left out too: it was grazed or cut
          * without a break. Actual = (second - first) / days. Estimated = the
-         * app's daily farm growth over the same days / days. */
+         * app's daily farm growth over the same days / days.
+         * Also regrowth after a grazing (Juani, 13 Oct 2026): the day after the
+         * last break before a real cover, the paddock is at the residual in
+         * use (GR_RESIDUAL, the median of the recent C checks), and grows to
+         * that real cover. Kept when 5-35 days, no other break between. */
         const GC_MIN_DAYS = 5, GC_MAX_DAYS = 35, GC_LOOKBACK_DAYS = 60;
         function growthCompareIntervals() {
             const out = [];
@@ -3517,6 +3521,25 @@
                     if (!byDay[grIso(d)]) byDay[grIso(d)] = { d, cover: Number(r.cover), source: 'partial', name: r.paddock };
                 });
                 const list = Object.keys(byDay).sort().map(x => byDay[x]);
+                const brs = (savedBreaks || []).filter(br => !br.isDeleted && !br.isCropBreak && br.paddock && normName(br.paddock) === k && br.createdAt)
+                    .map(br => grDayOf(new Date(br.createdAt)).getTime()).sort((x, y) => x - y);
+                const estOver = (fromT, toT) => { let e = 0, hv = 0; for (let t = fromT + GR_DAY; t <= toT; t += GR_DAY) { const g = GR.daily.get(grIso(new Date(t))); if (g != null) { e += g; hv++; } } return { e, hv }; };
+                // From a grazing to the next real cover.
+                list.forEach((b, i) => {
+                    if (b.d.getTime() < since) return;
+                    const before = brs.filter(t => t < b.d.getTime());
+                    if (!before.length) return;
+                    const lastBr = before[before.length - 1];
+                    const prev = i > 0 ? list[i - 1].d.getTime() : -Infinity;
+                    if (lastBr < prev) return;                   // not grazed since the cover before: a walk pair covers it
+                    const start = lastBr + GR_DAY;               // at the residual the day after the break
+                    const days = Math.round((b.d.getTime() - start) / GR_DAY);
+                    if (days < GC_MIN_DAYS || days > GC_MAX_DAYS) return;
+                    const w = estOver(start, b.d.getTime());
+                    if (w.hv < days * 0.8) return;
+                    out.push({ paddock: b.name, from: new Date(start), to: b.d, days, source: b.source, kind: 'graze',
+                               startCover: GR_RESIDUAL, actual: (b.cover - GR_RESIDUAL) / days, estimated: w.e / w.hv });
+                });
                 for (let i = 1; i < list.length; i++) {
                     const a = list[i - 1], b = list[i];
                     if (b.d.getTime() < since) continue;
@@ -3529,8 +3552,8 @@
                     let est = 0, have = 0;
                     for (let t = a.d.getTime() + GR_DAY; t <= b.d.getTime(); t += GR_DAY) { const g = GR.daily.get(grIso(new Date(t))); if (g != null) { est += g; have++; } }
                     if (have < days * 0.8) continue;
-                    out.push({ paddock: b.name || a.name, from: a.d, to: b.d, days, source: b.source,
-                               actual: (b.cover - a.cover) / days, estimated: est / have });
+                    out.push({ paddock: b.name || a.name, from: a.d, to: b.d, days, source: b.source, kind: 'walk',
+                               startCover: a.cover, actual: (b.cover - a.cover) / days, estimated: est / have });
                 }
             });
             return out;
@@ -3540,7 +3563,8 @@
             closeGrowthCompare();
             const rows = GR.ready ? growthCompareIntervals() : [];
             const groups = {};
-            rows.forEach(r => { const key = grIso(r.from) + '|' + grIso(r.to) + '|' + r.source; (groups[key] = groups[key] || []).push(r); });
+            rows.forEach(r => { const key = r.kind === 'graze' ? 'g|' + grIso(r.to) + '|' + r.source : 'w|' + grIso(r.from) + '|' + grIso(r.to) + '|' + r.source; (groups[key] = groups[key] || []).push(r); });
+            const walkRows = rows.filter(r => r.kind === 'walk'), grazeRows = rows.filter(r => r.kind === 'graze');
             const avg = (list, f) => list.reduce((a, r) => a + f(r), 0) / list.length;
             const line = (label, list, sub) => {
                 const act = avg(list, r => r.actual), est = avg(list, r => r.estimated), diff = est - act;
@@ -3558,13 +3582,18 @@
                 : `<table style="width:100%; font-size:12px; border-collapse:collapse;">
                     <tr style="font-size:10px; color:#7f8c8d;"><td>From → to</td><td style="text-align:right;">Paddocks</td><td style="text-align:right;">Actual<br>/day</td><td style="text-align:right;">Estimated<br>/day</td><td style="text-align:right;">Estimate</td></tr>
                     ${line(`All, last ${GC_LOOKBACK_DAYS} days`, rows, 'every pair below together')}
-                    ${keys.map(k => { const g = groups[k]; return line(`${fmtNZ(g[0].from)} → ${fmtNZ(g[0].to)}`, g, `${g[0].days} days · ${g[0].source === 'partial' ? 'to a partial walk' : 'walk to walk'}`); }).join('')}
+                    ${walkRows.length ? line('Walk to walk', walkRows, 'not grazed between two real covers') : ''}
+                    ${grazeRows.length ? line('After a grazing', grazeRows, `from the residual ${GR_RESIDUAL} (${grResidualText()}) to the next real cover`) : ''}
+                    ${keys.map(k => { const g = groups[k];
+                        return g[0].kind === 'graze'
+                            ? line(`grazing → ${fmtNZ(g[0].to)}`, g, `${Math.min(...g.map(r => r.days))}-${Math.max(...g.map(r => r.days))} days from ${GR_RESIDUAL} · ${g[0].source === 'partial' ? 'to a partial walk' : 'to the walk'}`)
+                            : line(`${fmtNZ(g[0].from)} → ${fmtNZ(g[0].to)}`, g, `${g[0].days} days · ${g[0].source === 'partial' ? 'to a partial walk' : 'walk to walk'}`); }).join('')}
                    </table>
                    <details style="margin-top:8px;"><summary style="font-size:11px; font-weight:bold; cursor:pointer;">Every paddock (${rows.length})</summary>
                    <table style="width:100%; font-size:11px; border-collapse:collapse; margin-top:4px;">
-                    <tr style="color:#7f8c8d;"><td>Paddock</td><td>From → to</td><td style="text-align:right;">Actual</td><td style="text-align:right;">Est.</td></tr>
+                    <tr style="color:#7f8c8d;"><td>Paddock</td><td>From → to</td><td style="text-align:right;">Start</td><td style="text-align:right;">Actual</td><td style="text-align:right;">Est.</td></tr>
                     ${rows.slice().sort((a, b) => b.to - a.to || String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }))
-                        .map(r => `<tr><td>${escUnit(r.paddock)}</td><td>${fmtNZ(r.from)} → ${fmtNZ(r.to)}</td><td style="text-align:right;">${Math.round(r.actual)}</td><td style="text-align:right;">${Math.round(r.estimated)}</td></tr>`).join('')}
+                        .map(r => `<tr><td>${escUnit(r.paddock)}</td><td>${r.kind === 'graze' ? 'grazed, ' : ''}${fmtNZ(r.from)} → ${fmtNZ(r.to)}</td><td style="text-align:right;">${r.startCover}</td><td style="text-align:right;">${Math.round(r.actual)}</td><td style="text-align:right;">${Math.round(r.estimated)}</td></tr>`).join('')}
                    </table></details>`;
             const wrap = document.createElement('div');
             wrap.id = 'growth-compare-modal';
@@ -3572,7 +3601,7 @@
             wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:600px; max-height:88vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📈 Actual growth vs estimated</h3>
                 <button onclick="closeGrowthCompare()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
-                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px; line-height:1.4;">kgDM/ha/day. Actual: two real covers of the same paddock (full or partial walk), ${GC_MIN_DAYS}-${GC_MAX_DAYS} days apart, with no break drawn between them. Estimated: the app's growth from measured weather over the same days. Walk-to-walk pairs were also used to tune the model's month factors, so the partial walks are the fairer test.</div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px; line-height:1.4;">kgDM/ha/day. Actual: two real covers of the same paddock (full or partial walk), ${GC_MIN_DAYS}-${GC_MAX_DAYS} days apart, with no break drawn between them; or, after a grazing, from the residual in use (${GR_RESIDUAL}) the day after the last break to the next real cover. Estimated: the app's growth from measured weather over the same days. Walk-to-walk pairs were also used to tune the model's month factors, so the partial walks are the fairer test.</div>
                 ${table}</div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closeGrowthCompare(); });
             document.body.appendChild(wrap);
