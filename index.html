@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.26</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.27</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.26</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.27</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1789,6 +1789,9 @@
                     </button>
                     <button id="btn-growth" onclick="openGrowthPage()" style="background:#27ae60; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
                         🌱 GROWTH
+                    </button>
+                    <button id="btn-check" onclick="toggleCheckView()" style="background:#c0392b; color:white; border:none; padding:8px 14px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">
+                        🎯 CHECK
                     </button>
                     <div style="flex-basis:100%; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                         <div id="unit-chips" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
@@ -2136,6 +2139,23 @@
             </div>
             <button onclick="pmOpenSheet()" style="width:100%; background:#27ae60; color:#fff; border:none; padding:12px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; margin-top:6px;">🖨 PRINT PREVIEW</button>
             <div style="font-size:10px; color:#95a5a6; margin-top:6px;">The marks are kept on this device only. The printer window can also save as PDF.</div>
+        </div>
+
+        <!-- CHECK: a partial farmwalk to test the estimate -->
+        <div id="check-view" style="display:none; padding:12px 15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <h3 style="margin:0 0 4px;">🎯 Check the estimate</h3>
+            <p style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
+                Walk some paddocks today and type what you measure. It is saved as a real partial farmwalk.<br>
+                <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
+                <b style="color:#e67e22;">C</b> grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the 1500 residual.<br>
+                <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests 1500 + growth.<br>
+                <span style="color:#7f8c8d;">Grey on the map: do not use.</span>
+            </p>
+            <div id="chk-summary" style="margin-bottom:8px;"></div>
+            <div id="chk-groups" style="display:flex; gap:6px; margin-bottom:8px;"></div>
+            <div id="chk-list"></div>
+            <button id="chk-save" onclick="saveCheckWalk()" style="width:100%; background:#2980b9; color:#fff; border:none; padding:12px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; margin-top:8px;">💾 SAVE AS FARMWALK (today)</button>
+            <div id="chk-status" style="font-size:11px; font-weight:bold; margin-top:6px;"></div>
         </div>
 
         <!-- Silage: new location / edit location -->
@@ -2968,9 +2988,9 @@
             return false;
         }
 
-        // The unit chips filter FARMWALK, SATELLITE and EST. FW.
+        // The unit chips filter FARMWALK, SATELLITE, EST. FW and CHECK.
         function unitFilterApplies() {
-            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite' || currentDashboardMode === 'estimate';
+            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite' || currentDashboardMode === 'estimate' || currentDashboardMode === 'check';
         }
 
         function getActiveUnit() {
@@ -3017,6 +3037,7 @@
             activeUnitId = (id === activeUnitId) ? null : id;
             renderUnitChips();
             renderDashboard();
+            if (currentDashboardMode === 'check') renderCheckView();
             updateGeoStyles();
         }
 
@@ -3290,7 +3311,7 @@
         function estimateCover(pName, date, opts) {
             if (!GR.ready) return null;
             const at = date || new Date();
-            const walk = grLastWalk(pName, at);
+            const walk = grLastWalk(pName, (opts && opts.walkBefore) || at);
             if (!walk) return null;
             let startCover = walk.cover, startDate = grDayOf(walk.dateObj), lastBreak = null, breakCount = 0;
             if (!(opts && opts.ignoreBreaks)) {
@@ -3349,6 +3370,214 @@
 
         function toggleEstimateView() {
             switchDashboardMode(currentDashboardMode === 'estimate' ? 'manual' : 'estimate');
+        }
+
+        /* ---- CHECK: a partial farmwalk to test the estimate ----
+         * Groups (Juani, 13 Oct 2026), worked out from the walks BEFORE today:
+         *   A  not grazed since its last walk, walked 7+ days ago: tests growth
+         *   C  last break 1-2 days ago: tests the 1500 residual (measure in the strip)
+         *   B  last break 7+ days ago: tests 1500 + growth
+         *   X  grey: out, never walked, walked under 7 days ago, a break today
+         *      (cows may be in it) or 3-6 days ago (too soon to tell)
+         * What is typed is compared with the estimate for today, and saved as a
+         * real partial farmwalk for today (farmwalk_load, merge), the same save
+         * as SAVE FARMWALK. After the save the paddock keeps its group and its
+         * result, because both come from the walk before today. */
+        const CHECK_COLORS = { A: '#27ae60', B: '#2980b9', C: '#e67e22', X: '#95a5a6' };
+        let checkGroupFilter = 'all';
+        let checkDraft = (() => {
+            try { const d = JSON.parse(localStorage.getItem('check_walk_draft') || 'null'); if (d && d.date === grIso(new Date())) return d.covers || {}; } catch (e) {}
+            return {};
+        })();
+        function saveCheckDraft() {
+            try { localStorage.setItem('check_walk_draft', JSON.stringify({ date: grIso(new Date()), covers: checkDraft })); } catch (e) {}
+        }
+
+        function checkInfo(name) {
+            const today = grDayOf(new Date());
+            const before = new Date(today.getTime() - 1);   // walks before today
+            const isOut = outTabHas(name) || walkOutPaddocks().some(w => normName(w.name) === normName(name));
+            if (isOut) return { group: 'X', why: 'out of rotation' };
+            if (!GR.ready) return { group: 'X', why: GR.error ? 'growth not available' : 'growth loading' };
+            const walk = grLastWalk(name, before);
+            if (!walk) return { group: 'X', why: 'never walked' };
+            const est = estimateCover(name, new Date(), { walkBefore: before });
+            const h = FARMWALK_HISTORY[normName(name)];
+            const todayWalk = h ? h.entries.find(e => e.dateObj && e.cover > 0 && grIso(e.dateObj) === grIso(today)) : null;
+            const draft = checkDraft[name] !== undefined && checkDraft[name] !== '' ? Number(checkDraft[name]) : null;
+            const info = { est, walk, saved: !!todayWalk, measured: todayWalk ? todayWalk.cover : (draft > 0 ? draft : null) };
+            if (!est.fromBreak) {
+                const d = Math.round((today - grDayOf(walk.dateObj)) / GR_DAY);
+                return Object.assign(info, d < 7 ? { group: 'X', why: `walked ${d} days ago` } : { group: 'A', sinceDays: d });
+            }
+            const d = Math.round((today - est.breakDate) / GR_DAY);
+            if (d === 0) return Object.assign(info, { group: 'X', why: 'break today: cows may be in it' });
+            if (d <= 2) return Object.assign(info, { group: 'C', sinceDays: d });
+            if (d < 7) return Object.assign(info, { group: 'X', why: `grazed ${d} days ago: too soon` });
+            return Object.assign(info, { group: 'B', sinceDays: d });
+        }
+
+        function checkStartText(c) {
+            return c.est.fromBreak ? `last break ${fmtNZ(c.est.breakDate)} · 1500 on ${fmtNZ(c.est.startDate)}`
+                                   : `walk ${fmtNZ(c.walk.dateObj)}: ${c.walk.cover}`;
+        }
+
+        // The result line for one paddock.
+        function checkResultHtml(c) {
+            if (c.measured == null) return '';
+            const diff = c.measured - c.est.cover;
+            const sign = v => (v > 0 ? '+' : '') + Math.round(v);
+            if (c.group === 'C') {
+                return `Residual measured <b>${c.measured}</b> · estimate ${c.est.cover} · <b style="color:${Math.abs(diff) < 150 ? '#27ae60' : '#c0392b'};">${sign(diff)}</b>`;
+            }
+            const perDay = c.est.days > 0 ? diff / c.est.days : null;
+            return `Measured <b>${c.measured}</b> − estimate ${c.est.cover} = <b style="color:${Math.abs(diff) < 150 ? '#27ae60' : '#c0392b'};">${sign(diff)}</b>` +
+                (perDay != null ? ` · <b>${sign(perDay)}</b> kgDM/ha/day` : '');
+        }
+
+        function renderCheckSummary(rows) {
+            const box = document.getElementById('chk-summary');
+            if (!box) return;
+            const line = (g, label) => {
+                const m = rows.filter(r => r.c.group === g && r.c.measured != null);
+                if (!m.length) return `<div style="font-size:11px; color:#7f8c8d;"><b style="color:${CHECK_COLORS[g]};">${g}</b> ${label}: nothing measured yet</div>`;
+                const avgDiff = m.reduce((s, r) => s + (r.c.measured - r.c.est.cover), 0) / m.length;
+                if (g === 'C') {
+                    const avgRes = m.reduce((s, r) => s + r.c.measured, 0) / m.length;
+                    return `<div style="font-size:12px;"><b style="color:${CHECK_COLORS[g]};">${g}</b> ${label}: residual <b>${Math.round(avgRes)}</b> on average (estimate ${Math.round(avgDiff) >= 0 ? Math.round(avgDiff) + ' too low' : -Math.round(avgDiff) + ' too high'}) · ${m.length} paddock${m.length === 1 ? '' : 's'}</div>`;
+                }
+                const avgDay = m.reduce((s, r) => s + (r.c.est.days > 0 ? (r.c.measured - r.c.est.cover) / r.c.est.days : 0), 0) / m.length;
+                const word = avgDay >= 0 ? 'too low' : 'too high';
+                return `<div style="font-size:12px;"><b style="color:${CHECK_COLORS[g]};">${g}</b> ${label}: estimate ${Math.abs(Math.round(avgDiff))} ${word} · <b>${Math.abs(avgDay).toFixed(1)} kgDM/ha/day ${word}</b> · ${m.length} paddock${m.length === 1 ? '' : 's'}</div>`;
+            };
+            box.innerHTML = `<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:3px;">
+                ${line('A', 'growth')}${line('C', 'residual')}${line('B', '1500 + growth')}</div>`;
+        }
+
+        function renderCheckView() {
+            const list = document.getElementById('chk-list');
+            if (!list) return;
+            const unit = getActiveUnit();
+            const rows = (manualModeData || []).map(p => ({ p, c: checkInfo(p.name) }))
+                .filter(r => !unit || unitHasPaddock(unit, r.p.name));
+            renderCheckSummary(rows);
+
+            const counts = { A: 0, B: 0, C: 0 };
+            rows.forEach(r => { if (counts[r.c.group] !== undefined) counts[r.c.group]++; });
+            const chip = (g, label, col) => `<button onclick="setCheckGroup('${g}')" style="flex:1; padding:6px 4px; border-radius:12px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid ${col}; background:${checkGroupFilter === g ? col : '#fff'}; color:${checkGroupFilter === g ? '#fff' : col};">${label}</button>`;
+            document.getElementById('chk-groups').innerHTML = chip('all', 'ALL', '#2c3e50') +
+                chip('A', `A (${counts.A})`, CHECK_COLORS.A) + chip('C', `C (${counts.C})`, CHECK_COLORS.C) + chip('B', `B (${counts.B})`, CHECK_COLORS.B);
+
+            const order = { A: 0, C: 1, B: 2 };
+            const shown = rows.filter(r => r.c.group !== 'X' && (checkGroupFilter === 'all' || r.c.group === checkGroupFilter))
+                .sort((a, b) => order[a.c.group] - order[b.c.group] || (b.c.est.fromBreak ? 0 : b.c.walk.cover) - (a.c.est.fromBreak ? 0 : a.c.walk.cover) || a.p.name.localeCompare(b.p.name, undefined, { numeric: true }));
+            if (!shown.length) {
+                list.innerHTML = `<div style="font-size:12px; color:#7f8c8d; padding:10px 0;">${GR.ready ? 'No paddock fits this group now.' : 'Loading the growth model...'}</div>`;
+                return;
+            }
+            list.innerHTML = shown.map(({ p, c }) => `
+                <div id="chk-card-${escUnit(normName(p.name))}" style="background:#fff; border:1px solid #ddd; border-left:6px solid ${CHECK_COLORS[c.group]}; border-radius:6px; padding:8px 10px; margin-bottom:6px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                        <b style="font-size:13px;">${escUnit(p.name)} <span style="background:${CHECK_COLORS[c.group]}; color:#fff; border-radius:4px; padding:1px 5px; font-size:10px;">${c.group}</span></b>
+                        <span style="font-size:11px; color:#7f8c8d;">${(p.area || 0).toFixed(1)} ha</span>
+                    </div>
+                    <div style="font-size:11px; color:#7f8c8d; margin:3px 0 5px;">${checkStartText(c)} · <b style="color:#2c3e50;">est. today ${c.est.cover}</b> (${c.est.growth} growth, ${c.est.days} days)</div>
+                    <input type="number" inputmode="numeric" min="1" placeholder="${c.group === 'C' ? 'Residual in the grazed strip' : 'Measured cover'}" value="${c.measured != null ? c.measured : ''}" ${c.saved ? 'disabled' : ''}
+                        oninput="checkInput('${escUnit(p.name)}', this.value)"
+                        style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:5px; font-size:15px; font-weight:bold; text-align:center;">
+                    <div id="chk-res-${escUnit(normName(p.name))}" style="font-size:11px; margin-top:4px;">${checkResultHtml(c)}${c.saved ? ' <span style="color:#27ae60; font-weight:bold;">· saved</span>' : ''}</div>
+                </div>`).join('');
+        }
+
+        function setCheckGroup(g) { checkGroupFilter = g; renderCheckView(); }
+
+        function checkInput(name, value) {
+            if (value === '' || Number(value) <= 0) delete checkDraft[name]; else checkDraft[name] = value;
+            saveCheckDraft();
+            const c = checkInfo(name);
+            const el = document.getElementById('chk-res-' + escUnit(normName(name)));
+            if (el) el.innerHTML = checkResultHtml(c);
+            const unit = getActiveUnit();
+            renderCheckSummary((manualModeData || []).map(p => ({ p, c: checkInfo(p.name) })).filter(r => !unit || unitHasPaddock(unit, r.p.name)));
+            updateGeoStyles();
+        }
+
+        function checkFocus(name) {
+            const card = document.getElementById('chk-card-' + escUnit(normName(name)));
+            if (!card) return;
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const inp = card.querySelector('input');
+            if (inp && !inp.disabled) setTimeout(() => inp.focus(), 300);
+        }
+
+        function toggleCheckView() {
+            switchDashboardMode(currentDashboardMode === 'check' ? 'manual' : 'check');
+        }
+
+        /* Saved as a real partial farmwalk for today, the same way SAVE
+         * FARMWALK saves: farmwalk_load with mode 'merge', so only these
+         * paddocks are written for the day. */
+        async function saveCheckWalk() {
+            const status = document.getElementById('chk-status');
+            const btn = document.getElementById('chk-save');
+            const today = new Date(); const dateVal = toDateInputValue(today);
+            const dateObj = new Date(dateVal + 'T12:00:00');
+            const entries = [];
+            (manualModeData || []).forEach(p => {
+                const v = Number(checkDraft[p.name]);
+                if (!(v > 0)) return;      // a cover of 0 is never saved
+                const c = checkInfo(p.name);
+                if (c.saved || c.group === 'X') return;
+                entries.push({ p, cover: Math.round(v) });
+            });
+            if (!entries.length) { status.textContent = 'Type at least one measured cover first.'; status.style.color = '#c0392b'; return; }
+            if (!confirm(`Save ${entries.length} paddock${entries.length === 1 ? '' : 's'} as a partial farmwalk for today?`)) return;
+
+            btn.disabled = true; btn.textContent = 'SAVING...';
+            const parts = dateVal.split('-');
+            const nzDate = `${Number(parts[2])}/${Number(parts[1])}/${parts[0]}`;
+            let ok = false;
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({
+                    type: 'farmwalk_load', sheetName: 'Farmwalks', date: nzDate, mode: 'merge',
+                    entries: entries.map(e => ({ paddock: e.p.name, cover: e.cover, reason: '' }))
+                }) });
+                const d = await res.json();
+                ok = !!(d && d.status === 'success');
+                if (!ok) console.error('Check walk save rejected:', d && d.message);
+            } catch (e) { console.error('Check walk save failed:', e); }
+
+            if (ok) {
+                // The same local update SAVE FARMWALK makes, so the app shows
+                // the walk at once (the published sheet lags minutes behind).
+                entries.forEach(({ p, cover }) => {
+                    if (p.latest && p.latest.ts && dateObj.getTime() > p.latest.ts) {
+                        p.previous = { cover: p.latest.cover, formattedDate: p.latest.formattedDate, ts: p.latest.ts };
+                    }
+                    p.isOut = false; p.neverWalked = false; p.reason = '';
+                    p.latest = { cover: cover, formattedDate: fmtNZ(dateObj), ts: dateObj.getTime() };
+                    if (!p.entries) p.entries = [];
+                    if (p.entries.length && p.entries[0].dateObj && p.entries[0].dateObj.toDateString() === dateObj.toDateString()) p.entries[0].cover = cover;
+                    else p.entries.unshift({ dateObj: dateObj, cover: cover, reason: '' });
+                    p.growthRate = coverGrowthRate(p.latest.cover, p.previous ? p.previous.cover : null,
+                        p.latest.ts, p.previous ? p.previous.ts : null, false);
+                    const k = normName(p.name);
+                    if (!FARMWALK_HISTORY[k]) FARMWALK_HISTORY[k] = { name: p.name, entries: [] };
+                    const he = FARMWALK_HISTORY[k].entries;
+                    const same = he.find(e => e.dateObj && e.dateObj.toDateString() === dateObj.toDateString());
+                    if (same) same.cover = cover; else he.unshift({ dateObj: dateObj, cover: cover, reason: '' });
+                    delete checkDraft[p.name];
+                });
+                saveCheckDraft();
+                estimatedBuiltAt = 0;
+                try { localStorage.setItem('wn_cached_manual_data', JSON.stringify(manualModeData)); } catch (e) {}
+                status.textContent = `✓ ${entries.length} paddock${entries.length === 1 ? '' : 's'} saved as today's farmwalk.`; status.style.color = '#27ae60';
+            } else {
+                status.textContent = '⚠ NOT saved. What you typed is kept on this phone; press SAVE again when there is signal.'; status.style.color = '#c0392b';
+            }
+            btn.disabled = false; btn.textContent = '💾 SAVE AS FARMWALK (today)';
+            renderCheckView();
+            updateGeoStyles();
         }
 
         /* ---- the GROWTH page (gr.html), inside the app ---- */
@@ -9370,6 +9599,13 @@
                                 return;
                             }
 
+                            // CHECK: a tap goes to that paddock's box in the list
+                            if (currentDashboardMode === 'check') {
+                                L.DomEvent.stopPropagation(e);
+                                checkFocus(pName);
+                                return;
+                            }
+
                             // Print Map: a tap paints the paddock in the colour picked
                             if (currentDashboardMode === 'print_map') {
                                 L.DomEvent.stopPropagation(e);
@@ -9452,7 +9688,7 @@
             selectedBreakIds.clear();
             currentDashboardMode = mode;
             // SATELLITE now lives inside FARMWALK, so FARMWALK stays lit for both.
-            document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual' || mode === 'satellite' || mode === 'estimate');
+            document.getElementById('btn-mode-man').classList.toggle('active', mode === 'manual' || mode === 'satellite' || mode === 'estimate' || mode === 'check');
             document.getElementById('btn-mode-feed').classList.toggle('active', mode === 'feed');
             document.getElementById('btn-mode-breaks').classList.toggle('active', mode === 'breaks');
 
@@ -9468,7 +9704,7 @@
             }
 
             // UI Toggles
-            document.getElementById('farmwalk-entry-bar').style.display = (mode === 'manual' || mode === 'satellite' || mode === 'estimate') ? 'flex' : 'none';
+            document.getElementById('farmwalk-entry-bar').style.display = (mode === 'manual' || mode === 'satellite' || mode === 'estimate' || mode === 'check') ? 'flex' : 'none';
             updateFarmwalkBarForMode(mode);
             document.getElementById('calibration-box').style.display = (mode === 'satellite' && calibrationModel) ? 'block' : 'none';
             document.getElementById('sat-layer-controls').style.display = (mode === 'satellite' || mode === 'breaks' || mode === 'health_safety') ? 'flex' : 'none';
@@ -9485,11 +9721,13 @@
             if (silageView) silageView.style.display = (mode === 'silage') ? 'block' : 'none';
             const printView = document.getElementById('print-map-view');
             if (printView) printView.style.display = (mode === 'print_map') ? 'block' : 'none';
+            const checkView = document.getElementById('check-view');
+            if (checkView) checkView.style.display = (mode === 'check') ? 'block' : 'none';
             // The cover figures belong to the farmwalk, not to a jobs list.
             const avgBox = document.querySelector('.avg-box');
             const syncNote = document.querySelector('.sync-note');
-            if (avgBox) avgBox.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map') ? 'none' : '';
-            if (syncNote) syncNote.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map') ? 'none' : '';
+            if (avgBox) avgBox.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check') ? 'none' : '';
+            if (syncNote) syncNote.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check') ? 'none' : '';
             if (mode !== 'maintenance') {
                 if (maintDrawType) cancelMaintDrawing();
                 clearMaintFromMap();      // the jobs belong to their own map
@@ -9565,7 +9803,7 @@
                 return;
             } else {
                 document.getElementById('map').style.display = (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
-                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config' || mode === 'maintenance' || mode === 'silage' || mode === 'print_map') ? 'none' : 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config' || mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
@@ -9669,6 +9907,16 @@
                     // The hazards are wanted here too, so fetch them if this
                     // device has not opened Health & Safety yet.
                     if (typeof hsHazards !== 'undefined' && hsHazards.length === 0 && typeof loadHSTables === 'function') loadHSTables();
+                    return;
+                } else if (mode === 'check') {
+                    // CHECK: the paddocks in their group colours, the recent
+                    // breaks to look at (so the grazed strips can be found).
+                    setLayerMode('satellite');
+                    document.getElementById('legend').style.display = 'none';
+                    renderUnitChips();
+                    renderCheckView();
+                    updateGeoStyles();
+                    renderBreaksOnMap();
                     return;
                 } else if (mode === 'print_map') {
                     // The print map: the farm, the names and the marks. Nothing else.
@@ -9801,7 +10049,7 @@
 
         function updateFarmwalkBarForMode(mode) {
             // Entering a walk only makes sense on FARMWALK itself.
-            const isSat = (mode === 'satellite' || mode === 'estimate');
+            const isSat = (mode === 'satellite' || mode === 'estimate' || mode === 'check');
             const entryBtn = document.getElementById('btn-farmwalk-entry');
             if (entryBtn) entryBtn.style.display = isSat ? 'none' : 'flex';
             // The walk controls belong to entering covers, not to the satellite view.
@@ -9815,6 +10063,11 @@
                 satBtn.innerHTML = mode === 'satellite' ? '✕ SATELLITE' : '🛰 SATELLITE';
                 satBtn.style.background = mode === 'satellite' ? '#34495e' : '#2471a3';
             }
+            const chkBtn = document.getElementById('btn-check');
+            if (chkBtn) {
+                chkBtn.innerHTML = mode === 'check' ? '✕ CHECK' : '🎯 CHECK';
+                chkBtn.style.background = mode === 'check' ? '#34495e' : '#c0392b';
+            }
             const estBtn = document.getElementById('btn-estimate');
             if (estBtn) {
                 estBtn.innerHTML = mode === 'estimate' ? '✕ EST. FW' : '📈 EST. FW';
@@ -9825,7 +10078,7 @@
 
         /* ---- Breaks on the map: show / hide on FARMWALK and SATELLITE ---- */
         function breakToggleApplies() {
-            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite' || currentDashboardMode === 'estimate';
+            return currentDashboardMode === 'manual' || currentDashboardMode === 'satellite' || currentDashboardMode === 'estimate' || currentDashboardMode === 'check';
         }
 
         function toggleBreaksOnMap() {
@@ -9854,6 +10107,7 @@
             // satellite covers while its own wedge was drawn from the farmwalk.
             // Planning is done off the farmwalk, the same as FEED.
             if (currentDashboardMode === 'estimate') return buildEstimatedPaddockData();
+            if (currentDashboardMode === 'check') return manualModeData;
             return (currentDashboardMode === 'manual' || currentDashboardMode === 'feed' || currentDashboardMode === 'plan')
                 ? manualModeData : satellitePaddockData;
         }
@@ -10731,6 +10985,16 @@
                     if (tipEl) tipEl.classList.add('show-label', 'pm-small');
                     layer.setTooltipContent(pmLabelHtml(pName));
                     layer._printLabel = true;
+                } else if (currentDashboardMode === 'check') {
+                    // CHECK: each paddock in its group colour; measured ones darker.
+                    const c = checkInfo(pName);
+                    layer.setStyle({ fillColor: CHECK_COLORS[c.group], fillOpacity: c.group === 'X' ? 0.15 : (c.measured != null ? 0.85 : 0.5),
+                                     color: 'white', opacity: 0.9, weight: c.measured != null ? 3 : 1.5 });
+                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div>` + (c.group === 'X'
+                        ? `<div style="font-size:11px; color:#7f8c8d;">not for the check: ${c.why}</div>`
+                        : `<div style="font-size:11px; font-weight:bold; color:${CHECK_COLORS[c.group]};">Group ${c.group}</div>` +
+                          `<div style="font-size:10px; color:#7f8c8d;">${checkStartText(c)}</div>` +
+                          `<div style="font-size:11px;">est. today ${c.est.cover}${c.measured != null ? ' · measured <b>' + c.measured + '</b>' : ''}</div>`));
                 } else if (currentDashboardMode === 'farm_config' && farmConfigSection === 'paddocks') {
                     // Boundary editor: the ones being worked on stand out, the rest recede.
                     const pid = paddockIdByName[pName];

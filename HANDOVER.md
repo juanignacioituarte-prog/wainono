@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.26**,
-service worker cache `wn-farm-v1.1.40`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.27**,
+service worker cache `wn-farm-v1.1.41`, Apps Script `2026-10-12-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -197,6 +197,22 @@ The app **opens on BREAKS with the plain satellite picture**.
   farm average at the top is the estimated average ("estimated today").
   Entering a walk is hidden there. GROWTH sort uses the average growth since
   the start, which is about the same for every paddock (one farm figure).
+- **🎯 CHECK** in the FARMWALK bar (v1.1.27, Juani 13 Oct 2026): a partial
+  farmwalk to test the estimate. Groups, from the walks BEFORE today
+  (`checkInfo`): **A** not grazed since its last walk, walked 7+ days ago
+  (tests growth); **C** last break 1-2 days ago (tests the 1500 residual;
+  measure inside the grazed strip); **B** last break 7+ days ago (tests 1500 +
+  growth); grey: out, never walked, walked under 7 days ago, a break today, or
+  a break 3-6 days ago. The map shows the groups (A green, C orange, B blue)
+  and the breaks; a tap goes to the paddock's box. Each typed cover shows
+  measured − estimate and per day; the top box averages each group.
+  **Saved as a real partial farmwalk for today** (Juani): `farmwalk_load`,
+  mode `merge`, only the measured paddocks, the same save as SAVE FARMWALK.
+  FARMWALK's "Previous" is then the last real measured cover, never an
+  estimate. Typed covers are kept on the phone until saved
+  (`check_walk_draft`). On 13 Oct: A 48, C 9, B 20, grey 52.
+  Note: for a C or B paddock the FARMWALK growth line compares the new cover
+  with the walk before the grazing, so it can read negative.
 - SATELLITE keeps the satellite cover ("≈ ... estimated · satellite <date>").
 
 ### Growth from measured weather (v1.1.22)
@@ -427,8 +443,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.26/v1.1.27/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.40/wn-farm-v1.1.41/" sw.js
+sed -i "s/v1\.1\.27/v1.1.28/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.41/wn-farm-v1.1.42/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -550,3 +566,5 @@ Added 12 October 2026:
 - After a break: 1500 on the day after the last break, growth from the next
   day (v1.1.25).
 - EST. FW: paddock ranking on the estimated cover, with all filters (v1.1.26).
+- CHECK: partial farmwalk with groups A / B / C to test the estimate, saved
+  as a real farmwalk (v1.1.27).
