@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.46</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.47</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.46</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.47</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3543,14 +3543,6 @@
             const rows = (typeof PARTIAL_WALKS !== 'undefined' ? PARTIAL_WALKS : []).slice();
             const dates = [...new Set(rows.map(r => r.date))].sort().reverse();
             const sign = v => (v > 0 ? '+' : '') + Math.round(v);
-            const groupLine = (list, g) => {
-                const m = list.filter(r => r.group === g && r.cover > 0 && r.estimate > 0 && (g !== 'C' || partialIsResidual(r)));
-                if (!m.length) return '';
-                const diff = m.reduce((a, r) => a + (r.cover - r.estimate), 0) / m.length;
-                if (g === 'C') return `<span style="color:${CHECK_COLORS.C};"><b>C</b> residual ${Math.round(m.reduce((a, r) => a + r.cover, 0) / m.length)} (${m.length})</span>`;
-                const perDay = m.filter(r => r.days > 0); const pd = perDay.length ? perDay.reduce((a, r) => a + (r.cover - r.estimate) / r.days, 0) / perDay.length : null;
-                return `<span style="color:${CHECK_COLORS[g]};"><b>${g}</b> ${sign(diff)}${pd != null ? ` (${sign(pd)}/day)` : ''} (${m.length})</span>`;
-            };
             const body = !dates.length ? '<div style="color:#7f8c8d; font-size:12px; padding:10px 0;">No partial walk saved yet. Use + PARTIAL in the FARMWALK bar.</div>'
                 : dates.map(d => {
                     const list = rows.filter(r => r.date === d).sort((a, b) => (a.group || '').localeCompare(b.group || '') || String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }));
@@ -3558,7 +3550,6 @@
                     return `<div style="border-top:1px solid #eee; padding:8px 0;">
                         <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;">
                             <b style="font-size:13px;">${dd ? fmtNZ(dd) : escUnit(d)} · ${list.length} paddock${list.length === 1 ? '' : 's'}</b>
-                            <span style="font-size:11px; display:flex; gap:8px;">${['A', 'B', 'C'].map(g => groupLine(list, g)).filter(Boolean).join('')}</span>
                         </div>
                         ${partialGrowthHtml(partialGrowth(list.filter(r => r.group === 'A' || r.group === 'B')
                             .map(r => ({ name: r.paddock, cover: Number(r.cover), start: Number(r.start), estimate: Number(r.estimate), days: Number(r.days) }))), true)}
@@ -3575,7 +3566,7 @@
             wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📋 Partial walks</h3>
                 <button onclick="closePartialWalks()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
-                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 6px;">Measured in a partial walk (+ PARTIAL), against what the app estimated that day. A: growth · B: residual + growth · C: residual.</div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 6px;">Measured in a partial walk, against what the app estimated that day.</div>
                 ${body}</div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closePartialWalks(); });
             document.body.appendChild(wrap);

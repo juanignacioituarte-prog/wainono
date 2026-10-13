@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.46**,
-service worker cache `wn-farm-v1.1.60`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.47**,
+service worker cache `wn-farm-v1.1.61`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -556,8 +556,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.46/v1.1.47/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.60/wn-farm-v1.1.61/" sw.js
+sed -i "s/v1\.1\.47/v1.1.48/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.61/wn-farm-v1.1.62/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -722,3 +722,6 @@ Added 12 October 2026:
   Growth: actual · estimated · % (A + B by area); Residual: actual (average of
   today's C checks, outliers left out) · in use · %. The per-group A/B/C lines
   were removed.
+- PARTIAL WALKS list: the A/B/C average line per date was removed (v1.1.47,
+  Juani said it was confusing). Each date shows the Growth line and the
+  paddock table only.
