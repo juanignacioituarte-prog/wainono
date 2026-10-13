@@ -1708,7 +1708,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.28</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.29</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1722,7 +1722,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.28</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.29</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2145,7 +2145,7 @@
         <div id="check-view" style="display:none; padding:12px 15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
             <h3 style="margin:0 0 4px;">🎯 Check the estimate</h3>
             <p style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
-                Walk some paddocks today and type what you measure. It is saved as a real partial farmwalk.<br>
+                Walk some paddocks today and type what you measure. It is saved in the <b>partial walk</b> tab, not in the farmwalk: FARMWALK and the last full farmwalk do not change.<br>
                 <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
                 <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests 1500 + growth.<br>
                 <b style="color:#e67e22;">C</b> grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the 1500 residual.<br>
@@ -2154,7 +2154,7 @@
             <div id="chk-summary" style="margin-bottom:8px;"></div>
             <div id="chk-groups" style="display:flex; gap:6px; margin-bottom:8px;"></div>
             <div id="chk-list"></div>
-            <button id="chk-save" onclick="saveCheckWalk()" style="width:100%; background:#2980b9; color:#fff; border:none; padding:12px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; margin-top:8px;">💾 SAVE AS FARMWALK (today)</button>
+            <button id="chk-save" onclick="saveCheckWalk()" style="width:100%; background:#2980b9; color:#fff; border:none; padding:12px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; margin-top:8px;">💾 SAVE PARTIAL WALK (today)</button>
             <div id="chk-status" style="font-size:11px; font-weight:bold; margin-top:6px;"></div>
         </div>
 
@@ -3379,10 +3379,24 @@
          *   C  last break 1-2 days ago: tests the 1500 residual (measure in the strip)
          *   X  grey: out, never walked, walked under 7 days ago, a break today
          *      (cows may be in it) or 3-6 days ago (too soon to tell)
-         * What is typed is compared with the estimate for today, and saved as a
-         * real partial farmwalk for today (farmwalk_load, merge), the same save
-         * as SAVE FARMWALK. After the save the paddock keeps its group and its
-         * result, because both come from the walk before today. */
+         * What is typed is compared with the estimate for today, and saved in
+         * the sheet tab "partial walk" (save_partial_walk), NEVER in Farmwalks
+         * (Juani, 13 Oct 2026): FARMWALK, its average and the last full walk do
+         * not change, and the estimates keep starting from the full walk. */
+        let PARTIAL_WALKS = [];           // rows of the partial walk tab
+        let partialWalksLoaded = false;
+        async function loadPartialWalks() {
+            try {
+                const r = await fetch(GOOGLE_SCRIPT_URL + '?type=partial_walk&t=' + Date.now(), { cache: 'no-store' });
+                const d = await r.json();
+                if (d && Array.isArray(d.entries)) { PARTIAL_WALKS = d.entries; partialWalksLoaded = true; }
+            } catch (e) { console.warn('Partial walks not loaded', e); }
+            if (currentDashboardMode === 'check') { renderCheckView(); updateGeoStyles(); }
+        }
+        function partialSavedToday(name) {
+            const today = grIso(new Date());
+            return PARTIAL_WALKS.find(r => r.date === today && normName(r.paddock) === normName(name)) || null;
+        }
         const CHECK_COLORS = { A: '#27ae60', B: '#2980b9', C: '#e67e22', X: '#95a5a6' };
         let checkGroupFilter = 'all';
         let checkDraft = (() => {
@@ -3402,10 +3416,9 @@
             const walk = grLastWalk(name, before);
             if (!walk) return { group: 'X', why: 'never walked' };
             const est = estimateCover(name, new Date(), { walkBefore: before });
-            const h = FARMWALK_HISTORY[normName(name)];
-            const todayWalk = h ? h.entries.find(e => e.dateObj && e.cover > 0 && grIso(e.dateObj) === grIso(today)) : null;
+            const savedRow = partialSavedToday(name);
             const draft = checkDraft[name] !== undefined && checkDraft[name] !== '' ? Number(checkDraft[name]) : null;
-            const info = { est, walk, saved: !!todayWalk, measured: todayWalk ? todayWalk.cover : (draft > 0 ? draft : null) };
+            const info = { est, walk, saved: !!savedRow, measured: draft > 0 ? draft : (savedRow ? savedRow.cover : null) };
             if (!est.fromBreak) {
                 const d = Math.round((today - grDayOf(walk.dateObj)) / GR_DAY);
                 return Object.assign(info, d < 7 ? { group: 'X', why: `walked ${d} days ago` } : { group: 'A', sinceDays: d });
@@ -3482,7 +3495,7 @@
                         <span style="font-size:11px; color:#7f8c8d;">${(p.area || 0).toFixed(1)} ha</span>
                     </div>
                     <div style="font-size:11px; color:#7f8c8d; margin:3px 0 5px;">${checkStartText(c)} · <b style="color:#2c3e50;">est. today ${c.est.cover}</b> (${c.est.growth} growth, ${c.est.days} days)</div>
-                    <input type="number" inputmode="numeric" min="1" placeholder="${c.group === 'C' ? 'Residual in the grazed strip' : 'Measured cover'}" value="${c.measured != null ? c.measured : ''}" ${c.saved ? 'disabled' : ''}
+                    <input type="number" inputmode="numeric" min="1" placeholder="${c.group === 'C' ? 'Residual in the grazed strip' : 'Measured cover'}" value="${c.measured != null ? c.measured : ''}"
                         oninput="checkInput('${escUnit(p.name)}', this.value)" onclick="event.stopPropagation();"
                         style="width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:5px; font-size:15px; font-weight:bold; text-align:center;">
                     <div id="chk-res-${escUnit(normName(p.name))}" style="font-size:11px; margin-top:4px;">${checkResultHtml(c)}${c.saved ? ' <span style="color:#27ae60; font-weight:bold;">· saved</span>' : ''}</div>
@@ -3536,9 +3549,9 @@
             switchDashboardMode(currentDashboardMode === 'check' ? 'manual' : 'check');
         }
 
-        /* Saved as a real partial farmwalk for today, the same way SAVE
-         * FARMWALK saves: farmwalk_load with mode 'merge', so only these
-         * paddocks are written for the day. */
+        /* Saved in the "partial walk" tab only. Nothing is written to Farmwalks
+         * and nothing changes in FARMWALK or the estimates on this phone. A
+         * paddock saved again the same day replaces its row. */
         async function saveCheckWalk() {
             const status = document.getElementById('chk-status');
             const btn = document.getElementById('chk-save');
@@ -3549,55 +3562,40 @@
                 const v = Number(checkDraft[p.name]);
                 if (!(v > 0)) return;      // a cover of 0 is never saved
                 const c = checkInfo(p.name);
-                if (c.saved || c.group === 'X') return;
-                entries.push({ p, cover: Math.round(v) });
+                if (c.group === 'X') return;
+                entries.push({ p, c, cover: Math.round(v) });
             });
             if (!entries.length) { status.textContent = 'Type at least one measured cover first.'; status.style.color = '#c0392b'; return; }
-            if (!confirm(`Save ${entries.length} paddock${entries.length === 1 ? '' : 's'} as a partial farmwalk for today?`)) return;
+            if (!confirm(`Save ${entries.length} paddock${entries.length === 1 ? '' : 's'} in the partial walk for today?`)) return;
 
             btn.disabled = true; btn.textContent = 'SAVING...';
-            const parts = dateVal.split('-');
-            const nzDate = `${Number(parts[2])}/${Number(parts[1])}/${parts[0]}`;
-            let ok = false;
+            let ok = false, why = 'could not reach the sheet';
             try {
                 const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({
-                    type: 'farmwalk_load', sheetName: 'Farmwalks', date: nzDate, mode: 'merge',
-                    entries: entries.map(e => ({ paddock: e.p.name, cover: e.cover, reason: '' }))
+                    type: 'save_partial_walk', user: localStorage.getItem('auth_name') || '',
+                    entries: entries.map(({ p, c, cover }) => ({
+                        date: dateVal, paddock: p.name, cover: cover, group: c.group, estimate: c.est.cover,
+                        start: c.est.fromBreak ? GR_RESIDUAL : c.walk.cover,
+                        startDate: grIso(c.est.fromBreak ? c.est.startDate : c.walk.dateObj), days: c.est.days }))
                 }) });
                 const d = await res.json();
                 ok = !!(d && d.status === 'success');
-                if (!ok) console.error('Check walk save rejected:', d && d.message);
-            } catch (e) { console.error('Check walk save failed:', e); }
+                if (!ok) why = (d && /unknown payload type/i.test(d.message || '')) ? 'the Apps Script needs updating' : ((d && d.message) || 'the sheet refused it');
+            } catch (e) { console.error('Partial walk save failed:', e); }
 
             if (ok) {
-                // The same local update SAVE FARMWALK makes, so the app shows
-                // the walk at once (the published sheet lags minutes behind).
-                entries.forEach(({ p, cover }) => {
-                    if (p.latest && p.latest.ts && dateObj.getTime() > p.latest.ts) {
-                        p.previous = { cover: p.latest.cover, formattedDate: p.latest.formattedDate, ts: p.latest.ts };
-                    }
-                    p.isOut = false; p.neverWalked = false; p.reason = '';
-                    p.latest = { cover: cover, formattedDate: fmtNZ(dateObj), ts: dateObj.getTime() };
-                    if (!p.entries) p.entries = [];
-                    if (p.entries.length && p.entries[0].dateObj && p.entries[0].dateObj.toDateString() === dateObj.toDateString()) p.entries[0].cover = cover;
-                    else p.entries.unshift({ dateObj: dateObj, cover: cover, reason: '' });
-                    p.growthRate = coverGrowthRate(p.latest.cover, p.previous ? p.previous.cover : null,
-                        p.latest.ts, p.previous ? p.previous.ts : null, false);
-                    const k = normName(p.name);
-                    if (!FARMWALK_HISTORY[k]) FARMWALK_HISTORY[k] = { name: p.name, entries: [] };
-                    const he = FARMWALK_HISTORY[k].entries;
-                    const same = he.find(e => e.dateObj && e.dateObj.toDateString() === dateObj.toDateString());
-                    if (same) same.cover = cover; else he.unshift({ dateObj: dateObj, cover: cover, reason: '' });
+                // Kept here too, so the list shows them saved before the next read.
+                entries.forEach(({ p, c, cover }) => {
+                    PARTIAL_WALKS = PARTIAL_WALKS.filter(r => !(r.date === dateVal && normName(r.paddock) === normName(p.name)));
+                    PARTIAL_WALKS.push({ date: dateVal, paddock: p.name, cover: cover, group: c.group, estimate: c.est.cover });
                     delete checkDraft[p.name];
                 });
                 saveCheckDraft();
-                estimatedBuiltAt = 0;
-                try { localStorage.setItem('wn_cached_manual_data', JSON.stringify(manualModeData)); } catch (e) {}
-                status.textContent = `✓ ${entries.length} paddock${entries.length === 1 ? '' : 's'} saved as today's farmwalk.`; status.style.color = '#27ae60';
+                status.textContent = `✓ ${entries.length} paddock${entries.length === 1 ? '' : 's'} saved in the partial walk.`; status.style.color = '#27ae60';
             } else {
-                status.textContent = '⚠ NOT saved. What you typed is kept on this phone; press SAVE again when there is signal.'; status.style.color = '#c0392b';
+                status.textContent = `⚠ NOT saved: ${why}. What you typed is kept on this phone.`; status.style.color = '#c0392b';
             }
-            btn.disabled = false; btn.textContent = '💾 SAVE AS FARMWALK (today)';
+            btn.disabled = false; btn.textContent = '💾 SAVE PARTIAL WALK (today)';
             renderCheckView();
             updateGeoStyles();
         }
@@ -9939,6 +9937,7 @@
                     renderCheckView();
                     updateGeoStyles();
                     renderBreaksOnMap();
+                    loadPartialWalks();
                     return;
                 } else if (mode === 'print_map') {
                     // The print map: the farm, the names and the marks. Nothing else.

@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.28**,
-service worker cache `wn-farm-v1.1.42`, Apps Script `2026-10-12-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.29**,
+service worker cache `wn-farm-v1.1.43`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -208,13 +208,15 @@ The app **opens on BREAKS with the plain satellite picture**.
   paddock goes to its card (lit up, box open); a tap on a card zooms the map
   to the paddock and shows its label (v1.1.28). Each typed cover shows
   measured − estimate and per day; the top box averages each group.
-  **Saved as a real partial farmwalk for today** (Juani): `farmwalk_load`,
-  mode `merge`, only the measured paddocks, the same save as SAVE FARMWALK.
-  FARMWALK's "Previous" is then the last real measured cover, never an
-  estimate. Typed covers are kept on the phone until saved
-  (`check_walk_draft`). On 13 Oct: A 48, C 9, B 20, grey 52.
-  Note: for a C or B paddock the FARMWALK growth line compares the new cover
-  with the walk before the grazing, so it can read negative.
+  **Saved in its own sheet tab, `partial walk`, never in Farmwalks** (Juani,
+  13 Oct 2026, v1.1.29): `save_partial_walk` / `?type=partial_walk`. Columns
+  date | paddock | cover | group | estimate | start | start date | days | user
+  | saved at; one row per paddock per date (a second save replaces it).
+  **The last full farmwalk is never modified**; FARMWALK, its average and its
+  UNMEASURED marks do not change, and EST. FW / BREAKS keep starting from the
+  full walk. (v1.1.27-28 saved into Farmwalks; nothing was ever saved that
+  way on the live sheet - checked 13 Oct, newest walk 30 Sept, 106 rows.)
+  Typed covers are kept on the phone until saved (`check_walk_draft`). On 13 Oct: A 48, C 9, B 20, grey 52.
 - SATELLITE keeps the satellite cover ("≈ ... estimated · satellite <date>").
 
 ### Growth from measured weather (v1.1.22)
@@ -572,3 +574,5 @@ Added 12 October 2026:
   as a real farmwalk (v1.1.27).
 - CHECK: groups in the order A, B, C; card and map paddock linked both ways
   (v1.1.28).
+- CHECK saves to the new `partial walk` tab, not Farmwalks (v1.1.29, Apps
+  Script `2026-10-13-a`). Paste the script; until then a save is refused.

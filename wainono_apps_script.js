@@ -28,12 +28,15 @@
  *      (reason | color), managed from the app: doPost 'save_out_reasons'.
  *      The list goes to the app with the feed settings (outReasons) and with
  *      ?type=out (reasons).
+ *  10. Partial walks (the app's CHECK screen) go to their own sheet
+ *      "partial walk", never to "Farmwalks": doPost 'save_partial_walk',
+ *      doGet 'partial_walk'.
  * Everything else is byte-identical to what you had.
  */
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-12-a";
+var SCRIPT_VERSION = "2026-10-13-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -65,6 +68,8 @@ function doGet(e) {
     return getMaintenance();
   } else if (type === 'silage') {
     return getSilage();
+  } else if (type === 'partial_walk') {
+    return getPartialWalk();
   } else if (type === 'silage_log') {
     return getSilageLog();
   } else if (type === 'version') {
@@ -118,6 +123,8 @@ function doPost(e) {
       return deleteMaintenanceJob(payload.id);
     } else if (type === 'save_maintenance_categories') {
       return saveMaintenanceCategories(payload.categories);
+    } else if (type === 'save_partial_walk') {
+      return savePartialWalk(payload);
     } else if (type === 'save_out_reasons') {
       return saveOutReasons(payload.reasons);
     } else if (type === 'save_silage_location') {
@@ -1218,6 +1225,71 @@ function appendSilageLogRows(entries) {
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, SILAGE_LOG_HEADERS.length).setValues(rows);
   }
   return rows.length;
+}
+
+/* ================== PARTIAL WALK ==================
+ * Sheet "partial walk": covers measured to test the app's estimate (the CHECK
+ * screen). Kept apart from "Farmwalks" on purpose (Juani, 13 Oct 2026): a few
+ * paddocks measured on a day must not look like a farmwalk, and the last full
+ * farmwalk is never changed by them.
+ *   date | paddock | cover | group | estimate | start | start date | days | user | saved at
+ * group is A (growth), B (1500 + growth) or C (residual). estimate is what the
+ * app estimated for that day. One row per paddock per date: saving the same
+ * paddock again on the same date replaces its row.
+ */
+var PARTIAL_COLS = ["date", "paddock", "cover", "group", "estimate", "start", "start date", "days", "user", "saved at"];
+
+function partialWalkSheet() {
+  var sheet = getOrCreateSheet("partial walk");
+  if (sheet.getLastRow() === 0) sheet.appendRow(PARTIAL_COLS);
+  return sheet;
+}
+
+function partialText(v) {
+  var isDate = v && typeof v.getTime === 'function' && !isNaN(v.getTime());
+  if (!isDate) return String(v == null ? "" : v).trim();
+  // A date cell: back to the yyyy-mm-dd the app sends, in the farm's time zone.
+  return Utilities.formatDate(v, "Pacific/Auckland", "yyyy-MM-dd");
+}
+
+function getPartialWalk() {
+  var sheet = partialWalkSheet();
+  var lastRow = sheet.getLastRow();
+  var rows = [];
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, PARTIAL_COLS.length).getValues().forEach(function(r) {
+      if (!r[1]) return;
+      rows.push({ date: partialText(r[0]), paddock: String(r[1]), cover: Number(r[2]) || 0, group: String(r[3] || ""),
+                  estimate: Number(r[4]) || 0, start: Number(r[5]) || 0, startDate: partialText(r[6]),
+                  days: Number(r[7]) || 0, user: String(r[8] || ""), savedAt: partialText(r[9]) });
+    });
+  }
+  return jsonResponse({ status: "success", entries: rows });
+}
+
+function savePartialWalk(payload) {
+  var list = payload && payload.entries;
+  if (!Array.isArray(list) || list.length === 0) return errorResponse("No entries");
+  var sheet = partialWalkSheet();
+  var lastRow = sheet.getLastRow();
+  var keys = {};
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 2).getValues().forEach(function(r, i) {
+      keys[partialText(r[0]) + "|" + String(r[1]).trim().toLowerCase()] = i + 2;
+    });
+  }
+  var added = 0, replaced = 0;
+  list.forEach(function(e) {
+    var cover = Number(e.cover);
+    if (!e || !e.paddock || !e.date || !(cover > 0)) return;     // a cover of 0 is never saved
+    var row = [String(e.date), String(e.paddock), Math.round(cover), String(e.group || ""),
+               Math.round(Number(e.estimate) || 0), Math.round(Number(e.start) || 0), String(e.startDate || ""),
+               Number(e.days) || 0, String(payload.user || e.user || ""), new Date().toISOString()];
+    var key = String(e.date) + "|" + String(e.paddock).trim().toLowerCase();
+    if (keys[key]) { sheet.getRange(keys[key], 1, 1, PARTIAL_COLS.length).setValues([row]); replaced++; }
+    else { sheet.appendRow(row); keys[key] = sheet.getLastRow(); added++; }
+  });
+  return jsonResponse({ status: "success", added: added, replaced: replaced });
 }
 
 /* ================== FARMWALK ROUTE ================== */
