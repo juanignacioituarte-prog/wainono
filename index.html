@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.51</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.52</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.51</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.52</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2168,11 +2168,10 @@
         <div id="check-view" style="display:none; padding:12px 15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
             <h3 style="margin:0 0 4px;">+ Partial walk <span style="font-size:12px; font-weight:normal; color:#7f8c8d;">check the estimate</span></h3>
             <p style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
-                Walk some paddocks today and type what you measure. It is saved in the <b>partial walk</b> tab, not in the farmwalk: FARMWALK and the last full farmwalk do not change.<br>
-                <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
-                <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests residual + growth.<br>
-                <b style="color:#e67e22;">C</b> 24 to 48 hours after the last break (a break is grazed out 24 hours after it is drawn): measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
-                <span style="color:#7f8c8d;">Grey on the map: do not use.</span>
+                <b style="color:#27ae60;">A</b> not grazed since last FW<br>
+                <b style="color:#2980b9;">B</b> grazed 7+ days ago<br>
+                <b style="color:#e67e22;">C</b> grazed up to 48 hr ago<br>
+                <span style="color:#7f8c8d;">Grey: do not use</span>
             </p>
             <div id="chk-summary" style="margin-bottom:8px;"></div>
             <div id="chk-groups" style="display:flex; gap:6px; margin-bottom:8px;"></div>
@@ -3314,7 +3313,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.51) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.52) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a

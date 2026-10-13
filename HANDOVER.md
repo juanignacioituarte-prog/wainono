@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.51**,
-service worker cache `wn-farm-v1.1.65`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.52**,
+service worker cache `wn-farm-v1.1.66`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -559,8 +559,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.51/v1.1.52/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.65/wn-farm-v1.1.66/" sw.js
+sed -i "s/v1\.1\.52/v1.1.53/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.66/wn-farm-v1.1.67/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -746,3 +746,6 @@ Added 12 October 2026:
   the real cover before today's (full or partial walk, or the residual the
   day after the last break), i.e. the MEASURED growth, over 3+ days. C
   residual checks still show no growth.
+- + PARTIAL help text cut to four lines in Juani's words (v1.1.52): A not
+  grazed since last FW / B grazed 7+ days ago / C grazed up to 48 hr ago /
+  Grey: do not use.
