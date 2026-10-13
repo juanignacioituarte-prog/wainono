@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.37</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.38</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.37</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.38</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2171,7 +2171,7 @@
                 Walk some paddocks today and type what you measure. It is saved in the <b>partial walk</b> tab, not in the farmwalk: FARMWALK and the last full farmwalk do not change.<br>
                 <b style="color:#27ae60;">A</b> not grazed since the last walk: tests the growth.<br>
                 <b style="color:#2980b9;">B</b> grazed 7 or more days ago: tests residual + growth.<br>
-                <b style="color:#e67e22;">C</b> grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
+                <b style="color:#e67e22;">C</b> being grazed today, or grazed 1-2 days ago: measure <b>inside the grazed strip</b>; tests the residual. The residual the app uses is the median of these checks.<br>
                 <span style="color:#7f8c8d;">Grey on the map: do not use.</span>
             </p>
             <div id="chk-summary" style="margin-bottom:8px;"></div>
@@ -3639,9 +3639,9 @@
          * Groups (Juani, 13 Oct 2026), worked out from the walks BEFORE today:
          *   A  not grazed since its last walk, walked 7+ days ago: tests growth
          *   B  last break 7+ days ago: tests residual + growth
-         *   C  last break 1-2 days ago: tests the residual (measure in the strip)
-         *   X  grey: out, never walked, walked under 7 days ago, a break today
-         *      (cows may be in it) or 3-6 days ago (too soon to tell)
+         *   C  last break today or 1-2 days ago: tests the residual (measure in the grazed strip)
+         *   X  grey: out, never walked, walked under 7 days ago, or a break
+         *      3-6 days ago (too soon to tell)
          * What is typed is compared with the estimate for today, and saved in
          * the sheet tab "partial walk" (save_partial_walk), NEVER in Farmwalks
          * (Juani, 13 Oct 2026): FARMWALK, its average and the last full walk do
@@ -3698,7 +3698,7 @@
                 return Object.assign(info, d < 7 ? { group: 'X', why: `walked ${d} days ago` } : { group: 'A', sinceDays: d });
             }
             const d = Math.round((today - est.breakDate) / GR_DAY);
-            if (d === 0) return Object.assign(info, { group: 'X', why: 'break today: cows may be in it' });
+            // Being grazed today, or 1-2 days ago: check the residual (Juani, 13 Oct 2026).
             if (d <= 2) return Object.assign(info, { group: 'C', sinceDays: d });
             if (d < 7) return Object.assign(info, { group: 'X', why: `grazed ${d} days ago: too soon` });
             return Object.assign(info, { group: 'B', sinceDays: d });
