@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.50**,
-service worker cache `wn-farm-v1.1.64`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.51**,
+service worker cache `wn-farm-v1.1.65`, Apps Script `2026-10-13-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -559,8 +559,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.50/v1.1.51/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.64/wn-farm-v1.1.65/" sw.js
+sed -i "s/v1\.1\.51/v1.1.52/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.65/wn-farm-v1.1.66/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -741,3 +741,8 @@ Added 12 October 2026:
   drawn 24+ hours before the row was saved. Display only: the estimate saved
   in the "partial walk" sheet is never changed. The original estimate is not
   shown.
+- ESTIMATED cards of paddocks measured today (v1.1.51, Juani 13 Oct 2026:
+  "many paddocks don't have growth"): growth and previous cover come from
+  the real cover before today's (full or partial walk, or the residual the
+  day after the last break), i.e. the MEASURED growth, over 3+ days. C
+  residual checks still show no growth.

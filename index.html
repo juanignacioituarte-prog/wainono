@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.50</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.51</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1738,7 +1738,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.50</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.51</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3314,7 +3314,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.50) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.51) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -3496,13 +3496,27 @@
             estimatedPaddockData = (manualModeData || []).map(p => {
                 const est = estimateCover(p.name, today);
                 const from = est ? (est.fromBreak ? `${est.startCover} on ${fmtNZ(est.startDate)}` : `${grWalkWord({ source: est.walkSource })} ${fmtNZ(est.walkDate)}`) : '';
+                /* Measured today (Juani, 13 Oct 2026): there is no growth since
+                 * today's cover, so the card shows the MEASURED growth from the
+                 * real cover before it (full or partial walk; or the residual the
+                 * day after the last break, 24-hour rule) to today's cover, over
+                 * PW_GROWTH_MIN_DAYS days or more (a C residual is not growth). */
+                let prevReal = null;
+                if (est && !est.fromBreak && est.days === 0) {
+                    const wd = grDayOf(est.walkDate);
+                    const e0 = estimateCover(p.name, wd, { walkBefore: new Date(wd.getTime() - 1), breaksUntil: new Date(wd.getTime() - GR_DAY) });
+                    const n = e0 ? Math.round((wd - grDayOf(e0.startDate)) / GR_DAY) : 0;
+                    if (e0 && n >= PW_GROWTH_MIN_DAYS) prevReal = { cover: e0.startCover, days: n, rate: Math.round((est.walkCover - e0.startCover) / n),
+                        label: e0.fromBreak ? `after break ${fmtNZ(e0.breakDate)}` : `${grWalkWord({ source: e0.walkSource })} ${fmtNZ(e0.walkDate)}` };
+                }
                 return {
                     name: p.name, area: p.area || 0, isOut: p.isOut, reason: p.reason, neverWalked: !est,
                     latest: { cover: est ? est.cover : 0, ts: todayTs,
                               formattedDate: est ? `est. today: ${from} + ${est.growth} growth` : '' },
-                    previous: est ? { cover: est.fromBreak ? est.startCover : est.walkCover,
+                    previous: prevReal ? { cover: prevReal.cover, formattedDate: prevReal.label }
+                        : est ? { cover: est.fromBreak ? est.startCover : est.walkCover,
                                       formattedDate: est.fromBreak ? `after break ${fmtNZ(est.breakDate)}` : `${grWalkWord({ source: est.walkSource })} ${fmtNZ(est.walkDate)}` } : null,
-                    growthRate: est && est.days > 0 ? Math.round(est.growth / est.days) : null,
+                    growthRate: prevReal ? prevReal.rate : (est && est.days > 0 ? Math.round(est.growth / est.days) : null),
                     est: est
                 };
             });
