@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.60</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.61</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.60</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.61</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2173,6 +2173,7 @@
                 <input type="date" id="fert-since" onchange="fertSetSince(this.value)" style="padding:6px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
             </div>
             <div id="fert-rounds" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
+            <button onclick="openFertReport()" style="width:100%; background:#2c3e50; color:#fff; border:none; padding:9px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; margin-bottom:6px;">📋 REPORT: FERT ORDERED BY DAY</button>
             <div id="fert-status" style="font-size:11px; min-height:14px; margin-bottom:4px;"></div>
             <div id="fert-list"></div>
         </div>
@@ -3326,7 +3327,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.60) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.61) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4318,7 +4319,8 @@
             if (!list.length) return;
             if (!confirm(`Tick fert ordered for ${list.length} paddock${list.length === 1 ? '' : 's'} of round ${fertRound}?`)) return;
             const user = localStorage.getItem('auth_name') || '';
-            list.forEach(x => FERT_ORDERED.push({ paddock: x.name, grazed: x.iso, round: x.round, user }));
+            const at = new Date().toISOString();
+            list.forEach(x => FERT_ORDERED.push({ paddock: x.name, grazed: x.iso, round: x.round, user, savedAt: at }));
             try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
             fertCache = null; renderFertView(); updateGeoStyles();
             setFertStatus('Saving...', '#7f8c8d');
@@ -4354,6 +4356,69 @@
             if (typeof checkFlashCard === 'function') checkFlashCard(row);
         }
 
+        /* REPORT (Juani, 15 Oct 2026): the paddocks ticked "fert ordered" on one
+         * day, by round, with hectares: a record of the applications ordered.
+         * The day is when the tick was saved (savedAt, NZ time). The round is
+         * the paddock's round today for that grazing (it can differ from the
+         * round saved when the tick was made, e.g. after a missed break). */
+        let fertReportDay = null;
+        function openFertReport(day) {
+            closeFertReport();
+            fertReportDay = day || fertReportDay || grIso(new Date());
+            const all = fertAll();
+            const roundOf = r => {
+                const f = all[normName(r.paddock)];
+                const i = f ? f.dates.findIndex(d => grIso(d) === r.grazed) : -1;
+                return i >= 0 ? i + 1 : (Number(r.round) || 0);
+            };
+            const dayOf = r => { const t = r.savedAt ? new Date(r.savedAt) : null; return t && isFinite(t.getTime()) ? grIso(t) : ''; };
+            const days = [...new Set(FERT_ORDERED.map(dayOf).filter(Boolean))].sort().reverse();
+            const rows = FERT_ORDERED.filter(r => dayOf(r) === fertReportDay).map(r => ({ r, round: roundOf(r), ha: Number(paddockAreaFor((all[normName(r.paddock)] || {}).name || r.paddock)) || 0 }));
+            const rounds = [...new Set(rows.map(x => x.round))].sort((a, b) => a - b);
+            const fmtHa = v => (Math.round(v * 10) / 10).toFixed(1);
+            const total = rows.reduce((a, x) => a + x.ha, 0);
+            const d = grPartialDate(fertReportDay);
+            const text = [`Fert ordered ${d ? fmtNZ(d) : fertReportDay}: ${rows.length} paddocks, ${fmtHa(total)} ha`].concat(rounds.map(rn => {
+                const list = rows.filter(x => x.round === rn).sort((a, b) => String(a.r.paddock).localeCompare(String(b.r.paddock), undefined, { numeric: true }));
+                return `Round ${rn || '?'} (${list.length} paddocks, ${fmtHa(list.reduce((a, x) => a + x.ha, 0))} ha): ` + list.map(x => `${x.r.paddock} ${fmtHa(x.ha)}`).join(', ');
+            })).join('\n');
+            const body = !rows.length
+                ? `<div style="font-size:12px; color:#7f8c8d; padding:10px 0;">Nothing ticked on this day.</div>`
+                : rounds.map(rn => {
+                    const list = rows.filter(x => x.round === rn).sort((a, b) => String(a.r.paddock).localeCompare(String(b.r.paddock), undefined, { numeric: true }));
+                    return `<div style="margin-top:10px;">
+                        <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; border-bottom:2px solid ${fertCountColor(rn)}; padding-bottom:3px;">
+                            <span>Round ${rn || '?'}</span><span>${list.length} paddock${list.length === 1 ? '' : 's'} · ${fmtHa(list.reduce((a, x) => a + x.ha, 0))} ha</span></div>
+                        <table style="width:100%; font-size:12px; border-collapse:collapse; margin-top:3px;">
+                            <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Grazed</td><td style="text-align:right;">ha</td><td style="text-align:right;">By</td></tr>
+                            ${list.map(x => { const g = grPartialDate(x.r.grazed); return `<tr style="border-top:1px solid #eee;"><td style="padding:3px 0;"><b>${escUnit(x.r.paddock)}</b></td><td>${g ? fmtNZ(g) : escUnit(x.r.grazed)}</td><td style="text-align:right;">${fmtHa(x.ha)}</td><td style="text-align:right; color:#7f8c8d;">${escUnit(x.r.user || '')}</td></tr>`; }).join('')}
+                        </table></div>`;
+                }).join('');
+            const wrap = document.createElement('div');
+            wrap.id = 'fert-report-modal';
+            wrap.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; display:flex; align-items:center; justify-content:center; padding:15px;';
+            wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:520px; max-height:88vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📋 Fert ordered</h3>
+                <button onclick="closeFertReport()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
+                <div style="display:flex; gap:8px; align-items:center; margin:8px 0; flex-wrap:wrap;">
+                    <input type="date" id="fert-report-day" value="${fertReportDay}" onchange="openFertReport(this.value)" style="padding:6px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+                    ${days.slice(0, 6).map(x => { const dd = grPartialDate(x); return `<button onclick="openFertReport('${x}')" style="padding:5px 8px; border-radius:5px; font-size:11px; cursor:pointer; border:1px solid #2c3e50; background:${x === fertReportDay ? '#2c3e50' : '#fff'}; color:${x === fertReportDay ? '#fff' : '#2c3e50'};">${dd ? fmtNZ(dd) : x}</button>`; }).join('')}
+                </div>
+                <div style="font-size:14px;"><b>${rows.length}</b> paddock${rows.length === 1 ? '' : 's'} · <b>${fmtHa(total)}</b> ha</div>
+                ${body}
+                ${rows.length ? `<button id="fert-report-copy" style="width:100%; margin-top:12px; background:#ecf0f1; color:#2c3e50; border:none; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⧉ COPY AS TEXT</button>` : ''}
+            </div>`;
+            wrap.addEventListener('click', e => { if (e.target === wrap) closeFertReport(); });
+            document.body.appendChild(wrap);
+            const btn = document.getElementById('fert-report-copy');
+            if (btn) btn.onclick = () => {
+                const done = () => { btn.textContent = '✓ Copied'; };
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, () => window.prompt('Copy:', text));
+                else window.prompt('Copy:', text);
+            };
+        }
+        function closeFertReport() { const w = document.getElementById('fert-report-modal'); if (w) w.remove(); }
+
         function setFertStatus(msg, col) { const el = document.getElementById('fert-status'); if (el) { el.textContent = msg; el.style.color = col || '#7f8c8d'; } }
         async function loadFert() {
             try {
@@ -4369,7 +4434,7 @@
         }
         async function fertToggle(name, iso, round, on) {
             FERT_ORDERED = FERT_ORDERED.filter(r => fertKey(r.paddock, r.grazed) !== fertKey(name, iso));
-            if (on) FERT_ORDERED.push({ paddock: name, grazed: iso, round: round, user: localStorage.getItem('auth_name') || '' });
+            if (on) FERT_ORDERED.push({ paddock: name, grazed: iso, round: round, user: localStorage.getItem('auth_name') || '', savedAt: new Date().toISOString() });
             try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
             fertCache = null; renderFertView(); updateGeoStyles();
             setFertStatus('Saving...', '#7f8c8d');
