@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.71**,
-service worker cache `wn-farm-v1.1.85`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.72**,
+service worker cache `wn-farm-v1.1.86`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.71/v1.1.72/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.85/wn-farm-v1.1.86/" sw.js
+sed -i "s/v1\.1\.72/v1.1.73/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.86/wn-farm-v1.1.87/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -864,3 +864,7 @@ Added 12 October 2026:
 - Fert: "being grazed" also needs the round's breaks under 90% of the
   paddock (`FERT_GRAZED_COVER`, `f.pcts`, `fertCowsOn`); 90%+ = grazed
   (v1.1.71, Juani). On 15 Oct: 8 paddocks instead of 15.
+- Fert: teal (being grazed) rows show the last spread and the N-day check
+  (`fertSpreadText`); the order list has a Last spread column, red when
+  less than N days before the spreading date, with a count above SEND
+  (v1.1.72).
