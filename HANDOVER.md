@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.61**,
-service worker cache `wn-farm-v1.1.75`, Apps Script `2026-10-15-b`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.62**,
+service worker cache `wn-farm-v1.1.76`, Apps Script `2026-10-15-c`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.61/v1.1.62/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.75/wn-farm-v1.1.76/" sw.js
+sed -i "s/v1\.1\.62/v1.1.63/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.76/wn-farm-v1.1.77/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -812,3 +812,10 @@ Added 12 October 2026:
   (by savedAt, NZ date; default today; the last 6 tick days as buttons),
   grouped by round (the round today for that grazing), with grazed date, ha,
   who, totals, and COPY AS TEXT.
+- Fert saving (v1.1.62, script 2026-10-15-c), after unticks were lost on
+  15 Oct: `saveFert` reads the `fert` sheet once and writes it once (TICK ALL
+  of 104 took ~70 s holding the lock; unticks sent meanwhile timed out at
+  30 s). The app queues every change in `fert_pending` (localStorage), sends
+  the queue in one POST, keeps it if the sheet does not answer, shows it on
+  top of the sheet's list, and sends it again with the next change or when
+  Fert opens (`fertSend`, `fertFlush`, `fertApplyPending`).

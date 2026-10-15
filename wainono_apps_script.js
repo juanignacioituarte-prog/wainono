@@ -38,7 +38,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-15-b";
+var SCRIPT_VERSION = "2026-10-15-c";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -1329,39 +1329,40 @@ function getFert() {
 }
 
 function saveFert(payload) {
-  // Several at once (the app's TICK ALL): entries [{paddock, grazed, round, ordered}].
-  if (payload && Array.isArray(payload.entries)) {
-    var n = 0;
-    payload.entries.forEach(function(e) {
-      if (!e || !e.paddock || !e.grazed) return;
-      saveFert({ paddock: e.paddock, grazed: e.grazed, round: e.round, ordered: e.ordered, user: payload.user });
-      n++;
-    });
-    return jsonResponse({ status: "success", saved: n });
-  }
-  if (!payload || !payload.paddock || !payload.grazed) return errorResponse("Paddock and grazing date needed");
+  // One tick ({paddock, grazed, round, ordered}) or several (entries: [...]).
+  // The sheet is read once and written once, so a TICK ALL of 100 paddocks
+  // takes a few seconds and does not hold the lock for a minute (15 Oct 2026:
+  // unticks sent during a slow TICK ALL timed out and were lost).
+  var list = (payload && Array.isArray(payload.entries)) ? payload.entries : [payload];
+  list = list.filter(function(e) { return e && e.paddock && e.grazed; });
+  if (!list.length) return errorResponse("Paddock and grazing date needed");
   var sheet = fertSheet();
-  var key = String(payload.paddock).trim().toLowerCase() + "|" + String(payload.grazed);
   var lastRow = sheet.getLastRow();
-  var at = 0;
-  if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, 2).getValues().forEach(function(r, i) {
-      if (String(r[0]).trim().toLowerCase() + "|" + partialText(r[1]) === key) at = i + 2;
-    });
-  }
-  if (!payload.ordered) {
-    if (at) sheet.deleteRow(at);
-    return jsonResponse({ status: "success", removed: at ? 1 : 0 });
-  }
-  var row = [String(payload.paddock), String(payload.grazed), Number(payload.round) || 0,
-             String(payload.user || ""), new Date().toISOString()];
-  if (at) sheet.getRange(at, 1, 1, FERT_COLS.length).setValues([row]);
-  else {
-    sheet.appendRow(row);
+  var rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, FERT_COLS.length).getValues() : [];
+  var keyOf = function(p, g) { return String(p).trim().toLowerCase() + "|" + String(g); };
+  var byKey = {};
+  rows.forEach(function(r) {
+    if (!r[0] || !r[1]) return;
+    var g = partialText(r[1]);
+    byKey[keyOf(r[0], g)] = [String(r[0]), g, r[2], r[3], partialText(r[4])];
+  });
+  var saved = 0, removed = 0, now = new Date().toISOString();
+  list.forEach(function(e) {
+    var k = keyOf(e.paddock, e.grazed);
+    if (e.ordered) {
+      byKey[k] = [String(e.paddock), String(e.grazed), Number(e.round) || 0, String(payload.user || e.user || ""), now];
+      saved++;
+    } else if (byKey[k]) { delete byKey[k]; removed++; }
+  });
+  var out = Object.keys(byKey).map(function(k) { return byKey[k]; });
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, FERT_COLS.length).clearContent();
+  if (out.length) {
+    var range = sheet.getRange(2, 1, out.length, FERT_COLS.length);
     // Plain text, so the date stays yyyy-mm-dd and a paddock called 7 stays "7".
-    sheet.getRange(sheet.getLastRow(), 1, 1, 2).setNumberFormat("@").setValues([[row[0], row[1]]]);
+    sheet.getRange(2, 1, out.length, 2).setNumberFormat("@");
+    range.setValues(out);
   }
-  return jsonResponse({ status: "success", saved: 1 });
+  return jsonResponse({ status: "success", saved: saved, removed: removed, rows: out.length });
 }
 
 /* ================== FARMWALK ROUTE ================== */

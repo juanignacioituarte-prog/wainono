@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.61</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.62</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.61</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.62</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3327,7 +3327,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.61) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.62) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4318,21 +4318,7 @@
             const list = FERT_ROWS.filter(x => !FERT_ORDERED.some(r => fertKey(r.paddock, r.grazed) === fertKey(x.name, x.iso)));
             if (!list.length) return;
             if (!confirm(`Tick fert ordered for ${list.length} paddock${list.length === 1 ? '' : 's'} of round ${fertRound}?`)) return;
-            const user = localStorage.getItem('auth_name') || '';
-            const at = new Date().toISOString();
-            list.forEach(x => FERT_ORDERED.push({ paddock: x.name, grazed: x.iso, round: x.round, user, savedAt: at }));
-            try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
-            fertCache = null; renderFertView(); updateGeoStyles();
-            setFertStatus('Saving...', '#7f8c8d');
-            try {
-                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'save_fert', user,
-                    entries: list.map(x => ({ paddock: x.name, grazed: x.iso, round: x.round, ordered: true })) }) });
-                const data = await res.json();
-                if (!data || data.status !== 'success') throw new Error((data && data.message) || 'the sheet refused it');
-                setFertStatus(`✓ ${list.length} saved to the sheet`, '#27ae60');
-            } catch (e) {
-                setFertStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
-            }
+            await fertSend(list.map(x => ({ paddock: x.name, grazed: x.iso, round: x.round, ordered: true })), `✓ ${list.length} saved to the sheet`);
         }
         function fertSetRound(r) { fertRound = r; renderFertView(); updateGeoStyles(); }
 
@@ -4420,35 +4406,80 @@
         function closeFertReport() { const w = document.getElementById('fert-report-modal'); if (w) w.remove(); }
 
         function setFertStatus(msg, col) { const el = document.getElementById('fert-status'); if (el) { el.textContent = msg; el.style.color = col || '#7f8c8d'; } }
+        /* Saving ticks (15 Oct 2026): every change goes into a queue kept on the
+         * phone (fert_pending) and is sent in one POST. If the sheet does not
+         * answer, the changes stay queued, still show on this phone, and are
+         * sent again with the next change or when Fert opens: an untick is
+         * never lost because the sheet was busy. */
+        let FERT_PENDING = (() => { try { const c = JSON.parse(localStorage.getItem('fert_pending') || '[]'); return Array.isArray(c) ? c : []; } catch (e) { return []; } })();
+        let fertFlushing = null;
+        function fertSavePending() { try { localStorage.setItem('fert_pending', JSON.stringify(FERT_PENDING)); } catch (e) {} }
+        // The sheet's list with the changes not sent yet on top.
+        function fertApplyPending(list) {
+            const out = list.slice();
+            FERT_PENDING.forEach(c => {
+                const i = out.findIndex(r => fertKey(r.paddock, r.grazed) === fertKey(c.paddock, c.grazed));
+                if (i >= 0) out.splice(i, 1);
+                if (c.ordered) out.push({ paddock: c.paddock, grazed: c.grazed, round: c.round, user: c.user, savedAt: c.at });
+            });
+            return out;
+        }
+        async function fertFlush() {
+            if (fertFlushing) return fertFlushing;
+            if (!FERT_PENDING.length) return true;
+            const batch = FERT_PENDING.slice();
+            fertFlushing = (async () => {
+                try {
+                    const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'save_fert', user: localStorage.getItem('auth_name') || '',
+                        entries: batch.map(c => ({ paddock: c.paddock, grazed: c.grazed, round: c.round, ordered: c.ordered })) }) });
+                    const data = await res.json();
+                    if (!data || data.status !== 'success') {
+                        const msg = (data && data.message) ? data.message : 'the sheet refused it';
+                        throw new Error(/unknown payload type/i.test(msg) ? 'the Apps Script needs updating' : msg);
+                    }
+                    // Sent: take them off the queue (a newer change to the same paddock stays).
+                    FERT_PENDING = FERT_PENDING.filter(c => !batch.includes(c));
+                    fertSavePending();
+                    return true;
+                } catch (e) {
+                    setFertStatus(`⚠ Not saved yet (${e.message}). ${FERT_PENDING.length} change${FERT_PENDING.length === 1 ? '' : 's'} kept on this phone, sent again next time.`, '#e67e22');
+                    return false;
+                } finally { fertFlushing = null; }
+            })();
+            return fertFlushing;
+        }
+        // Queue changes [{paddock, grazed, round, ordered}], show them, send them.
+        async function fertSend(changes, okText) {
+            const user = localStorage.getItem('auth_name') || '', at = new Date().toISOString();
+            changes.forEach(c => {
+                FERT_PENDING = FERT_PENDING.filter(x => fertKey(x.paddock, x.grazed) !== fertKey(c.paddock, c.grazed));
+                FERT_PENDING.push(Object.assign({ user, at }, c));
+                FERT_ORDERED = FERT_ORDERED.filter(r => fertKey(r.paddock, r.grazed) !== fertKey(c.paddock, c.grazed));
+                if (c.ordered) FERT_ORDERED.push({ paddock: c.paddock, grazed: c.grazed, round: c.round, user, savedAt: at });
+            });
+            fertSavePending();
+            try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
+            fertCache = null; renderFertView(); updateGeoStyles();
+            setFertStatus('Saving...', '#7f8c8d');
+            if (fertFlushing) await fertFlushing;          // one POST at a time
+            if (await fertFlush()) setFertStatus(okText, '#27ae60');
+        }
+
         async function loadFert() {
+            await fertFlush();
             try {
                 const res = await fetch(GOOGLE_SCRIPT_URL + '?type=fert&t=' + Date.now(), { cache: 'no-store' });
                 const d = await res.json();
                 if (d && Array.isArray(d.entries)) {
-                    FERT_ORDERED = d.entries;
+                    FERT_ORDERED = fertApplyPending(d.entries);
                     try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
                     fertCache = null;
                     if (currentDashboardMode === 'fert') { renderFertView(); updateGeoStyles(); }
                 } else if (d && d.status !== 'success') setFertStatus('⚠ The Apps Script needs updating for fert ticks', '#e67e22');
             } catch (e) { console.warn('Fert not loaded', e); }
         }
-        async function fertToggle(name, iso, round, on) {
-            FERT_ORDERED = FERT_ORDERED.filter(r => fertKey(r.paddock, r.grazed) !== fertKey(name, iso));
-            if (on) FERT_ORDERED.push({ paddock: name, grazed: iso, round: round, user: localStorage.getItem('auth_name') || '', savedAt: new Date().toISOString() });
-            try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
-            fertCache = null; renderFertView(); updateGeoStyles();
-            setFertStatus('Saving...', '#7f8c8d');
-            try {
-                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'save_fert', paddock: name, grazed: iso, round: round, ordered: !!on, user: localStorage.getItem('auth_name') || '' }) });
-                const data = await res.json();
-                if (!data || data.status !== 'success') {
-                    const msg = (data && data.message) ? data.message : 'the sheet refused it';
-                    throw new Error(/unknown payload type/i.test(msg) ? 'the Apps Script needs updating' : msg);
-                }
-                setFertStatus(`✓ ${name} ${on ? 'ticked' : 'unticked'}, saved to the sheet`, '#27ae60');
-            } catch (e) {
-                setFertStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
-            }
+        function fertToggle(name, iso, round, on) {
+            return fertSend([{ paddock: name, grazed: iso, round: round, ordered: !!on }], `✓ ${name} ${on ? 'ticked' : 'unticked'}, saved to the sheet`);
         }
 
         function renderPrintMapPanel() {
