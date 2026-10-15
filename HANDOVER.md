@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.63**,
-service worker cache `wn-farm-v1.1.77`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.64**,
+service worker cache `wn-farm-v1.1.78`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.63/v1.1.64/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.77/wn-farm-v1.1.78/" sw.js
+sed -i "s/v1\.1\.64/v1.1.65/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.78/wn-farm-v1.1.79/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -825,3 +825,12 @@ Added 12 October 2026:
   known, picked in the round list (date box on each ticked row; orange when
   empty). Round 1 spread dates come from HawkEye's spread records. The
   REPORT is by order day and shows the spread date.
+- Round 1 order and spread dates filled from HawkEye (15 Oct 2026) for the
+  99 round-1 ticks: each paddock's Ammo 31 spread goes on its round 1 tick,
+  also when it was spread before that grazing (order HE-01610041, 8 Sept:
+  36, G1, G2, 29, 31, J2, J5, J6, L2, L9).
+- Fert **nitrogen rule** (v1.1.64, `fertNStatus`): at least N days (28,
+  changeable, kept per phone in `fert_n_days`) between spreads; a warning
+  only. SPREAD ASAP = last grazing not ordered, grazed after the last
+  spread (or none), N days passed; else WAITING until last spread + N. The
+  button opens the list (`openFertAsap`); rows not ordered show it too.

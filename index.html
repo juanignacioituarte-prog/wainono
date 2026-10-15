@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.63</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.64</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.63</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.64</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2173,6 +2173,7 @@
                 <input type="date" id="fert-since" onchange="fertSetSince(this.value)" style="padding:6px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
             </div>
             <div id="fert-rounds" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
+            <div id="fert-nrule" style="margin-bottom:8px;"></div>
             <button onclick="openFertReport()" style="width:100%; background:#2c3e50; color:#fff; border:none; padding:9px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; margin-bottom:6px;">📋 REPORT: FERT ORDERED BY DAY</button>
             <div id="fert-status" style="font-size:11px; min-height:14px; margin-bottom:4px;"></div>
             <div id="fert-list"></div>
@@ -3327,7 +3328,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.63) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.64) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4275,6 +4276,16 @@
                 for (let r = 1; r <= max; r++) h += chip(r, `ROUND ${r} (${all.filter(f => f.dates.length >= r).length})`, fertCountColor(r));
                 rounds.innerHTML = h;
             }
+            const nbox = document.getElementById('fert-nrule');
+            if (nbox) {
+                const st = Object.values(fertNStatus());
+                const asap = st.filter(x => x.state === 'asap'), wait = st.filter(x => x.state === 'wait');
+                nbox.innerHTML = `<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; flex-wrap:wrap;"><b>Nitrogen rule:</b> at least
+                        <input type="number" id="fert-n-days" min="1" max="120" value="${fertNDays()}" onchange="fertSetNDays(this.value)" style="width:52px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:13px;"> days between spreads</div>
+                    <button onclick="openFertAsap()" style="background:${asap.length ? '#c0392b' : '#27ae60'}; color:#fff; border:none; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">🚜 SPREAD ASAP: ${asap.length} paddock${asap.length === 1 ? '' : 's'} · ${fmtHa(ha(asap.map(x => x.f)))} ha${wait.length ? ` <span style="font-weight:normal;">(${wait.length} waiting for the ${fertNDays()} days)</span>` : ''}</button>
+                </div>`;
+            }
             const box = document.getElementById('fert-list');
             if (!box) return;
             if (!fertRound) {
@@ -4309,7 +4320,7 @@
                     return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
                         <input type="checkbox" ${x.ordered ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
-                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : ''}</span>
+                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : fertRuleText(x.f.name)}</span>
                         ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread<input type="date" value="${escUnit(x.spread)}" title="Day it was spread" onclick="event.stopPropagation()" onchange="fertSetSpread(${i}, this.value)" style="font-size:11px; padding:2px 3px; border:1px solid ${x.spread ? '#27ae60' : '#e67e22'}; border-radius:4px; color:${x.spread ? '#27ae60' : '#e67e22'}; max-width:118px;"></span>` : ''}</label>`;
                 }).join('');
         }
@@ -4417,6 +4428,81 @@
             };
         }
         function closeFertReport() { const w = document.getElementById('fert-report-modal'); if (w) w.remove(); }
+
+        /* NITROGEN RULE (Juani, 15 Oct 2026): at least N days (default 28,
+         * changeable, kept on this phone) between two spreads on a paddock.
+         * It can be broken for logistics, so it only warns. A paddock should be
+         * spread ASAP when its last grazing has no fert ordered yet, it was
+         * grazed after its last spread (or has none), and N days have passed
+         * since that spread. If N days have not passed, it waits until then.
+         * A tick with no spread date yet counts as ordered, not spread. */
+        const FERT_N_DAYS_DEFAULT = 28;
+        function fertNDays() {
+            let v = null; try { v = Number(localStorage.getItem('fert_n_days')); } catch (e) {}
+            return v > 0 ? v : FERT_N_DAYS_DEFAULT;
+        }
+        function fertSetNDays(v) {
+            const n = Math.round(Number(v));
+            try { if (n > 0) localStorage.setItem('fert_n_days', String(n)); } catch (e) {}
+            renderFertView();
+        }
+        function fertNStatus() {
+            const today = grDayOf(new Date()), N = fertNDays(), out = {};
+            Object.values(fertAll()).forEach(f => {
+                if (!f.dates.length) return;
+                const k = normName(f.name);
+                const ticks = FERT_ORDERED.filter(t => normName(t.paddock) === k);
+                const spreads = ticks.map(t => t.spread).filter(Boolean).sort();
+                const lastSpread = spreads.length ? grPartialDate(spreads[spreads.length - 1]) : null;
+                const last = f.dates.length - 1, g = f.dates[last];
+                let state = 'done';
+                if (!f.ordered[last] && (!lastSpread || grDayOf(g) > lastSpread)) {
+                    const okFrom = lastSpread ? new Date(lastSpread.getTime() + N * GR_DAY) : null;
+                    state = (!okFrom || today >= okFrom) ? 'asap' : 'wait';
+                    out[k] = { f, state, grazed: g, round: last + 1, lastSpread, okFrom,
+                               days: lastSpread ? Math.round((today - lastSpread) / GR_DAY) : null };
+                }
+            });
+            return out;
+        }
+        // The small line on a paddock not ordered yet: OK to spread, or wait.
+        function fertRuleText(name) {
+            const x = fertNStatus()[normName(name)];
+            if (!x) return '';
+            return x.state === 'asap'
+                ? `<br><span style="color:#c0392b; font-weight:bold;">spread ASAP${x.lastSpread ? ` · last ${x.days} d ago` : ' · no spread yet'}</span>`
+                : `<br><span style="color:#e67e22;">wait: ${fertNDays()} days from ${fmtNZ(x.lastSpread)} = ${fmtNZ(x.okFrom)}</span>`;
+        }
+        function openFertAsap() {
+            closeFertAsap();
+            const st = Object.values(fertNStatus());
+            const fmtHa = v => (Math.round(v * 10) / 10).toFixed(1);
+            const haOf = x => Number(paddockAreaFor(x.f.name)) || 0;
+            const asap = st.filter(x => x.state === 'asap').sort((a, b) => (b.days == null ? 9999 : b.days) - (a.days == null ? 9999 : a.days) || a.grazed - b.grazed);
+            const wait = st.filter(x => x.state === 'wait').sort((a, b) => a.okFrom - b.okFrom);
+            const table = (list, last) => `<table style="width:100%; font-size:12px; border-collapse:collapse;">
+                <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Grazed</td><td>Last spread</td><td style="text-align:right;">${last}</td><td style="text-align:right;">ha</td></tr>
+                ${list.map(x => `<tr style="border-top:1px solid #eee; cursor:pointer;" onclick="closeFertAsap(); fertGoTo('${escUnit(x.f.name).replace(/&#39;/g, '')}')">
+                    <td style="padding:4px 0;"><b>${escUnit(x.f.name)}</b> <span style="font-size:10px; color:#7f8c8d;">R${x.round}</span></td><td>${fmtNZ(x.grazed)}</td>
+                    <td>${x.lastSpread ? fmtNZ(x.lastSpread) : '<span style="color:#7f8c8d;">none</span>'}</td>
+                    <td style="text-align:right; font-weight:bold;">${x.state === 'asap' ? (x.days == null ? '--' : x.days + ' d') : fmtNZ(x.okFrom)}</td>
+                    <td style="text-align:right;">${fmtHa(haOf(x))}</td></tr>`).join('')}</table>`;
+            const wrap = document.createElement('div');
+            wrap.id = 'fert-asap-modal';
+            wrap.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; display:flex; align-items:center; justify-content:center; padding:15px;';
+            wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:520px; max-height:88vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">🚜 Nitrogen to spread</h3>
+                <button onclick="closeFertAsap()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px;">Grazed, no fert ordered yet for that grazing. Rule: ${fertNDays()} days between spreads.</div>
+                <div style="font-size:13px; font-weight:bold; color:#c0392b; border-bottom:2px solid #c0392b; padding-bottom:3px;">Spread ASAP: ${asap.length} paddock${asap.length === 1 ? '' : 's'} · ${fmtHa(asap.reduce((a, x) => a + haOf(x), 0))} ha</div>
+                ${asap.length ? table(asap, 'Since spread') : '<div style="font-size:12px; color:#7f8c8d; padding:6px 0;">None.</div>'}
+                <div style="font-size:13px; font-weight:bold; color:#e67e22; border-bottom:2px solid #e67e22; padding-bottom:3px; margin-top:12px;">Waiting for the ${fertNDays()} days: ${wait.length} · ${fmtHa(wait.reduce((a, x) => a + haOf(x), 0))} ha</div>
+                ${wait.length ? table(wait, 'OK from') : '<div style="font-size:12px; color:#7f8c8d; padding:6px 0;">None.</div>'}
+            </div>`;
+            wrap.addEventListener('click', e => { if (e.target === wrap) closeFertAsap(); });
+            document.body.appendChild(wrap);
+        }
+        function closeFertAsap() { const w = document.getElementById('fert-asap-modal'); if (w) w.remove(); }
 
         function setFertStatus(msg, col) { const el = document.getElementById('fert-status'); if (el) { el.textContent = msg; el.style.color = col || '#7f8c8d'; } }
         /* Saving ticks (15 Oct 2026): every change goes into a queue kept on the
