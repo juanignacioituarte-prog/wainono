@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.58</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.59</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.58</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.59</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3326,7 +3326,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.58) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.59) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4232,13 +4232,13 @@
                 const starts = [];
                 let cur = null;
                 const full = c => !(area > 0) || c.ha >= FERT_COVER * area;
-                const done = c => !(area > 0) || c.ha >= FERT_DONE_COVER * area;
+                const finished = c => !(area > 0) || c.ha >= FERT_DONE_COVER * area;
                 list.forEach(b => {
                     if (cur) {
                         const gap = b.t - cur.last;
                         // A round ends after FERT_GAP_DAYS days with no break, if
                         // its breaks covered FERT_DONE_COVER (60%) of the paddock.
-                        if (gap > FERT_GAP_DAYS * GR_DAY && done(cur)) { starts.push(cur.start); cur = null; }
+                        if (gap > FERT_GAP_DAYS * GR_DAY && finished(cur)) { starts.push(cur.start); cur = null; }
                         // An unfinished round left for FERT_DROP_DAYS days never counts.
                         else if (gap > FERT_DROP_DAYS * GR_DAY) cur = null;
                     }
@@ -4246,7 +4246,7 @@
                     cur.ha += b.ha; cur.last = b.t;
                 });
                 // The last round: counts at 80%, or at 60% once 10 days pass with no break.
-                if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && done(cur)))) { starts.push(cur.start); cur = null; }
+                if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && finished(cur)))) { starts.push(cur.start); cur = null; }
                 const dates = starts.filter(t => t.getTime() >= since);
                 out[k] = { name: names[k], dates, ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
                            current: cur && area > 0 && Date.now() - cur.last <= FERT_DROP_DAYS * GR_DAY ? Math.round(cur.ha / area * 100) : null };
@@ -4291,12 +4291,15 @@
             }
             const r = fertRound;
             const rows = all.filter(f => f.dates.length >= r).map(f => ({ f, date: f.dates[r - 1], ordered: f.ordered[r - 1] }))
-                .sort((a, b) => b.date - a.date || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
+                // Still to order on top, ordered ones at the bottom (Juani); newest grazing first.
+                .sort((a, b) => (a.ordered - b.ordered) || (b.date - a.date) || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
             const done = rows.filter(x => x.ordered);
+            const todo = rows.length - done.length;
             FERT_ROWS = rows.map(x => ({ name: x.f.name, iso: grIso(x.date), round: r }));
             box.innerHTML = `<div style="font-size:12px; margin-bottom:6px;"><b>Round ${r}:</b> ${rows.length} paddocks · ${fmtHa(ha(rows.map(x => x.f)))} ha
                     <br><span style="color:#27ae60;">■ fert ordered</span> ${done.length} · ${fmtHa(ha(done.map(x => x.f)))} ha
                     &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.length - done.length} · ${fmtHa(ha(rows.filter(x => !x.ordered).map(x => x.f)))} ha</div>` +
+                (todo ? `<button onclick="fertTickAll()" style="width:100%; background:#27ae60; color:#fff; border:none; padding:10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:8px;">✓ TICK ALL ${todo} NOT ORDERED</button>` : '') +
                 rows.map((x, i) => {
                     const id = 'fert-row-' + escUnit(normName(x.f.name));
                     const iso = grIso(x.date);
@@ -4309,6 +4312,26 @@
         }
         let FERT_ROWS = [];
         function fertToggleRow(i, on) { const x = FERT_ROWS[i]; if (x) fertToggle(x.name, x.iso, x.round, on); }
+        // Every paddock of the round still not ordered, in one save.
+        async function fertTickAll() {
+            const list = FERT_ROWS.filter(x => !FERT_ORDERED.some(r => fertKey(r.paddock, r.grazed) === fertKey(x.name, x.iso)));
+            if (!list.length) return;
+            if (!confirm(`Tick fert ordered for ${list.length} paddock${list.length === 1 ? '' : 's'} of round ${fertRound}?`)) return;
+            const user = localStorage.getItem('auth_name') || '';
+            list.forEach(x => FERT_ORDERED.push({ paddock: x.name, grazed: x.iso, round: x.round, user }));
+            try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
+            fertCache = null; renderFertView(); updateGeoStyles();
+            setFertStatus('Saving...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'save_fert', user,
+                    entries: list.map(x => ({ paddock: x.name, grazed: x.iso, round: x.round, ordered: true })) }) });
+                const data = await res.json();
+                if (!data || data.status !== 'success') throw new Error((data && data.message) || 'the sheet refused it');
+                setFertStatus(`✓ ${list.length} saved to the sheet`, '#27ae60');
+            } catch (e) {
+                setFertStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
+        }
         function fertSetRound(r) { fertRound = r; renderFertView(); updateGeoStyles(); }
 
         // From the list to the map, and from the map to the list.

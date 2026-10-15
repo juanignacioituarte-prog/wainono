@@ -38,7 +38,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-15-a";
+var SCRIPT_VERSION = "2026-10-15-b";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -1329,6 +1329,16 @@ function getFert() {
 }
 
 function saveFert(payload) {
+  // Several at once (the app's TICK ALL): entries [{paddock, grazed, round, ordered}].
+  if (payload && Array.isArray(payload.entries)) {
+    var n = 0;
+    payload.entries.forEach(function(e) {
+      if (!e || !e.paddock || !e.grazed) return;
+      saveFert({ paddock: e.paddock, grazed: e.grazed, round: e.round, ordered: e.ordered, user: payload.user });
+      n++;
+    });
+    return jsonResponse({ status: "success", saved: n });
+  }
   if (!payload || !payload.paddock || !payload.grazed) return errorResponse("Paddock and grazing date needed");
   var sheet = fertSheet();
   var key = String(payload.paddock).trim().toLowerCase() + "|" + String(payload.grazed);

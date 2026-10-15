@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.58**,
-service worker cache `wn-farm-v1.1.72`, Apps Script `2026-10-15-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.59**,
+service worker cache `wn-farm-v1.1.73`, Apps Script `2026-10-15-b`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.58/v1.1.59/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.72/wn-farm-v1.1.73/" sw.js
+sed -i "s/v1\.1\.59/v1.1.60/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.73/wn-farm-v1.1.74/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -800,3 +800,8 @@ Added 12 October 2026:
 - Editing a break's createdAt in the Breaks sheet alone does not stick: a
   phone's copy wins when its lastEditedAt/createdAt is newer, and the next
   sync rewrites the whole sheet. Change lastEditedAt to now as well.
+- Fert (v1.1.59, script 2026-10-15-b): ticks showed as not ticked from
+  v1.1.55 to v1.1.58 (a helper named `done` hid the ticked list; renamed
+  `finished`). Round list: not ordered on top, ordered at the bottom; TICK
+  ALL button saves every not-ordered paddock of the round in one POST
+  (`save_fert` with `entries`).
