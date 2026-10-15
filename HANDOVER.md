@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.67**,
-service worker cache `wn-farm-v1.1.81`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.68**,
+service worker cache `wn-farm-v1.1.82`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.67/v1.1.68/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.81/wn-farm-v1.1.82/" sw.js
+sed -i "s/v1\.1\.68/v1.1.69/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.82/wn-farm-v1.1.83/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -847,3 +847,6 @@ Added 12 October 2026:
   and list); nothing goes to the sheet until SEND ORDER in the list, which
   sets one spreading date for all (ordered = that day). Unticking a paddock
   already sent unticks it in the sheet at once.
+- Fert: the red SPREAD ASAP banner and the red edges on the ALL map are
+  gone (v1.1.68, Juani); ASAP paddocks show only inside each round (red,
+  on top). `openFertAsap` is still in the code but has no button.

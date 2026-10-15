@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.67</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.68</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.67</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.68</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3329,7 +3329,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.67) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.68) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4292,12 +4292,10 @@
             renderFertDraftBar();
             const nbox = document.getElementById('fert-nrule');
             if (nbox) {
-                const st = Object.values(fertNStatus());
-                const asap = st.filter(x => x.state === 'asap'), wait = st.filter(x => x.state === 'wait');
+                // The ASAP paddocks show in each round (red, on top), not here (Juani).
                 nbox.innerHTML = `<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:6px;">
                     <div style="display:flex; align-items:center; gap:6px; font-size:12px; flex-wrap:wrap;"><b>Nitrogen rule:</b> at least
                         <input type="number" id="fert-n-days" min="1" max="120" value="${fertNDays()}" onchange="fertSetNDays(this.value)" style="width:52px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:13px;"> days between spreads</div>
-                    <button onclick="openFertAsap()" style="background:${asap.length ? '#c0392b' : '#27ae60'}; color:#fff; border:none; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">🚜 SPREAD ASAP: ${asap.length} paddock${asap.length === 1 ? '' : 's'} · ${fmtHa(ha(asap.map(x => x.f)))} ha${wait.length ? ` <span style="font-weight:normal;">(${wait.length} waiting for the ${fertNDays()} days)</span>` : ''}</button>
                 </div>`;
             }
             const box = document.getElementById('fert-list');
@@ -12074,13 +12072,12 @@
                 } else if (currentDashboardMode === 'fert') {
                     // FERT: all rounds = coloured by the number of grazings; one
                     // round = green fert ordered, orange not ordered, red spread
-                    // ASAP (nitrogen rule), faint not there yet. With ALL the
-                    // ASAP paddocks get a red edge.
+                    // ASAP (nitrogen rule), blue in the order list, faint not there yet.
                     const f = fertPaddockInfo(pName);
                     const ns = fertNStatus()[normName(pName)];
                     const asap = ns && ns.state === 'asap';
                     let fill, op, edge = 'white', w = 1.5;
-                    if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; if (asap) { edge = FERT_ASAP_COLOR; w = 3; } }
+                    if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; }
                     else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : fertInDraft(f.name, grIso(f.dates[fertRound - 1])) ? FERT_DRAFT_COLOR : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
                     else { fill = '#95a5a6'; op = 0.12; }
                     layer.setStyle({ fillColor: fill, fillOpacity: op, color: edge, opacity: 0.9, weight: w });
