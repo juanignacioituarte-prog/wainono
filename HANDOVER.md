@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.69**,
-service worker cache `wn-farm-v1.1.83`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.70**,
+service worker cache `wn-farm-v1.1.84`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.69/v1.1.70/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.83/wn-farm-v1.1.84/" sw.js
+sed -i "s/v1\.1\.70/v1.1.71/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.84/wn-farm-v1.1.85/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -855,3 +855,9 @@ Added 12 October 2026:
   grazing (its last break, `f.ends`) to today (not ordered) or to the
   spreading date (order list). Over M = purple (#8e44ad) "too close to next
   grazing", below the others in the list; a warning only.
+- Fert: paddocks **being grazed now** (a break in the last 3 days,
+  `FERT_GRAZING_DAYS`) show in their round in teal (#16a085), with % done
+  (v1.1.70, Juani: fert often comes a few days after). A grazing not counted
+  yet shows as the next round (`f.grazing`, key = its first break, the same
+  key it keeps when it counts); a counted round with a break in the last 3
+  days is teal too. They can be ticked / put in the order list.
