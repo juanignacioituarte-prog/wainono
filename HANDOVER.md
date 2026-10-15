@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.68**,
-service worker cache `wn-farm-v1.1.82`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.69**,
+service worker cache `wn-farm-v1.1.83`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.68/v1.1.69/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.82/wn-farm-v1.1.83/" sw.js
+sed -i "s/v1\.1\.69/v1.1.70/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.83/wn-farm-v1.1.84/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -850,3 +850,8 @@ Added 12 October 2026:
 - Fert: the red SPREAD ASAP banner and the red edges on the ALL map are
   gone (v1.1.68, Juani); ASAP paddocks show only inside each round (red,
   on top). `openFertAsap` is still in the code but has no button.
+- Fert rule **spread within M days after the grazing** (v1.1.69, M = 15,
+  changeable, per phone `fert_max_days`): days from the end of the round's
+  grazing (its last break, `f.ends`) to today (not ordered) or to the
+  spreading date (order list). Over M = purple (#8e44ad) "too close to next
+  grazing", below the others in the list; a warning only.

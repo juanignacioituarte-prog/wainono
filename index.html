@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.68</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.69</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.68</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.69</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3329,7 +3329,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.68) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.69) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4244,7 +4244,7 @@
             Object.keys(names).forEach(k => {
                 const list = (by[k] || []).sort((a, b) => a.t - b.t);
                 const area = Number(paddockAreaFor(names[k])) || 0;
-                const starts = [];
+                const starts = [], ends = [];
                 let cur = null;
                 const full = c => !(area > 0) || c.ha >= FERT_COVER * area;
                 const finished = c => !(area > 0) || c.ha >= FERT_DONE_COVER * area;
@@ -4253,7 +4253,7 @@
                         const gap = b.t - cur.last;
                         // A round ends after FERT_GAP_DAYS days with no break, if
                         // its breaks covered FERT_DONE_COVER (60%) of the paddock.
-                        if (gap > FERT_GAP_DAYS * GR_DAY && finished(cur)) { starts.push(cur.start); cur = null; }
+                        if (gap > FERT_GAP_DAYS * GR_DAY && finished(cur)) { starts.push(cur.start); ends.push(cur.last); cur = null; }
                         // An unfinished round left for FERT_DROP_DAYS days never counts.
                         else if (gap > FERT_DROP_DAYS * GR_DAY) cur = null;
                     }
@@ -4261,9 +4261,10 @@
                     cur.ha += b.ha; cur.last = b.t;
                 });
                 // The last round: counts at 80%, or at 60% once 10 days pass with no break.
-                if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && finished(cur)))) { starts.push(cur.start); cur = null; }
-                const dates = starts.filter(t => t.getTime() >= since);
-                out[k] = { name: names[k], dates, ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
+                if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && finished(cur)))) { starts.push(cur.start); ends.push(cur.last); cur = null; }
+                const keep = starts.map((t, i) => i).filter(i => starts[i].getTime() >= since);
+                const dates = keep.map(i => starts[i]);
+                out[k] = { name: names[k], dates, ends: keep.map(i => ends[i]), ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
                            current: cur && area > 0 && Date.now() - cur.last <= FERT_DROP_DAYS * GR_DAY ? Math.round(cur.ha / area * 100) : null };
             });
             fertCache = out; fertCacheAt = Date.now();
@@ -4296,6 +4297,8 @@
                 nbox.innerHTML = `<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:6px;">
                     <div style="display:flex; align-items:center; gap:6px; font-size:12px; flex-wrap:wrap;"><b>Nitrogen rule:</b> at least
                         <input type="number" id="fert-n-days" min="1" max="120" value="${fertNDays()}" onchange="fertSetNDays(this.value)" style="width:52px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:13px;"> days between spreads</div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:12px; flex-wrap:wrap;"><b>Spread within</b>
+                        <input type="number" id="fert-max-days" min="1" max="60" value="${fertMaxDays()}" onchange="fertSetMaxDays(this.value)" style="width:52px; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:13px;"> days after the grazing <span style="color:${FERT_LATE_COLOR};">(later: too close to next grazing)</span></div>
                 </div>`;
             }
             const box = document.getElementById('fert-list');
@@ -4319,11 +4322,14 @@
             const rows = all.filter(f => f.dates.length >= r).map(f => { const t = f.ordered[r - 1] ? tickOf(f, f.dates[r - 1]) : {};
                 const ns = nst[normName(f.name)];
                 const draft = !f.ordered[r - 1] && fertInDraft(f.name, grIso(f.dates[r - 1]));
-                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], draft, orderedOn: fertOrderedOn(t), spread: t.spread || '',
-                         asap: !f.ordered[r - 1] && !!ns && ns.state === 'asap' && ns.round === r }; })
-                // Spread ASAP on top, then the rest still to order, ordered ones
-                // at the bottom (Juani); newest grazing first.
-                .sort((a, b) => (b.asap - a.asap) || (a.ordered - b.ordered) || (b.date - a.date) || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
+                const late = !f.ordered[r - 1] && !draft && fertTooLate(f.name, r);
+                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], draft, late, orderedOn: fertOrderedOn(t), spread: t.spread || '',
+                         asap: !f.ordered[r - 1] && !late && !!ns && ns.state === 'asap' && ns.round === r }; })
+                // Spread ASAP on top, then the rest still to order, then too
+                // close to the next grazing, ordered ones at the bottom (Juani);
+                // newest grazing first.
+                .sort((a, b) => (b.asap - a.asap) || (a.ordered - b.ordered) || (a.late - b.late) || (b.date - a.date) || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
+            const nLate = rows.filter(x => x.late);
             const nAsap = rows.filter(x => x.asap);
             const done = rows.filter(x => x.ordered);
             const todo = rows.filter(x => !x.ordered && !x.draft).length;
@@ -4331,15 +4337,16 @@
             box.innerHTML = `<div style="font-size:12px; margin-bottom:6px;"><b>Round ${r}:</b> ${rows.length} paddocks · ${fmtHa(ha(rows.map(x => x.f)))} ha
                     <br><span style="color:#27ae60;">■ fert ordered</span> ${done.length} · ${fmtHa(ha(done.map(x => x.f)))} ha
                     <br><span style="color:${FERT_ASAP_COLOR};">■ spread ASAP</span> ${nAsap.length} · ${fmtHa(ha(nAsap.map(x => x.f)))} ha
-                    &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.length - done.length - nAsap.length} · ${fmtHa(ha(rows.filter(x => !x.ordered && !x.asap).map(x => x.f)))} ha</div>` +
+                    &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.filter(x => !x.ordered && !x.asap && !x.late).length} · ${fmtHa(ha(rows.filter(x => !x.ordered && !x.asap && !x.late).map(x => x.f)))} ha
+                    <br><span style="color:${FERT_LATE_COLOR};">■ too close to next grazing</span> ${nLate.length} · ${fmtHa(ha(nLate.map(x => x.f)))} ha</div>` +
                 (todo ? `<button onclick="fertTickAll()" style="width:100%; background:#2980b9; color:#fff; border:none; padding:10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:8px;">＋ ADD ALL ${todo} NOT ORDERED TO THE ORDER LIST</button>` : '') +
                 rows.map((x, i) => {
                     const id = 'fert-row-' + escUnit(normName(x.f.name));
                     const iso = grIso(x.date);
-                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.draft ? FERT_DRAFT_COLOR : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
+                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.draft ? FERT_DRAFT_COLOR : x.late ? FERT_LATE_COLOR : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
                         <input type="checkbox" ${x.ordered || x.draft ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
-                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : x.draft ? `<br><span style="color:${FERT_DRAFT_COLOR}; font-weight:bold;">in the order list (not sent)</span>` : fertRuleText(x.f.name)}</span>
+                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : x.draft ? `<br><span style="color:${FERT_DRAFT_COLOR}; font-weight:bold;">in the order list (not sent)</span>` : x.late ? `<br><span style="color:${FERT_LATE_COLOR}; font-weight:bold;">too close to next grazing · grazed ${fertDaysAfter(x.f.name, r)} d ago</span>` : fertRuleText(x.f.name)}</span>
                         ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread${dmyDateBox(x.spread, `fertSetSpread(${i}, this.value)`, { color: x.spread ? '#27ae60' : '#e67e22', empty: 'pick date', small: true })}</span>` : ''}</label>`;
                 }).join('');
         }
@@ -4459,6 +4466,31 @@
          * A tick with no spread date yet counts as ordered, not spread. */
         const FERT_N_DAYS_DEFAULT = 28;
         const FERT_ASAP_COLOR = '#c0392b';
+        /* MAX DAYS AFTER GRAZING (Juani, 15 Oct 2026): fert should be spread
+         * within M days (default 15, changeable, kept on this phone) of the end
+         * of the grazing (its last break). Later than that it is too close to
+         * the next grazing. A warning only: purple, never blocks. Counted to
+         * today for paddocks not ordered, to the spreading date in the order
+         * list. */
+        const FERT_LATE_COLOR = '#8e44ad', FERT_MAX_DAYS_DEFAULT = 15;
+        function fertMaxDays() {
+            let v = null; try { v = Number(localStorage.getItem('fert_max_days')); } catch (e) {}
+            return v > 0 ? v : FERT_MAX_DAYS_DEFAULT;
+        }
+        function fertSetMaxDays(v) {
+            const n = Math.round(Number(v));
+            try { if (n > 0) localStorage.setItem('fert_max_days', String(n)); } catch (e) {}
+            renderFertView(); updateGeoStyles();
+        }
+        // Days from the end of round r's grazing to a day (today if none); null if unknown.
+        function fertDaysAfter(name, round, onIso) {
+            const f = fertAll()[normName(name)];
+            const end = f && f.ends ? f.ends[round - 1] : null;
+            if (!end) return null;
+            const day = onIso ? grPartialDate(onIso) : grDayOf(new Date());
+            return day ? Math.round((day - grDayOf(end)) / GR_DAY) : null;
+        }
+        const fertTooLate = (name, round, onIso) => { const d = fertDaysAfter(name, round, onIso); return d != null && d > fertMaxDays(); };
         function fertNDays() {
             let v = null; try { v = Number(localStorage.getItem('fert_n_days')); } catch (e) {}
             return v > 0 ? v : FERT_N_DAYS_DEFAULT;
@@ -4655,13 +4687,16 @@
                 <button onclick="closeFertOrder()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
                 <div style="font-size:14px; margin:6px 0;"><b>${list.length}</b> paddock${list.length === 1 ? '' : 's'} · <b>${fmtHa(total)}</b> ha</div>
                 ${list.length ? `<table style="width:100%; font-size:12px; border-collapse:collapse;">
-                    <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Round</td><td>Grazed</td><td style="text-align:right;">ha</td><td></td></tr>
-                    ${list.map(d => { const g = grPartialDate(d.grazed); return `<tr style="border-top:1px solid #eee;"><td style="padding:4px 0;"><b>${escUnit(d.paddock)}</b></td><td>${d.round}</td><td>${g ? fmtNZ(g) : escUnit(d.grazed)}</td><td style="text-align:right;">${fmtHa(haOf(d))}</td>
+                    <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Round</td><td>Grazed</td><td>Days after</td><td style="text-align:right;">ha</td><td></td></tr>
+                    ${list.map(d => { const g = grPartialDate(d.grazed); const da = fertDaysAfter(d.paddock, d.round, fertOrderSpread || null); const late = da != null && da > fertMaxDays();
+                        return `<tr style="border-top:1px solid #eee;${late ? ` color:${FERT_LATE_COLOR};` : ''}"><td style="padding:4px 0;"><b>${escUnit(d.paddock)}</b></td><td>${d.round}</td><td>${g ? fmtNZ(g) : escUnit(d.grazed)}</td><td>${da == null ? '--' : da + ' d'}${late ? ' <b>too close</b>' : ''}</td><td style="text-align:right;">${fmtHa(haOf(d))}</td>
                         <td style="text-align:right;"><button onclick="fertDraftRemove('${escUnit(d.paddock).replace(/&#39;/g, '')}', '${d.grazed}')" style="background:none; border:none; color:#c0392b; font-size:16px; cursor:pointer;" title="Take off the list">&times;</button></td></tr>`; }).join('')}
                 </table>` : '<div style="font-size:12px; color:#7f8c8d; padding:8px 0;">The list is empty. Tick paddocks in a round to add them.</div>'}
                 ${list.length ? `<div style="display:flex; align-items:center; gap:8px; margin:12px 0 4px; font-size:13px; flex-wrap:wrap;"><b>Spreading date:</b>
                     ${dmyDateBox(fertOrderSpread, 'fertOrderSpread = this.value; openFertOrder()', { id: 'fert-order-spread', color: fertOrderSpread ? '#27ae60' : '#e67e22', empty: 'pick date' })}
                     <span style="font-size:11px; color:#7f8c8d;">for all of them (can be changed later per paddock)</span></div>
+                ${(() => { const n = list.filter(d => { const da = fertDaysAfter(d.paddock, d.round, fertOrderSpread || null); return da != null && da > fertMaxDays(); }).length;
+                    return n ? `<div style="font-size:12px; color:${FERT_LATE_COLOR}; font-weight:bold;">${n} paddock${n === 1 ? '' : 's'} more than ${fertMaxDays()} days after the grazing${fertOrderSpread ? ' on that date' : ' today'}: too close to next grazing.</div>` : ''; })()}
                 <button onclick="sendFertOrder()" style="width:100%; margin-top:8px; background:#27ae60; color:#fff; border:none; padding:12px; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">✓ SEND ORDER (${list.length})</button>
                 <button onclick="fertDraftClear()" style="width:100%; margin-top:6px; background:#ecf0f1; color:#c0392b; border:none; padding:8px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">CLEAR THE LIST</button>` : ''}
             </div>`;
@@ -12078,7 +12113,7 @@
                     const asap = ns && ns.state === 'asap';
                     let fill, op, edge = 'white', w = 1.5;
                     if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; }
-                    else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : fertInDraft(f.name, grIso(f.dates[fertRound - 1])) ? FERT_DRAFT_COLOR : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
+                    else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : fertInDraft(f.name, grIso(f.dates[fertRound - 1])) ? FERT_DRAFT_COLOR : fertTooLate(f.name, fertRound) ? FERT_LATE_COLOR : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
                     else { fill = '#95a5a6'; op = 0.12; }
                     layer.setStyle({ fillColor: fill, fillOpacity: op, color: edge, opacity: 0.9, weight: w });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${escUnit(pName)}</div>` +
