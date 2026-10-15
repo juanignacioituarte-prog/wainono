@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.72</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.73</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.72</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.73</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3329,7 +3329,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.72) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.73) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4162,6 +4162,33 @@
         // Being grazed: a break in the last FERT_GRAZING_DAYS days and the round's
         // breaks under FERT_GRAZED_COVER of the paddock (Juani: 90%+ = grazed).
         const FERT_GRAZING_DAYS = 3, FERT_GRAZED_COVER = 0.9, FERT_GRAZING_COLOR = '#16a085';
+        /* A cow seen from above (Juani: "something more visual, some cows from
+         * top"), drawn on the paddocks being grazed in Fert. */
+        const FERT_COW_SVG = size => `<svg width="${size}" height="${Math.round(size * 1.5)}" viewBox="0 0 20 30" style="vertical-align:middle;" aria-hidden="true">
+            <ellipse cx="10" cy="17" rx="7" ry="10.5" fill="#fdfdfd" stroke="#222" stroke-width="1.2"/>
+            <path d="M5 11 q3 -2 4 2 q-1 4 -5 3 z" fill="#222"/><path d="M12 18 q4 -1 4 3 q-2 4 -5 1 z" fill="#222"/><path d="M6 22 q2 1 1 3 q-2 0 -2 -2 z" fill="#222"/>
+            <ellipse cx="10" cy="4.5" rx="4" ry="4" fill="#fdfdfd" stroke="#222" stroke-width="1.2"/>
+            <ellipse cx="4.6" cy="3" rx="2" ry="1.1" fill="#222"/><ellipse cx="15.4" cy="3" rx="2" ry="1.1" fill="#222"/>
+            <ellipse cx="10" cy="7" rx="2.6" ry="1.5" fill="#f2b8b8" stroke="#222" stroke-width="0.6"/>
+            <path d="M10 27.5 v2" stroke="#222" stroke-width="1.2"/></svg>`;
+        let fertCowLayer = null;
+        function renderFertCows() {
+            if (fertCowLayer) { map.removeLayer(fertCowLayer); fertCowLayer = null; }
+            if (currentDashboardMode !== 'fert' || typeof L === 'undefined') return;
+            fertCowLayer = L.layerGroup();
+            Object.values(fertAll()).forEach(f => {
+                const on = f.grazing || fertCowsOn(f, f.dates.length);
+                const l = paddockMap[f.name];
+                if (!on || !l || !l.getBounds) return;
+                const pct = f.grazing ? f.grazing.pct : (f.pcts ? Math.round(f.pcts[f.pcts.length - 1] * 100) : null);
+                L.marker(l.getBounds().getCenter(), {
+                    interactive: false, keyboard: false,
+                    icon: L.divIcon({ className: '', iconSize: [26, 39], iconAnchor: [13, 20],
+                        html: `<div style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));" title="${escUnit(f.name)} being grazed${pct != null ? ' ' + pct + '%' : ''}">${FERT_COW_SVG(26)}</div>` })
+                }).addTo(fertCowLayer);
+            });
+            fertCowLayer.addTo(map);
+        }
         const fertCowsOn = (f, r) => r === f.dates.length && f.ends && f.ends[r - 1] && Date.now() - f.ends[r - 1] <= FERT_GRAZING_DAYS * GR_DAY && !(f.pcts && f.pcts[r - 1] >= FERT_GRAZED_COVER);
         const FERT_COVER = 0.8, FERT_DONE_COVER = 0.6, FERT_GAP_DAYS = 10, FERT_DROP_DAYS = 30;
         const FERT_COUNT_COLORS = ['#95a5a6', '#3498db', '#27ae60', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad'];
@@ -4360,16 +4387,16 @@
                     <br><span style="color:#27ae60;">■ fert ordered</span> ${done.length} · ${fmtHa(ha(done.map(x => x.f)))} ha
                     <br><span style="color:${FERT_ASAP_COLOR};">■ spread ASAP</span> ${nAsap.length} · ${fmtHa(ha(nAsap.map(x => x.f)))} ha
                     &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.filter(x => !x.ordered && !x.asap && !x.late && !x.grazing).length} · ${fmtHa(ha(rows.filter(x => !x.ordered && !x.asap && !x.late && !x.grazing).map(x => x.f)))} ha
-                    <br><span style="color:${FERT_GRAZING_COLOR};">■ being grazed now</span> ${nGrazing.length} · ${fmtHa(ha(nGrazing.map(x => x.f)))} ha
+                    <br>${FERT_COW_SVG(14)} being grazed now ${nGrazing.length} · ${fmtHa(ha(nGrazing.map(x => x.f)))} ha
                     <br><span style="color:${FERT_LATE_COLOR};">■ too close to next grazing</span> ${nLate.length} · ${fmtHa(ha(nLate.map(x => x.f)))} ha</div>` +
                 (todo ? `<button onclick="fertTickAll()" style="width:100%; background:#2980b9; color:#fff; border:none; padding:10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:8px;">＋ ADD ALL ${todo} NOT ORDERED TO THE ORDER LIST</button>` : '') +
                 rows.map((x, i) => {
                     const id = 'fert-row-' + escUnit(normName(x.f.name));
                     const iso = grIso(x.date);
-                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.draft ? FERT_DRAFT_COLOR : x.grazing ? FERT_GRAZING_COLOR : x.late ? FERT_LATE_COLOR : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
+                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.draft ? FERT_DRAFT_COLOR : x.late ? FERT_LATE_COLOR : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
                         <input type="checkbox" ${x.ordered || x.draft ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
-                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">${x.grazing ? `<span style="color:${FERT_GRAZING_COLOR}; font-weight:bold;">being grazed${x.pct != null ? ' · ' + x.pct + '% done' : ''}</span> · from` : 'grazed'} ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : x.draft ? `<br><span style="color:${FERT_DRAFT_COLOR}; font-weight:bold;">in the order list (not sent)</span>` : x.grazing ? fertSpreadText(x.f.name) : x.late ? `<br><span style="color:${FERT_LATE_COLOR}; font-weight:bold;">too close to next grazing · grazed ${fertDaysAfter(x.f.name, r)} d ago</span>` : fertRuleText(x.f.name)}</span>
+                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">${x.grazing ? `<span style="font-weight:bold; color:#2c3e50;">${FERT_COW_SVG(16)} being grazed${x.pct != null ? ' · ' + x.pct + '% done' : ''}</span> · from` : 'grazed'} ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : x.draft ? `<br><span style="color:${FERT_DRAFT_COLOR}; font-weight:bold;">in the order list (not sent)</span>` : x.grazing ? fertSpreadText(x.f.name) : x.late ? `<br><span style="color:${FERT_LATE_COLOR}; font-weight:bold;">too close to next grazing · grazed ${fertDaysAfter(x.f.name, r)} d ago</span>` : fertRuleText(x.f.name)}</span>
                         ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread${dmyDateBox(x.spread, `fertSetSpread(${i}, this.value)`, { color: x.spread ? '#27ae60' : '#e67e22', empty: 'pick date', small: true })}</span>` : ''}</label>`;
                 }).join('');
         }
@@ -12071,6 +12098,7 @@
 
         function updateGeoStyles() {
             if (!geoLayer) return;
+            if (typeof renderFertCows === 'function') renderFertCows();   // on in Fert, off elsewhere
             const currentData = getCurrentModeData();
             const walk = latestWalkInfo(currentData);
             const activeUnit = unitFilterApplies() ? getActiveUnit() : null;
@@ -12163,8 +12191,8 @@
                     if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; }
                     else if (f.n >= fertRound) {
                         const cowsOn = fertCowsOn(f, fertRound);
-                        fill = f.ordered[fertRound - 1] ? '#27ae60' : fertInDraft(f.name, grIso(f.dates[fertRound - 1])) ? FERT_DRAFT_COLOR : cowsOn ? FERT_GRAZING_COLOR : fertTooLate(f.name, fertRound) ? FERT_LATE_COLOR : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
-                    else if (f.grazing && f.n + 1 === fertRound) { const gi = grIso(f.grazing.start); fill = fertIsSent(f.name, gi) ? '#27ae60' : fertInDraft(f.name, gi) ? FERT_DRAFT_COLOR : FERT_GRAZING_COLOR; op = 0.75; }
+                        fill = f.ordered[fertRound - 1] ? '#27ae60' : fertInDraft(f.name, grIso(f.dates[fertRound - 1])) ? FERT_DRAFT_COLOR : (!cowsOn && fertTooLate(f.name, fertRound)) ? FERT_LATE_COLOR : (!cowsOn && asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
+                    else if (f.grazing && f.n + 1 === fertRound) { const gi = grIso(f.grazing.start); fill = fertIsSent(f.name, gi) ? '#27ae60' : fertInDraft(f.name, gi) ? FERT_DRAFT_COLOR : '#e67e22'; op = 0.75; }
                     else { fill = '#95a5a6'; op = 0.12; }
                     layer.setStyle({ fillColor: fill, fillOpacity: op, color: edge, opacity: 0.9, weight: w });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${escUnit(pName)}</div>` +
