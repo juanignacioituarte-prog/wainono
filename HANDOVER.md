@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.65**,
-service worker cache `wn-farm-v1.1.79`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.66**,
+service worker cache `wn-farm-v1.1.80`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.65/v1.1.66/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.79/wn-farm-v1.1.80/" sw.js
+sed -i "s/v1\.1\.66/v1.1.67/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.80/wn-farm-v1.1.81/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -839,3 +839,6 @@ Added 12 October 2026:
   text with an invisible date box on top that opens the picker. Only the
   Fert boxes (since, spread, report day); the other date boxes in the app
   are still the phone's own.
+- Fert: SPREAD ASAP paddocks are red (#c0392b, `FERT_ASAP_COLOR`) on the
+  round map (orange = not ordered, waiting; green = ordered) and first in
+  the round list; with ALL they get a red edge (v1.1.66).

@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.65</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.66</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.65</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.66</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3328,7 +3328,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.65) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.66) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4315,21 +4315,27 @@
             }
             const r = fertRound;
             const tickOf = (f, d) => FERT_ORDERED.find(x => fertKey(x.paddock, x.grazed) === fertKey(f.name, grIso(d))) || {};
+            const nst = fertNStatus();
             const rows = all.filter(f => f.dates.length >= r).map(f => { const t = f.ordered[r - 1] ? tickOf(f, f.dates[r - 1]) : {};
-                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], orderedOn: fertOrderedOn(t), spread: t.spread || '' }; })
-                // Still to order on top, ordered ones at the bottom (Juani); newest grazing first.
-                .sort((a, b) => (a.ordered - b.ordered) || (b.date - a.date) || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
+                const ns = nst[normName(f.name)];
+                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], orderedOn: fertOrderedOn(t), spread: t.spread || '',
+                         asap: !f.ordered[r - 1] && !!ns && ns.state === 'asap' && ns.round === r }; })
+                // Spread ASAP on top, then the rest still to order, ordered ones
+                // at the bottom (Juani); newest grazing first.
+                .sort((a, b) => (b.asap - a.asap) || (a.ordered - b.ordered) || (b.date - a.date) || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
+            const nAsap = rows.filter(x => x.asap);
             const done = rows.filter(x => x.ordered);
             const todo = rows.length - done.length;
             FERT_ROWS = rows.map(x => ({ name: x.f.name, iso: grIso(x.date), round: r }));
             box.innerHTML = `<div style="font-size:12px; margin-bottom:6px;"><b>Round ${r}:</b> ${rows.length} paddocks · ${fmtHa(ha(rows.map(x => x.f)))} ha
                     <br><span style="color:#27ae60;">■ fert ordered</span> ${done.length} · ${fmtHa(ha(done.map(x => x.f)))} ha
-                    &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.length - done.length} · ${fmtHa(ha(rows.filter(x => !x.ordered).map(x => x.f)))} ha</div>` +
+                    <br><span style="color:${FERT_ASAP_COLOR};">■ spread ASAP</span> ${nAsap.length} · ${fmtHa(ha(nAsap.map(x => x.f)))} ha
+                    &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.length - done.length - nAsap.length} · ${fmtHa(ha(rows.filter(x => !x.ordered && !x.asap).map(x => x.f)))} ha</div>` +
                 (todo ? `<button onclick="fertTickAll()" style="width:100%; background:#27ae60; color:#fff; border:none; padding:10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:8px;">✓ TICK ALL ${todo} NOT ORDERED</button>` : '') +
                 rows.map((x, i) => {
                     const id = 'fert-row-' + escUnit(normName(x.f.name));
                     const iso = grIso(x.date);
-                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
+                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
                         <input type="checkbox" ${x.ordered ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
                         <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : fertRuleText(x.f.name)}</span>
@@ -4449,6 +4455,7 @@
          * since that spread. If N days have not passed, it waits until then.
          * A tick with no spread date yet counts as ordered, not spread. */
         const FERT_N_DAYS_DEFAULT = 28;
+        const FERT_ASAP_COLOR = '#c0392b';
         function fertNDays() {
             let v = null; try { v = Number(localStorage.getItem('fert_n_days')); } catch (e) {}
             return v > 0 ? v : FERT_N_DAYS_DEFAULT;
@@ -4458,9 +4465,13 @@
             try { if (n > 0) localStorage.setItem('fert_n_days', String(n)); } catch (e) {}
             renderFertView();
         }
+        let fertNMemo = null;
         function fertNStatus() {
-            const today = grDayOf(new Date()), N = fertNDays(), out = {};
-            Object.values(fertAll()).forEach(f => {
+            const all = fertAll(), N = fertNDays();
+            // The map asks once per paddock: reuse while the grazings and ticks are the same.
+            if (fertNMemo && fertNMemo.all === all && fertNMemo.N === N && fertNMemo.n === FERT_ORDERED.length && fertNMemo.ref === FERT_ORDERED) return fertNMemo.out;
+            const today = grDayOf(new Date()), out = {};
+            Object.values(all).forEach(f => {
                 if (!f.dates.length) return;
                 const k = normName(f.name);
                 const ticks = FERT_ORDERED.filter(t => normName(t.paddock) === k);
@@ -4475,6 +4486,7 @@
                                days: lastSpread ? Math.round((today - lastSpread) / GR_DAY) : null };
                 }
             });
+            fertNMemo = { all, N, n: FERT_ORDERED.length, ref: FERT_ORDERED, out };
             return out;
         }
         // The small line on a paddock not ordered yet: OK to spread, or wait.
@@ -11987,13 +11999,17 @@
                     layer._printLabel = true;
                 } else if (currentDashboardMode === 'fert') {
                     // FERT: all rounds = coloured by the number of grazings; one
-                    // round = green fert ordered, orange not ordered, faint not there yet.
+                    // round = green fert ordered, orange not ordered, red spread
+                    // ASAP (nitrogen rule), faint not there yet. With ALL the
+                    // ASAP paddocks get a red edge.
                     const f = fertPaddockInfo(pName);
-                    let fill, op;
-                    if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; }
-                    else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : '#e67e22'; op = 0.75; }
+                    const ns = fertNStatus()[normName(pName)];
+                    const asap = ns && ns.state === 'asap';
+                    let fill, op, edge = 'white', w = 1.5;
+                    if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; if (asap) { edge = FERT_ASAP_COLOR; w = 3; } }
+                    else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
                     else { fill = '#95a5a6'; op = 0.12; }
-                    layer.setStyle({ fillColor: fill, fillOpacity: op, color: 'white', opacity: 0.9, weight: 1.5 });
+                    layer.setStyle({ fillColor: fill, fillOpacity: op, color: edge, opacity: 0.9, weight: w });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${escUnit(pName)}</div>` +
                         `<div style="font-size:11px;"><b>${f.n}</b> grazing${f.n === 1 ? '' : 's'} since ${fmtNZ(fertSinceDate())}</div>` +
                         f.dates.map((d, i) => `<div style="font-size:10px; color:#555;">${i + 1}. ${fmtNZ(d)}${f.ordered[i] ? ' <b style="color:#27ae60;">✓ fert</b>' : ''}</div>`).join('') +
