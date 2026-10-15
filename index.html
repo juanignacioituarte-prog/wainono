@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.54</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.55</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.54</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.55</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3326,7 +3326,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.54) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.55) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4144,18 +4144,19 @@
 
         /* ---- FERT (Juani, 15 Oct 2026) ----
          * How many times each paddock was grazed since a date (default: the
-         * start of the season, 1 June), from the breaks. A new round starts
-         * after FERT_GAP_DAYS (10) days with no break, but only when the round
-         * before covered FERT_COVER (80%) of the paddock area (Juani: so a
-         * paddock grazed slower than 10 days is not counted twice). A round
-         * counts once it covers 80%. Only grass breaks count: crop breaks and
+         * start of the season, 1 June), from the breaks. A round counts once
+         * its breaks cover FERT_COVER (80%) of the paddock area, or, after
+         * FERT_GAP_DAYS (10) days with no break, FERT_DONE_COVER (60%) (Juani:
+         * long strip grazings like 28 add up to only ~70%). A new round starts
+         * only after 10 days with no break AND 60% covered, so a paddock grazed
+         * slower than 10 days is not counted twice. Only grass breaks count: crop breaks and
          * lines (no area) are left out (Juani). An unfinished round with no break for
          * FERT_DROP_DAYS days is dropped. A round is dated by its first break.
          * Round N = the paddocks' Nth grazing. Fert ordered is ticked per paddock per grazing and
          * kept in the sheet "fert" (doPost 'save_fert', doGet 'fert'), keyed
          * by paddock + the grazing's date, so changing the date never moves
          * a tick to another grazing. */
-        const FERT_COVER = 0.8, FERT_GAP_DAYS = 10, FERT_DROP_DAYS = 30;
+        const FERT_COVER = 0.8, FERT_DONE_COVER = 0.6, FERT_GAP_DAYS = 10, FERT_DROP_DAYS = 30;
         const FERT_COUNT_COLORS = ['#95a5a6', '#3498db', '#27ae60', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad'];
         const fertCountColor = n => FERT_COUNT_COLORS[Math.min(n, FERT_COUNT_COLORS.length - 1)];
         let fertRound = 0;                 // 0 = all rounds
@@ -4222,19 +4223,21 @@
                 const starts = [];
                 let cur = null;
                 const full = c => !(area > 0) || c.ha >= FERT_COVER * area;
+                const done = c => !(area > 0) || c.ha >= FERT_DONE_COVER * area;
                 list.forEach(b => {
                     if (cur) {
                         const gap = b.t - cur.last;
-                        // A new round: FERT_GAP_DAYS days with no break AND the
-                        // round before covered FERT_COVER of the paddock.
-                        if (gap > FERT_GAP_DAYS * GR_DAY && full(cur)) { starts.push(cur.start); cur = null; }
+                        // A round ends after FERT_GAP_DAYS days with no break, if
+                        // its breaks covered FERT_DONE_COVER (60%) of the paddock.
+                        if (gap > FERT_GAP_DAYS * GR_DAY && done(cur)) { starts.push(cur.start); cur = null; }
                         // An unfinished round left for FERT_DROP_DAYS days never counts.
                         else if (gap > FERT_DROP_DAYS * GR_DAY) cur = null;
                     }
                     if (!cur) cur = { start: b.t, ha: 0 };
                     cur.ha += b.ha; cur.last = b.t;
                 });
-                if (cur && full(cur)) { starts.push(cur.start); cur = null; }
+                // The last round: counts at 80%, or at 60% once 10 days pass with no break.
+                if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && done(cur)))) { starts.push(cur.start); cur = null; }
                 const dates = starts.filter(t => t.getTime() >= since);
                 out[k] = { name: names[k], dates, ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
                            current: cur && area > 0 && Date.now() - cur.last <= FERT_DROP_DAYS * GR_DAY ? Math.round(cur.ha / area * 100) : null };
