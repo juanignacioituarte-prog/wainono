@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.57</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.58</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.57</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.58</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3326,7 +3326,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.57) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.58) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4184,10 +4184,12 @@
             if (!v.length) return null;
             const key = (b.id || b.name) + '|' + v.length + '|' + v[0].lat + ',' + v[0].lng;
             if (fertWhereCache.has(key)) return fertWhereCache.get(key);
-            // Sample points: the centre, and a point 30% of the way in from each
-            // corner (an odd-shaped break can have its centre outside itself).
+            // Sample points: the centre, and a point halfway between each corner
+            // and the centre, away from the edges (Juani: a corner drawn a little
+            // over the fence falls in the paddock next door). An odd-shaped break
+            // can have its centre outside itself, so the most points win.
             const cLat = v.reduce((a, p) => a + p.lat, 0) / v.length, cLng = v.reduce((a, p) => a + p.lng, 0) / v.length;
-            const pts = [[cLat, cLng]].concat(v.map(p => [p.lat + 0.3 * (cLat - p.lat), p.lng + 0.3 * (cLng - p.lng)]));
+            const pts = [[cLat, cLng]].concat(v.map(p => [p.lat + 0.5 * (cLat - p.lat), p.lng + 0.5 * (cLng - p.lng)]));
             const inRing = (ring, lat, lng) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) c = !c; } return c; };
             // The paddock holding the most sample points.
             let found = null, best = 0;

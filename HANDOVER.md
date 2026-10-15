@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.57**,
-service worker cache `wn-farm-v1.1.71`, Apps Script `2026-10-15-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.58**,
+service worker cache `wn-farm-v1.1.72`, Apps Script `2026-10-15-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.57/v1.1.58/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.71/wn-farm-v1.1.72/" sw.js
+sed -i "s/v1\.1\.58/v1.1.59/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.72/wn-farm-v1.1.73/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -794,8 +794,9 @@ Added 12 October 2026:
 - Fert: the finished-grazing rule went to 50% in v1.1.56 and back to 60% in
   v1.1.57. 33 looked 54% covered in Sept only because "Break 1430" (no
   paddock name, odd shape) had its centre outside 33. Breaks are now placed
-  by the paddock holding most sample points (centre + a point 30% in from
-  each corner).
+  by the paddock holding most sample points (centre + a point halfway
+  between each corner and the centre, v1.1.58, away from the fences).
+  Check on 15 Oct: every named break since June lands in its own paddock.
 - Editing a break's createdAt in the Breaks sheet alone does not stick: a
   phone's copy wins when its lastEditedAt/createdAt is newer, and the next
   sync rewrites the whole sheet. Change lastEditedAt to now as well.
