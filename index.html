@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.70</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.71</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.70</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.71</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3329,7 +3329,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.70) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.71) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4159,7 +4159,10 @@
          * kept in the sheet "fert" (doPost 'save_fert', doGet 'fert'), keyed
          * by paddock + the grazing's date, so changing the date never moves
          * a tick to another grazing. */
-        const FERT_GRAZING_DAYS = 3, FERT_GRAZING_COLOR = '#16a085';
+        // Being grazed: a break in the last FERT_GRAZING_DAYS days and the round's
+        // breaks under FERT_GRAZED_COVER of the paddock (Juani: 90%+ = grazed).
+        const FERT_GRAZING_DAYS = 3, FERT_GRAZED_COVER = 0.9, FERT_GRAZING_COLOR = '#16a085';
+        const fertCowsOn = (f, r) => r === f.dates.length && f.ends && f.ends[r - 1] && Date.now() - f.ends[r - 1] <= FERT_GRAZING_DAYS * GR_DAY && !(f.pcts && f.pcts[r - 1] >= FERT_GRAZED_COVER);
         const FERT_COVER = 0.8, FERT_DONE_COVER = 0.6, FERT_GAP_DAYS = 10, FERT_DROP_DAYS = 30;
         const FERT_COUNT_COLORS = ['#95a5a6', '#3498db', '#27ae60', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad'];
         const fertCountColor = n => FERT_COUNT_COLORS[Math.min(n, FERT_COUNT_COLORS.length - 1)];
@@ -4245,7 +4248,7 @@
             Object.keys(names).forEach(k => {
                 const list = (by[k] || []).sort((a, b) => a.t - b.t);
                 const area = Number(paddockAreaFor(names[k])) || 0;
-                const starts = [], ends = [];
+                const starts = [], ends = [], pcts = [];
                 let cur = null;
                 const full = c => !(area > 0) || c.ha >= FERT_COVER * area;
                 const finished = c => !(area > 0) || c.ha >= FERT_DONE_COVER * area;
@@ -4254,7 +4257,7 @@
                         const gap = b.t - cur.last;
                         // A round ends after FERT_GAP_DAYS days with no break, if
                         // its breaks covered FERT_DONE_COVER (60%) of the paddock.
-                        if (gap > FERT_GAP_DAYS * GR_DAY && finished(cur)) { starts.push(cur.start); ends.push(cur.last); cur = null; }
+                        if (gap > FERT_GAP_DAYS * GR_DAY && finished(cur)) { starts.push(cur.start); ends.push(cur.last); pcts.push(area > 0 ? cur.ha / area : 1); cur = null; }
                         // An unfinished round left for FERT_DROP_DAYS days never counts.
                         else if (gap > FERT_DROP_DAYS * GR_DAY) cur = null;
                     }
@@ -4262,16 +4265,16 @@
                     cur.ha += b.ha; cur.last = b.t;
                 });
                 // The last round: counts at 80%, or at 60% once 10 days pass with no break.
-                if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && finished(cur)))) { starts.push(cur.start); ends.push(cur.last); cur = null; }
+                if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && finished(cur)))) { starts.push(cur.start); ends.push(cur.last); pcts.push(area > 0 ? cur.ha / area : 1); cur = null; }
                 const keep = starts.map((t, i) => i).filter(i => starts[i].getTime() >= since);
                 const dates = keep.map(i => starts[i]);
-                out[k] = { name: names[k], dates, ends: keep.map(i => ends[i]), ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
+                out[k] = { name: names[k], dates, ends: keep.map(i => ends[i]), pcts: keep.map(i => pcts[i]), ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
                            current: cur && area > 0 && Date.now() - cur.last <= FERT_DROP_DAYS * GR_DAY ? Math.round(cur.ha / area * 100) : null,
                            // Being grazed now (Juani: fert often comes a few days
                            // after): a round not counted yet with a break in the last
                            // FERT_GRAZING_DAYS days. It shows as its next round; its
                            // key (the first break) stays the same when it counts.
-                           grazing: cur && cur.start.getTime() >= since && Date.now() - cur.last <= FERT_GRAZING_DAYS * GR_DAY
+                           grazing: cur && cur.start.getTime() >= since && Date.now() - cur.last <= FERT_GRAZING_DAYS * GR_DAY && !(area > 0 && cur.ha >= FERT_GRAZED_COVER * area)
                                ? { start: cur.start, pct: area > 0 ? Math.round(cur.ha / area * 100) : null } : null };
             });
             fertCache = out; fertCacheAt = Date.now();
@@ -4334,8 +4337,8 @@
                 const draft = !f.ordered[r - 1] && fertInDraft(f.name, grIso(f.dates[r - 1]));
                 const late = !f.ordered[r - 1] && !draft && fertTooLate(f.name, r);
                 // A round already counted (80%) whose last break is recent: cows still there.
-                const grazingNow = r === f.dates.length && f.ends && f.ends[r - 1] && Date.now() - f.ends[r - 1] <= FERT_GRAZING_DAYS * GR_DAY;
-                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], draft, late: late && !grazingNow, grazing: grazingNow, pct: null, orderedOn: fertOrderedOn(t), spread: t.spread || '',
+                const grazingNow = fertCowsOn(f, r);
+                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], draft, late: late && !grazingNow, grazing: grazingNow, pct: grazingNow && f.pcts ? Math.round(f.pcts[r - 1] * 100) : null, orderedOn: fertOrderedOn(t), spread: t.spread || '',
                          asap: !grazingNow && !f.ordered[r - 1] && !late && !!ns && ns.state === 'asap' && ns.round === r }; })
                 // Being grazed now, as this round (teal).
                 .concat(all.filter(f => f.grazing && f.dates.length + 1 === r).map(f => {
@@ -12137,7 +12140,7 @@
                     let fill, op, edge = 'white', w = 1.5;
                     if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; }
                     else if (f.n >= fertRound) {
-                        const cowsOn = fertRound === f.n && f.ends && f.ends[fertRound - 1] && Date.now() - f.ends[fertRound - 1] <= FERT_GRAZING_DAYS * GR_DAY;
+                        const cowsOn = fertCowsOn(f, fertRound);
                         fill = f.ordered[fertRound - 1] ? '#27ae60' : fertInDraft(f.name, grIso(f.dates[fertRound - 1])) ? FERT_DRAFT_COLOR : cowsOn ? FERT_GRAZING_COLOR : fertTooLate(f.name, fertRound) ? FERT_LATE_COLOR : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
                     else if (f.grazing && f.n + 1 === fertRound) { const gi = grIso(f.grazing.start); fill = fertIsSent(f.name, gi) ? '#27ae60' : fertInDraft(f.name, gi) ? FERT_DRAFT_COLOR : FERT_GRAZING_COLOR; op = 0.75; }
                     else { fill = '#95a5a6'; op = 0.12; }
