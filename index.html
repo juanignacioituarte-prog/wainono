@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.56</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.57</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.56</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.57</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3326,7 +3326,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.56) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.57) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4146,9 +4146,9 @@
          * How many times each paddock was grazed since a date (default: the
          * start of the season, 1 June), from the breaks. A round counts once
          * its breaks cover FERT_COVER (80%) of the paddock area, or, after
-         * FERT_GAP_DAYS (10) days with no break, FERT_DONE_COVER (50%) (Juani:
-         * long strip grazings like 28 add up to only ~70%, 33 in Sept to 54%).
-         * A new round starts only after 10 days with no break AND 50% covered, so a paddock grazed
+         * FERT_GAP_DAYS (10) days with no break, FERT_DONE_COVER (60%) (Juani:
+         * long strip grazings like 28 add up to only ~70%). A new round starts
+         * only after 10 days with no break AND 60% covered, so a paddock grazed
          * slower than 10 days is not counted twice. Only grass breaks count: crop breaks and
          * lines (no area) are left out (Juani). An unfinished round with no break for
          * FERT_DROP_DAYS days is dropped. A round is dated by its first break.
@@ -4156,7 +4156,7 @@
          * kept in the sheet "fert" (doPost 'save_fert', doGet 'fert'), keyed
          * by paddock + the grazing's date, so changing the date never moves
          * a tick to another grazing. */
-        const FERT_COVER = 0.8, FERT_DONE_COVER = 0.5, FERT_GAP_DAYS = 10, FERT_DROP_DAYS = 30;
+        const FERT_COVER = 0.8, FERT_DONE_COVER = 0.6, FERT_GAP_DAYS = 10, FERT_DROP_DAYS = 30;
         const FERT_COUNT_COLORS = ['#95a5a6', '#3498db', '#27ae60', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad'];
         const fertCountColor = n => FERT_COUNT_COLORS[Math.min(n, FERT_COUNT_COLORS.length - 1)];
         let fertRound = 0;                 // 0 = all rounds
@@ -4184,14 +4184,21 @@
             if (!v.length) return null;
             const key = (b.id || b.name) + '|' + v.length + '|' + v[0].lat + ',' + v[0].lng;
             if (fertWhereCache.has(key)) return fertWhereCache.get(key);
-            const lat = v.reduce((a, p) => a + p.lat, 0) / v.length, lng = v.reduce((a, p) => a + p.lng, 0) / v.length;
-            const inRing = ring => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) c = !c; } return c; };
-            let found = null;
+            // Sample points: the centre, and a point 30% of the way in from each
+            // corner (an odd-shaped break can have its centre outside itself).
+            const cLat = v.reduce((a, p) => a + p.lat, 0) / v.length, cLng = v.reduce((a, p) => a + p.lng, 0) / v.length;
+            const pts = [[cLat, cLng]].concat(v.map(p => [p.lat + 0.3 * (cLat - p.lat), p.lng + 0.3 * (cLng - p.lng)]));
+            const inRing = (ring, lat, lng) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) c = !c; } return c; };
+            // The paddock holding the most sample points.
+            let found = null, best = 0;
             for (const n of Object.keys(paddockMap || {})) {
                 const l = paddockMap[n], g = l && l.feature && l.feature.geometry;
-                if (!g || (l.getBounds && !l.getBounds().contains([lat, lng]))) continue;
+                if (!g) continue;
+                const bb = l.getBounds ? l.getBounds() : null;
                 const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
-                if (polys.some(p => p[0] && inRing(p[0]))) { found = n; break; }
+                let hits = 0;
+                pts.forEach(([la, ln]) => { if ((!bb || bb.contains([la, ln])) && polys.some(p => p[0] && inRing(p[0], la, ln))) hits++; });
+                if (hits > best) { best = hits; found = n; }
             }
             fertWhereCache.set(key, found);
             return found;
@@ -4228,7 +4235,7 @@
                     if (cur) {
                         const gap = b.t - cur.last;
                         // A round ends after FERT_GAP_DAYS days with no break, if
-                        // its breaks covered FERT_DONE_COVER (50%) of the paddock.
+                        // its breaks covered FERT_DONE_COVER (60%) of the paddock.
                         if (gap > FERT_GAP_DAYS * GR_DAY && done(cur)) { starts.push(cur.start); cur = null; }
                         // An unfinished round left for FERT_DROP_DAYS days never counts.
                         else if (gap > FERT_DROP_DAYS * GR_DAY) cur = null;
@@ -4236,7 +4243,7 @@
                     if (!cur) cur = { start: b.t, ha: 0 };
                     cur.ha += b.ha; cur.last = b.t;
                 });
-                // The last round: counts at 80%, or at 50% once 10 days pass with no break.
+                // The last round: counts at 80%, or at 60% once 10 days pass with no break.
                 if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && done(cur)))) { starts.push(cur.start); cur = null; }
                 const dates = starts.filter(t => t.getTime() >= since);
                 out[k] = { name: names[k], dates, ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
