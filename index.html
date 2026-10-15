@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.64</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.65</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.64</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.65</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2170,7 +2170,7 @@
             <h3 style="margin:0 0 6px;">🧪 Fert</h3>
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px;">
                 <b>Grazings since</b>
-                <input type="date" id="fert-since" onchange="fertSetSince(this.value)" style="padding:6px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+                <span id="fert-since-box"></span>
             </div>
             <div id="fert-rounds" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
             <div id="fert-nrule" style="margin-bottom:8px;"></div>
@@ -3328,7 +3328,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.64) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.65) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4179,6 +4179,18 @@
         }
         const fertKey = (name, iso) => normName(name) + '|' + iso;
 
+        /* A date box that reads dd/mm/yyyy (Juani, 15 Oct 2026). A phone's own
+         * date box shows its own format (mm/dd/yyyy on some), which the page
+         * cannot change, so the date is shown as text and an invisible date
+         * box on top of it opens the phone's picker when tapped. */
+        const dmy = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+        function dmyDateBox(iso, onchange, o) {
+            o = o || {};
+            const col = o.color || '#2c3e50';
+            return `<span style="position:relative; display:inline-block; border:1px solid ${col}; border-radius:${o.small ? 4 : 6}px; padding:${o.small ? '2px 5px' : '5px 8px'}; font-size:${o.small ? 11 : 13}px; color:${col}; background:#fff; white-space:nowrap; cursor:pointer;">${dmy(iso) || o.empty || 'pick date'}` +
+                `<input type="date"${o.id ? ` id="${o.id}"` : ''} value="${escUnit(iso || '')}" onclick="event.stopPropagation(); try { this.showPicker(); } catch (e) {}" onchange="${onchange}" style="position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; border:0; padding:0; margin:0;"></span>`;
+        }
+
         // The map paddock holding a break's centre (remembered per break), or null.
         const fertWhereCache = new Map();
         function fertBreakPaddock(b) {
@@ -4262,8 +4274,8 @@
         }
 
         function renderFertView() {
-            const inp = document.getElementById('fert-since');
-            if (inp && document.activeElement !== inp) inp.value = grIso(fertSinceDate());
+            const sinceBox = document.getElementById('fert-since-box');
+            if (sinceBox) sinceBox.innerHTML = dmyDateBox(grIso(fertSinceDate()), 'fertSetSince(this.value)', { id: 'fert-since' });
             const all = Object.values(fertAll());
             const max = all.reduce((m, f) => Math.max(m, f.dates.length), 0);
             const ha = list => list.reduce((a, f) => a + (Number(paddockAreaFor(f.name)) || 0), 0);
@@ -4321,7 +4333,7 @@
                         <input type="checkbox" ${x.ordered ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
                         <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : fertRuleText(x.f.name)}</span>
-                        ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread<input type="date" value="${escUnit(x.spread)}" title="Day it was spread" onclick="event.stopPropagation()" onchange="fertSetSpread(${i}, this.value)" style="font-size:11px; padding:2px 3px; border:1px solid ${x.spread ? '#27ae60' : '#e67e22'}; border-radius:4px; color:${x.spread ? '#27ae60' : '#e67e22'}; max-width:118px;"></span>` : ''}</label>`;
+                        ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread${dmyDateBox(x.spread, `fertSetSpread(${i}, this.value)`, { color: x.spread ? '#27ae60' : '#e67e22', empty: 'pick date', small: true })}</span>` : ''}</label>`;
                 }).join('');
         }
         let FERT_ROWS = [];
@@ -4411,7 +4423,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">📋 Fert ordered</h3>
                 <button onclick="closeFertReport()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
                 <div style="display:flex; gap:8px; align-items:center; margin:8px 0; flex-wrap:wrap;">
-                    <input type="date" id="fert-report-day" value="${fertReportDay}" onchange="openFertReport(this.value)" style="padding:6px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+                    ${dmyDateBox(fertReportDay, 'openFertReport(this.value)', { id: 'fert-report-day' })}
                     ${days.slice(0, 6).map(x => { const dd = grPartialDate(x); return `<button onclick="openFertReport('${x}')" style="padding:5px 8px; border-radius:5px; font-size:11px; cursor:pointer; border:1px solid #2c3e50; background:${x === fertReportDay ? '#2c3e50' : '#fff'}; color:${x === fertReportDay ? '#fff' : '#2c3e50'};">${dd ? fmtNZ(dd) : x}</button>`; }).join('')}
                 </div>
                 <div style="font-size:14px;"><b>${rows.length}</b> paddock${rows.length === 1 ? '' : 's'} · <b>${fmtHa(total)}</b> ha</div>
