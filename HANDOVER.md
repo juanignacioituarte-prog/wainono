@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.74**,
-service worker cache `wn-farm-v1.1.88`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.75**,
+service worker cache `wn-farm-v1.1.89`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.74/v1.1.75/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.88/wn-farm-v1.1.89/" sw.js
+sed -i "s/v1\.1\.75/v1.1.76/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.89/wn-farm-v1.1.90/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -877,3 +877,4 @@ Added 12 October 2026:
   today when it has none. Paddocks out of rotation (out tab) for any reason
   but silage are left out of Fert's rounds, rules and cows
   (`fertOutNotSilage`); on 15 Oct 28 paddocks (regrass, kale, beet, other).
+- Fert: changing the N-day rule now redraws the map too (v1.1.75).
