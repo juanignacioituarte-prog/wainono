@@ -624,7 +624,7 @@ pushed, or the version was not bumped.
 ## 9. Other projects in their own folders
 
 These are separate and have their own notes. They live in
-`G:\My Drive\Apps`. The full list, and what to read first in each, is in
+`G:\My Drive\Apps\`. The full list, and what to read first in each, is in
 `G:\My Drive\Apps\README.md`:
 
 | Project | Folder |
@@ -667,7 +667,7 @@ Added 3 October 2026:
 - kg DM per bale and "t DM on hand" (v1.1.14, script `2026-10-03-b`).
 - Silage idea not built: link the stock to the Silage card on the FEED screen
   (take what is fed each day).
-- Old tracked files still in the repo: `riverterrace-main`, `index viejo.html`,
+- Old tracked files still in the repo: `riverterrace-main\`, `index viejo.html`,
   `test.html`, `diff.txt`, `diff_local.txt`. Removing them needs its own commit.
 - There is no `.gitignore`. Add files to git by name only.
 - The names with `wainono` in them (repo, live address, cache name, the word in
