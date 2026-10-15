@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.62</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.63</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.62</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.63</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3327,7 +3327,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.62) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.63) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4291,7 +4291,9 @@
                 return;
             }
             const r = fertRound;
-            const rows = all.filter(f => f.dates.length >= r).map(f => ({ f, date: f.dates[r - 1], ordered: f.ordered[r - 1] }))
+            const tickOf = (f, d) => FERT_ORDERED.find(x => fertKey(x.paddock, x.grazed) === fertKey(f.name, grIso(d))) || {};
+            const rows = all.filter(f => f.dates.length >= r).map(f => { const t = f.ordered[r - 1] ? tickOf(f, f.dates[r - 1]) : {};
+                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], orderedOn: fertOrderedOn(t), spread: t.spread || '' }; })
                 // Still to order on top, ordered ones at the bottom (Juani); newest grazing first.
                 .sort((a, b) => (a.ordered - b.ordered) || (b.date - a.date) || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
             const done = rows.filter(x => x.ordered);
@@ -4307,11 +4309,21 @@
                     return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
                         <input type="checkbox" ${x.ordered ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
-                        <span style="font-size:11px; color:#7f8c8d; flex:1;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha</span>
-                        <span style="font-size:11px; font-weight:bold; color:${x.ordered ? '#27ae60' : '#e67e22'};">${x.ordered ? 'fert ✓' : ''}</span></label>`;
+                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : ''}</span>
+                        ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread<input type="date" value="${escUnit(x.spread)}" title="Day it was spread" onclick="event.stopPropagation()" onchange="fertSetSpread(${i}, this.value)" style="font-size:11px; padding:2px 3px; border:1px solid ${x.spread ? '#27ae60' : '#e67e22'}; border-radius:4px; color:${x.spread ? '#27ae60' : '#e67e22'}; max-width:118px;"></span>` : ''}</label>`;
                 }).join('');
         }
         let FERT_ROWS = [];
+        // The day a tick was ordered: its own date, or (ticks made before 15 Oct
+        // 2026 had none) the day it was ticked.
+        function fertOrderedOn(t) { return t.ordered || (t.savedAt ? grIso(new Date(t.savedAt)) : ''); }
+        // The day the fert was spread (empty clears it).
+        function fertSetSpread(i, iso) {
+            const x = FERT_ROWS[i];
+            if (!x || (iso && !/^\d{4}-\d{2}-\d{2}$/.test(iso))) return;
+            fertSend([{ paddock: x.name, grazed: x.iso, round: x.round, ordered: true, spread: iso || '' }],
+                iso ? `✓ ${x.name}: spread ${fmtNZ(grPartialDate(iso))}, saved to the sheet` : `✓ ${x.name}: spread date cleared`);
+        }
         function fertToggleRow(i, on) { const x = FERT_ROWS[i]; if (x) fertToggle(x.name, x.iso, x.round, on); }
         // Every paddock of the round still not ordered, in one save.
         async function fertTickAll() {
@@ -4357,7 +4369,8 @@
                 const i = f ? f.dates.findIndex(d => grIso(d) === r.grazed) : -1;
                 return i >= 0 ? i + 1 : (Number(r.round) || 0);
             };
-            const dayOf = r => { const t = r.savedAt ? new Date(r.savedAt) : null; return t && isFinite(t.getTime()) ? grIso(t) : ''; };
+            // The day ordered (the day of the tick).
+            const dayOf = r => fertOrderedOn(r);
             const days = [...new Set(FERT_ORDERED.map(dayOf).filter(Boolean))].sort().reverse();
             const rows = FERT_ORDERED.filter(r => dayOf(r) === fertReportDay).map(r => ({ r, round: roundOf(r), ha: Number(paddockAreaFor((all[normName(r.paddock)] || {}).name || r.paddock)) || 0 }));
             const rounds = [...new Set(rows.map(x => x.round))].sort((a, b) => a - b);
@@ -4366,7 +4379,7 @@
             const d = grPartialDate(fertReportDay);
             const text = [`Fert ordered ${d ? fmtNZ(d) : fertReportDay}: ${rows.length} paddocks, ${fmtHa(total)} ha`].concat(rounds.map(rn => {
                 const list = rows.filter(x => x.round === rn).sort((a, b) => String(a.r.paddock).localeCompare(String(b.r.paddock), undefined, { numeric: true }));
-                return `Round ${rn || '?'} (${list.length} paddocks, ${fmtHa(list.reduce((a, x) => a + x.ha, 0))} ha): ` + list.map(x => `${x.r.paddock} ${fmtHa(x.ha)}`).join(', ');
+                return `Round ${rn || '?'} (${list.length} paddocks, ${fmtHa(list.reduce((a, x) => a + x.ha, 0))} ha): ` + list.map(x => `${x.r.paddock} ${fmtHa(x.ha)}${x.r.spread ? ' (spread ' + fmtNZ(grPartialDate(x.r.spread)) + ')' : ''}`).join(', ');
             })).join('\n');
             const body = !rows.length
                 ? `<div style="font-size:12px; color:#7f8c8d; padding:10px 0;">Nothing ticked on this day.</div>`
@@ -4376,8 +4389,8 @@
                         <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; border-bottom:2px solid ${fertCountColor(rn)}; padding-bottom:3px;">
                             <span>Round ${rn || '?'}</span><span>${list.length} paddock${list.length === 1 ? '' : 's'} · ${fmtHa(list.reduce((a, x) => a + x.ha, 0))} ha</span></div>
                         <table style="width:100%; font-size:12px; border-collapse:collapse; margin-top:3px;">
-                            <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Grazed</td><td style="text-align:right;">ha</td><td style="text-align:right;">By</td></tr>
-                            ${list.map(x => { const g = grPartialDate(x.r.grazed); return `<tr style="border-top:1px solid #eee;"><td style="padding:3px 0;"><b>${escUnit(x.r.paddock)}</b></td><td>${g ? fmtNZ(g) : escUnit(x.r.grazed)}</td><td style="text-align:right;">${fmtHa(x.ha)}</td><td style="text-align:right; color:#7f8c8d;">${escUnit(x.r.user || '')}</td></tr>`; }).join('')}
+                            <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Grazed</td><td>Spread</td><td style="text-align:right;">ha</td><td style="text-align:right;">By</td></tr>
+                            ${list.map(x => { const g = grPartialDate(x.r.grazed); return `<tr style="border-top:1px solid #eee;"><td style="padding:3px 0;"><b>${escUnit(x.r.paddock)}</b></td><td>${g ? fmtNZ(g) : escUnit(x.r.grazed)}</td><td style="color:${x.r.spread ? '#27ae60' : '#e67e22'};">${x.r.spread ? fmtNZ(grPartialDate(x.r.spread)) : 'not yet'}</td><td style="text-align:right;">${fmtHa(x.ha)}</td><td style="text-align:right; color:#7f8c8d;">${escUnit(x.r.user || '')}</td></tr>`; }).join('')}
                         </table></div>`;
                 }).join('');
             const wrap = document.createElement('div');
@@ -4420,7 +4433,7 @@
             FERT_PENDING.forEach(c => {
                 const i = out.findIndex(r => fertKey(r.paddock, r.grazed) === fertKey(c.paddock, c.grazed));
                 if (i >= 0) out.splice(i, 1);
-                if (c.ordered) out.push({ paddock: c.paddock, grazed: c.grazed, round: c.round, user: c.user, savedAt: c.at });
+                if (c.ordered) out.push({ paddock: c.paddock, grazed: c.grazed, round: c.round, user: c.user, savedAt: c.at, ordered: c.ordered_on, spread: c.spread || '' });
             });
             return out;
         }
@@ -4431,7 +4444,7 @@
             fertFlushing = (async () => {
                 try {
                     const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'save_fert', user: localStorage.getItem('auth_name') || '',
-                        entries: batch.map(c => ({ paddock: c.paddock, grazed: c.grazed, round: c.round, ordered: c.ordered })) }) });
+                        entries: batch.map(c => ({ paddock: c.paddock, grazed: c.grazed, round: c.round, ordered: c.ordered, ordered_on: c.ordered_on, spread: c.spread })) }) });
                     const data = await res.json();
                     if (!data || data.status !== 'success') {
                         const msg = (data && data.message) ? data.message : 'the sheet refused it';
@@ -4452,10 +4465,15 @@
         async function fertSend(changes, okText) {
             const user = localStorage.getItem('auth_name') || '', at = new Date().toISOString();
             changes.forEach(c => {
+                // A new tick is ordered today; a tick already there keeps its
+                // order date and its spread date unless new ones are given.
+                const old = FERT_ORDERED.find(r => fertKey(r.paddock, r.grazed) === fertKey(c.paddock, c.grazed));
+                if (c.ordered && !c.ordered_on) c.ordered_on = (old && old.ordered) || grIso(new Date());
+                if (c.ordered && c.spread === undefined) c.spread = (old && old.spread) || '';
                 FERT_PENDING = FERT_PENDING.filter(x => fertKey(x.paddock, x.grazed) !== fertKey(c.paddock, c.grazed));
                 FERT_PENDING.push(Object.assign({ user, at }, c));
                 FERT_ORDERED = FERT_ORDERED.filter(r => fertKey(r.paddock, r.grazed) !== fertKey(c.paddock, c.grazed));
-                if (c.ordered) FERT_ORDERED.push({ paddock: c.paddock, grazed: c.grazed, round: c.round, user, savedAt: at });
+                if (c.ordered) FERT_ORDERED.push({ paddock: c.paddock, grazed: c.grazed, round: c.round, user, savedAt: at, ordered: c.ordered_on, spread: c.spread });
             });
             fertSavePending();
             try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}

@@ -38,7 +38,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-15-c";
+var SCRIPT_VERSION = "2026-10-15-d";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -1301,16 +1301,23 @@ function savePartialWalk(payload) {
 /* ================== FERT ==================
  * Sheet "fert": one row per paddock per grazing that had fert ordered (the
  * app's Fert screen, Juani 15 Oct 2026).
- *   paddock | grazed | round | user | saved at
+ *   paddock | grazed | round | user | saved at | ordered | spread
+ * (ordered and spread added 15 Oct 2026, yyyy-mm-dd) ordered = the day the
+ * paddock was ticked, i.e. the day the fert was ordered; kept once set.
+ * spread = the day it was spread: round 1 from HawkEye's spread records,
+ * later rounds typed in the app; empty until known.
  * grazed is the date of the grazing's first break (yyyy-mm-dd): it names the
  * grazing, so the row stays right when the app's "since" date changes. round
  * is only for reading the sheet. Unticking deletes the row.
  */
-var FERT_COLS = ["paddock", "grazed", "round", "user", "saved at"];
+var FERT_COLS = ["paddock", "grazed", "round", "user", "saved at", "ordered", "spread"];
 
 function fertSheet() {
   var sheet = getOrCreateSheet("fert");
   if (sheet.getLastRow() === 0) sheet.appendRow(FERT_COLS);
+  // Sheets made before "ordered" and "spread" were added get the new header.
+  else if (String(sheet.getRange(1, FERT_COLS.length).getValue()) !== FERT_COLS[FERT_COLS.length - 1])
+    sheet.getRange(1, 1, 1, FERT_COLS.length).setValues([FERT_COLS]);
   return sheet;
 }
 
@@ -1322,7 +1329,7 @@ function getFert() {
     sheet.getRange(2, 1, lastRow - 1, FERT_COLS.length).getValues().forEach(function(r) {
       if (!r[0] || !r[1]) return;
       rows.push({ paddock: String(r[0]), grazed: partialText(r[1]), round: Number(r[2]) || 0,
-                  user: String(r[3] || ""), savedAt: partialText(r[4]) });
+                  user: String(r[3] || ""), savedAt: partialText(r[4]), ordered: partialText(r[5]), spread: partialText(r[6]) });
     });
   }
   return jsonResponse({ status: "success", entries: rows });
@@ -1344,13 +1351,18 @@ function saveFert(payload) {
   rows.forEach(function(r) {
     if (!r[0] || !r[1]) return;
     var g = partialText(r[1]);
-    byKey[keyOf(r[0], g)] = [String(r[0]), g, r[2], r[3], partialText(r[4])];
+    byKey[keyOf(r[0], g)] = [String(r[0]), g, r[2], r[3], partialText(r[4]), partialText(r[5]), partialText(r[6])];
   });
   var saved = 0, removed = 0, now = new Date().toISOString();
   list.forEach(function(e) {
     var k = keyOf(e.paddock, e.grazed);
     if (e.ordered) {
-      byKey[k] = [String(e.paddock), String(e.grazed), Number(e.round) || 0, String(payload.user || e.user || ""), now];
+      // ordered: the one sent, else the one already there, else today (NZ).
+      // spread: the one sent ("" clears it), else the one already there.
+      var old = byKey[k];
+      var ordered = e.ordered_on ? String(e.ordered_on) : (old && old[5]) ? old[5] : Utilities.formatDate(new Date(), "Pacific/Auckland", "yyyy-MM-dd");
+      var spread = (e.spread !== undefined && e.spread !== null) ? String(e.spread) : (old && old[6]) ? old[6] : "";
+      byKey[k] = [String(e.paddock), String(e.grazed), Number(e.round) || 0, String(payload.user || e.user || ""), now, ordered, spread];
       saved++;
     } else if (byKey[k]) { delete byKey[k]; removed++; }
   });
@@ -1360,6 +1372,7 @@ function saveFert(payload) {
     var range = sheet.getRange(2, 1, out.length, FERT_COLS.length);
     // Plain text, so the date stays yyyy-mm-dd and a paddock called 7 stays "7".
     sheet.getRange(2, 1, out.length, 2).setNumberFormat("@");
+    sheet.getRange(2, 6, out.length, 2).setNumberFormat("@");
     range.setValues(out);
   }
   return jsonResponse({ status: "success", saved: saved, removed: removed, rows: out.length });

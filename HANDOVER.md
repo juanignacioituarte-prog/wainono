@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.62**,
-service worker cache `wn-farm-v1.1.76`, Apps Script `2026-10-15-c`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.63**,
+service worker cache `wn-farm-v1.1.77`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.62/v1.1.63/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.76/wn-farm-v1.1.77/" sw.js
+sed -i "s/v1\.1\.63/v1.1.64/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.77/wn-farm-v1.1.78/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -819,3 +819,9 @@ Added 12 October 2026:
   the queue in one POST, keeps it if the sheet does not answer, shows it on
   top of the sheet's list, and sends it again with the next change or when
   Fert opens (`fertSend`, `fertFlush`, `fertApplyPending`).
+- Fert ticks have two dates (v1.1.63, script 2026-10-15-d, sheet `fert`
+  columns 6-7): **ordered** = the day of the tick (Juani: the tick is the
+  order), kept once set; **spread** = the day it was spread, empty until
+  known, picked in the round list (date box on each ticked row; orange when
+  empty). Round 1 spread dates come from HawkEye's spread records. The
+  REPORT is by order day and shows the spread date.
