@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.52**,
-service worker cache `wn-farm-v1.1.66`, Apps Script `2026-10-13-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.53**,
+service worker cache `wn-farm-v1.1.67`, Apps Script `2026-10-15-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -559,8 +559,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.52/v1.1.53/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.66/wn-farm-v1.1.67/" sw.js
+sed -i "s/v1\.1\.53/v1.1.54/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.67/wn-farm-v1.1.68/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -749,3 +749,15 @@ Added 12 October 2026:
 - + PARTIAL help text cut to four lines in Juani's words (v1.1.52): A not
   grazed since last FW / B grazed 7+ days ago / C grazed up to 48 hr ago /
   Grey: do not use.
+- **Fert** in the ⋮ menu (v1.1.53, Apps Script `2026-10-15-a`, Juani 15 Oct
+  2026). Grazings per paddock since a date (default 1 June, the season
+  start; kept per phone). Grass breaks only (no crop breaks, no lines). A
+  new round starts after 10 days with no break AND only if the round before
+  covered 80% of the paddock area; a round counts once it covers 80%; an
+  unfinished round with no break for 30 days is dropped. Round dated by its
+  first break. ALL = map coloured by number of grazings; ROUND N = list of
+  the paddocks with an Nth grazing and a tick "fert ordered" (map: green
+  ordered, orange not). Ticks in the sheet `fert` (paddock | grazed | round |
+  user | saved at; grazed = first break date of that grazing; untick deletes
+  the row): doPost `save_fert`, doGet `fert`. Until the script is pasted a
+  tick is kept on that phone only.

@@ -31,12 +31,14 @@
  *  10. Partial walks (the app's CHECK screen) go to their own sheet
  *      "partial walk", never to "Farmwalks": doPost 'save_partial_walk',
  *      doGet 'partial_walk'.
+ *  11. Fert ordered per paddock per grazing (the app's Fert screen), sheet
+ *      "fert": doPost 'save_fert' (tick or untick), doGet 'fert'.
  * Everything else is byte-identical to what you had.
  */
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-13-a";
+var SCRIPT_VERSION = "2026-10-15-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -70,6 +72,8 @@ function doGet(e) {
     return getSilage();
   } else if (type === 'partial_walk') {
     return getPartialWalk();
+  } else if (type === 'fert') {
+    return getFert();
   } else if (type === 'silage_log') {
     return getSilageLog();
   } else if (type === 'version') {
@@ -125,6 +129,8 @@ function doPost(e) {
       return saveMaintenanceCategories(payload.categories);
     } else if (type === 'save_partial_walk') {
       return savePartialWalk(payload);
+    } else if (type === 'save_fert') {
+      return saveFert(payload);
     } else if (type === 'save_out_reasons') {
       return saveOutReasons(payload.reasons);
     } else if (type === 'save_silage_location') {
@@ -1290,6 +1296,62 @@ function savePartialWalk(payload) {
     else { sheet.appendRow(row); keys[key] = sheet.getLastRow(); added++; }
   });
   return jsonResponse({ status: "success", added: added, replaced: replaced });
+}
+
+/* ================== FERT ==================
+ * Sheet "fert": one row per paddock per grazing that had fert ordered (the
+ * app's Fert screen, Juani 15 Oct 2026).
+ *   paddock | grazed | round | user | saved at
+ * grazed is the date of the grazing's first break (yyyy-mm-dd): it names the
+ * grazing, so the row stays right when the app's "since" date changes. round
+ * is only for reading the sheet. Unticking deletes the row.
+ */
+var FERT_COLS = ["paddock", "grazed", "round", "user", "saved at"];
+
+function fertSheet() {
+  var sheet = getOrCreateSheet("fert");
+  if (sheet.getLastRow() === 0) sheet.appendRow(FERT_COLS);
+  return sheet;
+}
+
+function getFert() {
+  var sheet = fertSheet();
+  var lastRow = sheet.getLastRow();
+  var rows = [];
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, FERT_COLS.length).getValues().forEach(function(r) {
+      if (!r[0] || !r[1]) return;
+      rows.push({ paddock: String(r[0]), grazed: partialText(r[1]), round: Number(r[2]) || 0,
+                  user: String(r[3] || ""), savedAt: partialText(r[4]) });
+    });
+  }
+  return jsonResponse({ status: "success", entries: rows });
+}
+
+function saveFert(payload) {
+  if (!payload || !payload.paddock || !payload.grazed) return errorResponse("Paddock and grazing date needed");
+  var sheet = fertSheet();
+  var key = String(payload.paddock).trim().toLowerCase() + "|" + String(payload.grazed);
+  var lastRow = sheet.getLastRow();
+  var at = 0;
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 2).getValues().forEach(function(r, i) {
+      if (String(r[0]).trim().toLowerCase() + "|" + partialText(r[1]) === key) at = i + 2;
+    });
+  }
+  if (!payload.ordered) {
+    if (at) sheet.deleteRow(at);
+    return jsonResponse({ status: "success", removed: at ? 1 : 0 });
+  }
+  var row = [String(payload.paddock), String(payload.grazed), Number(payload.round) || 0,
+             String(payload.user || ""), new Date().toISOString()];
+  if (at) sheet.getRange(at, 1, 1, FERT_COLS.length).setValues([row]);
+  else {
+    sheet.appendRow(row);
+    // Plain text, so the date stays yyyy-mm-dd and a paddock called 7 stays "7".
+    sheet.getRange(sheet.getLastRow(), 1, 1, 2).setNumberFormat("@").setValues([[row[0], row[1]]]);
+  }
+  return jsonResponse({ status: "success", saved: 1 });
 }
 
 /* ================== FARMWALK ROUTE ================== */

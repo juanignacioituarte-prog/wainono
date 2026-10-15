@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.52</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.53</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1734,11 +1734,12 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('maintenance'); toggleSettingsMenu();" style="font-weight: bold; color: #16a085;">🔧 Farm Maintenance</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('silage'); toggleSettingsMenu();" style="font-weight: bold; color: #b7791f;">🌾 Silage</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('print_map'); toggleSettingsMenu();" style="font-weight: bold; color: #2c3e50;">🖨 Print Map</div>
+                    <div class="dropdown-item" onclick="switchDashboardMode('fert'); toggleSettingsMenu();" style="font-weight: bold; color: #27ae60;">🧪 Fert</div>
                     <div class="dropdown-item" id="menu-item-farm-config" style="display:none; font-weight: bold; color: #9b59b6;" onclick="switchDashboardMode('farm_config'); toggleSettingsMenu();">🗺️ Farm Configuration</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.52</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.53</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2162,6 +2163,18 @@
             </div>
             <button onclick="pmOpenSheet()" style="width:100%; background:#27ae60; color:#fff; border:none; padding:12px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; margin-top:6px;">🖨 PRINT PREVIEW</button>
             <div style="font-size:10px; color:#95a5a6; margin-top:6px;">The marks are kept on this device only. The printer window can also save as PDF.</div>
+        </div>
+
+        <!-- FERT: grazings per paddock since a date, and fert ordered per round -->
+        <div id="fert-view" style="display:none; padding:15px; flex-grow:1; background:#f9f9f9; overflow-y:auto;">
+            <h3 style="margin:0 0 6px;">🧪 Fert</h3>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px;">
+                <b>Grazings since</b>
+                <input type="date" id="fert-since" onchange="fertSetSince(this.value)" style="padding:6px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+            </div>
+            <div id="fert-rounds" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
+            <div id="fert-status" style="font-size:11px; min-height:14px; margin-bottom:4px;"></div>
+            <div id="fert-list"></div>
         </div>
 
         <!-- CHECK: a partial farmwalk to test the estimate -->
@@ -3313,7 +3326,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.52) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.53) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4127,6 +4140,184 @@
             });
             groups.forEach(g => g.paddocks.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
             return groups;
+        }
+
+        /* ---- FERT (Juani, 15 Oct 2026) ----
+         * How many times each paddock was grazed since a date (default: the
+         * start of the season, 1 June), from the breaks. A new round starts
+         * after FERT_GAP_DAYS (10) days with no break, but only when the round
+         * before covered FERT_COVER (80%) of the paddock area (Juani: so a
+         * paddock grazed slower than 10 days is not counted twice). A round
+         * counts once it covers 80%. Only grass breaks count: crop breaks and
+         * lines (no area) are left out (Juani). An unfinished round with no break for
+         * FERT_DROP_DAYS days is dropped. A round is dated by its first break.
+         * Round N = the paddocks' Nth grazing. Fert ordered is ticked per paddock per grazing and
+         * kept in the sheet "fert" (doPost 'save_fert', doGet 'fert'), keyed
+         * by paddock + the grazing's date, so changing the date never moves
+         * a tick to another grazing. */
+        const FERT_COVER = 0.8, FERT_GAP_DAYS = 10, FERT_DROP_DAYS = 30;
+        const FERT_COUNT_COLORS = ['#95a5a6', '#3498db', '#27ae60', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad'];
+        const fertCountColor = n => FERT_COUNT_COLORS[Math.min(n, FERT_COUNT_COLORS.length - 1)];
+        let fertRound = 0;                 // 0 = all rounds
+        let FERT_ORDERED = (() => { try { const c = JSON.parse(localStorage.getItem('fert_cache') || '[]'); return Array.isArray(c) ? c : []; } catch (e) { return []; } })();
+        let fertCache = null, fertCacheAt = 0;
+
+        function fertSinceDate() {
+            let v = null; try { v = localStorage.getItem('fert_since'); } catch (e) {}
+            const d = v ? grPartialDate(v) : null;
+            if (d) return d;
+            const t = new Date();
+            return new Date(t.getMonth() >= 5 ? t.getFullYear() : t.getFullYear() - 1, 5, 1);
+        }
+        function fertSetSince(v) {
+            try { if (v) localStorage.setItem('fert_since', v); else localStorage.removeItem('fert_since'); } catch (e) {}
+            fertCache = null; fertRound = 0;
+            renderFertView(); updateGeoStyles();
+        }
+        const fertKey = (name, iso) => normName(name) + '|' + iso;
+
+        // Every paddock on the map: { name, dates: [first break of each grazing], ordered: [bool] }.
+        function fertAll() {
+            if (fertCache && Date.now() - fertCacheAt < 3000) return fertCache;
+            const names = {}; Object.keys(paddockMap || {}).forEach(n => { names[normName(n)] = n; });
+            const by = {};
+            (savedBreaks || []).forEach(b => {
+                if (b.isDeleted || b.isCropBreak || !b.paddock || !b.createdAt) return;
+                const k = normName(b.paddock); if (!names[k]) return;
+                const t = new Date(b.createdAt); if (!isFinite(t.getTime())) return;
+                const ha = Number(b.areaHa) || (Number(b.areaSqm) || 0) / 10000;
+                if (b.cropMode === 'line' || !(ha > 0)) return;     // grass breaks only, no lines
+                (by[k] = by[k] || []).push({ t, ha });
+            });
+            const since = fertSinceDate().getTime();
+            const done = {}; FERT_ORDERED.forEach(r => { done[fertKey(r.paddock, r.grazed)] = true; });
+            const out = {};
+            Object.keys(names).forEach(k => {
+                const list = (by[k] || []).sort((a, b) => a.t - b.t);
+                const area = Number(paddockAreaFor(names[k])) || 0;
+                const starts = [];
+                let cur = null;
+                const full = c => !(area > 0) || c.ha >= FERT_COVER * area;
+                list.forEach(b => {
+                    if (cur) {
+                        const gap = b.t - cur.last;
+                        // A new round: FERT_GAP_DAYS days with no break AND the
+                        // round before covered FERT_COVER of the paddock.
+                        if (gap > FERT_GAP_DAYS * GR_DAY && full(cur)) { starts.push(cur.start); cur = null; }
+                        // An unfinished round left for FERT_DROP_DAYS days never counts.
+                        else if (gap > FERT_DROP_DAYS * GR_DAY) cur = null;
+                    }
+                    if (!cur) cur = { start: b.t, ha: 0 };
+                    cur.ha += b.ha; cur.last = b.t;
+                });
+                if (cur && full(cur)) { starts.push(cur.start); cur = null; }
+                const dates = starts.filter(t => t.getTime() >= since);
+                out[k] = { name: names[k], dates, ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
+                           current: cur && area > 0 && Date.now() - cur.last <= FERT_DROP_DAYS * GR_DAY ? Math.round(cur.ha / area * 100) : null };
+            });
+            fertCache = out; fertCacheAt = Date.now();
+            return out;
+        }
+        function fertPaddockInfo(name) {
+            const f = fertAll()[normName(name)] || { name, dates: [], ordered: [] };
+            return Object.assign({ n: f.dates.length }, f);
+        }
+
+        function renderFertView() {
+            const inp = document.getElementById('fert-since');
+            if (inp && document.activeElement !== inp) inp.value = grIso(fertSinceDate());
+            const all = Object.values(fertAll());
+            const max = all.reduce((m, f) => Math.max(m, f.dates.length), 0);
+            const ha = list => list.reduce((a, f) => a + (Number(paddockAreaFor(f.name)) || 0), 0);
+            const fmtHa = v => (Math.round(v * 10) / 10).toFixed(1);
+            const chip = (r, label, col) => `<button onclick="fertSetRound(${r})" style="padding:7px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; border:1.5px solid ${col}; background:${fertRound === r ? col : '#fff'}; color:${fertRound === r ? '#fff' : col};">${label}</button>`;
+            const rounds = document.getElementById('fert-rounds');
+            if (fertRound > max) fertRound = 0;
+            if (rounds) {
+                let h = chip(0, 'ALL', '#2c3e50');
+                for (let r = 1; r <= max; r++) h += chip(r, `ROUND ${r} (${all.filter(f => f.dates.length >= r).length})`, fertCountColor(r));
+                rounds.innerHTML = h;
+            }
+            const box = document.getElementById('fert-list');
+            if (!box) return;
+            if (!fertRound) {
+                // How many paddocks were grazed 0, 1, 2... times, with the colours of the map.
+                let h = '<div style="background:#fff; border:1px solid #ddd; border-radius:6px; padding:8px 10px;">';
+                for (let n = 0; n <= max; n++) {
+                    const list = all.filter(f => f.dates.length === n);
+                    if (!list.length) continue;
+                    h += `<div style="display:flex; align-items:center; gap:8px; font-size:12px; padding:3px 0;">
+                        <span style="width:14px; height:14px; border-radius:3px; background:${fertCountColor(n)}; opacity:${n ? 0.8 : 0.35};"></span>
+                        <b style="width:95px;">${n} grazing${n === 1 ? '' : 's'}</b><span>${list.length} paddock${list.length === 1 ? '' : 's'} · ${fmtHa(ha(list))} ha</span></div>`;
+                }
+                box.innerHTML = h + '<div style="font-size:11px; color:#7f8c8d; margin-top:6px;">Pick a round to tick the fert ordered.</div></div>';
+                return;
+            }
+            const r = fertRound;
+            const rows = all.filter(f => f.dates.length >= r).map(f => ({ f, date: f.dates[r - 1], ordered: f.ordered[r - 1] }))
+                .sort((a, b) => b.date - a.date || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
+            const done = rows.filter(x => x.ordered);
+            FERT_ROWS = rows.map(x => ({ name: x.f.name, iso: grIso(x.date), round: r }));
+            box.innerHTML = `<div style="font-size:12px; margin-bottom:6px;"><b>Round ${r}:</b> ${rows.length} paddocks · ${fmtHa(ha(rows.map(x => x.f)))} ha
+                    <br><span style="color:#27ae60;">■ fert ordered</span> ${done.length} · ${fmtHa(ha(done.map(x => x.f)))} ha
+                    &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.length - done.length} · ${fmtHa(ha(rows.filter(x => !x.ordered).map(x => x.f)))} ha</div>` +
+                rows.map((x, i) => {
+                    const id = 'fert-row-' + escUnit(normName(x.f.name));
+                    const iso = grIso(x.date);
+                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
+                        <input type="checkbox" ${x.ordered ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
+                        <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
+                        <span style="font-size:11px; color:#7f8c8d; flex:1;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha</span>
+                        <span style="font-size:11px; font-weight:bold; color:${x.ordered ? '#27ae60' : '#e67e22'};">${x.ordered ? 'fert ✓' : ''}</span></label>`;
+                }).join('');
+        }
+        let FERT_ROWS = [];
+        function fertToggleRow(i, on) { const x = FERT_ROWS[i]; if (x) fertToggle(x.name, x.iso, x.round, on); }
+        function fertSetRound(r) { fertRound = r; renderFertView(); updateGeoStyles(); }
+
+        // From the list to the map, and from the map to the list.
+        function fertGoTo(name) { if (paddockMap[name]) { try { map.fitBounds(paddockMap[name].getBounds(), { padding: [60, 60], maxZoom: 17 }); } catch (e) {} } }
+        function fertFocus(name) {
+            const f = fertPaddockInfo(name);
+            if (fertRound && f.n < fertRound) fertRound = f.n;
+            if (!fertRound && f.n) fertRound = f.n;
+            renderFertView(); updateGeoStyles();
+            const row = document.getElementById('fert-row-' + escUnit(normName(name)));
+            if (!row) return;
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof checkFlashCard === 'function') checkFlashCard(row);
+        }
+
+        function setFertStatus(msg, col) { const el = document.getElementById('fert-status'); if (el) { el.textContent = msg; el.style.color = col || '#7f8c8d'; } }
+        async function loadFert() {
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL + '?type=fert&t=' + Date.now(), { cache: 'no-store' });
+                const d = await res.json();
+                if (d && Array.isArray(d.entries)) {
+                    FERT_ORDERED = d.entries;
+                    try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
+                    fertCache = null;
+                    if (currentDashboardMode === 'fert') { renderFertView(); updateGeoStyles(); }
+                } else if (d && d.status !== 'success') setFertStatus('⚠ The Apps Script needs updating for fert ticks', '#e67e22');
+            } catch (e) { console.warn('Fert not loaded', e); }
+        }
+        async function fertToggle(name, iso, round, on) {
+            FERT_ORDERED = FERT_ORDERED.filter(r => fertKey(r.paddock, r.grazed) !== fertKey(name, iso));
+            if (on) FERT_ORDERED.push({ paddock: name, grazed: iso, round: round, user: localStorage.getItem('auth_name') || '' });
+            try { localStorage.setItem('fert_cache', JSON.stringify(FERT_ORDERED)); } catch (e) {}
+            fertCache = null; renderFertView(); updateGeoStyles();
+            setFertStatus('Saving...', '#7f8c8d');
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'save_fert', paddock: name, grazed: iso, round: round, ordered: !!on, user: localStorage.getItem('auth_name') || '' }) });
+                const data = await res.json();
+                if (!data || data.status !== 'success') {
+                    const msg = (data && data.message) ? data.message : 'the sheet refused it';
+                    throw new Error(/unknown payload type/i.test(msg) ? 'the Apps Script needs updating' : msg);
+                }
+                setFertStatus('✓ Saved to the sheet', '#27ae60');
+            } catch (e) {
+                setFertStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
+            }
         }
 
         function renderPrintMapPanel() {
@@ -10080,6 +10271,13 @@
                                 return;
                             }
 
+                            // FERT: a tap goes to that paddock's row in the list
+                            if (currentDashboardMode === 'fert') {
+                                L.DomEvent.stopPropagation(e);
+                                fertFocus(pName);
+                                return;
+                            }
+
                             // Print Map: a tap paints the paddock in the colour picked
                             if (currentDashboardMode === 'print_map') {
                                 L.DomEvent.stopPropagation(e);
@@ -10197,11 +10395,13 @@
             if (printView) printView.style.display = (mode === 'print_map') ? 'block' : 'none';
             const checkView = document.getElementById('check-view');
             if (checkView) checkView.style.display = (mode === 'check') ? 'block' : 'none';
+            const fertView = document.getElementById('fert-view');
+            if (fertView) fertView.style.display = (mode === 'fert') ? 'block' : 'none';
             // The cover figures belong to the farmwalk, not to a jobs list.
             const avgBox = document.querySelector('.avg-box');
             const syncNote = document.querySelector('.sync-note');
-            if (avgBox) avgBox.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check') ? 'none' : '';
-            if (syncNote) syncNote.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check') ? 'none' : '';
+            if (avgBox) avgBox.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check' || mode === 'fert') ? 'none' : '';
+            if (syncNote) syncNote.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check' || mode === 'fert') ? 'none' : '';
             if (mode !== 'maintenance') {
                 if (maintDrawType) cancelMaintDrawing();
                 clearMaintFromMap();      // the jobs belong to their own map
@@ -10277,7 +10477,7 @@
                 return;
             } else {
                 document.getElementById('map').style.display = (mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather') ? 'none' : 'block';
-                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config' || mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check') ? 'none' : 'block';
+                document.getElementById('list').style.display = (mode === 'health_safety' || mode === 'roster' || mode === 'vehicle_maintenance' || mode === 'weather' || mode === 'farm_config' || mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check' || mode === 'fert') ? 'none' : 'block';
                 document.getElementById('admin-view').style.display = 'none';
                 if (document.getElementById('audio-settings-view')) document.getElementById('audio-settings-view').style.display = 'none';
                 if (document.getElementById('weekly-report-view')) document.getElementById('weekly-report-view').style.display = 'none';
@@ -10392,6 +10592,15 @@
                     updateGeoStyles();
                     renderBreaksOnMap();
                     loadPartialWalks();
+                    return;
+                } else if (mode === 'fert') {
+                    // FERT: the paddocks coloured by grazings, no breaks on the map.
+                    setLayerMode('satellite');
+                    document.getElementById('legend').style.display = 'none';
+                    renderBreaksOnMap();          // clears them off the map
+                    renderFertView();
+                    updateGeoStyles();
+                    loadFert();
                     return;
                 } else if (mode === 'print_map') {
                     // The print map: the farm, the names and the marks. Nothing else.
@@ -11498,6 +11707,19 @@
                     if (tipEl) tipEl.classList.add('show-label', 'pm-small');
                     layer.setTooltipContent(pmLabelHtml(pName));
                     layer._printLabel = true;
+                } else if (currentDashboardMode === 'fert') {
+                    // FERT: all rounds = coloured by the number of grazings; one
+                    // round = green fert ordered, orange not ordered, faint not there yet.
+                    const f = fertPaddockInfo(pName);
+                    let fill, op;
+                    if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; }
+                    else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : '#e67e22'; op = 0.75; }
+                    else { fill = '#95a5a6'; op = 0.12; }
+                    layer.setStyle({ fillColor: fill, fillOpacity: op, color: 'white', opacity: 0.9, weight: 1.5 });
+                    layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${escUnit(pName)}</div>` +
+                        `<div style="font-size:11px;"><b>${f.n}</b> grazing${f.n === 1 ? '' : 's'} since ${fmtNZ(fertSinceDate())}</div>` +
+                        f.dates.map((d, i) => `<div style="font-size:10px; color:#555;">${i + 1}. ${fmtNZ(d)}${f.ordered[i] ? ' <b style="color:#27ae60;">✓ fert</b>' : ''}</div>`).join('') +
+                        (f.current != null ? `<div style="font-size:10px; color:#e67e22;">being grazed: ${f.current}% done (counts at ${Math.round(FERT_COVER * 100)}%)</div>` : '') + outLine);
                 } else if (currentDashboardMode === 'check') {
                     // CHECK: each paddock in its group colour; measured ones darker.
                     const c = checkInfo(pName);
@@ -13936,7 +14158,7 @@
             window.audioAidParallelLayers = [];
 
             // The maintenance map and the silage map never show breaks.
-            if (currentDashboardMode === 'maintenance' || currentDashboardMode === 'silage' || currentDashboardMode === 'print_map') return;
+            if (currentDashboardMode === 'maintenance' || currentDashboardMode === 'silage' || currentDashboardMode === 'print_map' || currentDashboardMode === 'fert') return;
 
             // FARMWALK and SATELLITE have a BREAKS ON/OFF button. There the breaks
             // are only drawn to look at: they let taps through to the paddock
