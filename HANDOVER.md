@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.59**,
-service worker cache `wn-farm-v1.1.73`, Apps Script `2026-10-15-b`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.60**,
+service worker cache `wn-farm-v1.1.74`, Apps Script `2026-10-15-b`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.59/v1.1.60/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.73/wn-farm-v1.1.74/" sw.js
+sed -i "s/v1\.1\.60/v1.1.61/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.74/wn-farm-v1.1.75/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -805,3 +805,6 @@ Added 12 October 2026:
   `finished`). Round list: not ordered on top, ordered at the bottom; TICK
   ALL button saves every not-ordered paddock of the round in one POST
   (`save_fert` with `entries`).
+- Fert: with a round picked, a tap on a paddock on the map ticks its fert
+  for that round, a second tap unticks it (v1.1.60). Not in that round: a
+  message only. With ALL: opens the paddock's last round.

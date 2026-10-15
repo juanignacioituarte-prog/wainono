@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.59</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.60</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.59</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.60</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3326,7 +3326,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.59) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.60) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4336,11 +4336,18 @@
 
         // From the list to the map, and from the map to the list.
         function fertGoTo(name) { if (paddockMap[name]) { try { map.fitBounds(paddockMap[name].getBounds(), { padding: [60, 60], maxZoom: 17 }); } catch (e) {} } }
+        /* A tap on the map. With a round picked (Juani, 15 Oct 2026): ticks the
+         * paddock's fert for that round, a second tap unticks it. A paddock not
+         * in that round only says so. With ALL: opens the paddock's last round. */
         function fertFocus(name) {
             const f = fertPaddockInfo(name);
-            if (fertRound && f.n < fertRound) fertRound = f.n;
-            if (!fertRound && f.n) fertRound = f.n;
-            renderFertView(); updateGeoStyles();
+            if (fertRound) {
+                if (f.n < fertRound) { setFertStatus(`${name}: no round ${fertRound} grazing yet`, '#7f8c8d'); return; }
+                fertToggle(f.name, grIso(f.dates[fertRound - 1]), fertRound, !f.ordered[fertRound - 1]);
+            } else if (f.n) {
+                fertRound = f.n;
+                renderFertView(); updateGeoStyles();
+            }
             const row = document.getElementById('fert-row-' + escUnit(normName(name)));
             if (!row) return;
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -4373,7 +4380,7 @@
                     const msg = (data && data.message) ? data.message : 'the sheet refused it';
                     throw new Error(/unknown payload type/i.test(msg) ? 'the Apps Script needs updating' : msg);
                 }
-                setFertStatus('✓ Saved to the sheet', '#27ae60');
+                setFertStatus(`✓ ${name} ${on ? 'ticked' : 'unticked'}, saved to the sheet`, '#27ae60');
             } catch (e) {
                 setFertStatus('⚠ Saved on this device only - ' + e.message, '#e67e22');
             }
