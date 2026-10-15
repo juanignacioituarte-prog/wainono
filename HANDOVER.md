@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.53**,
-service worker cache `wn-farm-v1.1.67`, Apps Script `2026-10-15-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.54**,
+service worker cache `wn-farm-v1.1.68`, Apps Script `2026-10-15-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.53/v1.1.54/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.67/wn-farm-v1.1.68/" sw.js
+sed -i "s/v1\.1\.54/v1.1.55/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.68/wn-farm-v1.1.69/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -783,3 +783,7 @@ Added 12 October 2026:
   the row): doPost `save_fert`, doGet `fert`. Deployed with clasp, version 41.
 - The Apps Script is now sent to Google with clasp: `sh
   /c/dev/wainono-apps-script/deploy.sh` (15 Oct 2026). No more pasting.
+- Fert: a break counts for the map paddock its centre lies in, not the
+  name it was saved with (v1.1.54). Breaks saved as "30" are in 30a, "23B"
+  in 23, "L8A" in L8, "L3A" in L1; some have no name. Falls back to the
+  name when the break has no points or lies outside every paddock.

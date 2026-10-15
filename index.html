@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.53</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.54</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.53</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.54</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3326,7 +3326,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.53) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.54) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4176,17 +4176,41 @@
         }
         const fertKey = (name, iso) => normName(name) + '|' + iso;
 
+        // The map paddock holding a break's centre (remembered per break), or null.
+        const fertWhereCache = new Map();
+        function fertBreakPaddock(b) {
+            const v = Array.isArray(b.vertices) ? b.vertices.filter(p => p && isFinite(p.lat) && isFinite(p.lng)) : [];
+            if (!v.length) return null;
+            const key = (b.id || b.name) + '|' + v.length + '|' + v[0].lat + ',' + v[0].lng;
+            if (fertWhereCache.has(key)) return fertWhereCache.get(key);
+            const lat = v.reduce((a, p) => a + p.lat, 0) / v.length, lng = v.reduce((a, p) => a + p.lng, 0) / v.length;
+            const inRing = ring => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) c = !c; } return c; };
+            let found = null;
+            for (const n of Object.keys(paddockMap || {})) {
+                const l = paddockMap[n], g = l && l.feature && l.feature.geometry;
+                if (!g || (l.getBounds && !l.getBounds().contains([lat, lng]))) continue;
+                const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+                if (polys.some(p => p[0] && inRing(p[0]))) { found = n; break; }
+            }
+            fertWhereCache.set(key, found);
+            return found;
+        }
+
         // Every paddock on the map: { name, dates: [first break of each grazing], ordered: [bool] }.
         function fertAll() {
             if (fertCache && Date.now() - fertCacheAt < 3000) return fertCache;
             const names = {}; Object.keys(paddockMap || {}).forEach(n => { names[normName(n)] = n; });
             const by = {};
             (savedBreaks || []).forEach(b => {
-                if (b.isDeleted || b.isCropBreak || !b.paddock || !b.createdAt) return;
-                const k = normName(b.paddock); if (!names[k]) return;
+                if (b.isDeleted || b.isCropBreak || !b.createdAt) return;
                 const t = new Date(b.createdAt); if (!isFinite(t.getTime())) return;
                 const ha = Number(b.areaHa) || (Number(b.areaSqm) || 0) / 10000;
                 if (b.cropMode === 'line' || !(ha > 0)) return;     // grass breaks only, no lines
+                // The paddock the break is drawn IN, not the name it was saved
+                // with: a break saved as "30" lies in 30a on the map.
+                const at = fertBreakPaddock(b);
+                const k = at ? normName(at) : normName(String(b.paddock == null ? '' : b.paddock));
+                if (!names[k]) return;
                 (by[k] = by[k] || []).push({ t, ha });
             });
             const since = fertSinceDate().getTime();
