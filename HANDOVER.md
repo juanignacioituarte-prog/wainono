@@ -32,7 +32,7 @@ commit as the code.
 |---|---|
 | `index.html` | **The whole app.** One file: HTML, CSS and all the JavaScript. This is the only file to edit for app changes |
 | `sw.js` | Service worker. Network first. `CACHE_NAME` must be bumped on every release |
-| `wainono_apps_script.js` | The Apps Script for the **feed sync** spreadsheet. Pasted by hand into the script editor (see section 4) |
+| `wainono_apps_script.js` | The Apps Script for the **feed sync** spreadsheet. Sent to Google with clasp (see section 4) |
 | `health_safety_apps_script.js` | Script for the Health & Safety sheet (separate spreadsheet) |
 | `vehicle_maintenance_apps_script.js` | Script for the vehicle sheet (separate spreadsheet) |
 | `roster_apps_script.js` | Script for the roster sheet |
@@ -123,7 +123,28 @@ whether a change landed.
 
 ## 4. Deploying the Apps Script
 
-The script is **not** deployed from this repo. To update it:
+**Automatic, with clasp (since 15 Oct 2026).** From Git Bash, after the
+change is committed in `C:\dev\onefarm`:
+
+```bash
+sh /c/dev/wainono-apps-script/deploy.sh
+```
+
+It copies `C:\dev\onefarm\wainono_apps_script.js` to
+`C:\dev\wainono-apps-script\Code.js`, runs `clasp push`, then `clasp deploy`
+on the SAME deployment the app calls (`AKfycbzRkk...`, so the URL never
+changes), and waits until `?type=version` shows the new `SCRIPT_VERSION`.
+Script ID `1VXavicL6jY7dY-bsUfoSwrdU1VJZI8Q53KqxgYH95J-2l37xuoU-1EIm`.
+`C:\dev\wainono-apps-script` is NOT in the public repo (`.clasp.json`,
+`deploy.sh`). clasp 3.4.1 is installed with npm (`npm install -g
+@google/clasp`); the Google login is in `~/.clasprc.json`, made by Juani with
+`clasp.cmd login`, and it can reach all of Juani's Apps Scripts: never copy
+it anywhere. On a new PC: install clasp, Juani runs `clasp.cmd login`, then
+`clasp.cmd clone <script ID>` into `C:\dev\wainono-apps-script` and copy
+`deploy.sh` (it is short: see the Zenbook/TUF16 copy). The Apps Script API
+must be on at https://script.google.com/home/usersettings (it is).
+
+By hand (old way, still works):
 
 1. Open the **feed sync** spreadsheet - Extensions - Apps Script
 2. Select all, paste `wainono_apps_script.js` over it, Ctrl+S
@@ -759,5 +780,6 @@ Added 12 October 2026:
   the paddocks with an Nth grazing and a tick "fert ordered" (map: green
   ordered, orange not). Ticks in the sheet `fert` (paddock | grazed | round |
   user | saved at; grazed = first break date of that grazing; untick deletes
-  the row): doPost `save_fert`, doGet `fert`. Until the script is pasted a
-  tick is kept on that phone only.
+  the row): doPost `save_fert`, doGet `fert`. Deployed with clasp, version 41.
+- The Apps Script is now sent to Google with clasp: \`sh
+  /c/dev/wainono-apps-script/deploy.sh\` (15 Oct 2026). No more pasting.
