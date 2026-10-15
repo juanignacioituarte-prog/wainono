@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.66**,
-service worker cache `wn-farm-v1.1.80`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.67**,
+service worker cache `wn-farm-v1.1.81`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.66/v1.1.67/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.80/wn-farm-v1.1.81/" sw.js
+sed -i "s/v1\.1\.67/v1.1.68/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.81/wn-farm-v1.1.82/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -842,3 +842,8 @@ Added 12 October 2026:
 - Fert: SPREAD ASAP paddocks are red (#c0392b, `FERT_ASAP_COLOR`) on the
   round map (orange = not ordered, waiting; green = ordered) and first in
   the round list; with ALL they get a red edge (v1.1.66).
+- Fert **ORDER LIST** (v1.1.67): ticking a paddock (box, map tap, ADD ALL)
+  puts it in an order list kept on the phone (`fert_draft`, blue on the map
+  and list); nothing goes to the sheet until SEND ORDER in the list, which
+  sets one spreading date for all (ordered = that day). Unticking a paddock
+  already sent unticks it in the sheet at once.

@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.66</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.67</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.66</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.67</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -2176,6 +2176,7 @@
             <div id="fert-nrule" style="margin-bottom:8px;"></div>
             <button onclick="openFertReport()" style="width:100%; background:#2c3e50; color:#fff; border:none; padding:9px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; margin-bottom:6px;">📋 REPORT: FERT ORDERED BY DAY</button>
             <div id="fert-status" style="font-size:11px; min-height:14px; margin-bottom:4px;"></div>
+            <div id="fert-draft-bar"></div>
             <div id="fert-list"></div>
         </div>
 
@@ -3328,7 +3329,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.66) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.67) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4288,6 +4289,7 @@
                 for (let r = 1; r <= max; r++) h += chip(r, `ROUND ${r} (${all.filter(f => f.dates.length >= r).length})`, fertCountColor(r));
                 rounds.innerHTML = h;
             }
+            renderFertDraftBar();
             const nbox = document.getElementById('fert-nrule');
             if (nbox) {
                 const st = Object.values(fertNStatus());
@@ -4318,27 +4320,28 @@
             const nst = fertNStatus();
             const rows = all.filter(f => f.dates.length >= r).map(f => { const t = f.ordered[r - 1] ? tickOf(f, f.dates[r - 1]) : {};
                 const ns = nst[normName(f.name)];
-                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], orderedOn: fertOrderedOn(t), spread: t.spread || '',
+                const draft = !f.ordered[r - 1] && fertInDraft(f.name, grIso(f.dates[r - 1]));
+                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], draft, orderedOn: fertOrderedOn(t), spread: t.spread || '',
                          asap: !f.ordered[r - 1] && !!ns && ns.state === 'asap' && ns.round === r }; })
                 // Spread ASAP on top, then the rest still to order, ordered ones
                 // at the bottom (Juani); newest grazing first.
                 .sort((a, b) => (b.asap - a.asap) || (a.ordered - b.ordered) || (b.date - a.date) || a.f.name.localeCompare(b.f.name, undefined, { numeric: true }));
             const nAsap = rows.filter(x => x.asap);
             const done = rows.filter(x => x.ordered);
-            const todo = rows.length - done.length;
+            const todo = rows.filter(x => !x.ordered && !x.draft).length;
             FERT_ROWS = rows.map(x => ({ name: x.f.name, iso: grIso(x.date), round: r }));
             box.innerHTML = `<div style="font-size:12px; margin-bottom:6px;"><b>Round ${r}:</b> ${rows.length} paddocks · ${fmtHa(ha(rows.map(x => x.f)))} ha
                     <br><span style="color:#27ae60;">■ fert ordered</span> ${done.length} · ${fmtHa(ha(done.map(x => x.f)))} ha
                     <br><span style="color:${FERT_ASAP_COLOR};">■ spread ASAP</span> ${nAsap.length} · ${fmtHa(ha(nAsap.map(x => x.f)))} ha
                     &nbsp; <span style="color:#e67e22;">■ not ordered</span> ${rows.length - done.length - nAsap.length} · ${fmtHa(ha(rows.filter(x => !x.ordered && !x.asap).map(x => x.f)))} ha</div>` +
-                (todo ? `<button onclick="fertTickAll()" style="width:100%; background:#27ae60; color:#fff; border:none; padding:10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:8px;">✓ TICK ALL ${todo} NOT ORDERED</button>` : '') +
+                (todo ? `<button onclick="fertTickAll()" style="width:100%; background:#2980b9; color:#fff; border:none; padding:10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:8px;">＋ ADD ALL ${todo} NOT ORDERED TO THE ORDER LIST</button>` : '') +
                 rows.map((x, i) => {
                     const id = 'fert-row-' + escUnit(normName(x.f.name));
                     const iso = grIso(x.date);
-                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
-                        <input type="checkbox" ${x.ordered ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
+                    return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.draft ? FERT_DRAFT_COLOR : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
+                        <input type="checkbox" ${x.ordered || x.draft ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
-                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : fertRuleText(x.f.name)}</span>
+                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">grazed ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : x.draft ? `<br><span style="color:${FERT_DRAFT_COLOR}; font-weight:bold;">in the order list (not sent)</span>` : fertRuleText(x.f.name)}</span>
                         ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread${dmyDateBox(x.spread, `fertSetSpread(${i}, this.value)`, { color: x.spread ? '#27ae60' : '#e67e22', empty: 'pick date', small: true })}</span>` : ''}</label>`;
                 }).join('');
         }
@@ -4355,11 +4358,12 @@
         }
         function fertToggleRow(i, on) { const x = FERT_ROWS[i]; if (x) fertToggle(x.name, x.iso, x.round, on); }
         // Every paddock of the round still not ordered, in one save.
-        async function fertTickAll() {
-            const list = FERT_ROWS.filter(x => !FERT_ORDERED.some(r => fertKey(r.paddock, r.grazed) === fertKey(x.name, x.iso)));
+        function fertTickAll() {
+            const list = FERT_ROWS.filter(x => !FERT_ORDERED.some(r => fertKey(r.paddock, r.grazed) === fertKey(x.name, x.iso)) && !fertInDraft(x.name, x.iso));
             if (!list.length) return;
-            if (!confirm(`Tick fert ordered for ${list.length} paddock${list.length === 1 ? '' : 's'} of round ${fertRound}?`)) return;
-            await fertSend(list.map(x => ({ paddock: x.name, grazed: x.iso, round: x.round, ordered: true })), `✓ ${list.length} saved to the sheet`);
+            list.forEach(x => FERT_DRAFT.push({ paddock: x.name, grazed: x.iso, round: x.round }));
+            fertSaveDraft();
+            setFertStatus(`${list.length} added to the order list`, FERT_DRAFT_COLOR);
         }
         function fertSetRound(r) { fertRound = r; renderFertView(); updateGeoStyles(); }
 
@@ -4372,7 +4376,8 @@
             const f = fertPaddockInfo(name);
             if (fertRound) {
                 if (f.n < fertRound) { setFertStatus(`${name}: no round ${fertRound} grazing yet`, '#7f8c8d'); return; }
-                fertToggle(f.name, grIso(f.dates[fertRound - 1]), fertRound, !f.ordered[fertRound - 1]);
+                const iso = grIso(f.dates[fertRound - 1]);
+                fertToggle(f.name, iso, fertRound, !(f.ordered[fertRound - 1] || fertInDraft(f.name, iso)));
             } else if (f.n) {
                 fertRound = f.n;
                 renderFertView(); updateGeoStyles();
@@ -4606,8 +4611,77 @@
                 } else if (d && d.status !== 'success') setFertStatus('⚠ The Apps Script needs updating for fert ticks', '#e67e22');
             } catch (e) { console.warn('Fert not loaded', e); }
         }
+        /* ORDER LIST (Juani, 15 Oct 2026): ticking a paddock puts it in the
+         * order list on this phone; nothing goes to the sheet until SEND, where
+         * one spreading date is set for all of them. Unticking a paddock in the
+         * list takes it off; unticking one already sent unticks it in the sheet. */
+        const FERT_DRAFT_COLOR = '#2980b9';
+        let FERT_DRAFT = (() => { try { const c = JSON.parse(localStorage.getItem('fert_draft') || '[]'); return Array.isArray(c) ? c : []; } catch (e) { return []; } })();
+        const fertInDraft = (name, iso) => FERT_DRAFT.some(d => fertKey(d.paddock, d.grazed) === fertKey(name, iso));
+        function fertSaveDraft() {
+            try { localStorage.setItem('fert_draft', JSON.stringify(FERT_DRAFT)); } catch (e) {}
+            if (currentDashboardMode === 'fert') { renderFertView(); updateGeoStyles(); }
+            if (document.getElementById('fert-order-modal')) openFertOrder();
+        }
         function fertToggle(name, iso, round, on) {
-            return fertSend([{ paddock: name, grazed: iso, round: round, ordered: !!on }], `✓ ${name} ${on ? 'ticked' : 'unticked'}, saved to the sheet`);
+            const sent = FERT_ORDERED.some(r => fertKey(r.paddock, r.grazed) === fertKey(name, iso));
+            if (sent) {
+                if (!on) return fertSend([{ paddock: name, grazed: iso, round: round, ordered: false }], `✓ ${name} unticked, saved to the sheet`);
+                return;
+            }
+            if (on && !fertInDraft(name, iso)) FERT_DRAFT.push({ paddock: name, grazed: iso, round: round });
+            if (!on) FERT_DRAFT = FERT_DRAFT.filter(d => fertKey(d.paddock, d.grazed) !== fertKey(name, iso));
+            fertSaveDraft();
+            setFertStatus(on ? `${name} added to the order list` : `${name} taken off the order list`, FERT_DRAFT_COLOR);
+        }
+        function renderFertDraftBar() {
+            const bar = document.getElementById('fert-draft-bar');
+            if (!bar) return;
+            const haSum = FERT_DRAFT.reduce((a, d) => a + (Number(paddockAreaFor(d.paddock)) || 0), 0);
+            bar.innerHTML = FERT_DRAFT.length
+                ? `<button onclick="openFertOrder()" style="width:100%; background:${FERT_DRAFT_COLOR}; color:#fff; border:none; padding:11px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:8px;">🧾 ORDER LIST: ${FERT_DRAFT.length} paddock${FERT_DRAFT.length === 1 ? '' : 's'} · ${(Math.round(haSum * 10) / 10).toFixed(1)} ha · OPEN TO SEND</button>`
+                : '';
+        }
+        let fertOrderSpread = '';
+        function openFertOrder() {
+            closeFertOrder();
+            const fmtHa = v => (Math.round(v * 10) / 10).toFixed(1);
+            const list = FERT_DRAFT.slice().sort((a, b) => (a.round - b.round) || String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }));
+            const haOf = d => Number(paddockAreaFor(d.paddock)) || 0;
+            const total = list.reduce((a, d) => a + haOf(d), 0);
+            const wrap = document.createElement('div');
+            wrap.id = 'fert-order-modal';
+            wrap.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; display:flex; align-items:center; justify-content:center; padding:15px;';
+            wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:480px; max-height:88vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">🧾 Order list</h3>
+                <button onclick="closeFertOrder()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
+                <div style="font-size:14px; margin:6px 0;"><b>${list.length}</b> paddock${list.length === 1 ? '' : 's'} · <b>${fmtHa(total)}</b> ha</div>
+                ${list.length ? `<table style="width:100%; font-size:12px; border-collapse:collapse;">
+                    <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Round</td><td>Grazed</td><td style="text-align:right;">ha</td><td></td></tr>
+                    ${list.map(d => { const g = grPartialDate(d.grazed); return `<tr style="border-top:1px solid #eee;"><td style="padding:4px 0;"><b>${escUnit(d.paddock)}</b></td><td>${d.round}</td><td>${g ? fmtNZ(g) : escUnit(d.grazed)}</td><td style="text-align:right;">${fmtHa(haOf(d))}</td>
+                        <td style="text-align:right;"><button onclick="fertDraftRemove('${escUnit(d.paddock).replace(/&#39;/g, '')}', '${d.grazed}')" style="background:none; border:none; color:#c0392b; font-size:16px; cursor:pointer;" title="Take off the list">&times;</button></td></tr>`; }).join('')}
+                </table>` : '<div style="font-size:12px; color:#7f8c8d; padding:8px 0;">The list is empty. Tick paddocks in a round to add them.</div>'}
+                ${list.length ? `<div style="display:flex; align-items:center; gap:8px; margin:12px 0 4px; font-size:13px; flex-wrap:wrap;"><b>Spreading date:</b>
+                    ${dmyDateBox(fertOrderSpread, 'fertOrderSpread = this.value; openFertOrder()', { id: 'fert-order-spread', color: fertOrderSpread ? '#27ae60' : '#e67e22', empty: 'pick date' })}
+                    <span style="font-size:11px; color:#7f8c8d;">for all of them (can be changed later per paddock)</span></div>
+                <button onclick="sendFertOrder()" style="width:100%; margin-top:8px; background:#27ae60; color:#fff; border:none; padding:12px; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">✓ SEND ORDER (${list.length})</button>
+                <button onclick="fertDraftClear()" style="width:100%; margin-top:6px; background:#ecf0f1; color:#c0392b; border:none; padding:8px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">CLEAR THE LIST</button>` : ''}
+            </div>`;
+            wrap.addEventListener('click', e => { if (e.target === wrap) closeFertOrder(); });
+            document.body.appendChild(wrap);
+        }
+        function closeFertOrder() { const w = document.getElementById('fert-order-modal'); if (w) w.remove(); }
+        function fertDraftRemove(name, iso) { FERT_DRAFT = FERT_DRAFT.filter(d => fertKey(d.paddock, d.grazed) !== fertKey(name, iso)); fertSaveDraft(); }
+        function fertDraftClear() { if (!confirm('Clear the order list? Nothing is sent.')) return; FERT_DRAFT = []; fertSaveDraft(); closeFertOrder(); }
+        async function sendFertOrder() {
+            const list = FERT_DRAFT.slice();
+            if (!list.length) return;
+            const sp = fertOrderSpread;
+            if (!sp && !confirm('No spreading date. Send without one? You can add it later per paddock.')) return;
+            FERT_DRAFT = []; fertSaveDraft(); closeFertOrder();
+            fertOrderSpread = '';
+            await fertSend(list.map(d => ({ paddock: d.paddock, grazed: d.grazed, round: d.round, ordered: true, spread: sp || '' })),
+                `✓ Order sent: ${list.length} paddock${list.length === 1 ? '' : 's'}${sp ? ', spreading ' + fmtNZ(grPartialDate(sp)) : ''}`);
         }
 
         function renderPrintMapPanel() {
@@ -12007,7 +12081,7 @@
                     const asap = ns && ns.state === 'asap';
                     let fill, op, edge = 'white', w = 1.5;
                     if (!fertRound) { fill = fertCountColor(f.n); op = f.n ? 0.7 : 0.15; if (asap) { edge = FERT_ASAP_COLOR; w = 3; } }
-                    else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
+                    else if (f.n >= fertRound) { fill = f.ordered[fertRound - 1] ? '#27ae60' : fertInDraft(f.name, grIso(f.dates[fertRound - 1])) ? FERT_DRAFT_COLOR : (asap && ns.round === fertRound ? FERT_ASAP_COLOR : '#e67e22'); op = 0.75; }
                     else { fill = '#95a5a6'; op = 0.12; }
                     layer.setStyle({ fillColor: fill, fillOpacity: op, color: edge, opacity: 0.9, weight: w });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${escUnit(pName)}</div>` +
