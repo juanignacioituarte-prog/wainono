@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.73</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.74</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.73</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.74</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3329,7 +3329,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.73) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.74) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4253,9 +4253,17 @@
         }
 
         // Every paddock on the map: { name, dates: [first break of each grazing], ordered: [bool] }.
+        // Out of rotation for a reason other than silage (Juani, 15 Oct 2026):
+        // left out of the rounds, the rules and the cows. Silage ones stay in.
+        function fertOutNotSilage(name) {
+            const st = (typeof excludedPaddocks !== 'undefined' && excludedPaddocks.get(normName(name))) || '';
+            if (!st) return false;
+            const info = outStatusInfo(st);
+            return !/silage/i.test(String(st) + ' ' + (info && info.label || ''));
+        }
         function fertAll() {
             if (fertCache && Date.now() - fertCacheAt < 3000) return fertCache;
-            const names = {}; Object.keys(paddockMap || {}).forEach(n => { names[normName(n)] = n; });
+            const names = {}; Object.keys(paddockMap || {}).forEach(n => { if (!fertOutNotSilage(n)) names[normName(n)] = n; });
             const by = {};
             (savedBreaks || []).forEach(b => {
                 if (b.isDeleted || b.isCropBreak || !b.createdAt) return;
@@ -4428,6 +4436,7 @@
          * paddock's fert for that round, a second tap unticks it. A paddock not
          * in that round only says so. With ALL: opens the paddock's last round. */
         function fertFocus(name) {
+            if (fertOutNotSilage(name)) { setFertStatus(`${name}: out of rotation, not in the rounds (add it in the order list if needed)`, '#7f8c8d'); return; }
             const f = fertPaddockInfo(name);
             if (fertRound) {
                 const g = f.grazing && f.n + 1 === fertRound;
@@ -4740,7 +4749,7 @@
             const haSum = FERT_DRAFT.reduce((a, d) => a + (Number(paddockAreaFor(d.paddock)) || 0), 0);
             bar.innerHTML = FERT_DRAFT.length
                 ? `<button onclick="openFertOrder()" style="width:100%; background:${FERT_DRAFT_COLOR}; color:#fff; border:none; padding:11px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; margin-bottom:8px;">🧾 ORDER LIST: ${FERT_DRAFT.length} paddock${FERT_DRAFT.length === 1 ? '' : 's'} · ${(Math.round(haSum * 10) / 10).toFixed(1)} ha · OPEN TO SEND</button>`
-                : '';
+                : `<button onclick="openFertOrder()" style="width:100%; background:#fff; color:${FERT_DRAFT_COLOR}; border:1.5px solid ${FERT_DRAFT_COLOR}; padding:8px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:8px;">🧾 ORDER LIST · ＋ add any paddock</button>`;
         }
         let fertOrderSpread = '';
         function openFertOrder() {
@@ -4756,10 +4765,17 @@
                 <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">🧾 Order list</h3>
                 <button onclick="closeFertOrder()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
                 <div style="font-size:14px; margin:6px 0;"><b>${list.length}</b> paddock${list.length === 1 ? '' : 's'} · <b>${fmtHa(total)}</b> ha</div>
+                <div style="display:flex; gap:6px; margin:6px 0 10px;">
+                    <select id="fert-add-paddock" style="flex:1; padding:7px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+                        <option value="">Add any paddock...</option>
+                        ${Object.keys(paddockMap || {}).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(n => `<option value="${escUnit(n)}">${escUnit(n)}</option>`).join('')}
+                    </select>
+                    <button onclick="fertAddCustom(document.getElementById('fert-add-paddock').value)" style="background:${FERT_DRAFT_COLOR}; color:#fff; border:none; padding:7px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">＋ ADD</button>
+                </div>
                 ${list.length ? `<table style="width:100%; font-size:12px; border-collapse:collapse;">
                     <tr style="color:#7f8c8d; font-size:10px;"><td>Paddock</td><td>Round</td><td>Grazed</td><td>Days after</td><td>Last spread</td><td style="text-align:right;">ha</td><td></td></tr>
                     ${list.map(d => { const g = grPartialDate(d.grazed); const da = fertDaysAfter(d.paddock, d.round, fertOrderSpread || null); const late = da != null && da > fertMaxDays();
-                        return `<tr style="border-top:1px solid #eee;${late ? ` color:${FERT_LATE_COLOR};` : ''}"><td style="padding:4px 0;"><b>${escUnit(d.paddock)}</b></td><td>${d.round}</td><td>${g ? fmtNZ(g) : escUnit(d.grazed)}</td><td>${da == null ? '--' : da + ' d'}${late ? ' <b>too close</b>' : ''}</td>${(() => { const ls = fertLastSpread(d.paddock); if (!ls) return '<td style="color:#7f8c8d;">none</td>';
+                        return `<tr style="border-top:1px solid #eee;${late ? ` color:${FERT_LATE_COLOR};` : ''}"><td style="padding:4px 0;"><b>${escUnit(d.paddock)}</b></td><td>${d.round || 'custom'}</td><td>${g ? fmtNZ(g) : escUnit(d.grazed)}</td><td>${da == null ? '--' : da + ' d'}${late ? ' <b>too close</b>' : ''}</td>${(() => { const ls = fertLastSpread(d.paddock); if (!ls) return '<td style="color:#7f8c8d;">none</td>';
                             const on = fertOrderSpread ? grPartialDate(fertOrderSpread) : grDayOf(new Date()); const gap = Math.round((on - ls) / GR_DAY);
                             return `<td style="${gap < fertNDays() ? `color:${FERT_ASAP_COLOR}; font-weight:bold;` : ''}">${fmtNZ(ls)} (${gap} d)</td>`; })()}<td style="text-align:right;">${fmtHa(haOf(d))}</td>
                         <td style="text-align:right;"><button onclick="fertDraftRemove('${escUnit(d.paddock).replace(/&#39;/g, '')}', '${d.grazed}')" style="background:none; border:none; color:#c0392b; font-size:16px; cursor:pointer;" title="Take off the list">&times;</button></td></tr>`; }).join('')}
@@ -4777,6 +4793,21 @@
             </div>`;
             wrap.addEventListener('click', e => { if (e.target === wrap) closeFertOrder(); });
             document.body.appendChild(wrap);
+        }
+        /* A custom order (Juani, 15 Oct 2026): any paddock. It goes on the
+         * paddock's last grazing (being grazed, else its last round); a paddock
+         * with no grazing since the "since" date gets a custom order, round 0,
+         * dated today (it counts for the last spread and the report). */
+        function fertAddCustom(name) {
+            if (!name) return;
+            const f = fertAll()[normName(name)];
+            let grazed, round;
+            if (f && f.grazing) { grazed = grIso(f.grazing.start); round = f.dates.length + 1; }
+            else if (f && f.dates.length) { round = f.dates.length; grazed = grIso(f.dates[round - 1]); }
+            else { grazed = grIso(new Date()); round = 0; }
+            if (fertIsSent(name, grazed)) { setFertStatus(`${name}: already ordered for that grazing`, '#7f8c8d'); return; }
+            if (!fertInDraft(name, grazed)) FERT_DRAFT.push({ paddock: name, grazed, round });
+            fertSaveDraft();
         }
         function closeFertOrder() { const w = document.getElementById('fert-order-modal'); if (w) w.remove(); }
         function fertDraftRemove(name, iso) { FERT_DRAFT = FERT_DRAFT.filter(d => fertKey(d.paddock, d.grazed) !== fertKey(name, iso)); fertSaveDraft(); }
