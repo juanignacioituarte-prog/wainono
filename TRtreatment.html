@@ -389,6 +389,12 @@
                 <input type="search" id="cow-search" placeholder="Type the tag number…" inputmode="numeric"
                        autocomplete="off" oninput="renderSearch()" style="margin-top:10px;">
                 <div id="search-results" style="margin-top:10px;"></div>
+                <div style="margin-top:10px;">
+                    <button class="btn small grey" onclick="$('list-file').click()">📄 Load a list of cows from a file</button>
+                    <input type="file" id="list-file" accept=".csv,.txt,text/csv,text/plain"
+                           onchange="loadCowListFile(event)" style="display:none;">
+                    <div id="list-result"></div>
+                </div>
             </div>
 
             <div class="card hidden" id="picked-card">
@@ -2439,9 +2445,170 @@
             renderBackdate();
             $('cow-search').value = '';
             $('new-notes').value = '';
+            $('list-result').innerHTML = '';
             updateDraftBar();
             renderSearch();
             window.scrollTo(0, 0);
+        }
+
+        /**
+         * Several cows at once from a file: a CSV or text file with EIDs, tag
+         * numbers or birth IDs, in a row, in a column, or both. Header words such
+         * as "EID" are skipped (anything with no digit in it). Every cow found is
+         * added to the "Several cows" list, as if she had been tapped. A number
+         * that is not in the cow list is NOT added; it is named instead.
+         */
+        function loadCowListFile(ev) {
+            const input = ev.target;
+            const file = input.files && input.files[0];
+            input.value = '';                     // the same file can be picked again
+            if (!file) return;
+            if (!state.cows.length) { toast('The cow list is not loaded yet. Press Refresh.'); return; }
+            const reader = new FileReader();
+            reader.onload = e => addCowsFromList(String(e.target.result || ''), file.name);
+            reader.readAsText(file);
+        }
+
+        /** What the last list file could not add, as a table for a CSV file. */
+        let listReport = { head: [], body: [], name: '' };
+
+        function downloadListReport() {
+            if (!listReport.body.length) return;
+            downloadCsv(listReport.head, listReport.body, listReport.name);
+            toast('Report saved: ' + listReport.name);
+        }
+
+        function addCowsFromList(text, fileName) {
+            const digits = v => String(v || '').replace(/\D/g, '');
+            const byEid = new Map(), byTag = new Map(), byBirth = new Map();
+            state.cows.forEach(c => {
+                if (digits(c.EID)) byEid.set(digits(c.EID), c);
+                if (String(c.Tag || '').trim()) byTag.set(String(c.Tag).trim(), c);
+                if (String(c.BirthID || '').trim()) byBirth.set(String(c.BirthID).trim().toLowerCase(), c);
+            });
+
+            // Exact matches only, never "starts with". A long number is an EID;
+            // anything else may be a tag number or a birth ID.
+            const lookup = v => {
+                const d = digits(v);
+                const hits = new Set(d.length >= 12 ? [byEid.get(d)]
+                    : [byTag.get(v), byBirth.get(v.toLowerCase())]);
+                hits.delete(undefined);
+                return hits;
+            };
+
+            const found = [], missing = [], unsure = [];
+            const rows = parseCsv(text).map(r => r.map(f => String(f).trim()));
+            // The report keeps the file's own columns when it has a header, plus
+            // a Problem column, so it can be sorted out and loaded again.
+            let reportHead = ['Value', 'Problem'];
+            const reportBody = [];
+
+            // A file with a header row, like a Tru-Test export
+            // (EID;VID;Date;Time;LID). Each row is ONE cow.
+            const kind = h => {
+                h = h.toLowerCase().replace(/[^a-z]/g, '');
+                if (/^(eid|rfid|electronicid|tagid)$/.test(h)) return 'eid';
+                if (/^(vid|tag|tagnumber|tagno|visualid|animal|animalid|cow|cownumber|cowno|number)$/.test(h)) return 'tag';
+                if (/^(lid|birthid|birth|lifeid|lifetimeid)$/.test(h)) return 'birth';
+                return '';
+            };
+            const head = rows.length > 1 ? rows[0].map(kind) : [];
+            const idCols = head.map((k, i) => k ? i : -1).filter(i => i >= 0);
+
+            const eidCol = head.indexOf('eid');
+
+            if (eidCol >= 0) {
+                // THE EID ONLY (Juani, 2026-10-16). It is the tag the reader
+                // actually read. The file's tag and birth IDs can be old or
+                // wrong (a reader said LID MFYQ-24-500 for cow MFYQ-24-50, a
+                // different animal), so they are never used to pick a cow. An
+                // EID not in the cow list goes in the report, with the rest of
+                // its row, so it can be sorted out.
+                reportHead = rows[0].concat('Problem');
+                rows.slice(1).forEach(r => {
+                    if (!r.some(f => f)) return;
+                    const eid = r[eidCol] || '';
+                    const c = eid ? byEid.get(digits(eid)) : null;
+                    if (c) { found.push(c); return; }
+                    reportBody.push(rows[0].map((h, i) => r[i] || '')
+                        .concat(eid ? 'EID not in the cow list' : 'No EID in this row'));
+                    const rest = rows[0].map((h, i) => i !== eidCol && r[i] ? h + ' ' + r[i] : '')
+                        .filter(Boolean).join(', ');
+                    missing.push((eid || '(no EID)') + (rest ? ' — ' + rest : ''));
+                });
+            } else if (idCols.length) {
+                // Tag and/or birth ID columns, no EID.
+                rows.slice(1).forEach(r => {
+                    const vals = idCols.map(i => r[i] || '').filter(v => v);
+                    if (!vals.length) return;
+                    const cows = new Set();
+                    vals.forEach(v => lookup(v).forEach(c => cows.add(c)));
+                    if (cows.size === 1) found.push([...cows][0]);
+                    else if (cows.size > 1) unsure.push(vals.join(' / '));
+                    else missing.push(vals.join(' / '));
+                    if (cows.size !== 1) reportBody.push([vals.join(' / '),
+                        cows.size ? 'Points to two different cows' : 'Not in the cow list']);
+                });
+            } else {
+                // No header: every value with a digit in it, in rows, in a
+                // column, or one long row. Split again on any separator, in case
+                // one file mixes them. Dates and times are not cow numbers.
+                rows.forEach(r => r.forEach(f => f.split(/[,;\t]/).forEach(p => {
+                    const v = p.trim();
+                    if (!/\d/.test(v) || /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/.test(v) || /^\d{1,2}:\d{2}/.test(v)) return;
+                    const cows = lookup(v);
+                    if (cows.size === 1) found.push([...cows][0]);
+                    else if (cows.size > 1) unsure.push(v);   // a tag of one cow, birth ID of another
+                    else missing.push(v);
+                    if (cows.size !== 1) reportBody.push([v,
+                        cows.size ? 'Points to two different cows' : 'Not in the cow list']);
+                })));
+            }
+
+            // The report: everything that was NOT added, one per line, and a
+            // button to copy it so it can be sorted out in the cow list.
+            listReport = { head: reportHead, body: reportBody,
+                name: 'not-matched-' + String(fileName).replace(/\.[^.]*$/, '') + '.csv' };
+            const problems = (missing.length ? `<div style="color:var(--red); margin-top:6px;">
+                    <b>${missing.length} not in the cow list, not added:</b><br>${missing.map(esc).join('<br>')}</div>` : '')
+                + (unsure.length ? `<div style="color:var(--red); margin-top:6px;">
+                    <b>${unsure.length} point to two different cows, not added:</b><br>
+                    ${unsure.map(esc).join('<br>')}<br>Add them by hand.</div>` : '')
+                + (reportBody.length ? `<button class="btn small grey" style="margin-top:6px;"
+                    onclick="downloadListReport()">⬇ Download this report (CSV)</button>` : '');
+
+            if (!found.length) {
+                $('list-result').innerHTML = `<div style="margin-top:8px; font-size:14px;">
+                    <b style="color:var(--red);">No cow from ${esc(fileName)} was added.</b>${problems}</div>`;
+                return;
+            }
+
+            if (!batchMode) {
+                // A list means several cows. Start a clean list, as a tap would.
+                draft.cows = [];
+                setBatchMode(true);
+            }
+            let added = 0, already = 0;
+            const seen = new Set();
+            found.forEach(c => {
+                const cow = { Tag: c.Tag, BirthID: c.BirthID, EID: c.EID };
+                const key = cowKey(cow);
+                if (seen.has(key)) return;        // the same cow twice in the file
+                seen.add(key);
+                if (draft.cows.some(x => cowKey(x) === key)) { already++; return; }
+                draft.cows.push(cow);
+                added++;
+            });
+
+            $('list-result').innerHTML = `<div style="margin-top:8px; font-size:14px;">
+                <b>${plural(added, 'cow')} added</b> from ${esc(fileName)}.
+                ${already ? plural(already, 'cow') + ' were already on the list.' : ''}
+                ${problems}
+              </div>`;
+            toast(plural(draft.cows.length, 'cow') + ' on the list');
+            renderPickedCard();
+            renderSearch();
         }
 
         function saveNewTreatment() {
@@ -3222,21 +3389,25 @@
                     t.CreatedBy || ''];
             });
 
+            const name = FARM.name.replace(/\s+/g, '-') + '-treatment-register-'
+                + ($('rep-from').value || '') + '-to-' + ($('rep-to').value || '') + '.csv';
+            downloadCsv(head, body, name);
+            toast(rows.length + ' treatments exported');
+        }
+
+        /** Save a table as a CSV file on the phone or computer. */
+        function downloadCsv(head, body, name) {
             const quote = v => {
                 const s = String(v === undefined || v === null ? '' : v);
                 return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
             };
             // The BOM is what makes Excel read the accents properly.
             const csv = '﻿' + [head, ...body].map(r => r.map(quote).join(',')).join('\r\n');
-
-            const name = FARM.name.replace(/\s+/g, '-') + '-treatment-register-'
-                + ($('rep-from').value || '') + '-to-' + ($('rep-to').value || '') + '.csv';
             const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
             const a = document.createElement('a');
             a.href = url; a.download = name;
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 2000);
-            toast(rows.length + ' treatments exported');
         }
 
         /* ---------- treatment detail sheet ---------- */
