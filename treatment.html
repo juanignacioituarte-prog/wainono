@@ -1549,17 +1549,27 @@
              * There is no milk to keep out of the vat and nothing to clear, so it
              * is finished the moment it is written and belongs in History only.
              */
-            const noHold = whMs(t.MilkWithhold, t.MilkWithholdUnit) === 0
-                && whMs(t.MeatWithhold, t.MeatWithholdUnit) === 0;
+            const noMilk = whMs(t.MilkWithhold, t.MilkWithholdUnit) === 0;
+            const noHold = noMilk && whMs(t.MeatWithhold, t.MeatWithholdUnit) === 0;
 
+            /*
+             * NO MILK WITHHOLD: NOTHING TO CLEAR (Juani, 2026-10-16: "conditions
+             * that dont have milk withold shouldnt go to clear list"). Her milk
+             * never left the vat, so once her doses are over she is finished on
+             * her own - she still shows in Doses Today while doses are due, and
+             * in Meat Withhold while the meat counts down, but never in To Clear.
+             * (This replaces the old rule that Ketomax, nil milk / 2 days meat,
+             * still needed clearing.)
+             */
             let stage;
             if (cleared || noHold) stage = 'done';
             else if (!dosingDone) stage = 'dosing';
+            else if (noMilk) stage = 'done';
             else if (!milkOk) stage = 'withhold';
             else stage = 'ready';
 
             return {
-                list, slots, total, given, missed, dueSlot, interval, noHold,
+                list, slots, total, given, missed, dueSlot, interval, noHold, noMilk,
                 ended, cleared, dosingDone, nextDue, dueNow,
                 lastDoseAt, plannedLastDose, milkEnds, meatEnds,
                 milkClear, meatClear, milkOk, meatOk, stage
@@ -3489,7 +3499,9 @@
                 ${trail}
                 ${i.given < i.total && !i.ended
                     ? `<p class="muted">${plural(i.total - i.given, 'dose')} still to give.</p>` : ''}
-                ${!t.ClearedAt ? '<p class="muted">Not cleared yet.</p>' : ''}
+                ${t.ClearedAt ? ''
+                    : i.noMilk ? '<p class="muted">No milk withhold, so nothing to clear.</p>'
+                    : '<p class="muted">Not cleared yet.</p>'}
                 <div class="row" style="margin-top:16px;">
                     <button class="btn grey" onclick="closeModal()">Close</button>
                     ${t.ClearedAt && !readOnly ? `<button class="btn blue" onclick="unclearCow('${esc(t.ID)}')">Undo clear</button>` : ''}
