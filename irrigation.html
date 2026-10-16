@@ -104,7 +104,7 @@
         "No Restriction" = 100. "37% Allocation" = 37.</div>
     </div>
     <div class="tile"><div class="lab">Daily volume allowed</div><div class="val" id="tVol">-</div><div class="note" id="tVolN"></div></div>
-    <div class="tile"><div class="lab">Flow allowed</div><div class="val" id="tLs">-</div><div class="note" id="tLsN"></div></div>
+    <div class="tile"><div class="lab">Flow running</div><div class="val" id="tLs">-</div><div class="note" id="tLsN"></div></div>
     <div class="tile"><div class="lab">Volume planned</div><div class="val" id="tUse">-</div><div class="note" id="tUseN"></div></div>
     <div class="tile"><div class="lab">Water wasted</div><div class="val" id="tWaste">-</div><div class="note">Allowed but not used</div></div>
   </div>
@@ -125,7 +125,8 @@
     How it works (same as the old "LH irrigation restrictions" sheet):<br>
     Allowed volume = full consent volume x allowed %. Each group (for example Manuka and River Terrace)
     gets its own share of that. Volume of a pivot = l/s x hours x 3.6 (m³). Hours off = 24 - hours on.
-    Flow allowed = allowed volume / 86.4 (l/s over 24 hours).
+    The restriction cuts only the daily volume, not the flow. The flow limit stays the full consent
+    (for example 400 l/s).
   </div>
 </div>
 
@@ -207,7 +208,6 @@ function renderGroups() {
       </table>
       <div class="sum">
         <div><div class="lab">Flow running</div><div class="v" id="g${gi}ls"></div></div>
-        <div><div class="lab">Flow allowed</div><div class="v" id="g${gi}lsA"></div></div>
         <div><div class="lab">Volume planned</div><div class="v" id="g${gi}vol"></div></div>
         <div><div class="lab">Volume allowed</div><div class="v" id="g${gi}volA"></div></div>
         <div><div class="lab">Volume left</div><div class="v" id="g${gi}left"></div></div>
@@ -229,8 +229,7 @@ function calc() {
   const c = S.consents[S.tab];
   const frac = num(S.restr) / 100;
   const volA = c.volume * frac;           // allowed m3 per day
-  const lsFull = c.volume / 86.4;         // l/s of the full consent
-  const lsA = volA / 86.4;                // allowed l/s
+  const lsFull = c.volume / 86.4;         // l/s of the full consent. The restriction does not cut the flow, only the daily volume
   let useAll = 0, lsAll = 0;
 
   c.groups.forEach((g, gi) => {
@@ -244,13 +243,10 @@ function calc() {
       document.querySelector(`.hrs[data-g="${gi}"][data-b="${bi}"]`).disabled = !b.on;
     });
     const gVolA = volA * g.share / 100;
-    const gLsA = lsA * g.share / 100;
     const left = gVolA - vol;
     useAll += vol; lsAll += ls;
 
     $('g' + gi + 'ls').innerHTML = `${r1(ls)} <span class="unit">l/s</span>`;
-    $('g' + gi + 'ls').className = 'v ' + (ls > gLsA + 0.05 ? 'warn-t' : '');
-    $('g' + gi + 'lsA').innerHTML = `${r1(gLsA)} <span class="unit">l/s</span>`;
     $('g' + gi + 'vol').innerHTML = `${r0(vol)} <span class="unit">m³</span>`;
     $('g' + gi + 'volA').innerHTML = `${r0(gVolA)} <span class="unit">m³</span>`;
     $('g' + gi + 'left').innerHTML = `${signed(left)} <span class="unit">m³</span>`;
@@ -263,9 +259,10 @@ function calc() {
   const waste = volA - useAll > 1 ? volA - useAll : 0;
   $('tVol').innerHTML = `${r0(volA)} <span class="unit">m³</span>`;
   $('tVolN').textContent = `Full consent ${r0(c.volume)} m³`;
-  $('tLs').innerHTML = `${r1(lsA)} <span class="unit">l/s</span>`;
-  $('tLsN').textContent = `Full consent ${r1(lsFull)} l/s. Running now ${r1(lsAll)} l/s`
-    + (lsAll > lsA + 0.05 ? ` (${r1(lsAll - lsA)} over)` : '');
+  $('tLs').innerHTML = `${r1(lsAll)} <span class="unit">l/s</span>`;
+  $('tLs').className = 'val ' + (lsAll > lsFull + 0.05 ? 'bad-t' : '');
+  $('tLsN').textContent = `Consent maximum ${r1(lsFull)} l/s`
+    + (lsAll > lsFull + 0.05 ? ` (${r1(lsAll - lsFull)} over)` : '');
   $('tUse').innerHTML = `${r0(useAll)} <span class="unit">m³</span>`;
   $('tUse').className = 'val ' + (useAll > volA + 0.5 ? 'bad-t' : '');
   $('tUseN').textContent = useAll > volA + 0.5 ? `Over by ${r0(useAll - volA)} m³` : `${r0(volA - useAll)} m³ left`;
