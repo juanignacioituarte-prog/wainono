@@ -580,7 +580,7 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.75/v1.1.76/g" index.html      # both places
+sed -i "s/v1\.1\.76/v1.1.77/g" index.html      # both places
 sed -i "s/wn-farm-v1\.1\.90/wn-farm-v1.1.91/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
