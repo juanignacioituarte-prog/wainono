@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.75</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.76</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.75</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.76</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3329,7 +3329,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.75) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.76) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4252,6 +4252,18 @@
             return found;
         }
 
+        /* The NZ calendar day of a time, as a local midnight Date (17 Oct 2026):
+         * a grazing is named by its date (yyyy-mm-dd) in the sheet, so every
+         * computer must get the same date. A computer set to another time zone
+         * (e.g. Argentina) put a 7 am NZ break on the day before, so its ticks
+         * did not match and ordered paddocks showed as not ordered. */
+        const fertNzFmt = (() => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }); } catch (e) { return null; } })();
+        function fertNzDay(t) {
+            if (!t) return t;
+            if (!fertNzFmt) return grDayOf(t);
+            const m = /(\d{4})-(\d{2})-(\d{2})/.exec(fertNzFmt.format(t));
+            return m ? new Date(+m[1], +m[2] - 1, +m[3]) : grDayOf(t);
+        }
         // Every paddock on the map: { name, dates: [first break of each grazing], ordered: [bool] }.
         // Out of rotation for a reason other than silage (Juani, 15 Oct 2026):
         // left out of the rounds, the rules and the cows. Silage ones stay in.
@@ -4302,15 +4314,15 @@
                 // The last round: counts at 80%, or at 60% once 10 days pass with no break.
                 if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && finished(cur)))) { starts.push(cur.start); ends.push(cur.last); pcts.push(area > 0 ? cur.ha / area : 1); cur = null; }
                 const keep = starts.map((t, i) => i).filter(i => starts[i].getTime() >= since);
-                const dates = keep.map(i => starts[i]);
-                out[k] = { name: names[k], dates, ends: keep.map(i => ends[i]), pcts: keep.map(i => pcts[i]), ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
+                const dates = keep.map(i => fertNzDay(starts[i]));
+                out[k] = { name: names[k], dates, ends: keep.map(i => fertNzDay(ends[i])), pcts: keep.map(i => pcts[i]), ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
                            current: cur && area > 0 && Date.now() - cur.last <= FERT_DROP_DAYS * GR_DAY ? Math.round(cur.ha / area * 100) : null,
                            // Being grazed now (Juani: fert often comes a few days
                            // after): a round not counted yet with a break in the last
                            // FERT_GRAZING_DAYS days. It shows as its next round; its
                            // key (the first break) stays the same when it counts.
                            grazing: cur && cur.start.getTime() >= since && Date.now() - cur.last <= FERT_GRAZING_DAYS * GR_DAY && !(area > 0 && cur.ha >= FERT_GRAZED_COVER * area)
-                               ? { start: cur.start, pct: area > 0 ? Math.round(cur.ha / area * 100) : null } : null };
+                               ? { start: fertNzDay(cur.start), pct: area > 0 ? Math.round(cur.ha / area * 100) : null } : null };
             });
             fertCache = out; fertCacheAt = Date.now();
             return out;

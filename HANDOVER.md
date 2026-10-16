@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.75**,
-service worker cache `wn-farm-v1.1.89`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.76**,
+service worker cache `wn-farm-v1.1.90`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.11/v1.1.12/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.76/v1.1.77/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -581,7 +581,7 @@ it, tests a whole screen without touching the live sheet.
 ```bash
 cd "<repo>"
 sed -i "s/v1\.1\.75/v1.1.76/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.89/wn-farm-v1.1.90/" sw.js
+sed -i "s/wn-farm-v1\.1\.90/wn-farm-v1.1.91/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -878,3 +878,7 @@ Added 12 October 2026:
   but silage are left out of Fert's rounds, rules and cows
   (`fertOutNotSilage`); on 15 Oct 28 paddocks (regrass, kale, beet, other).
 - Fert: changing the N-day rule now redraws the map too (v1.1.75).
+- Fert grazing dates are NZ dates on every computer (v1.1.76,
+  `fertNzDay`): ticks are keyed by paddock + grazing date, and a computer
+  set to another time zone put early-morning breaks on the day before, so
+  on Juani's other computer every ordered paddock showed as not ordered.
