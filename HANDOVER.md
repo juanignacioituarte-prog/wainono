@@ -39,7 +39,6 @@ commit as the code.
 | `treatment.html`, `TRtreatment.html` | Cow treatment app (own project folder: `G:\My Drive\Apps\cow-treatment`) |
 | `shed.html` | Shed cow display log viewer (own project: `G:\My Drive\Apps\shed-cow-display`) |
 | `gr.html` | Pasture growth prediction page (own project: `G:\My Drive\Apps\pasture-growth`) |
-| `irrigation.html` | Irrigation restrictions page, replaces the LH sheet (own project: `G:\My Drive\Apps\irrigation-restrictions`) |
 | `index viejo.html`, `test.html` | Old copies. **Ignore them.** Only `index.html` is live |
 
 ---
