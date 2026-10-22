@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.85</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.86</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.85</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.86</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3340,7 +3340,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.85) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.86) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -11057,7 +11057,7 @@
             // The cover figures belong to the farmwalk, not to a jobs list.
             const avgBox = document.querySelector('.avg-box');
             const syncNote = document.querySelector('.sync-note');
-            if (avgBox) avgBox.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check' || mode === 'fert') ? 'none' : '';
+            if (avgBox) avgBox.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check' || mode === 'fert' || (mode === 'breaks' && !breaksAvgOpen)) ? 'none' : '';
             if (syncNote) syncNote.style.display = (mode === 'maintenance' || mode === 'silage' || mode === 'print_map' || mode === 'check' || mode === 'fert') ? 'none' : '';
             if (mode !== 'maintenance') {
                 if (maintDrawType) cancelMaintDrawing();
@@ -11067,7 +11067,7 @@
                 if (silagePlacing) cancelSilagePlacing();
                 clearSilageStockFromMap();    // so does the silage
             }
-            document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'estimate' || mode === 'breaks') ? 'block' : 'none';
+            document.getElementById('search').style.display = (mode === 'satellite' || mode === 'manual' || mode === 'estimate') ? 'block' : 'none';   // not in BREAKS (Juani, 23 Oct 2026)
             // Sorting only means something where paddock cards are listed.
             const sortBar = document.getElementById('sort-bar');
             if (sortBar) sortBar.style.display = (mode === 'satellite' || mode === 'manual' || mode === 'estimate') ? 'flex' : 'none';
@@ -14906,6 +14906,14 @@
                 `<div style="font-size:10px; color:${est.fromBreak ? '#e67e22' : '#7f8c8d'};">${from} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` + area;
         }
 
+        // The green AREA/DAY box in BREAKS: folded unless opened (this visit only).
+        var breaksAvgOpen = false;
+        function toggleBreaksAvgBox() {
+            breaksAvgOpen = !breaksAvgOpen;
+            const avgBox = document.querySelector('.avg-box');
+            if (avgBox && currentDashboardMode === 'breaks') avgBox.style.display = breaksAvgOpen ? '' : 'none';
+            renderBreaksDashboard();
+        }
         // The break sizes per herd from FEED (calculateFeedLogic): { herdId: { parts: [[label, ha]], cows, m2 } }.
         var herdBreakSizes = {};   // var: calculateFeedLogic may run before this line
 
@@ -15317,6 +15325,8 @@
             document.getElementById('avg-growth').innerText = estRound;
 
             let html = '';
+            // The green AREA/DAY box is folded in BREAKS (Juani, 23 Oct 2026); this opens it.
+            html += `<div style="text-align:right; margin:-4px 0 4px;"><button onclick="toggleBreaksAvgBox()" style="background:none; border:none; color:#27ae60; font-size:11px; font-weight:bold; cursor:pointer; padding:2px 4px;">${breaksAvgOpen ? '▴ hide area/day' : '▾ show area/day · est. round'}</button></div>`;
 
             html += '<div style="display:flex; gap:6px; margin-bottom:12px; overflow-x:auto; padding-bottom:5px;">';
             const herdCowCounts = JSON.parse(localStorage.getItem('herd_cow_numbers') || '{}');
@@ -15329,22 +15339,20 @@
                     ? BREAK_GROUPS.reduce((sum, h) => h.id === 'all' ? sum : sum + (Number(herdCowCounts[h.id]) || 0), 0)
                     : (Number(herdCowCounts[g.id]) || 0);
 
-                html += `<button style="flex:1; min-width:65px; padding:6px 2px; font-size:10px; font-weight:${weight}; cursor:pointer; background:${g.color}; border:2px solid ${borderStyle}; color:#fff; border-radius:6px; transition:0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.1);" title="${g.name}: ${gCows} cows" onclick="setActiveBreakGroup('${g.id}')">
-                    ${g.name}<br><span style="font-size:8px; opacity:0.8;">(${gCows})</span>
-                </button>`;
+                // Under each button its break sizes, always shown (Juani, 23 Oct 2026).
+                const bs = g.id === 'all' ? null : herdBreakSizes[g.id];
+                const sizes = g.id === 'all'
+                    ? (grassTotalUsed > 0 ? `${grassTotalUsed.toFixed(1)} ha/day` : '')
+                    : (bs && bs.parts && bs.parts.length ? bs.parts.map(([l, v]) => `${l} ${(Number(v) || 0).toFixed(2)}`).join('<br>') : '--');
+                html += `<div style="flex:1; min-width:65px; display:flex; flex-direction:column; gap:2px;">
+                    <button style="width:100%; padding:6px 2px; font-size:10px; font-weight:${weight}; cursor:pointer; background:${g.color}; border:2px solid ${borderStyle}; color:#fff; border-radius:6px; transition:0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.1);" title="${g.name}: ${gCows} cows" onclick="setActiveBreakGroup('${g.id}')">
+                        ${g.name}<br><span style="font-size:8px; opacity:0.8;">(${gCows})</span>
+                    </button>
+                    <div style="font-size:9px; line-height:1.25; text-align:center; color:#2c3e50; font-weight:${isActive ? 'bold' : 'normal'}; font-variant-numeric:tabular-nums;" title="Break size (ha), from FEED">${sizes}</div>
+                </div>`;
             });
             html += `</div>`;
 
-            // The break sizes of the selected herd (Juani, 23 Oct 2026), from FEED.
-            if (activeBreakGroup !== 'all') {
-                const bs = herdBreakSizes[activeBreakGroup];
-                const ag = BREAK_GROUPS.find(g => g.id === activeBreakGroup);
-                html += bs && bs.parts && bs.parts.length
-                    ? `<div style="font-size:12px; margin:-6px 0 10px; padding:6px 10px; background:#fff; border:1px solid #ddd; border-left:4px solid ${ag ? ag.color : '#7f8c8d'}; border-radius:6px;">
-                        Break size: ${bs.parts.map(([l, v]) => `<b>${l} ${(Number(v) || 0).toFixed(2)} ha</b>`).join(' · ')}
-                        <span style="color:#7f8c8d; font-size:10px;">(${bs.cows} cows · ${Math.round(bs.m2)} m²/cow/day)</span></div>`
-                    : `<div style="font-size:11px; color:#7f8c8d; margin:-6px 0 10px;">Break size: not worked out for this herd (no cows on grass, or not in PLAN's unit).</div>`;
-            }
 
             if (weeklyFilterRange) {
                 const s = new Date(weeklyFilterRange.start).toLocaleDateString('en-NZ', { month:'short', day:'numeric' });
