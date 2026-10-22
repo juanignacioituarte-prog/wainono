@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.80**,
-service worker cache `wn-farm-v1.1.94`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.81**,
+service worker cache `wn-farm-v1.1.95`, Apps Script `2026-10-23-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.80/v1.1.81/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.81/v1.1.82/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.80/v1.1.81/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.94/wn-farm-v1.1.95/" sw.js
+sed -i "s/v1\.1\.81/v1.1.82/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.95/wn-farm-v1.1.96/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -900,3 +900,14 @@ Added 12 October 2026:
 - The FARMWALK tab opens on ESTIMATED, not MEASURED (v1.1.80,
   `openFarmwalkTab`); on a FARMWALK view already, it stays. + Farmwalk,
   history and continue-walk still go to MEASURED.
+- **Parts of paddocks out** (v1.1.81, Apps Script 2026-10-23-a, Juani 23 Oct
+  2026): Farm Configuration > Paddocks out > DRAW A PART OUT uses the break
+  drawing tool (mode `out_part`); then the paddock (found by the most sample
+  points, changeable) and the reason. Sheet `out parts` (id | paddock |
+  status | area ha | vertices | user | saved at), doGet `out_parts`, doPost
+  `save_out_part` / `delete_out_part` (BACK IN). The area comes off the
+  area in rotation and the feed area (PLAN, `rotationAreas`,
+  `outPartsArea`); a paddock out as a whole does not count its parts. Map:
+  the reason's colour with a white dashed edge, in FARMWALK, BREAKS, PLAN,
+  FEED, PARTIAL and Farm Configuration. Not yet used by Fert or the
+  farmwalk average.

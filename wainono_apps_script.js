@@ -31,6 +31,8 @@
  *  10. Partial walks (the app's CHECK screen) go to their own sheet
  *      "partial walk", never to "Farmwalks": doPost 'save_partial_walk',
  *      doGet 'partial_walk'.
+ *  12. Parts of paddocks out of rotation, drawn as a polygon (sheet "out
+ *      parts"): doGet 'out_parts', doPost 'save_out_part', 'delete_out_part'.
  *  11. Fert ordered per paddock per grazing (the app's Fert screen), sheet
  *      "fert": doPost 'save_fert' (tick or untick), doGet 'fert'.
  * Everything else is byte-identical to what you had.
@@ -38,7 +40,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-15-d";
+var SCRIPT_VERSION = "2026-10-23-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -74,6 +76,8 @@ function doGet(e) {
     return getPartialWalk();
   } else if (type === 'fert') {
     return getFert();
+  } else if (type === 'out_parts') {
+    return getOutParts();
   } else if (type === 'silage_log') {
     return getSilageLog();
   } else if (type === 'version') {
@@ -131,6 +135,10 @@ function doPost(e) {
       return savePartialWalk(payload);
     } else if (type === 'save_fert') {
       return saveFert(payload);
+    } else if (type === 'save_out_part') {
+      return saveOutPart(payload.part);
+    } else if (type === 'delete_out_part') {
+      return deleteOutPart(payload.id);
     } else if (type === 'save_out_reasons') {
       return saveOutReasons(payload.reasons);
     } else if (type === 'save_silage_location') {
@@ -1376,6 +1384,67 @@ function saveFert(payload) {
     range.setValues(out);
   }
   return jsonResponse({ status: "success", saved: saved, removed: removed, rows: out.length });
+}
+
+/* ================== OUT PARTS ==================
+ * Sheet "out parts": a part of a paddock out of rotation, drawn on the map
+ * (Juani, 23 Oct 2026). Whole paddocks out stay in the sheet "out".
+ *   id | paddock | status | area ha | vertices | user | saved at
+ * vertices is JSON [{lat,lng},...]. One row per part; saving the same id
+ * replaces its row; deleting removes it (the part is back in rotation).
+ */
+var OUT_PART_COLS = ["id", "paddock", "status", "area ha", "vertices", "user", "saved at"];
+
+function outPartsSheet() {
+  var sheet = getOrCreateSheet("out parts");
+  if (sheet.getLastRow() === 0) sheet.appendRow(OUT_PART_COLS);
+  return sheet;
+}
+
+function getOutParts() {
+  var sheet = outPartsSheet();
+  var lastRow = sheet.getLastRow();
+  var parts = [];
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, OUT_PART_COLS.length).getValues().forEach(function(r) {
+      if (!String(r[0] || "").trim()) return;
+      var v = [];
+      try { v = JSON.parse(r[4] || "[]"); } catch (e) { v = []; }
+      parts.push({ id: String(r[0]), paddock: String(r[1] || ""), status: String(r[2] || "OUT").trim().toUpperCase(),
+                   areaHa: Number(r[3]) || 0, vertices: v, user: String(r[5] || ""), savedAt: partialText(r[6]) });
+    });
+  }
+  return jsonResponse({ status: "success", parts: parts });
+}
+
+function saveOutPart(part) {
+  if (!part || !part.id || !Array.isArray(part.vertices) || part.vertices.length < 3) return errorResponse("A part needs an id and 3 or more points");
+  var sheet = outPartsSheet();
+  var row = [String(part.id), String(part.paddock || ""), String(part.status || "OUT").trim().toUpperCase(),
+             Math.round((Number(part.areaHa) || 0) * 1000) / 1000, JSON.stringify(part.vertices), String(part.user || ""), new Date().toISOString()];
+  var lastRow = sheet.getLastRow(), at = 0;
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach(function(r, i) { if (String(r[0]) === String(part.id)) at = i + 2; });
+  }
+  if (at) sheet.getRange(at, 1, 1, OUT_PART_COLS.length).setValues([row]);
+  else {
+    sheet.appendRow(row);
+    sheet.getRange(sheet.getLastRow(), 1, 1, 2).setNumberFormat("@").setValues([[row[0], row[1]]]);
+  }
+  return jsonResponse({ status: "success", saved: 1 });
+}
+
+function deleteOutPart(id) {
+  if (!id) return errorResponse("No id");
+  var sheet = outPartsSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = ids.length - 1; i >= 0; i--) {
+      if (String(ids[i][0]) === String(id)) { sheet.deleteRow(i + 2); return jsonResponse({ status: "success", removed: 1 }); }
+    }
+  }
+  return jsonResponse({ status: "success", removed: 0 });
 }
 
 /* ================== FARMWALK ROUTE ================== */

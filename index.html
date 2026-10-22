@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.80</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.81</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.80</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.81</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1928,6 +1928,12 @@
                     </div>
                     <div id="out-reasons-status" style="font-size:11px; font-weight:bold; margin-top:6px;"></div>
                 </details>
+                <div style="background:#fdf6ee; border:1px solid #f0d2b0; border-radius:6px; padding:8px 10px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:12px; font-weight:bold; color:#2c3e50;">Part of a paddock out</div>
+                    <div style="font-size:11px; color:#666;">Draw the part on the map (tap the corners, then ✓ Finish), then pick the reason. The rest of the paddock stays in rotation.</div>
+                    <button onclick="startOutPartDraw()" style="background:#e67e22; color:#fff; border:none; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">✏ DRAW A PART OUT</button>
+                    <div id="out-parts-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+                </div>
                 <div id="out-paddock-list" style="display:flex; flex-direction:column; gap:8px;"></div>
                 <div id="out-sync-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
             </div>
@@ -3334,7 +3340,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.80) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.81) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -7458,7 +7464,137 @@
             el.style.color = color;
         }
 
+        /* ---- PARTS OF PADDOCKS OUT (Juani, 23 Oct 2026) ----
+         * A part of a paddock drawn as a polygon and taken out of rotation for
+         * a reason, e.g. silage on one end. Kept in the sheet "out parts"
+         * (doGet 'out_parts', doPost 'save_out_part' / 'delete_out_part').
+         * Its area comes off the area in rotation and the feed area (PLAN);
+         * a paddock out as a whole does not count its parts again. Shown on
+         * the map dashed in the reason's colour. */
+        let OUT_PARTS = (() => { try { const c = JSON.parse(localStorage.getItem('out_parts_cache') || '[]'); return Array.isArray(c) ? c : []; } catch (e) { return []; } })();
+        async function loadOutParts() {
+            try {
+                const d = await (await fetch(GOOGLE_SCRIPT_URL + '?type=out_parts&t=' + Date.now(), { cache: 'no-store' })).json();
+                if (d && Array.isArray(d.parts)) {
+                    OUT_PARTS = d.parts;
+                    try { localStorage.setItem('out_parts_cache', JSON.stringify(OUT_PARTS)); } catch (e) {}
+                    renderOutPartsList(); updateGeoStyles();
+                    if (typeof updateFarmStats === 'function') updateFarmStats();
+                }
+            } catch (e) { console.warn('Out parts not loaded', e); }
+        }
+        // Hectares out in parts, by reason; paddocks out as a whole are skipped.
+        function outPartsArea(inScope) {
+            let total = 0; const byReason = {};
+            OUT_PARTS.forEach(pt => {
+                if (inScope && !inScope(pt.paddock)) return;
+                if (pt.paddock && excludedPaddocks.get(normName(pt.paddock))) return;
+                const ha = Number(pt.areaHa) || 0;
+                total += ha;
+                const v = outStatusInfo(pt.status).value;
+                byReason[v] = (byReason[v] || 0) + ha;
+            });
+            return { total, byReason };
+        }
+        // The paddock a drawn part is in: the most sample points (centre and
+        // halfway in from each corner), as for breaks.
+        function outPartPaddock(verts) {
+            if (typeof fertBreakPaddock === 'function') return fertBreakPaddock({ id: 'part', vertices: verts });
+            const c = verts.reduce((a, v) => ({ lat: a.lat + v.lat / verts.length, lng: a.lng + v.lng / verts.length }), { lat: 0, lng: 0 });
+            return getPaddockFromPoint(c);
+        }
+        function startOutPartDraw() {
+            if (isDrawingBreak) return;
+            startDrawingBreak('out_part');
+        }
+        function openOutPartReason(part) {
+            closeOutPartReason();
+            const wrap = document.createElement('div');
+            wrap.id = 'out-part-modal';
+            wrap.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; display:flex; align-items:center; justify-content:center; padding:15px;';
+            const names = Object.keys(paddockMap || {}).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:400px;">
+                <h3 style="margin:0 0 6px; font-size:16px;">Part of a paddock out</h3>
+                <div style="font-size:13px; margin-bottom:8px;"><b>${(part.areaHa || 0).toFixed(2)} ha</b> drawn</div>
+                <label style="font-size:11px; font-weight:bold; color:#555;">Paddock</label>
+                <select id="op-paddock" style="width:100%; padding:7px; border:1px solid #ccc; border-radius:6px; font-size:13px; margin:3px 0 8px;">
+                    <option value="">-- none --</option>${names.map(n => `<option value="${escUnit(n)}"${normName(n) === normName(part.paddock) ? ' selected' : ''}>${escUnit(n)}</option>`).join('')}
+                </select>
+                <div style="font-size:11px; font-weight:bold; color:#555; margin-bottom:4px;">Reason</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    ${OUT_STATUSES.map(o => `<button onclick="saveOutPart('${o.value}')" style="background:${o.color}; color:#fff; border:none; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">${escUnit(o.label)}</button>`).join('')}
+                </div>
+                <button onclick="closeOutPartReason()" style="width:100%; margin-top:10px; background:#ecf0f1; color:#2c3e50; border:none; padding:8px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">CANCEL (nothing saved)</button>
+            </div>`;
+            document.body.appendChild(wrap);
+            window.__outPartPending = part;
+        }
+        function closeOutPartReason() { const w = document.getElementById('out-part-modal'); if (w) w.remove(); }
+        async function saveOutPart(status) {
+            const part = window.__outPartPending; if (!part) return;
+            const sel = document.getElementById('op-paddock');
+            part.paddock = sel ? sel.value : part.paddock;
+            part.status = status;
+            part.user = localStorage.getItem('auth_name') || '';
+            closeOutPartReason();
+            OUT_PARTS = OUT_PARTS.filter(x => x.id !== part.id).concat([part]);
+            try { localStorage.setItem('out_parts_cache', JSON.stringify(OUT_PARTS)); } catch (e) {}
+            renderOutPartsList(); updateGeoStyles(); if (typeof updateFarmStats === 'function') updateFarmStats();
+            setOutSyncStatus('Saving the part...', '#7f8c8d');
+            try {
+                const d = await (await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'save_out_part', part }) })).json();
+                if (!d || d.status !== 'success') throw new Error((d && d.message) || 'the sheet refused it');
+                setOutSyncStatus(`✓ Part of ${part.paddock || 'a paddock'} out (${outStatusInfo(status).label}, ${part.areaHa.toFixed(2)} ha), saved to the sheet`, '#27ae60');
+            } catch (e) { setOutSyncStatus('⚠ Part saved on this device only - ' + e.message, '#e67e22'); }
+        }
+        async function deleteOutPart(id) {
+            const pt = OUT_PARTS.find(x => x.id === id); if (!pt) return;
+            if (!confirm(`Put this part of ${pt.paddock || 'the paddock'} (${(pt.areaHa || 0).toFixed(2)} ha) back in rotation?`)) return;
+            OUT_PARTS = OUT_PARTS.filter(x => x.id !== id);
+            try { localStorage.setItem('out_parts_cache', JSON.stringify(OUT_PARTS)); } catch (e) {}
+            renderOutPartsList(); updateGeoStyles(); if (typeof updateFarmStats === 'function') updateFarmStats();
+            try {
+                const d = await (await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ type: 'delete_out_part', id }) })).json();
+                if (!d || d.status !== 'success') throw new Error((d && d.message) || 'the sheet refused it');
+                setOutSyncStatus('✓ Part back in rotation, saved to the sheet', '#27ae60');
+            } catch (e) { setOutSyncStatus('⚠ Changed on this device only - ' + e.message, '#e67e22'); }
+        }
+        function renderOutPartsList() {
+            const box = document.getElementById('out-parts-list');
+            if (!box) return;
+            const list = OUT_PARTS.slice().sort((a, b) => String(a.paddock).localeCompare(String(b.paddock), undefined, { numeric: true }));
+            box.innerHTML = list.length ? list.map(pt => {
+                const info = outStatusInfo(pt.status);
+                const whole = pt.paddock && excludedPaddocks.get(normName(pt.paddock));
+                return `<div style="background:#fff; border:1px solid #ddd; border-left:6px solid ${info.color}; border-radius:6px; padding:6px 8px; display:flex; align-items:center; gap:8px; font-size:12px;">
+                    <b style="cursor:pointer;" onclick="zoomToOutPart('${pt.id}')">${escUnit(pt.paddock || '?')}</b>
+                    <span style="color:${info.color}; font-weight:bold;">${escUnit(info.label)}</span>
+                    <span style="color:#7f8c8d;">${(Number(pt.areaHa) || 0).toFixed(2)} ha${whole ? ' · whole paddock out too' : ''}</span>
+                    <button onclick="deleteOutPart('${pt.id}')" style="margin-left:auto; background:#27ae60; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">BACK IN</button></div>`;
+            }).join('') : '<div style="font-size:11px; color:#7f8c8d;">No parts out.</div>';
+        }
+        function zoomToOutPart(id) {
+            const pt = OUT_PARTS.find(x => x.id === id);
+            if (pt && pt.vertices && pt.vertices.length) { try { map.fitBounds(L.latLngBounds(pt.vertices.map(v => [v.lat, v.lng])), { padding: [60, 60], maxZoom: 18 }); } catch (e) {} }
+        }
+        let outPartsLayer = null;
+        function renderOutPartsOnMap() {
+            if (outPartsLayer) { map.removeLayer(outPartsLayer); outPartsLayer = null; }
+            const modes = ['farm_config', 'manual', 'estimate', 'satellite', 'breaks', 'plan', 'feed', 'check'];
+            if (!map || !OUT_PARTS.length || !modes.includes(currentDashboardMode)) return;
+            outPartsLayer = L.layerGroup();
+            OUT_PARTS.forEach(pt => {
+                if (!pt.vertices || pt.vertices.length < 3) return;
+                const info = outStatusInfo(pt.status);
+                L.polygon(pt.vertices.map(v => [v.lat, v.lng]), { color: '#fff', weight: 3, opacity: 1, dashArray: '7, 5', fillColor: info.color, fillOpacity: 0.55, interactive: true })
+                    .bindTooltip(`<div style="font-weight:bold; font-size:12px;">${escUnit(pt.paddock || '')}</div><div style="font-size:11px; font-weight:bold; color:${info.color};">PART OUT: ${escUnit(info.label)}</div><div style="font-size:10px; color:#7f8c8d;">${(Number(pt.areaHa) || 0).toFixed(2)} ha</div>`, { sticky: true })
+                    .addTo(outPartsLayer);
+            });
+            outPartsLayer.addTo(map);
+        }
+
         function renderOutManager() {
+            renderOutPartsList();
             const box = document.getElementById('out-paddock-list');
             if (!box) return;
 
@@ -10613,6 +10749,7 @@
             loadManualRankCSV();
             loadGrowthModel();          // measured weather growth, in the background
             loadPartialWalks();         // the residual comes from the C checks
+            loadOutParts();             // parts of paddocks out of rotation
             await loadGeoJSON();
 
             const calibHoverArea = document.getElementById('calib-hover-area');
@@ -11813,6 +11950,10 @@
                     byReason[v] = (byReason[v] || 0) + p.area;
                 }
             });
+            // Parts of paddocks out (drawn), in paddocks not out as a whole.
+            const parts = outPartsArea(unit ? (n => n && unitHasPaddock(unit, n)) : null);
+            out += parts.total;
+            Object.keys(parts.byReason).forEach(v => { byReason[v] = (byReason[v] || 0) + parts.byReason[v]; });
             return { all: all, out: out, inRotation: Math.max(0, all - out), byReason: byReason };
         }
 
@@ -11934,7 +12075,8 @@
                 : 'From the farmwalk.';
             // The feed area leaves out what is under a crop break. The average
             // cover does not: it is the average of the paddocks that were walked.
-            const wholeAreaC = Math.max(0, planStats.areaC - cropBreakArea(pUnit ? (n => n && unitHasPaddock(pUnit, n)) : null));
+            const wholeAreaC = Math.max(0, planStats.areaC - cropBreakArea(pUnit ? (n => n && unitHasPaddock(pUnit, n)) : null)
+                - outPartsArea(pUnit ? (n => n && unitHasPaddock(pUnit, n)) : null).total);   // parts out are not feed
             const wholeCoverVal = planStats.areaC > 0 ? Math.round(planStats.wCover / planStats.areaC) : 0;
             const wholeGrowthVal = planStats.areaG > 0 ? Math.round(planStats.wGrowth / planStats.areaG) : 0;
 
@@ -12154,6 +12296,7 @@
         function updateGeoStyles() {
             if (!geoLayer) return;
             if (typeof renderFertCows === 'function') renderFertCows();   // on in Fert, off elsewhere
+            if (typeof renderOutPartsOnMap === 'function') renderOutPartsOnMap();
             const currentData = getCurrentModeData();
             const walk = latestWalkInfo(currentData);
             const activeUnit = unitFilterApplies() ? getActiveUnit() : null;
@@ -14064,6 +14207,15 @@
                 
                 console.log("Finishing break, mode:", currentDrawingMode, "vertices:", drawingVertices.length);
                 
+                if (currentDrawingMode === 'out_part') {
+                    if (drawingVertices.length < 3) return;
+                    const verts = drawingVertices.map(v => ({ lat: v.lat, lng: v.lng }));
+                    const areaHa = calculatePolygonArea(drawingVertices) / 10000;
+                    cleanupDrawing();
+                    openOutPartReason({ id: 'op' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                        paddock: outPartPaddock(verts) || '', vertices: verts, areaHa: areaHa });
+                    return;
+                }
                 if (isCustomPaddock) {
                     if (drawingVertices.length < 3) return;
                     const areaSqm = calculatePolygonArea(drawingVertices);
