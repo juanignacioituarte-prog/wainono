@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.88**,
-service worker cache `wn-farm-v1.1.102`, Apps Script `2026-10-23-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.89**,
+service worker cache `wn-farm-v1.1.103`, Apps Script `2026-10-23-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.88/v1.1.89/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.89/v1.1.90/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.88/v1.1.89/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.102/wn-farm-v1.1.103/" sw.js
+sed -i "s/v1\.1\.89/v1.1.90/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.103/wn-farm-v1.1.104/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -932,3 +932,7 @@ Added 12 October 2026:
 - Start-up opens straight on BREAKS (v1.1.88): `init()` switches to BREAKS
   before loading the sheets, and again after; before, FARMWALK's layout
   showed until the data loaded.
+- Start-up **loading screen** (v1.1.89, `showAppLoading` /
+  `appLoadingDone`): "Loading information..." with the step (settings,
+  paddocks and farmwalks, farm map, breaks) covers the app until init has
+  loaded AND the breaks came from the sheet; 10 s at most.

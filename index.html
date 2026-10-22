@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.88</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.89</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.88</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.89</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3340,7 +3340,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.88) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.89) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -10719,6 +10719,41 @@
             el.appendChild(optCrop);
         }
 
+        /* A cover over the app while the main data loads (Juani, 23 Oct 2026),
+         * so nobody works on half-loaded data. Closed when init has the
+         * settings, paddocks, farmwalks and map AND the breaks from the
+         * sheet; never stays more than APP_LOADING_MAX_MS (10 s, Juani). */
+        const APP_LOADING_MAX_MS = 10000;
+        let appLoadingTimer = null;
+        const appLoadingPending = new Set(['init', 'breaks']);
+        function appLoadingDone(what) {
+            appLoadingPending.delete(what);
+            if (!document.getElementById('app-loading')) return;
+            if (!appLoadingPending.size) hideAppLoading();
+            else if (appLoadingPending.has('breaks')) showAppLoading('Loading breaks...');
+        }
+        function showAppLoading(text) {
+            let el = document.getElementById('app-loading');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'app-loading';
+                el.style.cssText = 'position:fixed; inset:0; z-index:9000; background:rgba(255,255,255,0.92); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; font-family:inherit;';
+                el.innerHTML = `<div style="width:42px; height:42px; border:4px solid #d5e8d4; border-top-color:#27ae60; border-radius:50%; animation:appspin 0.9s linear infinite;"></div>
+                    <div style="font-size:15px; font-weight:bold; color:#2c3e50;">Loading information...</div>
+                    <div id="app-loading-step" style="font-size:12px; color:#7f8c8d;"></div>
+                    <style>@keyframes appspin { to { transform: rotate(360deg); } }</style>`;
+                document.body.appendChild(el);
+                appLoadingTimer = setTimeout(hideAppLoading, APP_LOADING_MAX_MS);
+            }
+            const step = document.getElementById('app-loading-step');
+            if (step) step.textContent = text || '';
+        }
+        function hideAppLoading() {
+            clearTimeout(appLoadingTimer);
+            const el = document.getElementById('app-loading');
+            if (el) el.remove();
+        }
+
         async function init() {
             map = L.map('map', { 
                 zoomControl: false, 
@@ -10743,17 +10778,20 @@
             // Show BREAKS from the start (Juani, 23 Oct 2026): the page opened on
             // FARMWALK's layout until the sheets loaded, then jumped to BREAKS.
             try { switchDashboardMode('breaks'); } catch (e) { console.warn('Early BREAKS view:', e); }
+            showAppLoading('Loading settings...');
 
             // Load settings first
             await loadFeedSettings();
             loadCustomPaddocks(); // Load external paddocks
 
+            showAppLoading('Loading paddocks and farmwalks...');
             await Promise.all([loadStatusSheets(), loadManualSheet()]);
             loadCSV();
             loadManualRankCSV();
             loadGrowthModel();          // measured weather growth, in the background
             loadPartialWalks();         // the residual comes from the C checks
             loadOutParts();             // parts of paddocks out of rotation
+            showAppLoading('Loading the farm map...');
             await loadGeoJSON();
 
             const calibHoverArea = document.getElementById('calib-hover-area');
@@ -10766,6 +10804,7 @@
             applyUnitPermissions();
             renderUnitChips();
             switchDashboardMode('breaks');
+            appLoadingDone('init');
 
             // Units render instantly from localStorage; this refreshes them from the cloud.
             loadFarmUnits();
@@ -13636,9 +13675,10 @@
                                 renderBreaksOnMap();
                             }
                         }
+                        appLoadingDone('breaks');
                     })
-                    .catch(e => { console.log('Cloud breaks load failed, using local', e); });
-            }
+                    .catch(e => { console.log('Cloud breaks load failed, using local', e); appLoadingDone('breaks'); });
+            } else appLoadingDone('breaks');
         }
 
 
