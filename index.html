@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.82</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.83</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.82</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.83</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1988,7 +1988,7 @@
                 <div style="font-size:11px; color:#777; margin-bottom:4px;">Breaks shown on the map and dashboard: the rotation length (FEED, Grass Management: area in rotation / total used per day) plus or minus these days.</div>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="font-size:12px;">rotation length</span>
-                    <input type="number" id="inp-break-offset" value="-2" min="-60" max="60" step="1" onchange="saveAudioSettings()" style="width:70px;">
+                    <input type="number" id="inp-break-offset" value="-5" min="-60" max="60" step="1" onchange="saveAudioSettings()" style="width:70px;">
                     <span style="font-size:12px;">days</span>
                 </div>
                 <div id="break-days-note" style="font-size:11px; color:#2c3e50; font-weight:bold; margin-top:4px;"></div>
@@ -3340,7 +3340,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.82) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.83) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -14441,11 +14441,13 @@
         }
         /* Break Display Days follow the rotation length (Juani, 23 Oct 2026):
          * PLAN's rotation length (feed area / break area per day over the last
-         * N days) plus an offset in days, default -2. E.g. rotation 23, -2 ->
-         * breaks of the last 21 days. The offset is kept on this phone. */
+         * N days) plus an offset in days, default -5 (Juani, 23 Oct 2026). E.g. rotation 25, -5 ->
+         * breaks of the last 20 days. The offset is kept on this phone. */
         function getBreakDisplayOffset() {
+            // Once: a phone that saved the old default (-2) gets the new one.
+            try { if (!localStorage.getItem('break_offset_default_5')) { if (localStorage.getItem('break_display_offset') === '-2') localStorage.setItem('break_display_offset', '-5'); localStorage.setItem('break_offset_default_5', '1'); } } catch (e) {}
             const v = parseInt(localStorage.getItem('break_display_offset'), 10);
-            return isNaN(v) ? -2 : v;
+            return isNaN(v) ? -5 : v;
         }
         // The rotation length from Grass Management (area in rotation / total
         // used per day, Juani 23 Oct 2026); before FEED has worked it out, the
@@ -14479,7 +14481,7 @@
             const volPct = parseFloat(document.getElementById('inp-audio-vol').value) || 100;
             const solidDist = parseFloat(document.getElementById('inp-audio-solid').value) || 1;
             const offRaw = parseInt(document.getElementById('inp-break-offset').value, 10);
-            const breakOffset = isNaN(offRaw) ? -2 : offRaw;
+            const breakOffset = isNaN(offRaw) ? -5 : offRaw;
             localStorage.setItem('audio_beep_start_m', startDist);
             localStorage.setItem('audio_fence_ignore_m', ignoreDist);
             localStorage.setItem('audio_volume_pct', volPct);
