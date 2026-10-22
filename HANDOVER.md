@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.79**,
-service worker cache `wn-farm-v1.1.93`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.80**,
+service worker cache `wn-farm-v1.1.94`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.79/v1.1.80/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.80/v1.1.81/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.79/v1.1.80/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.93/wn-farm-v1.1.94/" sw.js
+sed -i "s/v1\.1\.80/v1.1.81/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.94/wn-farm-v1.1.95/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -897,3 +897,6 @@ Added 12 October 2026:
   break sizes (AM/PM, Long/Short, or AM only for once a day) with cows and
   m2/cow/day (v1.1.79). The numbers are FEED's, kept by calculateFeedLogic
   in `herdBreakSizes` (a typed size wins over the worked-out one).
+- The FARMWALK tab opens on ESTIMATED, not MEASURED (v1.1.80,
+  `openFarmwalkTab`); on a FARMWALK view already, it stays. + Farmwalk,
+  history and continue-walk still go to MEASURED.
