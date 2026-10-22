@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.77**,
-service worker cache `wn-farm-v1.1.91`, Apps Script `2026-10-15-d`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.78**,
+service worker cache `wn-farm-v1.1.92`, Apps Script `2026-10-15-d`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.77/v1.1.78/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.78/v1.1.79/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.77/v1.1.78/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.91/wn-farm-v1.1.92/" sw.js
+sed -i "s/v1\.1\.78/v1.1.79/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.92/wn-farm-v1.1.93/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -888,3 +888,8 @@ Added 12 October 2026:
   phone (`break_display_offset`; the old fixed `break_display_days` is no
   longer used). Rotation 23, -2 -> breaks of the last 21 days; it changes
   as the rotation length changes.
+- BREAKS hover (v1.1.78, `breakHoverLines`): a paddock shows the estimated
+  cover, then "last break <date> + est. growth X (N days)" (or the last walk
+  / partial walk when no break since), then the paddock area; no residual
+  line, no walk line. A break shows its name and area, then its paddock's
+  lines. Other modes keep the old tooltip.
