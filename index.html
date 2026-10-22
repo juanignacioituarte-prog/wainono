@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.76</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.77</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.76</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.77</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1979,8 +1979,13 @@
             
             <div class="input-group" style="margin-bottom:15px;">
                 <label style="font-weight:bold; font-size:12px;">Break Display Days</label>
-                <div style="font-size:11px; color:#777; margin-bottom:4px;">How many days to show breaks for on the map and dashboard.</div>
-                <input type="number" id="inp-break-days" value="21" min="1" max="365" onchange="saveAudioSettings()">
+                <div style="font-size:11px; color:#777; margin-bottom:4px;">Breaks shown on the map and dashboard: the rotation length (PLAN, from the breaks of the last days) plus or minus these days.</div>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-size:12px;">rotation length</span>
+                    <input type="number" id="inp-break-offset" value="-2" min="-60" max="60" step="1" onchange="saveAudioSettings()" style="width:70px;">
+                    <span style="font-size:12px;">days</span>
+                </div>
+                <div id="break-days-note" style="font-size:11px; color:#2c3e50; font-weight:bold; margin-top:4px;"></div>
             </div>
             
             <button onclick="switchDashboardMode('breaks')" style="background:#2ecc71; color:white; border:none; padding:10px 15px; border-radius:6px; font-weight:bold; cursor:pointer; width:100%;">Done</button>
@@ -3329,7 +3334,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.76) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.77) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -11153,7 +11158,8 @@
                     document.getElementById('inp-audio-ignore').value = getFenceIgnoreDistance();
                     document.getElementById('inp-audio-vol').value = getAudioVolume();
                     document.getElementById('inp-audio-solid').value = getContinuousToneDistance();
-                    document.getElementById('inp-break-days').value = getBreakDisplayDays();
+                    document.getElementById('inp-break-offset').value = getBreakDisplayOffset();
+                    renderBreakDaysNote();
                     
                     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                     return;
@@ -14251,21 +14257,41 @@
             const val = parseFloat(localStorage.getItem('audio_continuous_m'));
             return isNaN(val) ? 1 : val;
         }
+        /* Break Display Days follow the rotation length (Juani, 23 Oct 2026):
+         * PLAN's rotation length (feed area / break area per day over the last
+         * N days) plus an offset in days, default -2. E.g. rotation 23, -2 ->
+         * breaks of the last 21 days. The offset is kept on this phone. */
+        function getBreakDisplayOffset() {
+            const v = parseInt(localStorage.getItem('break_display_offset'), 10);
+            return isNaN(v) ? -2 : v;
+        }
+        function currentRotationLength() {
+            const el = document.getElementById('inp-round');
+            const v = parseFloat(el && el.value) || parseFloat(localStorage.getItem('feed_round'));
+            return v > 0 ? v : 25;
+        }
         function getBreakDisplayDays() {
-            const val = parseInt(localStorage.getItem('break_display_days'));
-            return isNaN(val) ? 21 : val;
+            return Math.max(1, Math.round(currentRotationLength()) + getBreakDisplayOffset());
+        }
+        function renderBreakDaysNote() {
+            const el = document.getElementById('break-days-note');
+            if (!el) return;
+            const off = getBreakDisplayOffset();
+            el.textContent = `Rotation ${Math.round(currentRotationLength())} days ${off >= 0 ? '+ ' + off : '- ' + Math.abs(off)} = breaks of the last ${getBreakDisplayDays()} days`;
         }
         function saveAudioSettings() {
             const startDist = parseFloat(document.getElementById('inp-audio-start').value) || 10;
             const ignoreDist = parseFloat(document.getElementById('inp-audio-ignore').value) || 2;
             const volPct = parseFloat(document.getElementById('inp-audio-vol').value) || 100;
             const solidDist = parseFloat(document.getElementById('inp-audio-solid').value) || 1;
-            const breakDays = parseInt(document.getElementById('inp-break-days').value) || 21;
+            const offRaw = parseInt(document.getElementById('inp-break-offset').value, 10);
+            const breakOffset = isNaN(offRaw) ? -2 : offRaw;
             localStorage.setItem('audio_beep_start_m', startDist);
             localStorage.setItem('audio_fence_ignore_m', ignoreDist);
             localStorage.setItem('audio_volume_pct', volPct);
             localStorage.setItem('audio_continuous_m', solidDist);
-            localStorage.setItem('break_display_days', breakDays);
+            localStorage.setItem('break_display_offset', String(breakOffset));
+            renderBreakDaysNote();
             
             if (typeof currentDashboardMode !== 'undefined' && currentDashboardMode === 'breaks') {
                 renderBreaksDashboard();
