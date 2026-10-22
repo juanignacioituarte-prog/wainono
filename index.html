@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.81</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.82</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.81</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.82</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1985,7 +1985,7 @@
             
             <div class="input-group" style="margin-bottom:15px;">
                 <label style="font-weight:bold; font-size:12px;">Break Display Days</label>
-                <div style="font-size:11px; color:#777; margin-bottom:4px;">Breaks shown on the map and dashboard: the rotation length (PLAN, from the breaks of the last days) plus or minus these days.</div>
+                <div style="font-size:11px; color:#777; margin-bottom:4px;">Breaks shown on the map and dashboard: the rotation length (FEED, Grass Management: area in rotation / total used per day) plus or minus these days.</div>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="font-size:12px;">rotation length</span>
                     <input type="number" id="inp-break-offset" value="-2" min="-60" max="60" step="1" onchange="saveAudioSettings()" style="width:70px;">
@@ -3340,7 +3340,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.81) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.82) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -13291,6 +13291,14 @@
             
             if (totalGrassAssigned > 0) {
                 document.getElementById('grass-herd-outputs').innerHTML += `<div style="text-align:right; font-weight:bold; font-size:12px; color:#2ecc71; margin-top:8px;">Total Used: ${totalGrassAssigned.toFixed(2)} ha/day</div>`;
+                /* Rotation length from the breaks set here (Juani, 23 Oct 2026):
+                 * area in rotation / total used per day. BREAKS shows breaks for
+                 * this many days plus the offset in Audio & Map Settings. */
+                grassTotalUsed = totalGrassAssigned;
+                const rotIn = rotationAreas(planUnit()).inRotation;
+                grassRotationLength = rotIn > 0 ? rotIn / totalGrassAssigned : 0;
+                try { if (grassRotationLength > 0) localStorage.setItem('grass_rotation_length', String(grassRotationLength)); } catch (e) {}
+                document.getElementById('grass-herd-outputs').innerHTML += `<div style="text-align:right; font-weight:bold; font-size:12px; color:#2c3e50; margin-top:2px;">Rotation length: ${grassRotationLength > 0 ? Math.round(grassRotationLength) + ' days' : '--'} <span style="font-weight:normal; font-size:10px; color:#7f8c8d;">(${rotIn.toFixed(1)} ha in rotation / ${totalGrassAssigned.toFixed(2)} ha/day)</span></div>`;
             }
 
             document.getElementById('crop-herd-outputs').innerHTML = cropHtml || '<div class="muted" style="font-size:11px; text-align:center;">No herds ticked for crops.</div>';
@@ -14439,7 +14447,19 @@
             const v = parseInt(localStorage.getItem('break_display_offset'), 10);
             return isNaN(v) ? -2 : v;
         }
+        // The rotation length from Grass Management (area in rotation / total
+        // used per day, Juani 23 Oct 2026); before FEED has worked it out, the
+        // last one saved, then PLAN's rotation length.
+        var grassRotationLength = 0, grassTotalUsed = 0;
         function currentRotationLength() {
+            if (grassRotationLength > 0) return grassRotationLength;
+            // FEED ran before the paddock areas loaded: work it out now.
+            if (grassTotalUsed > 0) {
+                const rotIn = rotationAreas(planUnit()).inRotation;
+                if (rotIn > 0) { grassRotationLength = rotIn / grassTotalUsed; return grassRotationLength; }
+            }
+            const saved = parseFloat(localStorage.getItem('grass_rotation_length'));
+            if (saved > 0) return saved;
             const el = document.getElementById('inp-round');
             const v = parseFloat(el && el.value) || parseFloat(localStorage.getItem('feed_round'));
             return v > 0 ? v : 25;
