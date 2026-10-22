@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.78</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.79</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1739,7 +1739,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.78</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.79</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3334,7 +3334,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.78) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.79) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -12929,6 +12929,7 @@
             let herdLockedCache = {};
 
             // Only the herds grazing what PLAN is showing share its daily area.
+            herdBreakSizes = {};
             const planHerdIds = {};
             planScopedHerds().forEach(g => { planHerdIds[g.id] = true; });
 
@@ -13040,6 +13041,18 @@
                     totalGrassAssigned += hAreaHa;
 
                     const effM2PerCow = hCows > 0 ? (hAreaHa * 10000) / hCows : 0;
+
+                    // Kept for BREAKS: the break sizes of this herd (typed ones win).
+                    {
+                        const ov = manualBreakOverrides[g.id] || {};
+                        const pick = (k, calc) => { const v = parseFloat(ov[k]); return !isNaN(v) && v > 0 ? v : calc; };
+                        let parts;
+                        if (cache.isOAD) parts = globalFreq === '3in2' ? [['Long', pick('long', hAreaHa)]] : [['AM', pick('am', hAreaHa)]];
+                        else if (globalFreq === 'tad') parts = [['AM', pick('am', hAreaHa * amPct)], ['PM', pick('pm', hAreaHa * pmPct)]];
+                        else if (globalFreq === '3in2') parts = [['Long', pick('long', hAreaHa * 2 * longPct)], ['Short', pick('short', hAreaHa * 2 * shortPct)]];
+                        else parts = [['Day', hAreaHa]];
+                        herdBreakSizes[g.id] = { parts, cows: hCows, m2: effM2PerCow, at: Date.now() };
+                    }
 
                     let hHtml = `<div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
                         <div style="font-weight:bold; color:${g.color}; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
@@ -14713,6 +14726,9 @@
                 `<div style="font-size:10px; color:${est.fromBreak ? '#e67e22' : '#7f8c8d'};">${from} + <b>est. growth ${est.growth}</b> (${est.days} days)</div>` + area;
         }
 
+        // The break sizes per herd from FEED (calculateFeedLogic): { herdId: { parts: [[label, ha]], cows, m2 } }.
+        var herdBreakSizes = {};   // var: calculateFeedLogic may run before this line
+
         function renderBreaksOnMap() {
             breakLayers.forEach(l => { if (l) map.removeLayer(l); });
             breakLayers.clear();
@@ -15138,6 +15154,17 @@
                 </button>`;
             });
             html += `</div>`;
+
+            // The break sizes of the selected herd (Juani, 23 Oct 2026), from FEED.
+            if (activeBreakGroup !== 'all') {
+                const bs = herdBreakSizes[activeBreakGroup];
+                const ag = BREAK_GROUPS.find(g => g.id === activeBreakGroup);
+                html += bs && bs.parts && bs.parts.length
+                    ? `<div style="font-size:12px; margin:-6px 0 10px; padding:6px 10px; background:#fff; border:1px solid #ddd; border-left:4px solid ${ag ? ag.color : '#7f8c8d'}; border-radius:6px;">
+                        Break size: ${bs.parts.map(([l, v]) => `<b>${l} ${(Number(v) || 0).toFixed(2)} ha</b>`).join(' · ')}
+                        <span style="color:#7f8c8d; font-size:10px;">(${bs.cows} cows · ${Math.round(bs.m2)} m²/cow/day)</span></div>`
+                    : `<div style="font-size:11px; color:#7f8c8d; margin:-6px 0 10px;">Break size: not worked out for this herd (no cows on grass, or not in PLAN's unit).</div>`;
+            }
 
             if (weeklyFilterRange) {
                 const s = new Date(weeklyFilterRange.start).toLocaleDateString('en-NZ', { month:'short', day:'numeric' });
