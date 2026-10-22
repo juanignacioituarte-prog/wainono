@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.83**,
-service worker cache `wn-farm-v1.1.97`, Apps Script `2026-10-23-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.84**,
+service worker cache `wn-farm-v1.1.98`, Apps Script `2026-10-23-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.83/v1.1.84/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.84/v1.1.85/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.83/v1.1.84/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.97/wn-farm-v1.1.98/" sw.js
+sed -i "s/v1\.1\.84/v1.1.85/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.98/wn-farm-v1.1.99/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -918,3 +918,5 @@ Added 12 October 2026:
   then PLAN's `inp-round`.
 - Break Display Days offset default is **-5** (v1.1.83); a phone that had
   saved the old default -2 is moved to -5 once; any other saved choice stays.
+- BREAKS break hover: the paddock name line is gone (the break name already
+  has it) (v1.1.84).
