@@ -183,11 +183,12 @@
       <button class="btn" data-t="level">Level check</button>
       <button class="btn" data-t="rate">kg per feed</button>
       <button class="btn" data-t="capacity">Silo size</button>
+      <button class="btn" data-t="alert">Email alert</button>
     </div>
     <div class="form">
       <div><label for="fWhen">Date and time</label><input type="datetime-local" id="fWhen"></div>
       <div id="valBox"><label for="fVal" id="valLab">Tonnes delivered</label><input type="number" id="fVal" step="0.01" min="0" inputmode="decimal"></div>
-      <div><label for="fNote">Note (optional)</label><input type="text" id="fNote" maxlength="80"></div>
+      <div><label for="fNote" id="noteLab">Note (optional)</label><input type="text" id="fNote" maxlength="80"></div>
       <div><button class="btn primary" style="width:100%" onclick="save()">Save</button></div>
     </div>
     <div class="muted" id="help" style="margin-top:8px"></div>
@@ -226,9 +227,10 @@ const HELP = {
   full:     'The silo was filled to the top. This sets the level to the silo size.',
   level:    'You checked how much is in the silo. This sets the level to the tonnes you enter.',
   rate:     'kg of PKE per feed, from this date on. Feeds before keep their old value.',
-  capacity: 'How many tonnes the silo holds when full.'
+  capacity: 'How many tonnes the silo holds when full.',
+  alert:    'An email is sent when the days left drop below this number, and again at 2 days. Each email once per fill. Checked every hour.'
 };
-const VAL_LABEL = { delivery:'Tonnes delivered', level:'Tonnes in the silo', rate:'kg per feed', capacity:'Silo size (tonnes)' };
+const VAL_LABEL = { delivery:'Tonnes delivered', level:'Tonnes in the silo', rate:'kg per feed', capacity:'Silo size (tonnes)', alert:'Warn when days left is below' };
 
 let type = 'delivery';
 let data = { events: [], milkings: [] };
@@ -252,6 +254,9 @@ document.querySelectorAll('#tabs .btn').forEach(b => b.onclick = () => {
   $('valBox').style.visibility = type === 'full' ? 'hidden' : 'visible';
   $('valLab').textContent = VAL_LABEL[type] || '';
   $('help').textContent = HELP[type];
+  $('noteLab').textContent = type === 'alert' ? 'Email address' : 'Note (optional)';
+  $('fNote').type = type === 'alert' ? 'email' : 'text';
+  if (type === 'alert' && !$('fVal').value) $('fVal').value = 5;
 });
 $('help').textContent = HELP.delivery;
 $('fWhen').value = isoLocal(new Date());
@@ -278,6 +283,7 @@ async function save(){
   const value = parseFloat($('fVal').value);
   if (!when) { toast('Enter the date and time', true); return; }
   if (type !== 'full' && !(value > 0)) { toast('Enter a number above 0', true); return; }
+  if (type === 'alert' && $('fNote').value.indexOf('@') < 0) { toast('Enter an email address', true); return; }
   try {
     const r = await fetch(SCRIPT_URL, { method:'POST',
       body: JSON.stringify({ action:'add', type, when, value: type === 'full' ? null : value, note: $('fNote').value }) });
@@ -386,6 +392,9 @@ function render(){
   else if (daysLeft != null && daysLeft < 7) { st = '<b>Order soon:</b> about ' + fmtT(daysLeft) + ' days left.'; col = 'var(--warn)'; }
   else                            { st = '<b>OK.</b>' + (daysLeft != null ? ' About ' + Math.round(daysLeft) + ' days left.' : ''); col = 'var(--ok)'; }
   if (c.noRate) st += ' (' + c.noRate + ' feeds have no kg per feed and are not counted.)';
+  const al = c.ev.filter(e => e.type === 'alert').pop();
+  st += '<br><span class="muted">Email alert: ' + (al ? 'below ' + al.value + ' days, to ' + al.note.replace(/</g, '&lt;')
+        : 'below 5 days, to the sheet owner (change it in "Email alert")') + '</span>';
   $('status').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + st + '</span>';
   $('lvl').setAttribute('fill', 'url(#gFill-' + (col === 'var(--bad)' ? 'bad' : col === 'var(--warn)' ? 'warn' : 'ok') + ')');
 
@@ -456,8 +465,8 @@ function renderTable(c){
 }
 
 function renderEvents(c){
-  const label = { delivery:'Delivery', full:'Silo full', level:'Level check', rate:'kg per feed', capacity:'Silo size' };
-  const unit  = { delivery:' t', level:' t', rate:' kg', capacity:' t' };
+  const label = { delivery:'Delivery', full:'Silo full', level:'Level check', rate:'kg per feed', capacity:'Silo size', alert:'Email alert below (days)' };
+  const unit  = { delivery:' t', level:' t', rate:' kg', capacity:' t', alert:'' };
   const list = c.ev.slice().reverse();
   $('events').innerHTML = list.length ? list.map(e =>
     '<div class="ev"><span class="w">' + niceWhen(e.when) + '</span><span class="t">' + label[e.type] +
