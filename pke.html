@@ -344,8 +344,7 @@ function compute(){
                      .sort((a, b) => a.key < b.key ? 1 : -1).slice(0, 7);
   const perDay = past.length ? past.reduce((s, d) => s + d.used, 0) / past.length : null;
 
-  const sources = new Set(mk.map(m => m.source));
-  return { ev, cap, rateNow: rateAt(Date.now()), rates, anchor, level, noRate, days, today, perDay, past, sources };
+  return { ev, cap, rateNow: rateAt(Date.now()), rates, anchor, level, noRate, days, today, perDay, past };
 }
 
 // ---------------------------------------------------------------------------
@@ -398,11 +397,7 @@ function render(){
   $('status').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + st + '</span>';
   $('lvl').setAttribute('fill', 'url(#gFill-' + (col === 'var(--bad)' ? 'bad' : col === 'var(--warn)' ? 'warn' : 'ok') + ')');
 
-  // source note
-  $('srcNote').textContent = c.sources.has('doses') && !c.sources.has('feeds')
-    ? 'Counted from the mineral doses. Cows the dispenser skipped (jammed, busy) are not counted, so the real use may be a bit higher.'
-    : c.sources.has('doses') ? 'Older days are counted from mineral doses, newer days from every feed.'
-    : c.sources.size ? 'Counted from every feed at the feed head.' : '';
+  $('srcNote').textContent = 'One feed = one mineral discharge, from the dispenser count.';
 
   renderBars(c);
   renderTable(c);
