@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PKE Silo</title>
+<style>
+  :root{
+    --bg:#101413; --card:#1a201e; --line:#2c3633;
+    --ink:#f2f5f4; --ink2:#a9b5b1; --ink3:#78847f;
+    --fill:#41ab5d; --fill2:#238b45;
+    /* status colours are reserved for state, never for a data series */
+    --ok:#41ab5d; --warn:#eda100; --bad:#e34948;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:900px; margin:0 auto; padding:0 16px 40px;}
+  header{position:sticky; top:0; z-index:5; background:var(--bg);
+    border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; gap:10px;}
+  header h1{font-size:15px; margin:0; letter-spacing:.5px; flex:1; font-weight:700;}
+  header .sub{font-size:11px; color:var(--ink3); font-weight:400; display:block; letter-spacing:0;}
+  .btn{background:var(--card); color:var(--ink); border:1px solid var(--line);
+    padding:8px 12px; border-radius:7px; font-size:13px; cursor:pointer; font-weight:600; font-family:inherit;}
+  .btn:active{transform:scale(.97);}
+  .btn.primary{background:var(--fill); border-color:var(--fill); color:#06140b;}
+  .btn.small{padding:4px 9px; font-size:11px;}
+
+  .top{display:grid; grid-template-columns:150px 1fr; gap:14px; margin:14px 0; align-items:stretch;}
+  @media (max-width:520px){ .top{grid-template-columns:110px 1fr;} }
+  .silo{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .silo svg{width:100%; max-width:120px; height:auto;}
+  .silo .cap{font-size:11px; color:var(--ink3); margin-top:6px; text-align:center;}
+
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px;}
+  .tile{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px;}
+  .tile .lab{font-size:10px; letter-spacing:.9px; color:var(--ink3); text-transform:uppercase;}
+  .tile .val{font-size:24px; font-weight:700; margin-top:3px; line-height:1.1;}
+  .tile .unit{font-size:11px; color:var(--ink2); font-weight:400;}
+  .tile .note{font-size:11px; color:var(--ink3); margin-top:4px;}
+
+  .status{display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:10px;
+    border:1px solid var(--line); background:var(--card); margin-bottom:14px; font-size:13px;}
+  .status .dot{width:10px; height:10px; border-radius:50%; flex:none;}
+  .status b{font-weight:700;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:14px;}
+  .card h2{font-size:11px; letter-spacing:.9px; color:var(--ink3); text-transform:uppercase; margin:0 0 10px; font-weight:700;}
+  .form{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; align-items:end;}
+  label{font-size:11px; color:var(--ink2); display:block; margin-bottom:3px;}
+  input,select{width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:8px; font-size:14px; font-family:inherit;}
+  .tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+  .tabs .btn.on{background:var(--fill); border-color:var(--fill); color:#06140b;}
+  .muted{color:var(--ink3); font-size:12px;}
+
+  .chart{position:relative;}
+  .chart svg{width:100%; height:auto; display:block;}
+  .tip{position:absolute; pointer-events:none; background:#0b0f0e; border:1px solid var(--line);
+    border-radius:6px; padding:6px 8px; font-size:12px; color:var(--ink); white-space:nowrap;
+    transform:translate(-50%,-110%); display:none;}
+
+  table{width:100%; border-collapse:collapse; font-size:12px;}
+  th,td{padding:6px 4px; border-bottom:1px solid var(--line); text-align:right;}
+  th{color:var(--ink3); font-weight:600; font-size:10px; letter-spacing:.6px; text-transform:uppercase;}
+  td:first-child,th:first-child{text-align:left;}
+  .ev{display:flex; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); font-size:13px;}
+  .ev .w{color:var(--ink3); font-size:12px; min-width:110px;}
+  .ev .t{flex:1;}
+  .toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:#0b0f0e;
+    border:1px solid var(--line); padding:9px 14px; border-radius:8px; font-size:13px; display:none; z-index:9;}
+</style>
+</head>
+<body>
+<header>
+  <h1>PKE silo<span class="sub" id="sub">loading…</span></h1>
+  <button class="btn small" onclick="load()">Refresh</button>
+</header>
+
+<div class="wrap">
+  <div id="setup" class="card" style="display:none; margin-top:14px">
+    <h2>Not connected yet</h2>
+    <div class="muted">This page needs the address of the Google Script (it ends in /exec).
+      Put it in SCRIPT_URL at the top of the page's script.</div>
+  </div>
+
+  <div class="top">
+    <div class="silo">
+      <svg viewBox="0 0 120 222" role="img" aria-label="Silo level">
+        <defs><clipPath id="body"><path d="M14 40 H106 V150 L68 192 H52 L14 150 Z"/></clipPath></defs>
+        <!-- legs -->
+        <path d="M20 150 V218 M100 150 V218 M60 192 V200" stroke="#3c4844" stroke-width="4" stroke-linecap="round"/>
+        <!-- roof -->
+        <path d="M10 40 L60 10 L110 40 Z" fill="#232a28" stroke="#3c4844" stroke-width="2" stroke-linejoin="round"/>
+        <!-- body and cone, empty -->
+        <path d="M14 40 H106 V150 L68 192 H52 L14 150 Z" fill="#0b0f0e"/>
+        <rect id="lvl" x="0" y="192" width="120" height="0" fill="var(--fill)" clip-path="url(#body)"/>
+        <!-- ribs, like the steel sheets of a silo -->
+        <g stroke="#ffffff" stroke-opacity=".07" stroke-width="1">
+          <path d="M14 62 H106 M14 84 H106 M14 106 H106 M14 128 H106"/>
+        </g>
+        <path d="M14 40 H106 V150 L68 192 H52 L14 150 Z" fill="none" stroke="#3c4844" stroke-width="2" stroke-linejoin="round"/>
+        <text id="pctTxt" x="60" y="104" text-anchor="middle" font-size="26" font-weight="700"
+              fill="#f2f5f4" stroke="#101413" stroke-width="4" paint-order="stroke">—</text>
+      </svg>
+      <div class="cap" id="capLab">—</div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="lab">In the silo</div><div class="val" id="tNow">—</div><div class="note" id="tPct">—</div></div>
+      <div class="tile"><div class="lab">Use per day</div><div class="val" id="tUse">—</div><div class="note">last 7 days</div></div>
+      <div class="tile"><div class="lab">Days left</div><div class="val" id="tDays">—</div><div class="note" id="tEmpty">—</div></div>
+      <div class="tile"><div class="lab">Used today</div><div class="val" id="tToday">—</div><div class="note" id="tTodayN">—</div></div>
+      <div class="tile"><div class="lab">kg per feed</div><div class="val" id="tRate">—</div><div class="note" id="tRateFrom">—</div></div>
+    </div>
+  </div>
+
+  <div class="status" id="status"><span class="dot"></span><span>Loading…</span></div>
+
+  <div class="card">
+    <h2>Add to the record</h2>
+    <div class="tabs" id="tabs">
+      <button class="btn on" data-t="delivery">Delivery</button>
+      <button class="btn" data-t="full">Silo full</button>
+      <button class="btn" data-t="level">Level check</button>
+      <button class="btn" data-t="rate">kg per feed</button>
+      <button class="btn" data-t="capacity">Silo size</button>
+    </div>
+    <div class="form">
+      <div><label for="fWhen">Date and time</label><input type="datetime-local" id="fWhen"></div>
+      <div id="valBox"><label for="fVal" id="valLab">Tonnes delivered</label><input type="number" id="fVal" step="0.01" min="0" inputmode="decimal"></div>
+      <div><label for="fNote">Note (optional)</label><input type="text" id="fNote" maxlength="80"></div>
+      <div><button class="btn primary" style="width:100%" onclick="save()">Save</button></div>
+    </div>
+    <div class="muted" id="help" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>PKE used per day (tonnes)</h2>
+    <div class="chart" id="chart"><svg id="bars"></svg><div class="tip" id="tip"></div></div>
+    <div class="muted" id="srcNote" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Days</h2>
+    <table><thead><tr><th>Date</th><th>AM feeds</th><th>PM feeds</th><th>kg/feed</th><th>Used (t)</th><th>Delivered (t)</th></tr></thead>
+      <tbody id="dayRows"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Record</h2>
+    <div id="events" class="muted">—</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// The Google Script in the mineral dispenser's sheet (Code.gs). Ends in /exec.
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxU8lSrZKe6d36O4uBmJlIXAnEdkpCRnSzPLPsn2oEEhkMGe_w0BQ0FUedyBvnwvk1w/exec';
+
+// A milking's feeds are counted at these times of its day. Events (a
+// delivery, "silo full") before this time come before that milking's feeds.
+const AM_AT = '08:00', PM_AT = '18:00';
+const DEFAULT_CAPACITY = 20;
+
+const HELP = {
+  delivery: 'Tonnes delivered into the silo.',
+  full:     'The silo was filled to the top. This sets the level to the silo size.',
+  level:    'You checked how much is in the silo. This sets the level to the tonnes you enter.',
+  rate:     'kg of PKE per feed, from this date on. Feeds before keep their old value.',
+  capacity: 'How many tonnes the silo holds when full.'
+};
+const VAL_LABEL = { delivery:'Tonnes delivered', level:'Tonnes in the silo', rate:'kg per feed', capacity:'Silo size (tonnes)' };
+
+let type = 'delivery';
+let data = { events: [], milkings: [] };
+
+const $ = id => document.getElementById(id);
+const fmtT = t => (Math.round(t * 10) / 10).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1});
+const pad = n => String(n).padStart(2, '0');
+const isoLocal = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+const dayKey = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const niceDate = d => d.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'});
+const niceWhen = s => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString(undefined, {day:'numeric', month:'short'}) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+
+function toast(m, bad){
+  const t = $('toast'); t.textContent = m; t.style.borderColor = bad ? 'var(--bad)' : 'var(--line)';
+  t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 3000);
+}
+
+document.querySelectorAll('#tabs .btn').forEach(b => b.onclick = () => {
+  type = b.dataset.t;
+  document.querySelectorAll('#tabs .btn').forEach(x => x.classList.toggle('on', x === b));
+  $('valBox').style.visibility = type === 'full' ? 'hidden' : 'visible';
+  $('valLab').textContent = VAL_LABEL[type] || '';
+  $('help').textContent = HELP[type];
+});
+$('help').textContent = HELP.delivery;
+$('fWhen').value = isoLocal(new Date());
+
+// ---------------------------------------------------------------------------
+async function load(){
+  if (!SCRIPT_URL) { $('setup').style.display = 'block'; $('sub').textContent = 'not connected'; render(); return; }
+  $('sub').textContent = 'loading…';
+  try {
+    const r = await fetch(SCRIPT_URL + '?pke=1', { cache: 'no-store' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'error');
+    data = j;
+    $('sub').textContent = 'updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  } catch (e) {
+    $('sub').textContent = 'could not load: ' + e.message;
+  }
+  render();
+}
+
+async function save(){
+  if (!SCRIPT_URL) { toast('Not connected yet', true); return; }
+  const when = $('fWhen').value;
+  const value = parseFloat($('fVal').value);
+  if (!when) { toast('Enter the date and time', true); return; }
+  if (type !== 'full' && !(value > 0)) { toast('Enter a number above 0', true); return; }
+  try {
+    const r = await fetch(SCRIPT_URL, { method:'POST',
+      body: JSON.stringify({ action:'add', type, when, value: type === 'full' ? null : value, note: $('fNote').value }) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'refused');
+    toast('Saved');
+    $('fVal').value = ''; $('fNote').value = ''; $('fWhen').value = isoLocal(new Date());
+    load();
+  } catch (e) { toast('Not saved: ' + e.message, true); }
+}
+
+async function del(id){
+  if (!confirm('Delete this entry? (It stays in the sheet, marked as deleted.)')) return;
+  try {
+    const r = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'delete', id }) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'refused');
+    toast('Deleted'); load();
+  } catch (e) { toast('Not deleted: ' + e.message, true); }
+}
+
+// ---------------------------------------------------------------------------
+// The maths. Level = last "full" or "level check" + deliveries since
+//                    - feeds since × kg per feed (the value at the time).
+function compute(){
+  const ev = (data.events || []).map(e => Object.assign({}, e, { t: new Date(e.when).getTime() }))
+                                .filter(e => !isNaN(e.t)).sort((a, b) => a.t - b.t);
+  const caps  = ev.filter(e => e.type === 'capacity');
+  const cap   = caps.length ? caps[caps.length - 1].value : DEFAULT_CAPACITY;
+  const rates = ev.filter(e => e.type === 'rate');
+  const rateAt = t => { let r = null; for (const e of rates) if (e.t <= t) r = e.value; return r; };
+
+  const mk = (data.milkings || []).map(m => {
+    const t = new Date(m.date + 'T' + (m.milking === 'pm' ? PM_AT : AM_AT)).getTime();
+    const rate = rateAt(t);
+    return Object.assign({}, m, { t, rate, tonnes: rate == null ? 0 : m.count * rate / 1000 });
+  }).filter(m => !isNaN(m.t)).sort((a, b) => a.t - b.t);
+
+  // Start point: the last "full" or "level" entry.
+  let anchor = null;
+  for (const e of ev) if (e.type === 'full' || e.type === 'level') anchor = e;
+  let level = null, noRate = 0;
+  if (anchor) {
+    level = anchor.type === 'full' ? cap : anchor.value;
+    for (const e of ev) if (e.type === 'delivery' && e.t > anchor.t) level += e.value;
+    for (const m of mk) if (m.t > anchor.t) { level -= m.tonnes; if (m.rate == null) noRate += m.count; }
+  }
+
+  // Per day.
+  const days = {};
+  const day = k => days[k] || (days[k] = { key:k, am:0, pm:0, used:0, rate:null, delivered:0 });
+  for (const m of mk) { const d = day(m.date); d[m.milking === 'pm' ? 'pm' : 'am'] += m.count; d.used += m.tonnes; if (m.rate != null) d.rate = m.rate; }
+  for (const e of ev) if (e.type === 'delivery') day(dayKey(new Date(e.t))).delivered += e.value;
+
+  // Use per day: the last 7 whole days that have feeds (today is not finished).
+  const today = dayKey(new Date());
+  const past = Object.values(days).filter(d => d.key < today && (d.am + d.pm) > 0)
+                     .sort((a, b) => a.key < b.key ? 1 : -1).slice(0, 7);
+  const perDay = past.length ? past.reduce((s, d) => s + d.used, 0) / past.length : null;
+
+  const sources = new Set(mk.map(m => m.source));
+  return { ev, cap, rateNow: rateAt(Date.now()), rates, anchor, level, noRate, days, today, perDay, past, sources };
+}
+
+// ---------------------------------------------------------------------------
+function render(){
+  const c = compute();
+
+  // silo gauge
+  const pct = c.level == null ? 0 : Math.max(0, Math.min(1, c.level / c.cap));
+  // Fill height by volume, not by height: the cone at the bottom holds a
+  // third of a cylinder of the same height, so it fills (and empties) fast.
+  const CYL = 110, CONE = 42, BOTTOM = 192;                  // drawing units
+  const vol = pct * (CYL + CONE / 3);
+  const h = vol <= CONE / 3 ? CONE * Math.cbrt(vol / (CONE / 3)) : CONE + (vol - CONE / 3);
+  $('lvl').setAttribute('y', BOTTOM - h); $('lvl').setAttribute('height', h);
+  $('pctTxt').textContent = c.level == null ? '—' : Math.round(Math.max(0, c.level) / c.cap * 100) + '%';
+  $('capLab').textContent = fmtT(c.cap) + ' t silo';
+
+  $('tNow').innerHTML = c.level == null ? '—' : fmtT(c.level) + ' <span class="unit">t</span>';
+  $('tPct').textContent = c.level == null ? 'add "Silo full" or "Level check"' : Math.round(c.level / c.cap * 100) + '% full';
+  $('tUse').innerHTML = c.perDay == null ? '—' : fmtT(c.perDay) + ' <span class="unit">t/day</span>';
+  let daysLeft = null;
+  if (c.level != null && c.perDay > 0) daysLeft = Math.max(0, c.level) / c.perDay;
+  $('tDays').textContent = daysLeft == null ? '—' : (daysLeft < 10 ? fmtT(daysLeft) : Math.round(daysLeft));
+  $('tEmpty').textContent = daysLeft == null ? '—' : 'empty about ' + niceDate(new Date(Date.now() + daysLeft * 86400000));
+  const td = c.days[c.today];
+  $('tToday').innerHTML = td ? fmtT(td.used) + ' <span class="unit">t</span>' : '0.0 <span class="unit">t</span>';
+  $('tTodayN').textContent = td ? (td.am + td.pm) + ' feeds' : 'no feeds yet';
+  $('tRate').innerHTML = c.rateNow == null ? '—' : c.rateNow + ' <span class="unit">kg</span>';
+  const lastRate = c.rates.length ? c.rates[c.rates.length - 1] : null;
+  $('tRateFrom').textContent = lastRate ? 'since ' + niceWhen(lastRate.when) : 'not set yet';
+
+  // status: colour + word, never colour alone
+  let st, col;
+  if (c.level == null)            { st = '<b>No starting level.</b> Add "Silo full" or a "Level check".'; col = 'var(--ink3)'; }
+  else if (c.rateNow == null)     { st = '<b>kg per feed not set.</b> Add it, or the level cannot go down.'; col = 'var(--warn)'; }
+  else if (c.level < 0)           { st = '<b>Below zero.</b> A delivery is missing, or kg per feed is too high. Add a "Level check".'; col = 'var(--bad)'; }
+  else if (c.level > c.cap * 1.02){ st = '<b>More than the silo holds.</b> Check the deliveries or add a "Level check".'; col = 'var(--warn)'; }
+  else if (daysLeft != null && daysLeft < 3) { st = '<b>Low:</b> about ' + fmtT(daysLeft) + ' days left. Order now.'; col = 'var(--bad)'; }
+  else if (daysLeft != null && daysLeft < 7) { st = '<b>Order soon:</b> about ' + fmtT(daysLeft) + ' days left.'; col = 'var(--warn)'; }
+  else                            { st = '<b>OK.</b>' + (daysLeft != null ? ' About ' + Math.round(daysLeft) + ' days left.' : ''); col = 'var(--ok)'; }
+  if (c.noRate) st += ' (' + c.noRate + ' feeds have no kg per feed and are not counted.)';
+  $('status').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + st + '</span>';
+  $('lvl').setAttribute('fill', col === 'var(--bad)' ? 'var(--bad)' : col === 'var(--warn)' ? 'var(--warn)' : 'var(--fill)');
+
+  // source note
+  $('srcNote').textContent = c.sources.has('doses') && !c.sources.has('feeds')
+    ? 'Counted from the mineral doses. Cows the dispenser skipped (jammed, busy) are not counted, so the real use may be a bit higher.'
+    : c.sources.has('doses') ? 'Older days are counted from mineral doses, newer days from every feed.'
+    : c.sources.size ? 'Counted from every feed at the feed head.' : '';
+
+  renderBars(c);
+  renderTable(c);
+  renderEvents(c);
+}
+
+// Daily use, last 21 days. One series, one hue; hover/tap for the numbers.
+function renderBars(c){
+  const svg = $('bars'), W = 600, H = 170, padL = 34, padB = 22, padT = 8;
+  const keys = [];
+  for (let i = 20; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); keys.push(dayKey(d)); }
+  const vals = keys.map(k => c.days[k] ? c.days[k].used : 0);
+  const max = Math.max(0.5, ...vals) * 1.15;
+  const bw = (W - padL) / keys.length;
+  let s = '';
+  for (let g = 0; g <= 3; g++) {
+    const v = max * g / 3, y = H - padB - (H - padB - padT) * g / 3;
+    s += '<line x1="' + padL + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#2c3633" stroke-width="1"/>';
+    s += '<text x="' + (padL - 4) + '" y="' + (y + 3) + '" fill="#78847f" font-size="10" text-anchor="end">' + v.toFixed(1) + '</text>';
+  }
+  keys.forEach((k, i) => {
+    const v = vals[i], bh = (H - padB - padT) * v / max, x = padL + i * bw + 1, y = H - padB - bh;
+    const isToday = k === c.today;
+    if (bh > 0) {
+      const w = bw - 2, r = Math.min(4, w / 2, bh);
+      s += '<path d="M' + x + ' ' + (H - padB) + ' V' + (y + r) + ' Q' + x + ' ' + y + ' ' + (x + r) + ' ' + y +
+           ' H' + (x + w - r) + ' Q' + (x + w) + ' ' + y + ' ' + (x + w) + ' ' + (y + r) + ' V' + (H - padB) + ' Z" fill="' +
+           (isToday ? 'var(--fill2)' : 'var(--fill)') + '"/>';
+    }
+    if (i % 3 === 0 || isToday) {
+      const d = new Date(k + 'T12:00');
+      s += '<text x="' + (x + bw / 2 - 1) + '" y="' + (H - 6) + '" fill="#78847f" font-size="10" text-anchor="middle">' +
+           (isToday ? 'today' : d.getDate() + '/' + (d.getMonth() + 1)) + '</text>';
+    }
+    // hit target bigger than the bar
+    s += '<rect x="' + (padL + i * bw) + '" y="' + padT + '" width="' + bw + '" height="' + (H - padB - padT) + '" fill="transparent" data-i="' + i + '"/>';
+  });
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.innerHTML = s;
+  const tip = $('tip');
+  svg.querySelectorAll('rect[data-i]').forEach(r => {
+    const show = () => {
+      const i = +r.dataset.i, k = keys[i], d = c.days[k], box = svg.getBoundingClientRect();
+      tip.innerHTML = '<b>' + niceDate(new Date(k + 'T12:00')) + '</b><br>' +
+        (d ? fmtT(d.used) + ' t · ' + (d.am + d.pm) + ' feeds' + (d.rate != null ? ' · ' + d.rate + ' kg/feed' : '') : 'no feeds');
+      tip.style.left = ((padL + (i + .5) * bw) / W * box.width) + 'px';
+      tip.style.top = '20px'; tip.style.display = 'block';
+    };
+    r.addEventListener('mouseenter', show); r.addEventListener('click', show);
+    r.addEventListener('mouseleave', () => tip.style.display = 'none');
+  });
+}
+
+function renderTable(c){
+  const rows = Object.values(c.days).sort((a, b) => a.key < b.key ? 1 : -1).slice(0, 30);
+  $('dayRows').innerHTML = rows.length ? rows.map(d =>
+    '<tr><td>' + niceDate(new Date(d.key + 'T12:00')) + '</td><td>' + (d.am || '') + '</td><td>' + (d.pm || '') +
+    '</td><td>' + (d.rate != null ? d.rate : '—') + '</td><td>' + fmtT(d.used) + '</td><td>' + (d.delivered ? fmtT(d.delivered) : '') + '</td></tr>'
+  ).join('') : '<tr><td colspan="6" class="muted">No feeds yet</td></tr>';
+}
+
+function renderEvents(c){
+  const label = { delivery:'Delivery', full:'Silo full', level:'Level check', rate:'kg per feed', capacity:'Silo size' };
+  const unit  = { delivery:' t', level:' t', rate:' kg', capacity:' t' };
+  const list = c.ev.slice().reverse();
+  $('events').innerHTML = list.length ? list.map(e =>
+    '<div class="ev"><span class="w">' + niceWhen(e.when) + '</span><span class="t">' + label[e.type] +
+    (e.value != null ? ': <b>' + e.value + unit[e.type] + '</b>' : '') +
+    (e.note ? ' <span class="muted">· ' + e.note.replace(/</g, '&lt;') + '</span>' : '') +
+    '</span><button class="btn small" onclick="del(\'' + e.id + '\')">Delete</button></div>'
+  ).join('') : 'Nothing yet. Start with "Silo full" (or a "Level check") and "kg per feed".';
+}
+
+load();
+setInterval(load, 5 * 60 * 1000);
+</script>
+</body>
+</html>
