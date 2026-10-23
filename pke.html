@@ -188,7 +188,7 @@
     <div class="form">
       <div><label for="fWhen">Date and time</label><input type="datetime-local" id="fWhen"></div>
       <div id="valBox"><label for="fVal" id="valLab">Tonnes delivered</label><input type="number" id="fVal" step="0.01" min="0" inputmode="decimal"></div>
-      <div><label for="fNote" id="noteLab">Note (optional)</label><input type="text" id="fNote" maxlength="80"></div>
+      <div><label for="fNote" id="noteLab">Note (optional)</label><input type="text" id="fNote" maxlength="80" placeholder=""></div>
       <div><button class="btn primary" style="width:100%" onclick="save()">Save</button></div>
     </div>
     <div class="muted" id="help" style="margin-top:8px"></div>
@@ -228,7 +228,7 @@ const HELP = {
   level:    'You checked how much is in the silo. This sets the level to the tonnes you enter.',
   rate:     'kg of PKE per feed, from this date on. Feeds before keep their old value.',
   capacity: 'How many tonnes the silo holds when full.',
-  alert:    'An email is sent when the days left drop below this number, and again at 2 days. Each email once per fill. Checked every hour.'
+  alert:    'An email is sent when the days left drop below this number, and again at 2 days. Each email once per fill. Checked every hour. Several people: put a comma between the addresses.'
 };
 const VAL_LABEL = { delivery:'Tonnes delivered', level:'Tonnes in the silo', rate:'kg per feed', capacity:'Silo size (tonnes)', alert:'Warn when days left is below' };
 
@@ -254,8 +254,10 @@ document.querySelectorAll('#tabs .btn').forEach(b => b.onclick = () => {
   $('valBox').style.visibility = type === 'full' ? 'hidden' : 'visible';
   $('valLab').textContent = VAL_LABEL[type] || '';
   $('help').textContent = HELP[type];
-  $('noteLab').textContent = type === 'alert' ? 'Email address' : 'Note (optional)';
+  $('noteLab').textContent = type === 'alert' ? 'Email addresses (comma between them)' : 'Note (optional)';
   $('fNote').type = type === 'alert' ? 'email' : 'text';
+  $('fNote').multiple = type === 'alert';
+  $('fNote').maxLength = type === 'alert' ? 300 : 80;
   if (type === 'alert' && !$('fVal').value) $('fVal').value = 5;
 });
 $('help').textContent = HELP.delivery;
