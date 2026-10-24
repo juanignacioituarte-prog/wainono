@@ -422,22 +422,25 @@ function compute(){
   }
   for (const e of ev) if (e.type === 'delivery') day(dayKey(new Date(e.t))).delivered += e.value;
 
-  // Use per day: the last USE_DAYS whole days that have feeds (today is not finished).
+  // Use per day (the forecast) = average feeds per day over the last USE_DAYS
+  // whole days x the kg per feed in force NOW (Juani, 24 Oct 2026), so a new
+  // ration changes the forecast at once. Past days keep their own value.
   const today = dayKey(new Date());
+  const rateNow = rateAt(Date.now());
   const past = Object.values(days).filter(d => d.key < today && (d.am + d.pm) > 0)
                      .sort((a, b) => a.key < b.key ? 1 : -1).slice(0, USE_DAYS);
-  let perDay = past.length ? past.reduce((s, d) => s + d.used, 0) / past.length : null;
-  // No whole day yet (the data starts on DATA_FROM): use today so far as a
-  // first guess (Juani, 24 Oct 2026). Only the page does this; the email
-  // alerts in Code.gs wait for a whole day.
-  const perDayGuess = perDay == null && !!days[today] && days[today].used > 0;
-  if (perDayGuess) perDay = days[today].used;
+  let feedsPerDay = past.length ? past.reduce((s, d) => s + d.am + d.pm, 0) / past.length : null;
+  // No whole day yet (the data starts on DATA_FROM): use today's feeds so far
+  // as a first guess. Only the page does this; Code.gs waits for a whole day.
+  const perDayGuess = feedsPerDay == null && !!days[today] && (days[today].am + days[today].pm) > 0;
+  if (perDayGuess) feedsPerDay = days[today].am + days[today].pm;
+  const perDay = feedsPerDay == null || rateNow == null ? null : feedsPerDay * rateNow / 1000;
 
   // PKE orders still to come: delivery date today or later (Juani, 24 Oct 2026).
   const orders = ev.filter(e => e.type === 'order' && e.when.slice(0, 10) >= today)
                    .sort((a, b) => a.when < b.when ? -1 : 1);
 
-  return { ev, cap, rateNow: rateAt(Date.now()), rates, anchor, level, noRate, days, today, perDay, perDayGuess, past, orders };
+  return { ev, cap, rateNow, rates, anchor, level, noRate, days, today, perDay, feedsPerDay, perDayGuess, past, orders };
 }
 
 // ---------------------------------------------------------------------------
@@ -463,7 +466,8 @@ function render(){
   $('tNow').innerHTML = c.level == null ? '—' : fmtT(c.level) + ' <span class="unit">t</span>';
   $('tPct').textContent = c.level == null ? 'add "Silo full" or "Level check"' : Math.round(c.level / c.cap * 100) + '% full';
   $('tUse').innerHTML = c.perDay == null ? '—' : fmtT(c.perDay) + ' <span class="unit">t/day</span>';
-  $('tUseNote').textContent = c.perDayGuess ? 'first guess: today so far' : 'last ' + (c.past.length > 1 ? c.past.length + ' days' : 'day');
+  $('tUseNote').textContent = c.perDay == null ? (c.perDayGuess || c.past.length ? 'kg per feed not set' : 'no feeds yet')
+    : Math.round(c.feedsPerDay) + ' feeds/day × ' + c.rateNow + ' kg' + (c.perDayGuess ? ' (first guess: today so far)' : ' (last ' + (c.past.length > 1 ? c.past.length + ' days' : 'day') + ')');
   let daysLeft = null;
   if (c.level != null && c.perDay > 0) daysLeft = Math.max(0, c.level) / c.perDay;
   $('tDays').textContent = daysLeft == null ? '—' : (daysLeft < 10 ? fmtT(daysLeft) : Math.round(daysLeft));
