@@ -503,7 +503,10 @@ function renderDispenser(){
   if (st.sim) txt += ' <span class="muted">(milking simulator is running)</span>';
   $('dispStatus').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + txt + '</span>';
   const t = (lab, val, note) => '<div class="tile"><div class="lab">' + lab + '</div><div class="val" style="font-size:20px">' + val + '</div><div class="note">' + (note || '') + '</div></div>';
-  const fa = st.feedsAm == null ? '—' : st.feedsAm, fp = st.feedsPm == null ? '—' : st.feedsPm;
+  // A hand-set count (FEED_FIX) for today wins over the sender's counter.
+  const today = dayKey(new Date()), fixAm = FEED_FIX[today + '|am'], fixPm = FEED_FIX[today + '|pm'];
+  const fa = fixAm != null ? fixAm : st.feedsAm == null ? '—' : st.feedsAm;
+  const fp = fixPm != null ? fixPm : st.feedsPm == null ? '—' : st.feedsPm;
   $('dispTiles').innerHTML =
     t('Feeds today', fa + ' / ' + fp, 'AM / PM') +
     t('Mineral doses', st.am + ' / ' + st.pm, 'AM / PM') +
