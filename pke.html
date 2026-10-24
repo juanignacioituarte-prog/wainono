@@ -263,6 +263,10 @@ const DEFAULT_CAPACITY = 20;
 // Feeds before this day are left out (tests, and days before the sender
 // counted feeds). Juani, 24 Oct 2026. Keep in step with DATA_FROM in Code.gs.
 const DATA_FROM = '2026-10-24';
+// Feed counts set by hand, where the counter was wrong. Key 'yyyy-mm-dd|am'.
+// 24 Oct AM: the count from before the sender update was wrong; Juani set
+// 1100 (24 Oct 2026). Keep in step with FEED_FIX in Code.gs.
+const FEED_FIX = { '2026-10-24|am': 1100 };
 
 let data = { events: [], milkings: [] };
 
@@ -371,6 +375,8 @@ function compute(){
     // Every dose comes from a feed order, so feeds >= doses: take the higher one
     // (same rule as Code.gs). Covers days when the feed count started late.
     m = Object.assign({}, m, { count: Math.max(m.feeds || 0, m.doses || 0, m.feeds == null && m.doses == null ? m.count : 0) });
+    const fix = FEED_FIX[m.date + '|' + m.milking];
+    if (fix != null) m = Object.assign(m, { count: fix, feeds: fix, fixed: true });
     const t = new Date(m.date + 'T' + (m.milking === 'pm' ? PM_AT : AM_AT)).getTime();
     const rate = rateAt(t);
     return Object.assign({}, m, { t, rate, tonnes: rate == null ? 0 : m.count * rate / 1000 });
@@ -393,7 +399,7 @@ function compute(){
     const d = day(m.date), pm = m.milking === 'pm';
     d[pm ? 'pm' : 'am'] += m.count;
     d[pm ? 'dosesPm' : 'dosesAm'] += m.doses || 0;
-    if (m.feeds == null || m.feeds < (m.doses || 0)) d.noFeeds = true;   // doses stood in
+    if (!m.fixed && (m.feeds == null || m.feeds < (m.doses || 0))) d.noFeeds = true;   // doses stood in
     d.used += m.tonnes; if (m.rate != null) d.rate = m.rate;
   }
   for (const e of ev) if (e.type === 'delivery') day(dayKey(new Date(e.t))).delivered += e.value;
@@ -501,7 +507,10 @@ function renderDispenser(){
   $('dispTiles').innerHTML =
     t('Feeds today', fa + ' / ' + fp, 'AM / PM') +
     t('Mineral doses', st.am + ' / ' + st.pm, 'AM / PM') +
-    t('Jams', st.lifetimeJams, 'lifetime, with retries') +
+    // Jams in the last milking only, counted from 24 Oct 2026 (Juani). Code.gs
+    // works it out; an older Code.gs sends no jamsMilking.
+    t('Jams', st.jamsMilking == null ? '—' : st.jamsMilking,
+      st.jamsKey ? 'last milking: ' + st.jamsKey.split('|')[1].toUpperCase() + ' ' + st.jamsKey.slice(8, 10) + '/' + st.jamsKey.slice(5, 7) : 'last milking') +
     t('Last report', ago(ageMin), 'from the sender');
   $('dispNote').textContent = 'Dispenser running for ' + Math.round(st.dispUptime / 3600) + ' h · sender WiFi ' + st.rssi + ' dBm' +
     (st.senderReset ? ' · sender running for ' + Math.round(st.senderUptime / 3600) + ' h, last restart: ' + st.senderReset : '') + '.';
