@@ -338,12 +338,14 @@ async function load(){
       if (!j.ok) throw new Error(j.error || 'error');
     }
     data = j;
-    $('who').textContent = j.user || '';
+    $('who').textContent = j.userName || j.user || '';
     $('login').style.display = 'none';
     $('sub').textContent = 'updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   } catch (e) {
     if (e.auth === false) { forgetToken(); showLogin('This Google account is not on the farm app list. Ask the admin, or sign in with another account.'); return; }
     $('sub').textContent = 'could not load: ' + e.message;
+    // Still on the sign-in screen: say why, instead of only asking again.
+    if ($('login').style.display !== 'none') { $('loginMsg').textContent = 'Signed in, but the page could not load: ' + e.message; return; }
   }
   render();
 }
@@ -678,7 +680,8 @@ function renderEvents(c){
   const list = c.ev.slice().reverse();
   $('events').innerHTML = list.length ? list.map(e =>
     '<div class="ev"><span class="w">' + (e.type === 'order' ? niceDate(new Date(e.when)) : niceWhen(e.when)) + '</span><span class="t">' + label[e.type] + val(e) +
-    (e.note ? ' <span class="muted">· ' + e.note.replace(/</g, '&lt;') + '</span>' : '') +
+    (e.note && !(e.type === 'power' || e.type === 'override') ? ' <span class="muted">· ' + e.note.replace(/</g, '&lt;') + '</span>' : '') +
+    (e.byName ? ' <span class="muted">· by ' + e.byName.replace(/</g, '&lt;') + '</span>' : '') +
     '</span>' + (e.type === 'power' || e.type === 'override' ? '' :   // switching is a record, not undone here
     '<button class="btn small" onclick="del(\'' + e.id + '\')">Delete</button>') + '</div>'
   ).join('') : 'Nothing yet. Start with "Silo full" (or a "Level check") and "kg per feed".';
