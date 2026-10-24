@@ -166,7 +166,7 @@
     </div>
     <div class="tiles">
       <div class="tile"><div class="lab">In the silo</div><div class="val" id="tNow">—</div><div class="note" id="tPct">—</div></div>
-      <div class="tile"><div class="lab">Use per day</div><div class="val" id="tUse">—</div><div class="note">last 7 days</div></div>
+      <div class="tile"><div class="lab">Use per day</div><div class="val" id="tUse">—</div><div class="note" id="tUseNote">last 7 days</div></div>
       <div class="tile"><div class="lab">Days left</div><div class="val" id="tDays">—</div><div class="note" id="tEmpty">—</div></div>
       <div class="tile"><div class="lab">Used today</div><div class="val" id="tToday">—</div><div class="note" id="tTodayN">—</div></div>
       <div class="tile"><div class="lab">kg per feed</div><div class="val" id="tRate">—</div><div class="note" id="tRateFrom">—</div></div>
@@ -408,9 +408,14 @@ function compute(){
   const today = dayKey(new Date());
   const past = Object.values(days).filter(d => d.key < today && (d.am + d.pm) > 0)
                      .sort((a, b) => a.key < b.key ? 1 : -1).slice(0, 7);
-  const perDay = past.length ? past.reduce((s, d) => s + d.used, 0) / past.length : null;
+  let perDay = past.length ? past.reduce((s, d) => s + d.used, 0) / past.length : null;
+  // No whole day yet (the data starts on DATA_FROM): use today so far as a
+  // first guess (Juani, 24 Oct 2026). Only the page does this; the email
+  // alerts in Code.gs wait for a whole day.
+  const perDayGuess = perDay == null && !!days[today] && days[today].used > 0;
+  if (perDayGuess) perDay = days[today].used;
 
-  return { ev, cap, rateNow: rateAt(Date.now()), rates, anchor, level, noRate, days, today, perDay, past };
+  return { ev, cap, rateNow: rateAt(Date.now()), rates, anchor, level, noRate, days, today, perDay, perDayGuess, past };
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +441,7 @@ function render(){
   $('tNow').innerHTML = c.level == null ? '—' : fmtT(c.level) + ' <span class="unit">t</span>';
   $('tPct').textContent = c.level == null ? 'add "Silo full" or "Level check"' : Math.round(c.level / c.cap * 100) + '% full';
   $('tUse').innerHTML = c.perDay == null ? '—' : fmtT(c.perDay) + ' <span class="unit">t/day</span>';
+  $('tUseNote').textContent = c.perDayGuess ? 'first guess: today so far' : 'last ' + (c.past.length > 1 ? c.past.length + ' days' : 'day');
   let daysLeft = null;
   if (c.level != null && c.perDay > 0) daysLeft = Math.max(0, c.level) / c.perDay;
   $('tDays').textContent = daysLeft == null ? '—' : (daysLeft < 10 ? fmtT(daysLeft) : Math.round(daysLeft));
