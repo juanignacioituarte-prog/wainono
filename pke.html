@@ -166,7 +166,7 @@
     </div>
     <div class="tiles">
       <div class="tile"><div class="lab">In the silo</div><div class="val" id="tNow">—</div><div class="note" id="tPct">—</div></div>
-      <div class="tile"><div class="lab">Use per day</div><div class="val" id="tUse">—</div><div class="note" id="tUseNote">last 7 days</div></div>
+      <div class="tile"><div class="lab">Use per day</div><div class="val" id="tUse">—</div><div class="note" id="tUseNote">last 2 days</div></div>
       <div class="tile"><div class="lab">Days left</div><div class="val" id="tDays">—</div><div class="note" id="tEmpty">—</div></div>
       <div class="tile"><div class="lab">Used today</div><div class="val" id="tToday">—</div><div class="note" id="tTodayN">—</div></div>
       <div class="tile"><div class="lab">kg per feed</div><div class="val" id="tRate">—</div><div class="note" id="tRateFrom">—</div></div>
@@ -267,6 +267,9 @@ const DATA_FROM = '2026-10-24';
 // 24 Oct AM: the count from before the sender update was wrong; Juani set
 // 1100 (24 Oct 2026). Keep in step with FEED_FIX in Code.gs.
 const FEED_FIX = { '2026-10-24|am': 1100 };
+// Use per day = the average of this many whole days (Juani, 24 Oct 2026: 2).
+// Keep in step with USE_DAYS in Code.gs.
+const USE_DAYS = 2;
 
 let data = { events: [], milkings: [] };
 
@@ -404,10 +407,10 @@ function compute(){
   }
   for (const e of ev) if (e.type === 'delivery') day(dayKey(new Date(e.t))).delivered += e.value;
 
-  // Use per day: the last 7 whole days that have feeds (today is not finished).
+  // Use per day: the last USE_DAYS whole days that have feeds (today is not finished).
   const today = dayKey(new Date());
   const past = Object.values(days).filter(d => d.key < today && (d.am + d.pm) > 0)
-                     .sort((a, b) => a.key < b.key ? 1 : -1).slice(0, 7);
+                     .sort((a, b) => a.key < b.key ? 1 : -1).slice(0, USE_DAYS);
   let perDay = past.length ? past.reduce((s, d) => s + d.used, 0) / past.length : null;
   // No whole day yet (the data starts on DATA_FROM): use today so far as a
   // first guess (Juani, 24 Oct 2026). Only the page does this; the email
