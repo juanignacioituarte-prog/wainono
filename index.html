@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.92</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.93</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1740,7 +1740,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.92</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.93</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3341,7 +3341,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.92) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.93) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -10752,22 +10752,12 @@
             if (el) el.remove();
         }
 
-        /* PKE Silo (Juani, 24 Oct 2026): pke.html (same site) shown full screen
-         * over the app, with a close button; the app stays where it was. */
+        /* PKE Silo (Juani, 24 Oct 2026): pke.html in a new tab. In a frame
+         * inside the app its Google sign-in did not work. */
         function openPkePage() {
-            closePkePage();
-            const wrap = document.createElement('div');
-            wrap.id = 'pke-page';
-            wrap.style.cssText = 'position:fixed; inset:0; z-index:5000; background:#fff; display:flex; flex-direction:column;';
-            wrap.innerHTML = `<div style="display:flex; align-items:center; gap:8px; padding:6px 10px; padding-top:calc(6px + env(safe-area-inset-top, 0px)); background:#2c3e50; color:#fff;">
-                    <b style="font-size:14px; flex:1;">🥛 PKE Silo</b>
-                    <a href="pke.html" target="_blank" rel="noopener" style="color:#fff; font-size:11px; text-decoration:underline;">open in new tab</a>
-                    <button onclick="closePkePage()" style="background:none; border:none; color:#fff; font-size:24px; line-height:1; cursor:pointer; padding:0 4px;" title="Close">&times;</button>
-                </div>
-                <iframe src="pke.html?t=${Date.now()}" title="PKE Silo" style="flex:1; width:100%; border:0;"></iframe>`;
-            document.body.appendChild(wrap);
+            const w = window.open('pke.html', '_blank', 'noopener');
+            if (!w) location.href = 'pke.html';   // pop-up blocked: open it here
         }
-        function closePkePage() { const w = document.getElementById('pke-page'); if (w) w.remove(); }
 
         async function init() {
             map = L.map('map', { 

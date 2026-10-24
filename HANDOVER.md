@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.92**,
-service worker cache `wn-farm-v1.1.106`, Apps Script `2026-10-23-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.93**,
+service worker cache `wn-farm-v1.1.107`, Apps Script `2026-10-23-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.92/v1.1.93/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.93/v1.1.94/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.92/v1.1.93/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.106/wn-farm-v1.1.107/" sw.js
+sed -i "s/v1\.1\.93/v1.1.94/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.107/wn-farm-v1.1.108/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -944,3 +944,5 @@ Added 12 October 2026:
   breaks always go back on top, with the out parts between.
 - ⋮ menu **🥛 PKE Silo** (v1.1.92, `openPkePage`): pke.html full screen over
   the app in a frame, with ✕ close and "open in new tab".
+- PKE Silo opens pke.html in a new tab (v1.1.93): in a frame its Google
+  sign-in did not work.
