@@ -354,7 +354,8 @@ function compute(){
   const caps  = ev.filter(e => e.type === 'capacity');
   const cap   = caps.length ? caps[caps.length - 1].value : DEFAULT_CAPACITY;
   const rates = ev.filter(e => e.type === 'rate');
-  const rateAt = t => { let r = null; for (const e of rates) if (e.t <= t) r = e.value; return r; };
+  // The value at that time. Feeds older than the first entry use the first one.
+  const rateAt = t => { let r = rates.length ? rates[0].value : null; for (const e of rates) if (e.t <= t) r = e.value; return r; };
 
   const mk = (data.milkings || []).map(m => {
     const t = new Date(m.date + 'T' + (m.milking === 'pm' ? PM_AT : AM_AT)).getTime();
