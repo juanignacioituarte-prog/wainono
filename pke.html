@@ -175,6 +175,13 @@
 
   <div class="status" id="status"><span class="dot"></span><span>Loading…</span></div>
 
+  <div class="card" id="dispCard">
+    <h2>Mineral dispenser</h2>
+    <div class="status" id="dispStatus" style="margin-bottom:10px"><span class="dot"></span><span>—</span></div>
+    <div class="tiles" id="dispTiles"></div>
+    <div class="muted" id="dispNote" style="margin-top:8px"></div>
+  </div>
+
   <div class="card">
     <h2>Delivery</h2>
     <div class="form">
@@ -460,9 +467,37 @@ function render(){
   if (document.activeElement !== $('sCap') && !$('sCap').value) $('sCap').placeholder = c.cap;
   if (document.activeElement !== $('sRate') && !$('sRate').value && c.rateNow != null) $('sRate').placeholder = c.rateNow;
 
+  renderDispenser();
   renderBars(c);
   renderTable(c);
   renderEvents(c);
+}
+
+// The dispenser, as the sender last reported it through the sheet. The page
+// cannot reach the farm network itself.
+function renderDispenser(){
+  const st = data.status;
+  if (!st) {
+    $('dispStatus').innerHTML = '<span class="dot" style="background:var(--ink3)"></span><span>No report yet. The sender sends one at least every 10 minutes.</span>';
+    $('dispTiles').innerHTML = ''; $('dispNote').textContent = ''; return;
+  }
+  const ageMin = (Date.now() - new Date(st.received).getTime()) / 60000;
+  const ago = m => m < 1 ? 'just now' : m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago';
+  let txt, col;
+  if (ageMin > 20)          { txt = '<b>No news from the sender</b> since ' + ago(ageMin) + '. The sender or the farm WiFi may be down.'; col = 'var(--warn)'; }
+  else if (st.jam || st.state === 'JAMMED') { txt = '<b>JAMMED.</b> Clear the auger, then press Clear jam on the dispenser page.'; col = 'var(--bad)'; }
+  else if (!st.link)        { txt = '<b>Dispenser offline.</b> The sender has not heard it for ' + Math.round(st.heardAgo / 60) + ' min.'; col = 'var(--bad)'; }
+  else                      { txt = '<b>OK</b> · ' + st.state; col = 'var(--ok)'; }
+  if (st.sim) txt += ' <span class="muted">(milking simulator is running)</span>';
+  $('dispStatus').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + txt + '</span>';
+  const t = (lab, val, note) => '<div class="tile"><div class="lab">' + lab + '</div><div class="val" style="font-size:20px">' + val + '</div><div class="note">' + (note || '') + '</div></div>';
+  const fa = st.feedsAm == null ? '—' : st.feedsAm, fp = st.feedsPm == null ? '—' : st.feedsPm;
+  $('dispTiles').innerHTML =
+    t('Feeds today', fa + ' / ' + fp, 'AM / PM') +
+    t('Mineral doses', st.am + ' / ' + st.pm, 'AM / PM') +
+    t('Jams', st.lifetimeJams, 'lifetime, with retries') +
+    t('Last report', ago(ageMin), 'from the sender');
+  $('dispNote').textContent = 'Dispenser running for ' + Math.round(st.dispUptime / 3600) + ' h · sender WiFi ' + st.rssi + ' dBm.';
 }
 
 // Daily use, last 21 days. One series, one hue; hover/tap for the numbers.
