@@ -74,8 +74,18 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+<!-- Private page (Juani, 24 Oct 2026): sign in first, with the farm app's
+     Google sign-in. Code.gs checks the sign-in on every request and only
+     answers people on the farm app's authorised list. -->
+<div id="login" style="position:fixed; inset:0; z-index:20; background:var(--bg); display:flex;
+     flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:16px; text-align:center">
+  <h1 style="margin:0">PKE silo</h1>
+  <div class="muted" id="loginMsg">Sign in with your farm app Google account.</div>
+  <div id="loginBtn"></div>
+</div>
 <header>
   <h1>PKE silo<span class="sub" id="sub">loading…</span></h1>
+  <span class="muted" id="who" style="font-size:12px"></span>
   <button class="btn small" onclick="load()">Refresh</button>
 </header>
 
@@ -315,24 +325,44 @@ resetTimes();
 // ---------------------------------------------------------------------------
 async function load(){
   if (!SCRIPT_URL) { $('setup').style.display = 'block'; $('sub').textContent = 'not connected'; render(); return; }
+  if (!idToken || !tokenFresh()) { showLogin(); return; }
   $('sub').textContent = 'loading…';
   try {
-    const r = await fetch(SCRIPT_URL + '?pke=1', { cache: 'no-store' });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'error');
+    let j;
+    try { j = await post({ action:'read' }); }
+    catch (e) {
+      // Until the new Code.gs is deployed it does not know "read". Remove this
+      // fallback once it is (Code.gs of 24 Oct 2026 evening).
+      if (!/unknown action/.test(e.message)) throw e;
+      j = await (await fetch(SCRIPT_URL + '?pke=1', { cache: 'no-store' })).json();
+      if (!j.ok) throw new Error(j.error || 'error');
+    }
     data = j;
+    $('who').textContent = j.user || '';
+    $('login').style.display = 'none';
     $('sub').textContent = 'updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   } catch (e) {
+    if (e.auth === false) { forgetToken(); showLogin('This Google account is not on the farm app list. Ask the admin, or sign in with another account.'); return; }
     $('sub').textContent = 'could not load: ' + e.message;
   }
   render();
 }
 
+// The sign-in screen. Google signs in by itself when it can (auto_select).
+function showLogin(msg){
+  $('login').style.display = 'flex';
+  if (msg) $('loginMsg').textContent = msg;
+  if (!gsiInit()) { setTimeout(() => showLogin(msg), 300); return; }   // Google's script still loading
+  google.accounts.id.renderButton($('loginBtn'), { theme:'outline', size:'large', text:'signin_with' });
+  google.accounts.id.prompt();
+}
+
+// Every request carries the Google sign-in; Code.gs checks it.
 async function post(body){
   if (!SCRIPT_URL) throw new Error('not connected yet');
-  const r = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify(body) });
+  const r = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify(Object.assign({}, body, { token: idToken })) });
   const j = await r.json();
-  if (!j.ok) throw new Error(j.error || 'refused');
+  if (!j.ok) { const e = new Error(j.error || 'refused'); e.auth = j.auth; throw e; }
   return j;
 }
 
@@ -381,9 +411,7 @@ async function sendSample(){
 async function del(id){
   if (!confirm('Delete this entry? (It stays in the sheet, marked as deleted.)')) return;
   try {
-    const r = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'delete', id }) });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'refused');
+    await post({ action:'delete', id });
     toast('Deleted'); load();
   } catch (e) { toast('Not deleted: ' + e.message, true); }
 }
@@ -662,6 +690,9 @@ function renderEvents(c){
 // sender asks Code.gs every 2 minutes and sends no feed orders while stopped.
 const CLIENT_ID = '299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com';   // the farm app's sign-in
 let idToken = null, pendingAct = null, gateOn = true;
+// Kept for this browser tab only, so a reload does not ask again (a token lives 1 hour).
+try { idToken = sessionStorage.getItem('pkeToken'); } catch (e) {}
+function forgetToken(){ idToken = null; try { sessionStorage.removeItem('pkeToken'); } catch (e) {} }
 
 const tokenFresh = () => {
   try { const p = JSON.parse(atob(idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
@@ -672,7 +703,9 @@ function gsiInit(){
   if (!gsiInit.done) {
     google.accounts.id.initialize({ client_id: CLIENT_ID, auto_select: true, callback: r => {
       idToken = r.credential; $('gsiBtn').innerHTML = '';
+      try { sessionStorage.setItem('pkeToken', idToken); } catch (e) {}
       if (pendingAct) { const a = pendingAct; pendingAct = null; a(); }
+      else load();
     }});
     gsiInit.done = true;
   }
@@ -689,7 +722,7 @@ function signedIn(act){
 }
 async function switchAct(body, done){
   try { await post(Object.assign(body, { token: idToken })); toast(done); load(); }
-  catch (e) { if (/sign in/.test(e.message)) idToken = null; toast('Not changed: ' + e.message, true); }
+  catch (e) { if (e.auth === false) forgetToken(); toast('Not changed: ' + e.message, true); }
 }
 function powerClick(){
   const on = !gateOn;
