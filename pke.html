@@ -71,6 +71,7 @@
   .toast{position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:#0b0f0e;
     border:1px solid var(--line); padding:9px 14px; border-radius:8px; font-size:13px; display:none; z-index:9;}
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <header>
@@ -180,6 +181,16 @@
     <div class="status" id="dispStatus" style="margin-bottom:10px"><span class="dot"></span><span>—</span></div>
     <div class="tiles" id="dispTiles"></div>
     <div class="muted" id="dispNote" style="margin-top:8px"></div>
+    <div id="powerBox" style="display:none; margin-top:12px; padding-top:10px; border-top:1px solid var(--line)">
+      <div class="status" id="powerTxt" style="margin-bottom:8px"><span class="dot"></span><span>—</span></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+        <button class="btn" id="btnPower" onclick="powerClick()">—</button>
+        <button class="btn primary" id="btnKeep" style="display:none" onclick="keepRunning()">Keep running</button>
+        <div id="gsiBtn"></div>
+      </div>
+      <div class="muted" style="margin-top:6px">Only people on the farm app's list can switch it (Google sign-in).
+        The sender checks every 2 minutes. Under 1 day of PKE it stops by itself and emails the alert list.</div>
+    </div>
   </div>
 
   <div class="card">
@@ -528,6 +539,7 @@ function render(){
   if (document.activeElement !== $('sRate') && !$('sRate').value && c.rateNow != null) $('sRate').placeholder = c.rateNow;
 
   renderDispenser();
+  renderPower();
   renderBars(c);
   renderTable(c);
   renderEvents(c);
@@ -631,15 +643,81 @@ function renderTable(c){
 }
 
 function renderEvents(c){
-  const label = { delivery:'Delivery', full:'Silo full', level:'Level check', rate:'kg per feed', capacity:'Silo size', alert:'Email alert below (days)', order:'PKE order, delivery' };
+  const label = { delivery:'Delivery', full:'Silo full', level:'Level check', rate:'kg per feed', capacity:'Silo size', alert:'Email alert below (days)', order:'PKE order, delivery',
+                  power:'Mineral dispenser turned', override:'Mineral dispenser kept running under 1 day' };
   const unit  = { delivery:' t', level:' t', rate:' kg', capacity:' t', alert:'', order:' t' };
+  const val = e => e.type === 'power' ? ' <b>' + (e.value ? 'ON' : 'OFF') + '</b>' : (e.value != null ? ': <b>' + e.value + unit[e.type] + '</b>' : '');
   const list = c.ev.slice().reverse();
   $('events').innerHTML = list.length ? list.map(e =>
-    '<div class="ev"><span class="w">' + (e.type === 'order' ? niceDate(new Date(e.when)) : niceWhen(e.when)) + '</span><span class="t">' + label[e.type] +
-    (e.value != null ? ': <b>' + e.value + unit[e.type] + '</b>' : '') +
+    '<div class="ev"><span class="w">' + (e.type === 'order' ? niceDate(new Date(e.when)) : niceWhen(e.when)) + '</span><span class="t">' + label[e.type] + val(e) +
     (e.note ? ' <span class="muted">· ' + e.note.replace(/</g, '&lt;') + '</span>' : '') +
-    '</span><button class="btn small" onclick="del(\'' + e.id + '\')">Delete</button></div>'
+    '</span>' + (e.type === 'power' || e.type === 'override' ? '' :   // switching is a record, not undone here
+    '<button class="btn small" onclick="del(\'' + e.id + '\')">Delete</button>') + '</div>'
   ).join('') : 'Nothing yet. Start with "Silo full" (or a "Level check") and "kg per feed".';
+}
+
+// ---------------------------------------------------------------------------
+// Mineral dispenser on / off (Juani, 24 Oct 2026). Code.gs keeps the switch
+// and checks the Google sign-in against the farm app's authorised list; the
+// sender asks Code.gs every 2 minutes and sends no feed orders while stopped.
+const CLIENT_ID = '299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com';   // the farm app's sign-in
+let idToken = null, pendingAct = null, gateOn = true;
+
+const tokenFresh = () => {
+  try { const p = JSON.parse(atob(idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return p.exp * 1000 > Date.now() + 60000; } catch (e) { return false; }
+};
+function gsiInit(){
+  if (!window.google || !google.accounts || !google.accounts.id) return false;
+  if (!gsiInit.done) {
+    google.accounts.id.initialize({ client_id: CLIENT_ID, auto_select: true, callback: r => {
+      idToken = r.credential; $('gsiBtn').innerHTML = '';
+      if (pendingAct) { const a = pendingAct; pendingAct = null; a(); }
+    }});
+    gsiInit.done = true;
+  }
+  return true;
+}
+// Runs act now if signed in; otherwise shows the Google button and runs it after.
+function signedIn(act){
+  if (idToken && tokenFresh()) { act(); return; }
+  if (!gsiInit()) { toast('Google sign-in is still loading. Try again in a moment.', true); return; }
+  pendingAct = act;
+  google.accounts.id.renderButton($('gsiBtn'), { theme:'outline', size:'medium', text:'signin_with' });
+  google.accounts.id.prompt();
+  toast('Sign in with your farm app Google account');
+}
+async function switchAct(body, done){
+  try { await post(Object.assign(body, { token: idToken })); toast(done); load(); }
+  catch (e) { if (/sign in/.test(e.message)) idToken = null; toast('Not changed: ' + e.message, true); }
+}
+function powerClick(){
+  const on = !gateOn;
+  if (!on && !confirm('Turn the mineral dispenser OFF? No mineral is dosed until somebody turns it on again.')) return;
+  signedIn(() => switchAct({ action:'power', on }, on ? 'Turned on. The sender picks it up within 2 minutes.' : 'Turned off. The sender picks it up within 2 minutes.'));
+}
+function keepRunning(){
+  if (!confirm('Keep the mineral dispenser running although the PKE is under 1 day? It runs until the next delivery, "silo full" or silo check.')) return;
+  signedIn(() => switchAct({ action:'override' }, 'Kept running. The sender picks it up within 2 minutes.'));
+}
+
+function renderPower(){
+  const g = data.gate, st = data.status;
+  $('powerBox').style.display = g ? '' : 'none';
+  if (!g) return;
+  gateOn = !g.power || g.power.on !== false;
+  const esc = t => String(t || '').replace(/</g, '&lt;');
+  let txt, col;
+  if (!g.run && g.reason === 'off') { txt = '<b>STOPPED from this page</b> by ' + esc(g.power.by) + ', ' + niceWhen(g.power.at) + '.'; col = 'var(--bad)'; }
+  else if (!g.run)                  { txt = '<b>STOPPED: PKE under 1 day.</b> Press "Keep running", or save a Silo check.'; col = 'var(--bad)'; }
+  else                              { txt = '<b>Running.</b>' + (g.override ? ' Kept running under 1 day by ' + esc(g.override.by) + '.' : ''); col = 'var(--ok)'; }
+  // Has the sender picked it up yet? (it reports remoteStop with each upload)
+  if (st && st.remoteStop == null) txt += ' <span class="muted">(the sender needs the new firmware for this)</span>';
+  else if (st && st.remoteStop !== !g.run) txt += ' <span class="muted">(the sender has not picked this up yet)</span>';
+  $('powerTxt').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + txt + '</span>';
+  $('btnPower').textContent = gateOn ? 'Turn off' : 'Turn on';
+  $('btnPower').className = 'btn' + (gateOn ? '' : ' primary');
+  $('btnKeep').style.display = g.low && !g.override && gateOn ? '' : 'none';
 }
 
 load();
