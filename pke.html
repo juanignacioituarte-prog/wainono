@@ -176,22 +176,54 @@
   <div class="status" id="status"><span class="dot"></span><span>Loading…</span></div>
 
   <div class="card">
-    <h2>Add to the record</h2>
-    <div class="tabs" id="tabs">
-      <button class="btn on" data-t="delivery">Delivery</button>
-      <button class="btn" data-t="full">Silo full</button>
-      <button class="btn" data-t="level">Level check</button>
-      <button class="btn" data-t="rate">kg per feed</button>
-      <button class="btn" data-t="capacity">Silo size</button>
-      <button class="btn" data-t="alert">Email alert</button>
-    </div>
+    <h2>Delivery</h2>
     <div class="form">
-      <div><label for="fWhen">Date and time</label><input type="datetime-local" id="fWhen"></div>
-      <div id="valBox"><label for="fVal" id="valLab">Tonnes delivered</label><input type="number" id="fVal" step="0.01" min="0" inputmode="decimal"></div>
-      <div><label for="fNote" id="noteLab">Note (optional)</label><input type="text" id="fNote" maxlength="80" placeholder=""></div>
-      <div><button class="btn primary" style="width:100%" onclick="save()">Save</button></div>
+      <div><label for="dWhen">Date and time</label><input type="datetime-local" id="dWhen"></div>
+      <div><label for="dVal">Tonnes delivered</label><input type="number" id="dVal" step="0.01" min="0" inputmode="decimal"></div>
+      <div><label for="dNote">Note (optional)</label><input type="text" id="dNote" maxlength="80"></div>
+      <div><button class="btn primary" style="width:100%" onclick="saveDelivery()">Save delivery</button></div>
     </div>
-    <div class="muted" id="help" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Silo check</h2>
+    <div class="form">
+      <div><label for="cWhen">Date and time</label><input type="datetime-local" id="cWhen"></div>
+      <div><label for="cVal">Tonnes in the silo</label><input type="number" id="cVal" step="0.1" min="0" inputmode="decimal"></div>
+      <div><button class="btn primary" style="width:100%" onclick="saveLevel()">Save level</button></div>
+      <div><button class="btn" style="width:100%" onclick="saveFull()">Silo is full now</button></div>
+    </div>
+    <div class="muted" style="margin-top:8px">Sets the level to what you found. The page counts down from there.</div>
+  </div>
+
+  <div class="card">
+    <h2>Email alerts</h2>
+    <div id="alertNow" style="font-size:13px; margin-bottom:10px">—</div>
+    <div class="form">
+      <div style="grid-column:span 2"><label for="aMail">Email addresses (comma between them)</label><input type="email" id="aMail" multiple maxlength="300"></div>
+      <div><label for="aDays">Warn when days left is below</label><input type="number" id="aDays" min="0.5" max="60" step="0.5"></div>
+      <div><button class="btn primary" style="width:100%" onclick="saveAlert()">Add alert</button></div>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <button class="btn" onclick="sendSample()">Send a sample email</button>
+      <span class="muted">Goes to everyone on the list now, with today's numbers.</span>
+    </div>
+    <div class="muted" style="margin-top:8px">Add one alert for each warning you want, for example 7, 3 and 1 day.
+      A person can have several. Each warning is sent once per fill, checked every hour.</div>
+  </div>
+
+  <div class="card">
+    <h2>Settings</h2>
+    <div class="form">
+      <div><label for="sWhen">From (date and time)</label><input type="datetime-local" id="sWhen"></div>
+      <div><label for="sRate">kg per feed</label><input type="number" id="sRate" step="0.01" min="0" inputmode="decimal"></div>
+      <div><button class="btn primary" style="width:100%" onclick="saveRate()">Save kg per feed</button></div>
+    </div>
+    <div class="muted" style="margin:6px 0 12px">Feeds before this date keep their old value.</div>
+    <div class="form">
+      <div><label for="sCap">Silo size (tonnes)</label><input type="number" id="sCap" step="0.5" min="1" inputmode="decimal"></div>
+      <div><button class="btn" style="width:100%" onclick="saveCap()">Save silo size</button></div>
+    </div>
   </div>
 
   <div class="card">
@@ -222,17 +254,6 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxU8lSrZKe6d36O4uBmJ
 const AM_AT = '08:00', PM_AT = '18:00';
 const DEFAULT_CAPACITY = 20;
 
-const HELP = {
-  delivery: 'Tonnes delivered into the silo.',
-  full:     'The silo was filled to the top. This sets the level to the silo size.',
-  level:    'You checked how much is in the silo. This sets the level to the tonnes you enter.',
-  rate:     'kg of PKE per feed, from this date on. Feeds before keep their old value.',
-  capacity: 'How many tonnes the silo holds when full.',
-  alert:    'An email is sent when the days left drop below this number, and again at 2 days. Each email once per fill. Checked every hour. Several people: put a comma between the addresses.'
-};
-const VAL_LABEL = { delivery:'Tonnes delivered', level:'Tonnes in the silo', rate:'kg per feed', capacity:'Silo size (tonnes)', alert:'Warn when days left is below' };
-
-let type = 'delivery';
 let data = { events: [], milkings: [] };
 
 const $ = id => document.getElementById(id);
@@ -248,20 +269,8 @@ function toast(m, bad){
   t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 3000);
 }
 
-document.querySelectorAll('#tabs .btn').forEach(b => b.onclick = () => {
-  type = b.dataset.t;
-  document.querySelectorAll('#tabs .btn').forEach(x => x.classList.toggle('on', x === b));
-  $('valBox').style.visibility = type === 'full' ? 'hidden' : 'visible';
-  $('valLab').textContent = VAL_LABEL[type] || '';
-  $('help').textContent = HELP[type];
-  $('noteLab').textContent = type === 'alert' ? 'Email addresses (comma between them)' : 'Note (optional)';
-  $('fNote').type = type === 'alert' ? 'email' : 'text';
-  $('fNote').multiple = type === 'alert';
-  $('fNote').maxLength = type === 'alert' ? 300 : 80;
-  if (type === 'alert' && !$('fVal').value) $('fVal').value = 5;
-});
-$('help').textContent = HELP.delivery;
-$('fWhen').value = isoLocal(new Date());
+function resetTimes(){ ['dWhen', 'cWhen', 'sWhen'].forEach(id => $(id).value = isoLocal(new Date())); }
+resetTimes();
 
 // ---------------------------------------------------------------------------
 async function load(){
@@ -279,22 +288,51 @@ async function load(){
   render();
 }
 
-async function save(){
-  if (!SCRIPT_URL) { toast('Not connected yet', true); return; }
-  const when = $('fWhen').value;
-  const value = parseFloat($('fVal').value);
+async function post(body){
+  if (!SCRIPT_URL) throw new Error('not connected yet');
+  const r = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'refused');
+  return j;
+}
+
+async function addEvent(type, when, value, note, clear){
   if (!when) { toast('Enter the date and time', true); return; }
   if (type !== 'full' && !(value > 0)) { toast('Enter a number above 0', true); return; }
-  if (type === 'alert' && $('fNote').value.indexOf('@') < 0) { toast('Enter an email address', true); return; }
   try {
-    const r = await fetch(SCRIPT_URL, { method:'POST',
-      body: JSON.stringify({ action:'add', type, when, value: type === 'full' ? null : value, note: $('fNote').value }) });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'refused');
+    await post({ action:'add', type, when, value: type === 'full' ? null : value, note: note || '' });
     toast('Saved');
-    $('fVal').value = ''; $('fNote').value = ''; $('fWhen').value = isoLocal(new Date());
+    (clear || []).forEach(id => $(id).value = '');
+    resetTimes();
     load();
   } catch (e) { toast('Not saved: ' + e.message, true); }
+}
+
+const saveDelivery = () => addEvent('delivery', $('dWhen').value, parseFloat($('dVal').value), $('dNote').value, ['dVal', 'dNote']);
+const saveLevel    = () => addEvent('level',    $('cWhen').value, parseFloat($('cVal').value), '', ['cVal']);
+const saveFull     = () => { if (confirm('Set the silo to full now?')) addEvent('full', $('cWhen').value, null, '', []); };
+const saveRate     = () => addEvent('rate',     $('sWhen').value, parseFloat($('sRate').value), '', ['sRate']);
+const saveCap      = () => addEvent('capacity', isoLocal(new Date()), parseFloat($('sCap').value), '', ['sCap']);
+
+async function saveAlert(){
+  const mails = $('aMail').value.split(',').map(x => x.trim()).filter(Boolean);
+  const days = parseFloat($('aDays').value);
+  if (!mails.length || mails.some(m => m.indexOf('@') < 1)) { toast('Check the email addresses', true); return; }
+  if (!(days > 0)) { toast('Enter the number of days', true); return; }
+  try {
+    // One row per address, so each person's alert can be removed on its own.
+    for (const m of mails) await post({ action:'add', type:'alert', when: isoLocal(new Date()), value: days, note: m });
+    toast('Alert added for ' + mails.length + (mails.length > 1 ? ' people' : ' person'));
+    $('aMail').value = '';
+    load();
+  } catch (e) { toast('Not saved: ' + e.message, true); }
+}
+
+async function sendSample(){
+  try {
+    const j = await post({ action:'testmail' });
+    toast('Sample sent to ' + j.to);
+  } catch (e) { toast('Not sent: ' + e.message, true); }
 }
 
 async function del(id){
@@ -393,13 +431,27 @@ function render(){
   else if (daysLeft != null && daysLeft < 7) { st = '<b>Order soon:</b> about ' + fmtT(daysLeft) + ' days left.'; col = 'var(--warn)'; }
   else                            { st = '<b>OK.</b>' + (daysLeft != null ? ' About ' + Math.round(daysLeft) + ' days left.' : ''); col = 'var(--ok)'; }
   if (c.noRate) st += ' (' + c.noRate + ' feeds have no kg per feed and are not counted.)';
-  const al = c.ev.filter(e => e.type === 'alert').pop();
-  st += '<br><span class="muted">Email alert: ' + (al ? 'below ' + al.value + ' days, to ' + al.note.replace(/</g, '&lt;')
-        : 'below 5 days, to the sheet owner (change it in "Email alert")') + '</span>';
+
   $('status').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + st + '</span>';
   $('lvl').setAttribute('fill', 'url(#gFill-' + (col === 'var(--bad)' ? 'bad' : col === 'var(--warn)' ? 'warn' : 'ok') + ')');
 
   $('srcNote').textContent = 'One feed = one mineral discharge, from the dispenser count.';
+
+  // Email alerts box: each person with their warning days.
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const rules = {};
+  c.ev.filter(e => e.type === 'alert').forEach(e => String(e.note).split(',').map(x => x.trim()).filter(Boolean)
+    .forEach(m => (rules[m.toLowerCase()] = rules[m.toLowerCase()] || []).push({ id: e.id, days: e.value })));
+  const people = Object.keys(rules).sort();
+  $('alertNow').innerHTML = people.length
+    ? people.map(m => '<div style="padding:6px 0; border-bottom:1px solid var(--line)">&#9993; ' + esc(m) + '<div style="margin-top:4px">' +
+        rules[m].sort((a, b) => b.days - a.days).map(r => '<span style="display:inline-block; border:1px solid var(--line); border-radius:20px; padding:2px 4px 2px 9px; margin:2px 4px 2px 0">' +
+          r.days + ' days <button class="btn small" style="padding:0 6px; margin-left:4px" title="Remove this alert" onclick="del(\'' + r.id + '\')">&times;</button></span>').join('') +
+        '</div></div>').join('')
+    : '<div>&#9993; the sheet owner, at <b>5 days</b> and <b>2 days</b> <span class="muted">(no alerts added yet)</span></div>';
+  if (document.activeElement !== $('aDays') && !$('aDays').value) $('aDays').value = 5;
+  if (document.activeElement !== $('sCap') && !$('sCap').value) $('sCap').placeholder = c.cap;
+  if (document.activeElement !== $('sRate') && !$('sRate').value && c.rateNow != null) $('sRate').placeholder = c.rateNow;
 
   renderBars(c);
   renderTable(c);
