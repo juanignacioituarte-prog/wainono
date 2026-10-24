@@ -1,5 +1,5 @@
 {
- "version": "2026-10-25 10:53 3f8e8f",
+ "version": "2026-10-25 10:55 3f9ecb",
  "files": {
   "app.mpy": {
    "size": 11001,
@@ -22,8 +22,8 @@
    "sha256": "85d356f27768b9f437eb099df4b683ff9c038861b5e530bfd70494a771d1a436"
   },
   "shed.html.gz": {
-   "size": 72267,
-   "sha256": "90110cc74c8cce11f627c7413a2ad310c3aa4010c3ee3dcbdf409e56a9894520"
+   "size": 72287,
+   "sha256": "b14afbe477029480f815a4c7af0718ca88d64707508965f2c25aa771594d8586"
   }
  }
 }
