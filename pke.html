@@ -196,13 +196,12 @@
     <h2>PKE orders</h2>
     <div class="form">
       <div><label for="oWhen">Delivery date</label><input type="date" id="oWhen"></div>
-      <div><label for="oVal">Tonnes ordered</label><input type="number" id="oVal" step="0.01" min="0" inputmode="decimal"></div>
       <div><label for="oNote">Note (optional)</label><input type="text" id="oNote" maxlength="80"></div>
       <div><button class="btn primary" style="width:100%" onclick="saveOrder()">Save order</button></div>
     </div>
     <div id="orders" style="font-size:13px; margin-top:10px"></div>
     <div class="muted" style="margin-top:8px">While an order arrives before the silo runs out, no email alert is sent.
-      An order counts until the end of its delivery date. When the PKE comes, save it under Delivery.</div>
+      An order counts until the end of its delivery date. When the PKE comes, press "Silo is full now" under Silo check.</div>
   </div>
 
   <div class="card">
@@ -328,9 +327,10 @@ async function post(body){
 
 async function addEvent(type, when, value, note, clear){
   if (!when) { toast('Enter the date and time', true); return; }
-  if (type !== 'full' && !(value > 0)) { toast('Enter a number above 0', true); return; }
+  const noValue = type === 'full' || type === 'order';   // an order just fills the silo: no tonnes
+  if (!noValue && !(value > 0)) { toast('Enter a number above 0', true); return; }
   try {
-    await post({ action:'add', type, when, value: type === 'full' ? null : value, note: note || '' });
+    await post({ action:'add', type, when, value: noValue ? null : value, note: note || '' });
     toast('Saved');
     (clear || []).forEach(id => $(id).value = '');
     resetTimes();
@@ -340,7 +340,7 @@ async function addEvent(type, when, value, note, clear){
 
 const saveDelivery = () => addEvent('delivery', $('dWhen').value, parseFloat($('dVal').value), $('dNote').value, ['dVal', 'dNote']);
 const saveOrder    = () => { if (!$('oWhen').value) { toast('Enter the delivery date', true); return; }
-                              addEvent('order', $('oWhen').value + 'T00:00', parseFloat($('oVal').value), $('oNote').value, ['oWhen', 'oVal', 'oNote']); };
+                              addEvent('order', $('oWhen').value + 'T00:00', null, $('oNote').value, ['oWhen', 'oNote']); };
 const saveLevel    = () => addEvent('level',    $('cWhen').value, parseFloat($('cVal').value), '', ['cVal']);
 const saveFull     = () => { if (confirm('Set the silo to full now?')) addEvent('full', $('cWhen').value, null, '', []); };
 const saveRate     = () => addEvent('rate',     $('sWhen').value, parseFloat($('sRate').value), '', ['sRate']);
@@ -545,6 +545,8 @@ function renderDispenser(){
   const ago = m => m < 1 ? 'just now' : m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago';
   let txt, col;
   if (ageMin > 20)          { txt = '<b>No news from the sender</b> since ' + ago(ageMin) + '. The sender or the farm WiFi may be down.'; col = 'var(--warn)'; }
+  else if (st.senderOn === false || st.dispOn === false) {
+    txt = '<b>Turned OFF</b> on the ' + (st.senderOn === false ? 'sender' : 'dispenser') + ' page: feeds are counted, no mineral is dosed.'; col = 'var(--bad)'; }
   else if (st.jam || st.state === 'JAMMED') { txt = '<b>JAMMED.</b> Clear the auger, then press Clear jam on the dispenser page.'; col = 'var(--bad)'; }
   else if (!st.link)        { txt = '<b>Dispenser offline.</b> The sender has not heard it for ' + Math.round(st.heardAgo / 60) + ' min.'; col = 'var(--bad)'; }
   else                      { txt = '<b>OK</b> · ' + st.state; col = 'var(--ok)'; }
@@ -560,7 +562,8 @@ function renderDispenser(){
     t('Mineral doses', st.am + ' / ' + st.pm, 'AM / PM') +
     // Feed orders that did not become a dose (sender firmware from 24 Oct 2026).
     (st.noAnsAm == null ? '' : t('Orders not dosed', (st.noAnsAm + st.ignAm) + ' / ' + (st.noAnsPm + st.ignPm),
-      'no answer ' + st.noAnsAm + ' / ' + st.noAnsPm + ' · ignored ' + st.ignAm + ' / ' + st.ignPm)) +
+      'no answer ' + st.noAnsAm + ' / ' + st.noAnsPm + ' · ignored ' + st.ignAm + ' / ' + st.ignPm +
+      (st.offAm || st.offPm ? ' · sender off ' + (st.offAm || 0) + ' / ' + (st.offPm || 0) : ''))) +
     // Jams in the last milking only, counted from 24 Oct 2026 (Juani). Code.gs
     // works it out; an older Code.gs sends no jamsMilking.
     t('Jams', st.jamsMilking == null ? '—' : st.jamsMilking,
