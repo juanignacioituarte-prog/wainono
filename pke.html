@@ -234,7 +234,7 @@
 
   <div class="card">
     <h2>Days</h2>
-    <table><thead><tr><th>Date</th><th>AM feeds</th><th>PM feeds</th><th>kg/feed</th><th>Used (t)</th><th>Delivered (t)</th></tr></thead>
+    <table><thead><tr><th>Date</th><th>Feeds<br>AM / PM</th><th>Mineral<br>AM / PM</th><th>kg/feed</th><th>Used (t)</th><th>In (t)</th></tr></thead>
       <tbody id="dayRows"></tbody></table>
   </div>
 
@@ -374,8 +374,14 @@ function compute(){
 
   // Per day.
   const days = {};
-  const day = k => days[k] || (days[k] = { key:k, am:0, pm:0, used:0, rate:null, delivered:0 });
-  for (const m of mk) { const d = day(m.date); d[m.milking === 'pm' ? 'pm' : 'am'] += m.count; d.used += m.tonnes; if (m.rate != null) d.rate = m.rate; }
+  const day = k => days[k] || (days[k] = { key:k, am:0, pm:0, used:0, rate:null, delivered:0, dosesAm:0, dosesPm:0, noFeeds:false });
+  for (const m of mk) {
+    const d = day(m.date), pm = m.milking === 'pm';
+    d[pm ? 'pm' : 'am'] += m.count;
+    d[pm ? 'dosesPm' : 'dosesAm'] += m.doses || 0;
+    if (m.feeds == null) d.noFeeds = true;
+    d.used += m.tonnes; if (m.rate != null) d.rate = m.rate;
+  }
   for (const e of ev) if (e.type === 'delivery') day(dayKey(new Date(e.t))).delivered += e.value;
 
   // Use per day: the last 7 whole days that have feeds (today is not finished).
@@ -435,7 +441,7 @@ function render(){
   $('status').innerHTML = '<span class="dot" style="background:' + col + '"></span><span>' + st + '</span>';
   $('lvl').setAttribute('fill', 'url(#gFill-' + (col === 'var(--bad)' ? 'bad' : col === 'var(--warn)' ? 'warn' : 'ok') + ')');
 
-  $('srcNote').textContent = 'One feed = one mineral discharge, from the dispenser count.';
+  $('srcNote').textContent = 'A feed = a feed order the sender sent to the dispenser. Days marked * have no feed count yet; the mineral doses are used for them.';
 
   // Email alerts box: each person with their warning days.
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -508,7 +514,9 @@ function renderBars(c){
 function renderTable(c){
   const rows = Object.values(c.days).sort((a, b) => a.key < b.key ? 1 : -1).slice(0, 30);
   $('dayRows').innerHTML = rows.length ? rows.map(d =>
-    '<tr><td>' + niceDate(new Date(d.key + 'T12:00')) + '</td><td>' + (d.am || '') + '</td><td>' + (d.pm || '') +
+    '<tr><td>' + niceDate(new Date(d.key + 'T12:00')) + '</td><td>' +
+      (d.noFeeds ? '<span class="muted" title="No feed count yet on this day: the mineral doses are used">' + d.am + ' / ' + d.pm + '*</span>' : d.am + ' / ' + d.pm) +
+    '</td><td>' + d.dosesAm + ' / ' + d.dosesPm +
     '</td><td>' + (d.rate != null ? d.rate : '—') + '</td><td>' + fmtT(d.used) + '</td><td>' + (d.delivered ? fmtT(d.delivered) : '') + '</td></tr>'
   ).join('') : '<tr><td colspan="6" class="muted">No feeds yet</td></tr>';
 }
