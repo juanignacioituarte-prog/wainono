@@ -260,6 +260,9 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxU8lSrZKe6d36O4uBmJ
 // delivery, "silo full") before this time come before that milking's feeds.
 const AM_AT = '08:00', PM_AT = '18:00';
 const DEFAULT_CAPACITY = 20;
+// Feeds before this day are left out (tests, and days before the sender
+// counted feeds). Juani, 24 Oct 2026. Keep in step with DATA_FROM in Code.gs.
+const DATA_FROM = '2026-10-24';
 
 let data = { events: [], milkings: [] };
 
@@ -364,7 +367,7 @@ function compute(){
   // The value at that time. Feeds older than the first entry use the first one.
   const rateAt = t => { let r = rates.length ? rates[0].value : null; for (const e of rates) if (e.t <= t) r = e.value; return r; };
 
-  const mk = (data.milkings || []).map(m => {
+  const mk = (data.milkings || []).filter(m => m.date >= DATA_FROM).map(m => {
     const t = new Date(m.date + 'T' + (m.milking === 'pm' ? PM_AT : AM_AT)).getTime();
     const rate = rateAt(t);
     return Object.assign({}, m, { t, rate, tonnes: rate == null ? 0 : m.count * rate / 1000 });
