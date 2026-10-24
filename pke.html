@@ -500,7 +500,8 @@ function renderDispenser(){
     t('Mineral doses', st.am + ' / ' + st.pm, 'AM / PM') +
     t('Jams', st.lifetimeJams, 'lifetime, with retries') +
     t('Last report', ago(ageMin), 'from the sender');
-  $('dispNote').textContent = 'Dispenser running for ' + Math.round(st.dispUptime / 3600) + ' h · sender WiFi ' + st.rssi + ' dBm.';
+  $('dispNote').textContent = 'Dispenser running for ' + Math.round(st.dispUptime / 3600) + ' h · sender WiFi ' + st.rssi + ' dBm' +
+    (st.senderReset ? ' · sender running for ' + Math.round(st.senderUptime / 3600) + ' h, last restart: ' + st.senderReset : '') + '.';
 }
 
 // Daily use, last 21 days. One series, one hue; hover/tap for the numbers.
