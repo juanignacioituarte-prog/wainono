@@ -558,6 +558,9 @@ function renderDispenser(){
   $('dispTiles').innerHTML =
     t('Feeds today', fa + ' / ' + fp, 'AM / PM') +
     t('Mineral doses', st.am + ' / ' + st.pm, 'AM / PM') +
+    // Feed orders that did not become a dose (sender firmware from 24 Oct 2026).
+    (st.noAnsAm == null ? '' : t('Orders not dosed', (st.noAnsAm + st.ignAm) + ' / ' + (st.noAnsPm + st.ignPm),
+      'no answer ' + st.noAnsAm + ' / ' + st.noAnsPm + ' · ignored ' + st.ignAm + ' / ' + st.ignPm)) +
     // Jams in the last milking only, counted from 24 Oct 2026 (Juani). Code.gs
     // works it out; an older Code.gs sends no jamsMilking.
     t('Jams', st.jamsMilking == null ? '—' : st.jamsMilking,
