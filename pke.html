@@ -368,6 +368,9 @@ function compute(){
   const rateAt = t => { let r = rates.length ? rates[0].value : null; for (const e of rates) if (e.t <= t) r = e.value; return r; };
 
   const mk = (data.milkings || []).filter(m => m.date >= DATA_FROM).map(m => {
+    // Every dose comes from a feed order, so feeds >= doses: take the higher one
+    // (same rule as Code.gs). Covers days when the feed count started late.
+    m = Object.assign({}, m, { count: Math.max(m.feeds || 0, m.doses || 0, m.feeds == null && m.doses == null ? m.count : 0) });
     const t = new Date(m.date + 'T' + (m.milking === 'pm' ? PM_AT : AM_AT)).getTime();
     const rate = rateAt(t);
     return Object.assign({}, m, { t, rate, tonnes: rate == null ? 0 : m.count * rate / 1000 });
@@ -390,7 +393,7 @@ function compute(){
     const d = day(m.date), pm = m.milking === 'pm';
     d[pm ? 'pm' : 'am'] += m.count;
     d[pm ? 'dosesPm' : 'dosesAm'] += m.doses || 0;
-    if (m.feeds == null) d.noFeeds = true;
+    if (m.feeds == null || m.feeds < (m.doses || 0)) d.noFeeds = true;   // doses stood in
     d.used += m.tonnes; if (m.rate != null) d.rate = m.rate;
   }
   for (const e of ev) if (e.type === 'delivery') day(dayKey(new Date(e.t))).delivered += e.value;
