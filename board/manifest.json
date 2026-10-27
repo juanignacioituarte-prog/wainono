@@ -1,9 +1,9 @@
 {
- "version": "2026-10-27 18:53 e2fc76",
+ "version": "2026-10-27 19:02 80c39d",
  "files": {
   "app.mpy": {
-   "size": 14834,
-   "sha256": "742183bc31e1308ecacbe39a880b50646bfd4a11ad69e48265ebd27ee1b8c4cd"
+   "size": 17274,
+   "sha256": "d5c67822282becac42040359f6b5630c09e15802c4610adff7b0488a61966d1e"
   },
   "net.mpy": {
    "size": 2338,
@@ -22,8 +22,8 @@
    "sha256": "a72589c78356da7d570d302ecafcd08383754abb78efb3e54971b3682d822068"
   },
   "shed.html.gz": {
-   "size": 79129,
-   "sha256": "1e97cb0cca915d48810733dd29552fc0a34c2049bb3580e0b89131167d2bd1f4"
+   "size": 79187,
+   "sha256": "45713318512038f6667f7c4debf955a45de332c9106a48583d73c9b635e00ab1"
   }
  }
 }
