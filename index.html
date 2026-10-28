@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.94</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.95</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1740,7 +1740,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.94</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.95</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3342,7 +3342,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.94) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.95) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -5211,7 +5211,7 @@
             });
             (typeof OUT_PARTS !== 'undefined' ? OUT_PARTS : []).forEach(pt => {
                 if (isSilage(pt.status) && !(pt.paddock && excludedPaddocks.get(normName(pt.paddock))))
-                    rows.push({ name: pt.paddock || '?', ha: Number(pt.areaHa) || 0, part: true });
+                    rows.push({ name: pt.paddock || '?', ha: Number(paddockAreaFor(pt.paddock)) || 0, part: true });   // the paddock's area (Juani)
             });
             if (!rows.length) { box.innerHTML = '<div style="font-size:12px; color:#7f8c8d;">No paddocks locked for silage.</div>'; return; }
             const today = new Date();
@@ -5231,10 +5231,10 @@
             box.innerHTML = `<div style="font-size:13px; font-weight:bold; color:#2c3e50; border-bottom:2px solid ${col}; padding-bottom:3px; margin-bottom:6px;">Paddocks locked for silage</div>
                 <div style="font-size:12px; margin-bottom:6px;"><b>${rows.length}</b> paddock${rows.length === 1 ? '' : 's'} · <b>${ha.toFixed(1)}</b> ha${avg != null ? ` · average <b>${avg}</b> kgDM/ha <i style="color:#7f8c8d;">estimated</i>` : ''}</div>
                 <table style="width:100%; font-size:12px; border-collapse:collapse; background:#fff; border:1px solid #ddd; border-radius:6px;">
-                    <tr style="color:#7f8c8d; font-size:10px;"><td style="padding:4px 6px;">Paddock</td><td style="text-align:right;">ha</td><td>Last grazing</td><td style="text-align:right;">Days</td><td style="text-align:right; padding-right:6px;">Est. cover</td></tr>
+                    <tr style="color:#7f8c8d; font-size:10px;"><td style="padding:4px 6px;">Paddock</td><td style="text-align:right; padding-right:8px;">Area (ha)</td><td>Last grazing</td><td style="text-align:right;">Days</td><td style="text-align:right; padding-right:6px;">Est. cover</td></tr>
                     ${rows.map(r => `<tr style="border-top:1px solid #eee; cursor:pointer;" onclick="if (paddockMap['${escUnit(r.name).replace(/&#39;/g, '')}']) map.fitBounds(paddockMap['${escUnit(r.name).replace(/&#39;/g, '')}'].getBounds(), { padding: [60, 60], maxZoom: 17 })">
                         <td style="padding:4px 6px;"><b>${escUnit(r.name)}</b>${r.part ? ' <span style="font-size:10px; color:#7f8c8d;">(part)</span>' : ''}</td>
-                        <td style="text-align:right;">${r.ha.toFixed(1)}</td>
+                        <td style="text-align:right; padding-right:8px;">${r.ha.toFixed(1)}</td>
                         <td>${r.last ? fmtNZ(r.last) : '<span style="color:#7f8c8d;">--</span>'}</td>
                         <td style="text-align:right;">${r.days != null ? r.days : '--'}</td>
                         <td style="text-align:right; padding-right:6px; font-weight:bold; color:#2980b9;">${r.cover != null ? '&asymp; ' + r.cover : '--'}</td></tr>`).join('')}
