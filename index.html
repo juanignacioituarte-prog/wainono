@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.97</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.98</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1740,7 +1740,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.97</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.98</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -3342,7 +3342,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.97) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.98) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -4286,6 +4286,17 @@
             const info = outStatusInfo(st);
             return !/silage/i.test(String(st) + ' ' + (info && info.label || ''));
         }
+        /* The days this paddock was cut for silage: a farmwalk cover saved with
+         * the reason "mown" when the paddock came back into the rotation. */
+        function fertCutDates(name) {
+            const p = (typeof manualModeData !== 'undefined' ? manualModeData : []).find(x => normName(x.name) === normName(name));
+            if (!p || !Array.isArray(p.entries)) return [];
+            return p.entries
+                .filter(e => e && e.dateObj && /^(mown|cut)/i.test(String(e.reason || '')) && Number(e.cover) > 0)
+                .map(e => e.dateObj)
+                .sort((a, b) => a - b);
+        }
+
         function fertAll() {
             if (fertCache && Date.now() - fertCacheAt < 3000) return fertCache;
             const names = {}; Object.keys(paddockMap || {}).forEach(n => { if (!fertOutNotSilage(n)) names[normName(n)] = n; });
@@ -4308,7 +4319,7 @@
             Object.keys(names).forEach(k => {
                 const list = (by[k] || []).sort((a, b) => a.t - b.t);
                 const area = Number(paddockAreaFor(names[k])) || 0;
-                const starts = [], ends = [], pcts = [];
+                const starts = [], ends = [], pcts = [], isCut = [];
                 let cur = null;
                 const full = c => !(area > 0) || c.ha >= FERT_COVER * area;
                 const finished = c => !(area > 0) || c.ha >= FERT_DONE_COVER * area;
@@ -4326,9 +4337,18 @@
                 });
                 // The last round: counts at 80%, or at 60% once 10 days pass with no break.
                 if (cur && (full(cur) || (Date.now() - cur.last > FERT_GAP_DAYS * GR_DAY && finished(cur)))) { starts.push(cur.start); ends.push(cur.last); pcts.push(area > 0 ? cur.ha / area : 1); cur = null; }
-                const keep = starts.map((t, i) => i).filter(i => starts[i].getTime() >= since);
+
+                /* A silage cut is a round too (Juani, 1 Nov 2026). The whole
+                 * paddock was taken off, so for fert it is a grazing. It comes
+                 * from the farmwalk: the residual typed when the paddock came
+                 * back, saved with the reason "mown". Only fert counts it -
+                 * the weekly area report stays grazing only. */
+                fertCutDates(names[k]).forEach(t => { starts.push(t); ends.push(t); pcts.push(1); isCut.push(starts.length - 1); });
+                const order = starts.map((t, i) => i).sort((a, b) => starts[a] - starts[b]);
+                const cutAt = new Set(isCut);
+                const keep = order.filter(i => starts[i].getTime() >= since);
                 const dates = keep.map(i => fertNzDay(starts[i]));
-                out[k] = { name: names[k], dates, ends: keep.map(i => fertNzDay(ends[i])), pcts: keep.map(i => pcts[i]), ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
+                out[k] = { name: names[k], dates, ends: keep.map(i => fertNzDay(ends[i])), pcts: keep.map(i => pcts[i]), cuts: keep.map(i => cutAt.has(i)), ordered: dates.map(d => !!done[fertKey(names[k], grIso(d))]),
                            current: cur && area > 0 && Date.now() - cur.last <= FERT_DROP_DAYS * GR_DAY ? Math.round(cur.ha / area * 100) : null,
                            // Being grazed now (Juani: fert often comes a few days
                            // after): a round not counted yet with a break in the last
@@ -4398,7 +4418,7 @@
                 const late = !f.ordered[r - 1] && !draft && fertTooLate(f.name, r);
                 // A round already counted (80%) whose last break is recent: cows still there.
                 const grazingNow = fertCowsOn(f, r);
-                return { f, date: f.dates[r - 1], ordered: f.ordered[r - 1], draft, late: late && !grazingNow, grazing: grazingNow, pct: grazingNow && f.pcts ? Math.round(f.pcts[r - 1] * 100) : null, orderedOn: fertOrderedOn(t), spread: t.spread || '',
+                return { f, date: f.dates[r - 1], cut: !!(f.cuts && f.cuts[r - 1]), ordered: f.ordered[r - 1], draft, late: late && !grazingNow, grazing: grazingNow, pct: grazingNow && f.pcts ? Math.round(f.pcts[r - 1] * 100) : null, orderedOn: fertOrderedOn(t), spread: t.spread || '',
                          asap: !grazingNow && !f.ordered[r - 1] && !late && !!ns && ns.state === 'asap' && ns.round === r }; })
                 // Being grazed now, as this round (teal).
                 .concat(all.filter(f => f.grazing && f.dates.length + 1 === r).map(f => {
@@ -4429,7 +4449,7 @@
                     return `<label id="${id}" style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #ddd; border-left:5px solid ${x.ordered ? '#27ae60' : x.draft ? FERT_DRAFT_COLOR : x.late ? FERT_LATE_COLOR : x.asap ? FERT_ASAP_COLOR : '#e67e22'}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
                         <input type="checkbox" ${x.ordered || x.draft ? 'checked' : ''} onchange="fertToggleRow(${i}, this.checked)" style="width:20px; height:20px;">
                         <b style="font-size:13px; min-width:44px;" onclick="event.preventDefault(); fertGoTo(FERT_ROWS[${i}].name)">${escUnit(x.f.name)}</b>
-                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">${x.grazing ? `<span style="font-weight:bold; color:#2c3e50;">${FERT_COW_SVG(16)} being grazed${x.pct != null ? ' · ' + x.pct + '% done' : ''}</span> · from` : 'grazed'} ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : x.draft ? `<br><span style="color:${FERT_DRAFT_COLOR}; font-weight:bold;">in the order list (not sent)</span>` : x.grazing ? fertSpreadText(x.f.name) : x.late ? `<br><span style="color:${FERT_LATE_COLOR}; font-weight:bold;">too close to next grazing · grazed ${fertDaysAfter(x.f.name, r)} d ago</span>` : fertRuleText(x.f.name)}</span>
+                        <span style="font-size:11px; color:#7f8c8d; flex:1; min-width:0;">${x.grazing ? `<span style="font-weight:bold; color:#2c3e50;">${FERT_COW_SVG(16)} being grazed${x.pct != null ? ' · ' + x.pct + '% done' : ''}</span> · from` : (x.cut ? '<span style="color:#8e44ad; font-weight:bold;">✂ cut</span>' : 'grazed')} ${fmtNZ(x.date)} · ${fmtHa(Number(paddockAreaFor(x.f.name)) || 0)} ha${x.ordered && x.orderedOn ? `<br><span style="color:#27ae60;">ordered ${fmtNZ(grPartialDate(x.orderedOn))}</span>` : x.draft ? `<br><span style="color:${FERT_DRAFT_COLOR}; font-weight:bold;">in the order list (not sent)</span>` : x.grazing ? fertSpreadText(x.f.name) : x.late ? `<br><span style="color:${FERT_LATE_COLOR}; font-weight:bold;">too close to next grazing · grazed ${fertDaysAfter(x.f.name, r)} d ago</span>` : fertRuleText(x.f.name)}</span>
                         ${x.ordered ? `<span style="display:flex; flex-direction:column; align-items:flex-end; font-size:9px; color:#7f8c8d;">spread${dmyDateBox(x.spread, `fertSetSpread(${i}, this.value)`, { color: x.spread ? '#27ae60' : '#e67e22', empty: 'pick date', small: true })}</span>` : ''}</label>`;
                 }).join('');
         }
@@ -10209,13 +10229,33 @@
             }
         }
 
-        function savePaddockReturn(pName) {
+        /* Back into the rotation.
+         *
+         * A paddock that was cut takes a mowing date and the residual left
+         * behind. The cut is written as that day's cover with the reason
+         * "mown", and Fert counts it as a grazing: the paddock was defoliated,
+         * so it is due its fert like any other round. Nothing else counts it -
+         * the weekly area report and the round length are grazing only.
+         *
+         * A paddock that comes back without being cut is just a cover on the
+         * day it is typed. It is not a grazing. */
+        function savePaddockReturn(pName, wasCut) {
             const inp = document.getElementById(`inp-return-cover-${pName}`);
             let val = parseFloat(inp ? inp.value : '1500');
             if (!isNaN(val) && val <= 0) return alert('A cover cannot be 0. Type the cover the paddock has now.');
             if (isNaN(val)) val = 1500;
-            savePaddockCover(pName, val, '');
+
+            let mowDate = null;
+            if (wasCut) {
+                const dEl = document.getElementById(`inp-mow-date-${pName}`);
+                mowDate = (dEl && dEl.value) || toDateInputValue(new Date());
+                if (new Date(mowDate + 'T12:00:00').getTime() > Date.now()) {
+                    return alert('The mowing date cannot be in the future.');
+                }
+            }
+            savePaddockCover(pName, val, wasCut ? 'mown' : '', mowDate);
             if (outTabHas(pName)) changeOutTab(rows => rows.filter(r => normName(r.paddock) !== normName(pName)));
+            if (typeof fertCache !== 'undefined') fertCache = null;   // the cut is a new round
         }
 
         // "Take out of rotation" in the farmwalk. It goes on the out tab, the
@@ -10230,8 +10270,8 @@
             });
         }
 
-        async function savePaddockCover(pName, coverOverride, reasonOverride) {
-            const dateVal = document.getElementById('farmwalk-entry-date')?.value || toDateInputValue(new Date());
+        async function savePaddockCover(pName, coverOverride, reasonOverride, dateOverride) {
+            const dateVal = dateOverride || document.getElementById('farmwalk-entry-date')?.value || toDateInputValue(new Date());
             let coverVal = (coverOverride !== undefined) ? coverOverride : parseFloat(document.getElementById(`inp-cover-${pName}`)?.value);
             // A cover of 0 is never saved; out of rotation is the out tab.
             if (isNaN(coverVal) || coverVal <= 0) return;
@@ -10245,27 +10285,29 @@
                 manualModeData.push(item);
             }
 
-            if (item.latest && item.latest.ts && dateObj.getTime() > item.latest.ts) {
-                item.previous = { cover: item.latest.cover, formattedDate: item.latest.formattedDate, ts: item.latest.ts };
-            }
-
             item.isOut = (coverVal === 0);
             item.neverWalked = false;
             if (reasonVal) item.reason = reasonVal;
 
-            item.latest = {
-                cover: coverVal,
-                formattedDate: fmtNZ(dateObj),
-                ts: dateObj.getTime()
-            };
-
+            /* Put the reading in the history by its date, then read the latest
+             * and the previous back off it.
+             *
+             * A mowing is often typed days after it happened. The old code made
+             * whatever was typed last the latest cover, so a cut backdated to
+             * last week pushed a newer walk out of the way. */
             if (!item.entries) item.entries = [];
-            if (item.entries.length > 0 && item.entries[0].dateObj && item.entries[0].dateObj.toDateString() === dateObj.toDateString()) {
-                item.entries[0].cover = coverVal;
-                item.entries[0].reason = item.reason || '';
+            const sameDay = item.entries.find(e => e.dateObj && e.dateObj.toDateString() === dateObj.toDateString());
+            if (sameDay) {
+                sameDay.cover = coverVal;
+                sameDay.reason = reasonVal || sameDay.reason || '';
             } else {
-                item.entries.unshift({ dateObj: dateObj, cover: coverVal, reason: item.reason || '' });
+                item.entries.push({ dateObj: dateObj, cover: coverVal, reason: reasonVal || '' });
             }
+            item.entries.sort((a, b) => (b.dateObj ? b.dateObj.getTime() : 0) - (a.dateObj ? a.dateObj.getTime() : 0));
+
+            const newest = item.entries[0], prior = item.entries[1];
+            item.latest = { cover: newest.cover, formattedDate: fmtNZ(newest.dateObj), ts: newest.dateObj.getTime() };
+            item.previous = prior ? { cover: prior.cover, formattedDate: fmtNZ(prior.dateObj), ts: prior.dateObj.getTime() } : null;
 
             item.growthRate = coverGrowthRate(item.latest.cover, item.previous ? item.previous.cover : null,
                 item.latest.ts, item.previous ? item.previous.ts : null, item.isOut);
@@ -12377,11 +12419,23 @@
                             </div>
                         `;
                     } else {
+                        // Out for silage: it may have been cut, which counts as
+                        // a grazing for fert. Out for any other reason does not.
+                        const outStatus = (typeof excludedPaddocks !== 'undefined' && excludedPaddocks.get(normName(p.name))) || p.reason || '';
+                        const wasSilage = /silage/i.test(String(outStatus) + ' ' + (outStatusInfo(outStatus).label || ''));
                         entryControlsHtml = `
                             <div class="farmwalk-card-controls" style="margin-top:10px; padding-top:8px; border-top:1px dashed #ddd; display:flex; flex-direction:column; gap:8px;" onclick="event.stopPropagation();">
                                 <button onclick="toggleBringBackMenu('${p.name}')" style="background:#2980b9; color:white; border:none; padding:6px 10px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer; width:100%;">Bring back to rotation ▾</button>
-                                <div id="in-menu-${p.name}" style="display:none; gap:6px; margin-top:4px; align-items:center;">
-                                    <input type="number" id="inp-return-cover-${p.name}" placeholder="New cover kgDM" value="" style="flex:1; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:12px; font-weight:bold;" />
+                                <div id="in-menu-${p.name}" style="display:none; flex-direction:column; gap:6px; margin-top:4px;">
+                                    <input type="number" id="inp-return-cover-${p.name}" placeholder="${wasSilage ? 'Residual kgDM' : 'New cover kgDM'}" value="" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; font-weight:bold; box-sizing:border-box;" />
+                                    ${wasSilage ? `
+                                    <div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#7f8c8d;">
+                                        <span>Mown on</span>
+                                        <input type="date" id="inp-mow-date-${p.name}" value="${toDateInputValue(new Date())}" max="${toDateInputValue(new Date())}" style="flex:1; padding:5px; border:1px solid #ccc; border-radius:4px; font-size:12px;" />
+                                    </div>
+                                    <button onclick="savePaddockReturn('${p.name}', true)" style="background:#27ae60; color:#fff; border:none; padding:7px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">✂ CUT - counts as a grazing for fert</button>
+                                    <button onclick="savePaddockReturn('${p.name}', false)" style="background:#ecf0f1; color:#2c3e50; border:none; padding:7px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">Not cut - just back in</button>`
+                                    : `<button onclick="savePaddockReturn('${p.name}', false)" style="background:#2980b9; color:#fff; border:none; padding:7px; border-radius:5px; font-size:11px; font-weight:bold; cursor:pointer;">BACK IN ROTATION</button>`}
                                 </div>
                             </div>
                         `;
@@ -12550,7 +12604,7 @@
                     layer.setStyle({ fillColor: fill, fillOpacity: op, color: edge, opacity: 0.9, weight: w });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${escUnit(pName)}</div>` +
                         `<div style="font-size:11px;"><b>${f.n}</b> grazing${f.n === 1 ? '' : 's'} since ${fmtNZ(fertSinceDate())}</div>` +
-                        f.dates.map((d, i) => `<div style="font-size:10px; color:#555;">${i + 1}. ${fmtNZ(d)}${f.ordered[i] ? ' <b style="color:#27ae60;">✓ fert</b>' : ''}</div>`).join('') +
+                        f.dates.map((d, i) => `<div style="font-size:10px; color:#555;">${i + 1}. ${fmtNZ(d)}${f.cuts && f.cuts[i] ? ' <span style="color:#8e44ad; font-weight:bold;">✂ cut</span>' : ''}${f.ordered[i] ? ' <b style="color:#27ae60;">✓ fert</b>' : ''}</div>`).join('') +
                         (f.current != null ? `<div style="font-size:10px; color:#e67e22;">being grazed: ${f.current}% done (counts at ${Math.round(FERT_COVER * 100)}%)</div>` : '') + outLine);
                 } else if (currentDashboardMode === 'check') {
                     // CHECK: each paddock in its group colour; measured ones darker.
