@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.98</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.99</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1740,7 +1740,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.98</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.99</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1934,6 +1934,20 @@
                     <div style="font-size:11px; color:#666;">Draw the part on the map (tap the corners, then ✓ Finish), then pick the reason. The rest of the paddock stays in rotation.</div>
                     <button onclick="startOutPartDraw()" style="background:#e67e22; color:#fff; border:none; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">✏ DRAW A PART OUT</button>
                     <div id="out-parts-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+                </div>
+                <div style="background:#eafaf1; border:1px solid #abebc6; border-radius:6px; padding:8px 10px; margin-bottom:12px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:12px; font-weight:bold; color:#2c3e50;">Bring paddocks back</div>
+                    <div style="font-size:11px; color:#666;">Tick them in the list below, or tap them on the map. Paddocks that were cut for silage take a mowing date and the residual, and count as a grazing for fert.</div>
+                    <div id="out-back-picked" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
+                    <div id="out-back-cut" style="display:none; flex-direction:column; gap:6px;">
+                        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:11px; color:#666;">
+                            <span>Mown on</span>
+                            <input type="date" id="out-back-date" style="padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px;">
+                            <input type="number" id="out-back-residual" placeholder="Residual kgDM" style="flex:1; min-width:110px; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:12px; font-weight:bold;">
+                        </div>
+                        <button onclick="returnPickedPaddocks(true)" style="background:#27ae60; color:#fff; border:none; padding:9px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">✂ CUT - BACK IN, COUNTS AS A GRAZING FOR FERT</button>
+                    </div>
+                    <button id="out-back-plain" onclick="returnPickedPaddocks(false)" style="background:#2980b9; color:#fff; border:none; padding:9px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer;">↩ BACK IN ROTATION</button>
                 </div>
                 <div id="out-paddock-list" style="display:flex; flex-direction:column; gap:8px;"></div>
                 <div id="out-sync-status" style="margin-top:10px; font-size:11px; font-weight:bold; line-height:1.4;"></div>
@@ -3342,7 +3356,7 @@
         /* The correction from the LAST measurement (Juani, 13 Oct 2026): the
          * newest walk date (full or partial) with GR_CORR_MIN_N or more pairs
          * sets the factor. Pairs: not grazed between two real covers, AND (Juani,
-         * 13 Oct 2026, v1.1.98) grazed then measured, from the residual (the B
+         * 13 Oct 2026, v1.1.99) grazed then measured, from the residual (the B
          * paddocks; needed when there are no full walks). Factor = actual
          * growth / model growth on those pairs, weighted by days, kept within
          * GR_CORR_CLAMP. It stays until the next walk or partial walk gives a
@@ -7559,6 +7573,7 @@
         // The paddocks picked in "Take paddocks out" (normName -> name). One tap
         // on a reason takes them all out together.
         let outPicked = new Map();
+        let backPicked = new Map();   // paddocks picked to come back into rotation
         let outFocusName = '';  // a paddock already out, tapped on the map: its line is shown
 
         function outTabHas(name) {
@@ -7719,6 +7734,7 @@
                 .sort(byName);
 
             renderOutAddBox(rows);
+            renderOutBackBox(rows);
             renderOutReasonsBox(rows);
 
             if (rows.length === 0) {
@@ -7730,8 +7746,10 @@
                 const opts = OUT_STATUSES.map(s =>
                     `<option value="${s.value}" ${r.status === s.value ? 'selected' : ''}>${s.label}</option>`).join('');
                 const picked = outFocusName && normName(outFocusName) === normName(r.paddock);
+                const ticked = backPicked.has(normName(r.paddock));
                 return `
-                <div id="out-row-${escUnit(normName(r.paddock))}" style="background:${picked ? '#fef5e7' : '#fff'}; border:1px solid ${picked ? '#e67e22' : '#ddd'}; border-left:6px solid ${outStatusColor(r.status)}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <div id="out-row-${escUnit(normName(r.paddock))}" style="background:${ticked ? '#eafaf1' : picked ? '#fef5e7' : '#fff'}; border:1px solid ${ticked ? '#27ae60' : picked ? '#e67e22' : '#ddd'}; border-left:6px solid ${outStatusColor(r.status)}; border-radius:6px; padding:8px 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <input type="checkbox" ${ticked ? 'checked' : ''} onchange="pickBackPaddock('${escUnit(r.paddock)}')" title="Pick to bring back" style="width:18px; height:18px; cursor:pointer;">
                     <div style="font-weight:bold; font-size:12px; min-width:80px;">${escUnit(r.paddock)}
                         ${r.walk ? `<div style="font-weight:normal; font-size:10px; color:#7f8c8d;">cover 0 in the farmwalk of ${escUnit(r.walk)}. BACK IN changes that cover.</div>` : ''}</div>
                     <select onchange="setOutStatus('${escUnit(r.paddock)}', this.value)"
@@ -7786,10 +7804,8 @@
             if (!p) return;
             const isOut = outTabHas(p) || walkOutPaddocks().some(w => normName(w.name) === normName(p));
             if (isOut) {
-                // Already out: show its line in the list instead.
-                outFocusName = p;
-                renderOutManager();
-                updateGeoStyles();
+                // Already out: a tap picks it to come back, and shows its line.
+                pickBackPaddock(p);
                 const row = document.getElementById('out-row-' + escUnit(normName(p)));
                 if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
@@ -7803,6 +7819,108 @@
 
         function clearOutPicked() {
             outPicked.clear();
+            renderOutManager();
+            updateGeoStyles();
+        }
+
+        /* ---- bringing several paddocks back at once ----
+         * The mirror of "Take paddocks out". Tick the paddocks, or tap them on
+         * the map, then one button puts them all back. Paddocks out for silage
+         * can go back as a cut: the mowing date and the residual are written as
+         * that day's cover, which Fert counts as a grazing. */
+        function outIsSilage(status) {
+            const s = String(status || '');
+            return /silage/i.test(s + ' ' + (outStatusInfo(s).label || ''));
+        }
+
+        function pickBackPaddock(name) {
+            const p = String(name || '');
+            if (!p) return;
+            const key = normName(p);
+            if (backPicked.has(key)) backPicked.delete(key); else backPicked.set(key, p);
+            outFocusName = '';
+            renderOutManager();
+            updateGeoStyles();
+        }
+
+        function clearBackPicked() {
+            backPicked.clear();
+            renderOutManager();
+            updateGeoStyles();
+        }
+
+        // The picked paddocks, and whether every one of them was out for silage.
+        function renderOutBackBox(rows) {
+            const chips = document.getElementById('out-back-picked');
+            const cutBox = document.getElementById('out-back-cut');
+            const plainBtn = document.getElementById('out-back-plain');
+            if (!chips || !cutBox || !plainBtn) return;
+
+            // A paddock someone else already brought back drops off the pick.
+            const outNow = new Map(rows.map(r => [normName(r.paddock), r.status]));
+            [...backPicked.keys()].forEach(k => { if (!outNow.has(k)) backPicked.delete(k); });
+
+            const picked = [...backPicked.values()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            const n = picked.length;
+            const ha = picked.reduce((s, p) => s + (Number(paddockAreaFor(p)) || 0), 0);
+            const allSilage = n > 0 && picked.every(p => outIsSilage(outNow.get(normName(p))));
+
+            chips.innerHTML = (n
+                ? `<div style="flex-basis:100%; font-size:12px; font-weight:bold; color:#2c3e50;">${n} paddock${n === 1 ? '' : 's'} picked &middot; ${(Math.round(ha * 10) / 10).toFixed(1)} ha</div>`
+                : `<div style="flex-basis:100%; font-size:11px; color:#7f8c8d;">No paddocks picked yet.</div>`) +
+                picked.map(p => `<span style="display:inline-flex; align-items:center; gap:4px; background:#27ae60; color:#fff; border-radius:12px; padding:3px 4px 3px 9px; font-size:11px; font-weight:bold;">${escUnit(p)}
+                    <b onclick="pickBackPaddock('${escUnit(p)}')" style="cursor:pointer; padding:0 5px;">×</b></span>`).join('') +
+                (n > 1 ? `<span onclick="clearBackPicked()" style="cursor:pointer; border:1px solid #95a5a6; color:#7f8c8d; border-radius:12px; padding:3px 9px; font-size:11px; font-weight:bold;">CLEAR</span>` : '');
+
+            // The cut only shows when every picked paddock was out for silage.
+            // A mixed pick would write a mowing on a paddock that was never cut.
+            cutBox.style.display = allSilage ? 'flex' : 'none';
+            const dEl = document.getElementById('out-back-date');
+            if (dEl && !dEl.value) { dEl.value = toDateInputValue(new Date()); dEl.max = toDateInputValue(new Date()); }
+            plainBtn.style.opacity = n ? 1 : 0.5;
+            plainBtn.textContent = n > 1 ? `↩ BACK IN ROTATION (${n})` : '↩ BACK IN ROTATION';
+        }
+
+        async function returnPickedPaddocks(wasCut) {
+            const names = [...backPicked.values()];
+            if (names.length === 0) return alert('Tick a paddock first: in the list, or tap it on the map.');
+            if (!requireUnitAdmin()) return;
+
+            /* A paddock whose last farmwalk says 0 is held out by that cover,
+             * not by the out tab. Taking it off the tab would not bring it
+             * back, so it needs a cover typed. A cut writes one anyway; a
+             * plain return does not, so those are left for their own line. */
+            const zeroWalk = !wasCut ? names.filter(n =>
+                hasZeroLatestCover((manualModeData || []).find(d => normName(d.name) === normName(n)))) : [];
+            if (zeroWalk.length) {
+                alert(`${zeroWalk.join(', ')} ${zeroWalk.length === 1 ? 'shows a cover' : 'show covers'} of 0 in the last farmwalk.\n\n` +
+                      `Use ↩ BACK IN on ${zeroWalk.length === 1 ? 'its' : 'their'} own line and type the cover.`);
+                if (zeroWalk.length === names.length) return;
+            }
+            const todo = names.filter(n => !zeroWalk.some(z => normName(z) === normName(n)));
+
+            let residual = null, mowDate = null;
+            if (wasCut) {
+                residual = parseFloat(document.getElementById('out-back-residual')?.value);
+                if (!(residual > 0)) return alert('Type the residual left after the cut.');
+                mowDate = document.getElementById('out-back-date')?.value || toDateInputValue(new Date());
+                if (new Date(mowDate + 'T12:00:00').getTime() > Date.now()) return alert('The mowing date cannot be in the future.');
+                if (!confirm(`${todo.length} paddock${todo.length === 1 ? '' : 's'} back in rotation, cut on ${fmtNZ(new Date(mowDate + 'T12:00:00'))} with ${residual} kgDM left.\n\n${todo.join(', ')}\n\nEach one counts as a grazing for fert.`)) return;
+            } else {
+                if (!confirm(`Put ${todo.length} paddock${todo.length === 1 ? '' : 's'} back into rotation?\n\n${todo.join(', ')}\n\nThis does not count as a grazing.`)) return;
+            }
+
+            backPicked.clear();
+            // One save for the out tab, whatever the pick size.
+            changeOutTab(rows => rows.filter(r => !todo.some(n => normName(n) === normName(r.paddock))));
+
+            if (wasCut) {
+                for (const name of todo) await savePaddockCover(name, residual, 'mown', mowDate);
+                fertCache = null;
+                setOutSyncStatus(`✓ ${todo.length} paddock${todo.length === 1 ? '' : 's'} back in, cut on ${fmtNZ(new Date(mowDate + 'T12:00:00'))}.`, '#27ae60');
+            }
+            const rEl = document.getElementById('out-back-residual');
+            if (rEl) rEl.value = '';
             renderOutManager();
             updateGeoStyles();
         }
@@ -12647,13 +12765,16 @@
                     const wp = walkOutPaddocks().find(w => normName(w.name) === normName(pName));
                     const status = tabStatus || (wp ? (wp.reason || 'OTHER') : '');
                     const picked = outPicked.has(normName(pName)) || (outFocusName && normName(outFocusName) === normName(pName));
+                    // Picked to come back: a green line around it, like the chip.
+                    const back = backPicked.has(normName(pName));
                     layer.setStyle({
                         fillColor: status ? outStatusColor(status) : (picked ? '#f1c40f' : '#95a5a6'),
                         fillOpacity: status ? 0.8 : (picked ? 0.7 : 0.2),
-                        color: 'white', opacity: 1, weight: picked ? 4 : 1
+                        color: back ? '#27ae60' : 'white', opacity: 1, weight: (picked || back) ? 4 : 1
                     });
                     layer.setTooltipContent(`<div style="font-weight:bold; font-size:12px;">${pName}</div>` +
-                        (status ? `<div style="font-size:11px; color:${outStatusColor(status)};">OUT: ${outStatusInfo(status).label}</div>` : ''));
+                        (status ? `<div style="font-size:11px; color:${outStatusColor(status)};">OUT: ${outStatusInfo(status).label}</div>` : '') +
+                        (back ? `<div style="font-size:11px; font-weight:bold; color:#27ae60;">picked to come back</div>` : ''));
                 } else if (currentDashboardMode === 'farm_config') {
                     // Unit editor: every paddock wears its unit's colour, grey if unassigned.
                     const owner = unitForPaddock(pName);
