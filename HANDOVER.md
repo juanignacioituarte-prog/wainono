@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.99**,
-service worker cache `wn-farm-v1.1.113`, Apps Script `2026-11-01-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.100**,
+service worker cache `wn-farm-v1.1.114`, Apps Script `2026-11-01-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -970,3 +970,7 @@ Added 12 October 2026:
   `loadFarmwalk` writes the reason only when there is a 4th column, so the
   reason was dropped and Fert never saw a cut. The script now adds the
   "reason" header when a cover comes with a reason.
+- PLAN pre-grazing target counted every herd (fixed 1 Nov 2026, v1.1.100):
+  the demand summed all herds but divided by the area of the unit shown, so
+  one unit showed a target near 5200 and a huge supplement. It now uses
+  `planScopedHerds()`, like the rest of the page.
