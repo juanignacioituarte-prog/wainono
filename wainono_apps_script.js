@@ -40,7 +40,7 @@
 
 // Bump this whenever the script changes. ?type=version says what is actually
 // deployed, so "did the paste take?" is a question with an answer.
-var SCRIPT_VERSION = "2026-10-23-a";
+var SCRIPT_VERSION = "2026-11-01-a";
 
 function jsonResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -1626,6 +1626,13 @@ function loadFarmwalk(payload) {
   if (!date) return errorResponse("Missing date");
 
   var lastCol = Math.max(3, sheet.getLastColumn());
+  // A reason (e.g. "mown" for a silage cut, which Fert counts as a round)
+  // needs a 4th column. The Farmwalks tab had only Date | paddock | cover, so
+  // every reason was dropped (1 Nov 2026): add the header when it is missing.
+  if (lastCol < 4 && payload.entries.some(function(e) { return e && e.reason; })) {
+    sheet.getRange(1, 4).setValue("reason");
+    lastCol = 4;
+  }
 
   /* mode 'merge' touches only the paddocks named in this message.
    *
