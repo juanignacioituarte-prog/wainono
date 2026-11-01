@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.97**,
-service worker cache `wn-farm-v1.1.111`, Apps Script `2026-10-23-a`.
+Written 2 October 2026, updated 12 October 2026. App version: **v1.1.99**,
+service worker cache `wn-farm-v1.1.113`, Apps Script `2026-10-23-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -50,7 +50,7 @@ commit as the code.
    and must stay out of git. Always stage files by name:
    `git add index.html sw.js`.
 3. **Bump the version on every release**: the `v1.1.xx` string in `index.html`
-   (it appears twice - use `sed -i "s/v1\.1\.97/v1.1.98/g"`) and `CACHE_NAME`
+   (it appears twice - use `sed -i "s/v1\.1\.99/v1.1.100/g"`) and `CACHE_NAME`
    in `sw.js`. Without the bump, phones keep the old file.
 4. **Never test against the live sheet.** `index.html` has a guard: on
    `file://` every POST to `script.google.com` is refused. For local testing,
@@ -580,8 +580,8 @@ it, tests a whole screen without touching the live sheet.
 
 ```bash
 cd "<repo>"
-sed -i "s/v1\.1\.97/v1.1.98/g" index.html      # both places
-sed -i "s/wn-farm-v1\.1\.111/wn-farm-v1.1.112/" sw.js
+sed -i "s/v1\.1\.99/v1.1.100/g" index.html      # both places
+sed -i "s/wn-farm-v1\.1\.113/wn-farm-v1.1.114/" sw.js
 # syntax check (above), then
 git add index.html sw.js                        # never -A
 git commit -m "..."
@@ -959,3 +959,9 @@ Added 12 October 2026:
 - Silage map: every paddock locked for silage is shown in the silage colour,
   the ticked ones strong with a white edge; a tap on one ticks / unticks it
   (v1.1.97, `silageLockedNames`). PRINT MAP still prints only the ticked.
+- (1 Nov 2026, another session, recorded here) v1.1.98: bringing a paddock
+  out for silage back to rotation asks for the mowing date and residual; the
+  cut is saved as that day's cover with reason "mown" and Fert counts it as
+  a round ("cut"); a backdated cover no longer replaces a newer one.
+  v1.1.99: Farm Configuration > Paddocks out has "Bring paddocks back" for
+  many at once (cut or not).
