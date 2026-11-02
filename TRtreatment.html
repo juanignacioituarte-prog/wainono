@@ -152,11 +152,16 @@
         .flag-old3T { width: auto; padding: 0 6px; background: #d6eaf8; color: #1f618d;
                       font-size: 11px; letter-spacing: 0; box-shadow: inset 0 0 0 1.5px #2980b9; }
         .flag-old3T.big { width: auto; font-size: 14px; }
+        /* lists loaded by hand (2026-11-02): whole words, so as wide as they need */
+        .flag-Sexed, .flag-Beef { width: auto; padding: 0 6px; font-size: 11px; letter-spacing: 0; }
+        .flag-Sexed { background: #8e44ad; }
+        .flag-Beef { background: #6e2c00; }
+        .flag-Sexed.big, .flag-Beef.big { width: auto; font-size: 14px; }
         .tcard .flag { box-shadow: 0 0 0 2px rgba(255, 255, 255, .55); }
         /* the history row lines its items up on the text baseline, which drops a
            box to the floor, so the marks centre themselves instead */
         .hrow .hd .flag { align-self: center; width: 23px; height: 23px; font-size: 12px; }
-        .hrow .hd .flag-old3T { width: auto; font-size: 10px; }
+        .hrow .hd .flag-old3T, .hrow .hd .flag-Sexed, .hrow .hd .flag-Beef { width: auto; font-size: 10px; }
 
         .pill {
             display: inline-block; padding: 2px 8px; border-radius: 10px;
@@ -1610,7 +1615,11 @@
         const FLAG_LOOK = {
             'Staph aureus': { code: 'S', cls: 'S', title: 'Staph aureus' },
             '3 Titter': { code: '3T', cls: '3T', title: 'Three teats' },
-            'Old 3 Titter': { code: 'old 3T', cls: 'old3T', title: 'Three teats, from before this season', unless: '3 Titter' }
+            'Old 3 Titter': { code: 'old 3T', cls: 'old3T', title: 'Three teats, from before this season', unless: '3 Titter' },
+            // Loaded by hand in Config, cleared when they are done with
+            // (Juani, 2026-11-02). No condition puts a cow on these.
+            'Sexed': { code: 'Sexed', cls: 'Sexed', title: 'Sexed' },
+            'Beef': { code: 'Beef', cls: 'Beef', title: 'Beef' }
         };
 
         /** Which lists this cow is on. Matched on her tag. */
@@ -2488,7 +2497,13 @@
             toast('Report saved: ' + listReport.name);
         }
 
-        function addCowsFromList(text, fileName) {
+        /**
+         * Match a list of cows - typed, pasted or from a file - against the cow
+         * list. Exact matches only. Used by the New tab and by the mark lists in
+         * Config. Returns the cows found and what could not be matched, ready for
+         * the report.
+         */
+        function matchCowList(text) {
             const digits = v => String(v || '').replace(/\D/g, '');
             const byEid = new Map(), byTag = new Map(), byBirth = new Map();
             state.cows.forEach(c => {
@@ -2562,9 +2577,12 @@
                 });
             } else {
                 // No header: every value with a digit in it, in rows, in a
-                // column, or one long row. Split again on any separator, in case
-                // one file mixes them. Dates and times are not cow numbers.
-                rows.forEach(r => r.forEach(f => f.split(/[,;\t]/).forEach(p => {
+                // column, or one long row. Split again on any separator and on
+                // spaces, in case one file mixes them - but an EID written with
+                // a space ("942 000048922827") stays one number. Dates and times
+                // are not cow numbers.
+                rows.forEach(r => r.forEach(f => f.replace(/(\d{3})\s+(\d{12})/g, '$1$2')
+                        .split(/[\s,;\t]+/).forEach(p => {
                     const v = p.trim();
                     if (!/\d/.test(v) || /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/.test(v) || /^\d{1,2}:\d{2}/.test(v)) return;
                     const cows = lookup(v);
@@ -2576,17 +2594,30 @@
                 })));
             }
 
-            // The report: everything that was NOT added, one per line, and a
-            // button to copy it so it can be sorted out in the cow list.
+            return { found, missing, unsure, reportHead, reportBody };
+        }
+
+        /**
+         * What could not be matched, in red, with a button to download it as a
+         * CSV so it can be sorted out in the cow list.
+         */
+        function matchProblems(m, fileName) {
+            const { missing, unsure, reportHead, reportBody } = m;
             listReport = { head: reportHead, body: reportBody,
-                name: 'not-matched-' + String(fileName).replace(/\.[^.]*$/, '') + '.csv' };
-            const problems = (missing.length ? `<div style="color:var(--red); margin-top:6px;">
+                name: 'not-matched-' + String(fileName || 'list').replace(/\.[^.]*$/, '') + '.csv' };
+            return (missing.length ? `<div style="color:var(--red); margin-top:6px;">
                     <b>${missing.length} not in the cow list, not added:</b><br>${missing.map(esc).join('<br>')}</div>` : '')
                 + (unsure.length ? `<div style="color:var(--red); margin-top:6px;">
                     <b>${unsure.length} point to two different cows, not added:</b><br>
                     ${unsure.map(esc).join('<br>')}<br>Add them by hand.</div>` : '')
                 + (reportBody.length ? `<button class="btn small grey" style="margin-top:6px;"
                     onclick="downloadListReport()">⬇ Download this report (CSV)</button>` : '');
+        }
+
+        function addCowsFromList(text, fileName) {
+            const m = matchCowList(text);
+            const found = m.found;
+            const problems = matchProblems(m, fileName);
 
             if (!found.length) {
                 $('list-result').innerHTML = `<div style="margin-top:8px; font-size:14px;">
@@ -3617,12 +3648,17 @@
                         <span class="muted" style="margin-left:auto;">${plural(on.length, 'cow')}</span>
                     </div>
                     <textarea id="${id}" style="min-height:70px; margin-top:8px;"
-                        placeholder="Cow numbers, one per line or separated by commas"></textarea>
-                    <div class="row" style="margin-top:6px;">
+                        placeholder="Tag numbers, birth IDs or EIDs - typed, pasted, or from a file"></textarea>
+                    <input type="file" id="${id}-file" accept=".csv,.txt,text/csv,text/plain"
+                           onchange="flagFileToBox(event,'${id}')" style="display:none;">
+                    <div class="row" style="margin-top:6px; flex-wrap:wrap;">
+                        <button class="btn small grey" onclick="$('${id}-file').click()">📄 From a file</button>
                         <button class="btn small grey" onclick="loadFlagList('${esc(name)}','${id}','merge')">Add these</button>
                         <button class="btn small grey" onclick="loadFlagList('${esc(name)}','${id}','replace')">Replace the list</button>
                         <button class="btn small grey" onclick="showFlagList('${esc(name)}')">Show list</button>
+                        <button class="btn small grey" onclick="clearFlagList('${esc(name)}')">Clear the list</button>
                     </div>
+                    <div id="${id}-result"></div>
                   </div>`;
             }).join('');
 
@@ -3918,28 +3954,69 @@
             toast('Recalculating…');
         }
 
-        /** Paste a list of cow numbers onto one of the lists. */
+        /** A file goes into the box first, so it can be checked before it is sent. */
+        function flagFileToBox(ev, boxId) {
+            const input = ev.target;
+            const file = input.files && input.files[0];
+            input.value = '';
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                $(boxId).value = String(e.target.result || '');
+                $(boxId).dataset.file = file.name;
+                toast(file.name + ' loaded - now tap Add these or Replace the list');
+            };
+            reader.readAsText(file);
+        }
+
+        /**
+         * Put the cows in the box on one of the lists. Tag numbers, birth IDs and
+         * EIDs, mixed, or a Tru-Test file (EID only) - matched exactly against the
+         * cow list, the same way as the New tab. A cow that is not in the cow list
+         * is NOT put on the list; it is named, with a CSV report to download.
+         */
         function loadFlagList(name, boxId, mode) {
             if (!isManager()) return;
             const raw = ($(boxId).value || '').trim();
-            if (!raw) { toast('Paste the cow numbers first'); return; }
+            if (!raw) { toast('Paste the cows or pick a file first'); return; }
+            if (!state.cows.length) { toast('The cow list is not loaded yet. Press Refresh.'); return; }
 
-            const cows = [...new Set(raw.split(/[\s,;]+/).map(s => s.trim()).filter(Boolean))];
-            if (!cows.length) { toast('No cow numbers found'); return; }
+            const m = matchCowList(raw);
+            // The lists go by tag number.
+            const cows = [...new Set(m.found.map(c => String(c.Tag || '').trim()).filter(Boolean))];
+            const noTag = m.found.filter(c => !String(c.Tag || '').trim()).length;
+            const out = $(boxId + '-result');
+            const problems = matchProblems(m, $(boxId).dataset.file || name);
+            const tagNote = noTag ? `<div style="color:var(--red); margin-top:6px;">
+                <b>${plural(noTag, 'cow')} with no tag number, not added.</b></div>` : '';
 
-            // Say which ones are not in the herd list, rather than swallowing them.
-            const known = new Set(state.cows.map(c => String(c.Tag).trim()));
-            const strangers = cows.filter(c => !known.has(c));
+            if (!cows.length) {
+                out.innerHTML = `<div style="margin-top:8px; font-size:14px;">
+                    <b style="color:var(--red);">Nothing was sent: no cow matched.</b>${problems}${tagNote}</div>`;
+                return;
+            }
 
-            if (!confirm(`${mode === 'replace' ? 'REPLACE' : 'Add to'} the ${name} list with ${plural(cows.length, 'cow')}?`
-                + (strangers.length
-                    ? `\n\n${plural(strangers.length, 'cow')} not in the herd list: ${strangers.slice(0, 12).join(', ')}`
-                      + (strangers.length > 12 ? '…' : '')
-                    : ''))) return;
+            const left = m.missing.length + m.unsure.length + noTag;
+            if (!confirm(`${mode === 'replace' ? 'REPLACE the ' + name + ' list with' : 'Add to the ' + name + ' list:'} `
+                + `${plural(cows.length, 'cow')}?`
+                + (left ? `\n\n${left} could not be matched and will NOT go on the list.` : ''))) return;
 
             send({ type: 'import_flags', flag: name, mode: mode, cows: cows });
             $(boxId).value = '';
+            delete $(boxId).dataset.file;
+            out.innerHTML = `<div style="margin-top:8px; font-size:14px;">
+                <b>${plural(cows.length, 'cow')} sent to the ${esc(name)} list.</b>${problems}${tagNote}</div>`;
             toast(cows.length + ' sent to the ' + name + ' list');
+        }
+
+        /** Take every cow off a list, for when that job is done. */
+        function clearFlagList(name) {
+            if (!isManager()) return;
+            const n = (state.flags[name] || []).length;
+            if (!n) { toast('The ' + name + ' list is already empty'); return; }
+            if (!confirm(`Take all ${plural(n, 'cow')} off the ${name} list?\n\nThe list will be empty. Their records are not touched.`)) return;
+            send({ type: 'import_flags', flag: name, mode: 'replace', cows: [] });
+            toast('Clearing the ' + name + ' list…');
         }
 
         function showFlagList(name) {
