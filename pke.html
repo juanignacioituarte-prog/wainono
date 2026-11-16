@@ -199,7 +199,7 @@
         <div id="gsiBtn"></div>
       </div>
       <div class="muted" style="margin-top:6px">Only people on the farm app's list can switch it (Google sign-in).
-        The sender checks every 2 minutes. Under 1 day of PKE it stops by itself and emails the alert list.</div>
+        The sender checks every 2 minutes. When the silo reaches 0% it stops by itself and emails the alert list.</div>
     </div>
   </div>
 
@@ -674,7 +674,7 @@ function renderTable(c){
 
 function renderEvents(c){
   const label = { delivery:'Delivery', full:'Silo full', level:'Level check', rate:'kg per feed', capacity:'Silo size', alert:'Email alert below (days)', order:'PKE order, delivery',
-                  power:'Mineral dispenser turned', override:'Mineral dispenser kept running under 1 day' };
+                  power:'Mineral dispenser turned', override:'Mineral dispenser kept running at 0%' };
   const unit  = { delivery:' t', level:' t', rate:' kg', capacity:' t', alert:'', order:' t' };
   const val = e => e.type === 'power' ? ' <b>' + (e.value ? 'ON' : 'OFF') + '</b>' : (e.value != null ? ': <b>' + e.value + unit[e.type] + '</b>' : '');
   const list = c.ev.slice().reverse();
@@ -733,7 +733,7 @@ function powerClick(){
   signedIn(() => switchAct({ action:'power', on }, on ? 'Turned on. The sender picks it up within 2 minutes.' : 'Turned off. The sender picks it up within 2 minutes.'));
 }
 function keepRunning(){
-  if (!confirm('Keep the mineral dispenser running although the PKE is under 1 day? It runs until the next delivery, "silo full" or silo check.')) return;
+  if (!confirm('Keep the mineral dispenser running although the silo is at 0%? It runs until the next delivery, "silo full" or silo check.')) return;
   signedIn(() => switchAct({ action:'override' }, 'Kept running. The sender picks it up within 2 minutes.'));
 }
 
@@ -745,8 +745,8 @@ function renderPower(){
   const esc = t => String(t || '').replace(/</g, '&lt;');
   let txt, col;
   if (!g.run && g.reason === 'off') { txt = '<b>STOPPED from this page</b> by ' + esc(g.power.by) + ', ' + niceWhen(g.power.at) + '.'; col = 'var(--bad)'; }
-  else if (!g.run)                  { txt = '<b>STOPPED: PKE under 1 day.</b> Press "Keep running", or save a Silo check.'; col = 'var(--bad)'; }
-  else                              { txt = '<b>Running.</b>' + (g.override ? ' Kept running under 1 day by ' + esc(g.override.by) + '.' : ''); col = 'var(--ok)'; }
+  else if (!g.run)                  { txt = '<b>STOPPED: silo at 0%.</b> Press "Keep running", or save a Silo check.'; col = 'var(--bad)'; }
+  else                              { txt = '<b>Running.</b>' + (g.override ? ' Kept running at 0% by ' + esc(g.override.by) + '.' : ''); col = 'var(--ok)'; }
   // Has the sender picked it up yet? (it reports remoteStop with each upload)
   if (st && st.remoteStop == null) txt += ' <span class="muted">(the sender needs the new firmware for this)</span>';
   else if (st && st.remoteStop !== !g.run) txt += ' <span class="muted">(the sender has not picked this up yet)</span>';
