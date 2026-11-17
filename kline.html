@@ -123,9 +123,10 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
         </div>
       </div>
       <div id="setupMap"></div>
-      <div class="muted">The map shows the strips as white lines with their numbers. Drag the round points R (riser), A and B (strip 1 ends) to move them; strip 1 moves all the strips. Drag the numbered points to move the end of one other strip. If the strips are on the wrong side of strip 1, tap:</div>
+      <div class="muted">The map shows the strips as white lines with their numbers. Drag the round points R (riser), A and B (strip 1 ends) to move them; strip 1 moves all the strips. Drag the numbered points to move the end of one other strip.</div>
+      <div id="sideText" style="margin-top:10px"></div>
       <div class="row">
-        <button onclick="flipSide()">Strips to the other side</button>
+        <button class="primary" id="btnSide" onclick="flipSide()">Put the strips on the other side</button>
       </div>
       <div id="movedList"></div>
       <div id="geoWarn" class="muted" style="color:var(--warn)"></div>
@@ -243,7 +244,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18e';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18f';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -656,6 +657,13 @@ function renderSetup(fit = true) {
     else if (need > half) warn = `The pod line (${need.toFixed(0)} m from the end) is longer than half the paddock (${half.toFixed(0)} m). Check the points.`;
   }
   $('#geoWarn').textContent = warn;
+  // say in compass words which side the strips go, and what the button will do
+  if (g && L.strips > 1) {
+    const now = compass(g.bearS), other = compass((g.bearS + 180) % 360);
+    $('#sideText').innerHTML = `Strips 2 to ${L.strips} are on the <b>${now}</b> side of strip 1.`;
+    $('#btnSide').textContent = `Put strips 2 to ${L.strips} on the ${other} side`;
+    $('#btnSide').style.display = '';
+  } else { $('#sideText').textContent = ''; $('#btnSide').style.display = 'none'; }
   const moved = Object.keys(L.stripEnds || {}).filter(k => +k <= L.strips);
   $('#movedList').innerHTML = moved.map(k => `<div class="pt"><b>Strip ${k} was moved</b><button class="small" onclick="unmoveStrip(${k})">Put it back in line</button></div>`).join('');
   const s = shapeIdx != null && L.order[shapeIdx];
@@ -722,7 +730,11 @@ function tapPoint(k) {
   $('#tapHint').textContent = `Tap the map at ${names[k]}.`; $('#tapHint').style.display = 'block';
 }
 function unmoveStrip(k) { const L = lineById(edId); delete L.stripEnds[k]; save(); renderSetup(false); }
-function flipSide() { const L = lineById(edId); L.side *= -1; save(); renderSetup(true); }
+function flipSide() {
+  const L = lineById(edId), moved = Object.keys(L.stripEnds || {}).length;
+  if (moved && !confirm('The strips you moved by hand go back in line. Go on?')) return;
+  L.side *= -1; L.stripEnds = {}; save(); renderSetup(true);
+}
 function manualOrderFor(L) {
   const f = L.firstHalf, o = f === 'A' ? 'B' : 'A', own = L.order.filter(s => !isGrid(s));
   L.order = [];
