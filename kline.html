@@ -42,6 +42,7 @@ input,select{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px s
 .order li .nm{flex:1 1 100%}
 .vtx{width:18px;height:18px;border-radius:50%;background:#ff4081;border:2px solid #fff}
 .vtx.tow{background:#ff1744;width:22px;height:22px}
+.findme{display:flex!important;align-items:center;justify-content:center;width:34px;height:34px;background:#fff}
 details{margin-top:10px}
 summary{cursor:pointer;padding:10px;border:1px solid #444;border-radius:8px;color:var(--text)}
 details[open] summary{margin-bottom:6px}
@@ -188,7 +189,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
       <button id="btnRec" onclick="toggleRec()">Record</button>
       <button class="primary" onclick="doneShift()">Done</button>
       <button onclick="lineIsHere()">Line is here</button>
-      <button onclick="centreMe()">Centre</button>
+      <button onclick="findMe(hMap)">Find me</button>
     </div>
     <div class="bar">
       <button id="btnSim" onclick="toggleSim()">Test mode: off</button>
@@ -661,7 +662,8 @@ function drawSetupMap(fit) {
       m.on('dragend', () => { const q = m.getLatLng(); s.pts[j] = [q.lat, q.lng]; save(); renderSetup(false); });
     });
   }
-  if (fit) b ? sMap.fitBounds(b, { padding: [20, 20] }) : (L.riser && sMap.setView(L.riser, 17));
+  // a new line with no points yet: start the map where I am
+  if (fit) b ? sMap.fitBounds(b, { padding: [20, 20] }) : L.riser ? sMap.setView(L.riser, 17) : findMe(sMap, true);
 }
 function gpsHere(ok) {
   if (!navigator.geolocation) return toast('No GPS on this device');
@@ -760,7 +762,38 @@ function makeMap(id) {
   const m = L_.map(id, { zoomControl: true, attributionControl: false, zoomSnap: 0.25 });
   L_.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 21 }).addTo(m);
   m.setView([-43.9, 171.75], 15);
+  // "Find me" button under the zoom buttons
+  const Find = L_.Control.extend({
+    onAdd() {
+      const b = L_.DomUtil.create('a', 'leaflet-bar findme');
+      b.href = '#'; b.title = 'Find me (GPS)'; b.setAttribute('role', 'button'); b.setAttribute('aria-label', 'Find me');
+      b.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="4" fill="#2979ff"/><circle cx="12" cy="12" r="8" fill="none" stroke="#222" stroke-width="2"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="#222" stroke-width="2"/></svg>';
+      L_.DomEvent.on(b, 'click', e => { L_.DomEvent.stop(e); findMe(m); });
+      L_.DomEvent.disableClickPropagation(b);
+      return b;
+    }
+  });
+  new Find({ position: 'topleft' }).addTo(m);
   return m;
+}
+// Show where I am on a map and zoom there. The Shift page uses its running GPS when it has one.
+function findMe(m, quiet) {
+  const go = (p, a) => {
+    m.setView(p, Math.max(m.getZoom(), 18));
+    if (m === hMap && !sim) return;               // the Shift page draws its own blue dot
+    if (m._me) m._me.remove();
+    m._me = L_.layerGroup([
+      L_.circle(p, { radius: a || 5, color: '#2979ff', weight: 1, fillOpacity: .1, interactive: false }),
+      L_.circleMarker(p, { radius: 8, color: '#fff', weight: 3, fillColor: '#2979ff', fillOpacity: 1, interactive: false })
+    ]).addTo(m);
+  };
+  if (m === hMap && pos && !sim) return go(pos, acc);
+  if (!navigator.geolocation) return quiet || toast('No GPS on this device.');
+  if (!quiet) toast('Finding you...');
+  navigator.geolocation.getCurrentPosition(
+    p => { go([p.coords.latitude, p.coords.longitude], p.coords.accuracy); if (!quiet) toast(`Found you (GPS ±${Math.round(p.coords.accuracy)} m).`); },
+    e => quiet || toast('GPS: ' + e.message + '. Allow location for this page in the phone settings.'),
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
 }
 function drawPods(layer, L, set, style) {
   const pts = podsLL(L, set);
@@ -858,7 +891,6 @@ function drawMe() {
   if (acc && acc > 2) L_.circle(pos, { radius: acc, color: '#2979ff', weight: 1, fillOpacity: .1 }).addTo(meLayer);
   L_.circleMarker(pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#2979ff', fillOpacity: 1 }).addTo(meLayer);
 }
-function centreMe() { if (pos) hMap.setView(pos, Math.max(hMap.getZoom(), 18)); else drawShift(true); }
 
 function startGPS() {
   if (watchId !== null) return;
