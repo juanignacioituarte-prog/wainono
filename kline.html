@@ -251,7 +251,7 @@ th{font-weight:600;color:var(--muted);font-size:13px}
       <button id="btnRec" onclick="toggleRec()" style="display:none">Record</button>
       <button class="primary" id="btnDone" onclick="doneShift()">Shift done</button>
       <button onclick="lineIsHere()">Line is here</button>
-      <button onclick="findMe(hMap)">Find me</button>
+      <button id="btnFind" onclick="findMe(hMap)">Find me</button>
     </div>
     <details class="more">
       <summary>More: map turning, test mode</summary>
@@ -309,7 +309,7 @@ th{font-weight:600;color:var(--muted);font-size:13px}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18m';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18n';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -1021,8 +1021,9 @@ function makeMap(id) {
 }
 // Zoom the map to where I am. There is only one blue dot: the running GPS draws it (drawMe).
 // In Test mode on the Shift page the dot is the test tractor, so go to that.
+// On the Shift map, Find me also turns on "follow me" (until you drag the map).
 function findMe(m, quiet) {
-  const go = p => m.setView(p, Math.max(m.getZoom(), 18));
+  const go = p => { if (m === hMap) { setFollow(true); centreMe(p, Math.max(m.getZoom(), 18)); } else m.setView(p, Math.max(m.getZoom(), 18)); };
   if (pos) return go(pos);
   if (!navigator.geolocation) return quiet || toast('No GPS on this device.');
   if (!quiet) toast('Finding you...');
@@ -1035,6 +1036,18 @@ function findMe(m, quiet) {
     },
     e => quiet || toast(e.code === 1 ? 'Location is blocked for this page. In the browser: site settings > Location > Allow. Then reload.' : 'GPS: ' + e.message),
     { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
+}
+// Put a point in the middle of the part of the Shift map you can see: above the card.
+function centreMe(p, zoom) {
+  hMap.setView(p, zoom == null ? hMap.getZoom() : zoom, { animate: false });
+  const h = $('#guide').offsetHeight || 0;
+  if (h) hMap.panBy([0, h / 2], { animate: false });
+}
+// "Follow me": the Shift map keeps you in view. Dragging the map stops it; Find me starts it.
+let followMe = false;
+function setFollow(v) {
+  followMe = v;
+  const b = $('#btnFind'); if (b) b.className = v ? 'on' : '';
 }
 function drawPods(layer, L, set, style) {
   const pts = podsLL(L, set);
@@ -1098,6 +1111,7 @@ function openShift() {
   if (!hMap) {
     hMap = makeMap('shiftMap');
     hMap.on('click', e => { if (sim) { stopAuto(); onPos([e.latlng.lat, e.latlng.lng], 1, null, null); } });
+    hMap.on('dragstart', () => setFollow(false));   // you moved the map: stop following you
     // small "Setup" button at the top right of the map
     const Setup = L_.Control.extend({
       onAdd() {
@@ -1110,7 +1124,7 @@ function openShift() {
     });
     new Setup({ position: 'topright' }).addTo(hMap);
   }
-  setTimeout(() => { hMap.invalidateSize(); drawShift(true); }, 0);
+  setTimeout(() => { hMap.invalidateSize(); drawShift(!followMe); if (followMe && pos) centreMe(pos); }, 0);
   if (!L) return;
   try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => wake = w).catch(() => {}); } catch (e) {}
 }
@@ -1211,9 +1225,9 @@ function onPos(p, a, hd, sp) {
   if (hd != null && sp != null && sp > 0.7) heading = hd;
   pos = p; acc = a;
   const L = lineById(shId), g = L && proj(L);
-  if (headUp && hMap && hMap.setBearing && page === 'shift') {
-    if (heading != null) hMap.setBearing(-heading);   // driving direction up
-    hMap.panTo(pos, { animate: false });
+  if (followMe && hMap && page === 'shift') {
+    if (headUp && hMap.setBearing && heading != null) hMap.setBearing(-heading);   // driving direction up
+    centreMe(pos);
   }
   if (recording && (a == null || a < 20)) {
     const q = track[track.length - 1];
@@ -1360,6 +1374,7 @@ function toggleHeadUp() {
     if (!headUp) hMap.setBearing(0);
     else if (heading != null) hMap.setBearing(-heading);
   }
+  if (headUp && pos) { setFollow(true); centreMe(pos); }   // driving up only makes sense while following
   guide();
 }
 function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; $('#btnAuto').textContent = 'Auto drive all shifts'; } }
