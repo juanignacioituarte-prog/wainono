@@ -179,7 +179,8 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <section class="page" id="pg-shift">
   <div id="shiftMap"></div>
   <div id="guide">
-    <div id="gTitle">Pick a K-line on the K-lines page.</div>
+    <select id="shLine" onchange="chooseShiftLine(this.value)" aria-label="K-line to shift" style="padding:8px;margin-bottom:4px"></select>
+    <div id="gTitle">Tap a K-line on the map to shift it.</div>
     <div id="gMain">
       <svg id="arrow" viewBox="0 0 64 64"><path d="M32 4 L54 40 L38 36 L38 60 L26 60 L26 36 L10 40 Z" fill="#fff"/></svg>
       <div><div id="gBig">-</div><div id="gSub"></div></div>
@@ -243,7 +244,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18h';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18i';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -967,11 +968,39 @@ function leaveShift() {
   stopAuto();
   if (wake) { wake.release().catch(() => {}); wake = null; }
 }
+// Pick which K-line to shift (from the list at the top, or by tapping it on the map).
+function chooseShiftLine(id) {
+  if (id === shId) return;
+  if (recording && track.length && !confirm('Stop recording and throw away this track?')) { $('#shLine').value = shId || ''; return; }
+  stopAuto(); recording = false; track = [];
+  shId = id || null; drawShift(true);
+}
+// The other K-lines: where each line is now, in white with its name. Tap one to shift it.
+function drawOtherLines(layer) {
+  const pts = [];
+  db.lines.forEach(L2 => {
+    if (L2.id === shId || !L2.order[L2.cur]) return;
+    const pods = podsLL(L2, L2.order[L2.cur]); if (!pods) return;
+    L_.polyline(pods, { color: '#fff', weight: 4, opacity: .85, interactive: false }).addTo(layer);
+    pods.forEach((p, i) => L_.circleMarker(p, { radius: i === 0 ? 6 : 4, color: '#000', weight: 1, fillColor: i === 0 ? '#ff5252' : '#fff', fillOpacity: 1, interactive: false }).addTo(layer));
+    L_.polyline(pods, { weight: 26, opacity: 0.01, color: '#fff', bubblingMouseEvents: false })
+      .bindTooltip(L2.name, { permanent: true, className: 'lbl', direction: 'top' })
+      .on('click', () => chooseShiftLine(L2.id)).addTo(layer);
+    pts.push(...pods);
+  });
+  return pts;
+}
 function drawShift(fit) {
   const L = lineById(shId);
   if (hLayer) hLayer.remove();
   hLayer = L_.layerGroup().addTo(hMap);
-  if (!L) { guide(); return; }
+  $('#shLine').innerHTML = (L ? '' : '<option value="">Choose a K-line to shift</option>')
+    + db.lines.map(x => `<option value="${x.id}"${x.id === shId ? ' selected' : ''}>${esc(x.name)}${x.order.length ? ' — on Set ' + (x.cur + 1) : ''}</option>`).join('');
+  const others = drawOtherLines(hLayer);
+  if (!L) {
+    if (fit && others.length) hMap.fitBounds(L_.latLngBounds(others), { padding: [30, 30] });
+    drawMe(); guide(); return;
+  }
   const b = drawLayout(hLayer, L, { pick: i => pickSet(L, i) });
   const ap = activePath(L), n = L.order.length;
   if (ap.pj && n) {
@@ -1058,11 +1087,14 @@ function guide() {
   $('#btnAuto').style.display = sim ? 'block' : 'none';
   $('#speed').style.display = sim ? 'block' : 'none';
   $('#pathChoice').style.display = 'none'; $('#gNote').textContent = '';
-  if (!L) { $('#gTitle').textContent = 'Pick a K-line on the K-lines page.'; return set('-'); }
+  if (!L) {
+    $('#gTitle').textContent = '';
+    return set(db.lines.length ? 'Pick a K-line' : 'No K-lines yet', db.lines.length ? 'Tap a K-line on the map, or choose it in the list above.' : 'Make one on the K-lines page.');
+  }
   const n = L.order.length;
   if (n < 2) { $('#gTitle').textContent = L.name; return set('No sets', 'Make the shifting order in Setup.'); }
   const ap = activePath(L);
-  $('#gTitle').textContent = `${L.name}: ${setName(L, L.cur)}  →  ${setName(L, (L.cur + 1) % n)}`;
+  $('#gTitle').textContent = `${setName(L, L.cur)}  →  ${setName(L, (L.cur + 1) % n)}`;
   if (!ap.pj) return set('Setup needed', 'Set the riser and the two strip 1 markers in Setup, or draw own-shape sets.');
   const notes = [];
   const to = L.order[(L.cur + 1) % n];
