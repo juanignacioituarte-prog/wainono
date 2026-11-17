@@ -130,6 +130,14 @@ th{font-weight:600;color:var(--muted);font-size:13px}
     <button onclick="show('log')">Log</button>
   </div>
   <div class="card">
+    <div class="pt" style="border:0;padding-top:0">
+      <b>Language / Idioma</b>
+      <select id="langSel" style="width:auto" onchange="setLang(this.value)" aria-label="Language / Idioma">
+        <option value="en">English</option><option value="es">Español</option>
+      </select>
+    </div>
+  </div>
+  <div class="card">
     <h3>K-lines</h3>
     <div id="lines"></div>
     <div class="row">
@@ -307,9 +315,191 @@ th{font-weight:600;color:var(--muted);font-size:13px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script>
+// ---------- language ----------
+// The app is written in English. In Spanish, every text it shows (page, messages, map labels,
+// pop-up questions) goes through tr(): first the whole text in ES, then the patterns in ES_RULES.
+// The choice is saved on this phone; the first time, the phone's own language decides.
+const LANG = (() => {
+  try { const v = localStorage.getItem('kline-lang'); if (v) return v; } catch (e) {}
+  return (navigator.language || '').toLowerCase().startsWith('es') ? 'es' : 'en';
+})();
+function setLang(v) { try { localStorage.setItem('kline-lang', v); } catch (e) {} location.reload(); }
+const CMP = { north: 'norte', 'north-east': 'noreste', east: 'este', 'south-east': 'sureste', south: 'sur', 'south-west': 'suroeste', west: 'oeste', 'north-west': 'noroeste' };
+const CMP_SHORT = { N: 'N', NE: 'NE', E: 'E', SE: 'SE', S: 'S', SW: 'SO', W: 'O', NW: 'NO' };
+const ES = {
+  // map screen
+  'Shift done': 'Cambio hecho', 'Line is here': 'La línea está aquí', 'Find me': 'Ubicarme', 'Setup': 'Configurar',
+  '← Map': '← Mapa', '← Setup': '← Configurar', '⚙︎ Setup': '⚙︎ Configurar',
+  'Suggested path': 'Recorrido sugerido', 'My recorded path': 'Mi recorrido grabado', 'Record': 'Grabar',
+  'More: map turning, test mode': 'Más: girar el mapa, modo prueba', 'Map: north up': 'Mapa: norte arriba', 'Map: driving up': 'Mapa: avance arriba',
+  'Test mode: off': 'Modo prueba: no', 'Test mode: on': 'Modo prueba: sí', 'Auto drive all shifts': 'Manejo automático, todos los cambios', 'Stop auto': 'Parar automático',
+  'Line in another place? Tap that set on the map, or stand at the tow end and tap "Line is here".': '¿La línea está en otro lugar? Toque esa posición en el mapa, o párese junto a la punta de tiro y toque "La línea está aquí".',
+  'Tap a K-line on the map to shift it.': 'Toque una K-line en el mapa para moverla.', 'Choose a K-line to shift': 'Elija una K-line para mover',
+  'K-line to shift': 'K-line para mover', 'Auto drive speed': 'Velocidad del manejo automático',
+  'Pick a K-line': 'Elija una K-line', 'No K-lines yet': 'Todavía no hay K-lines',
+  'Tap a K-line on the map, or choose it in the list above.': 'Toque una K-line en el mapa, o elíjala en la lista de arriba.',
+  'Tap "Setup" at the top right of the map to make one.': 'Toque "Configurar" arriba a la derecha del mapa para crear una.',
+  'No sets': 'Sin posiciones', 'Make the shifting order in Setup.': 'Haga el orden de los cambios en Configurar.',
+  'Setup needed': 'Falta configurar', 'Set the riser and the two strip 1 markers in Setup, or draw own-shape sets.': 'Ponga el hidrante y las dos marcas de la franja 1 en Configurar, o dibuje posiciones con forma propia.',
+  'No path yet': 'Todavía no hay recorrido', 'A set has no shape yet, or the app cannot make a path. Record it: Setup > Record a shift.': 'Una posición no tiene forma todavía, o la app no puede hacer un recorrido. Grábelo: Configurar > Grabar un cambio.',
+  'Waiting for GPS': 'Esperando el GPS', 'Test mode: tap the map to put the tractor there, or tap Auto drive.': 'Modo prueba: toque el mapa para poner el tractor ahí, o toque Manejo automático.',
+  'Drive to the tow end of the line.': 'Vaya hasta la punta de tiro de la línea.', 'STOP': 'PARE', 'Unhook the line. Then tap Shift done.': 'Desenganche la línea. Después toque Cambio hecho.',
+  'On the path': 'En el recorrido', 'Slow down. Stop at the red line.': 'Más despacio. Pare en la línea roja.', 'Hook on, then drive along the path.': 'Enganche y siga el recorrido.',
+  'Follow the path. Drive over the feed line and aim at the marker.': 'Siga el recorrido. Pase por encima de la manguera de alimentación y apunte a la marca.',
+  'This path has a sharp turn that may kink the pipe. Record your own: Setup > Record a shift.': 'Este recorrido tiene una curva cerrada que puede doblar el caño. Grabe el suyo: Configurar > Grabar un cambio.',
+  'This is a long move. Check the path, or record your own: Setup > Record a shift.': 'Es un cambio largo. Revise el recorrido, o grabe el suyo: Configurar > Grabar un cambio.',
+  'No GPS: use Test mode.': 'Sin GPS: use el modo prueba.', 'Start': 'Inicio', 'Riser': 'Hidrante', 'end A': 'punta A', 'end B': 'punta B',
+  'Looking for GPS...': 'Buscando el GPS...', 'This phone or browser gives no location.': 'Este teléfono o navegador no da la ubicación.',
+  'Location is blocked for this page. In the browser: site settings > Location > Allow. Then reload the page.': 'La ubicación está bloqueada para esta página. En el navegador: configuración del sitio > Ubicación > Permitir. Después recargue la página.',
+  'Location is blocked for this page. In the browser: site settings > Location > Allow. Then reload.': 'La ubicación está bloqueada para esta página. En el navegador: configuración del sitio > Ubicación > Permitir. Después recargue.',
+  'GPS is slow to answer. Go outside, or wait a little.': 'El GPS tarda en responder. Salga afuera, o espere un poco.',
+  'Recording. Drive the shift, then tap Shift done.': 'Grabando. Haga el cambio y después toque Cambio hecho.',
+  'Stop recording and throw away this track?': '¿Parar de grabar y tirar este recorrido?', 'Saved.': 'Guardado.', 'Saved. Your path is saved for this shift.': 'Guardado. Su recorrido quedó guardado para este cambio.',
+  'No sets yet. Make them in Setup.': 'Todavía no hay posiciones. Hágalas en Configurar.', 'Setup needed first.': 'Primero hay que configurar.',
+  'No set has a place yet. Check Setup.': 'Ninguna posición tiene lugar todavía. Revise Configurar.', 'Getting GPS...': 'Buscando el GPS...',
+  'No GPS on this device.': 'Este aparato no tiene GPS.', 'No GPS on this device': 'Este aparato no tiene GPS', 'Finding you...': 'Buscándolo...',
+  'Test mode: tap the map to move the tractor.': 'Modo prueba: toque el mapa para mover el tractor.', 'No shifts to drive.': 'No hay cambios para manejar.',
+  'Round finished: all shifts driven.': 'Vuelta terminada: se hicieron todos los cambios.', 'Demo line made. Use Test mode on the map.': 'Línea de prueba creada. Use el modo prueba en el mapa.',
+  // setup
+  'Map': 'Mapa', 'Log': 'Registro', 'K-lines': 'K-lines', '+ New K-line': '+ Nueva K-line', '+ Demo line (for testing)': '+ Línea de prueba (para probar)',
+  'Tap "Edit" on a K-line above, or make a new one.': 'Toque "Editar" en una K-line de arriba, o cree una nueva.', 'Edit': 'Editar', 'Shift': 'Mover',
+  'The K-line': 'La K-line', 'Name': 'Nombre', 'Number of pods': 'Cantidad de pods', 'Metres between pods': 'Metros entre pods',
+  'The paddock': 'El potrero',
+  'The paddock is cut into strips side by side. The line waters one half of a strip at a time. Give 3 points, with the GPS (stand there) or by tapping the map:': 'El potrero se divide en franjas, una al lado de la otra. La línea riega media franja por vez. Dé 3 puntos, con el GPS (párese ahí) o tocando el mapa:',
+  'GPS': 'GPS', 'Tap map': 'Tocar mapa', 'Strip 1, one end': 'Franja 1, una punta', 'Strip 1, other end': 'Franja 1, la otra punta', 'set': 'listo', 'not set': 'falta',
+  'The two ends are the marker points at the paddock fences, in the middle of strip 1. When you set the riser and end A, the app puts end B for you, at the right distance for the line.': 'Las dos puntas son las marcas en los alambrados del potrero, en el medio de la franja 1. Cuando pone el hidrante y la punta A, la app pone la punta B por usted, a la distancia justa para la línea.',
+  'Make strip 1 fit the line (move end B)': 'Ajustar la franja 1 a la línea (mover la punta B)', 'Strip width (m)': 'Ancho de franja (m)', 'Number of strips': 'Cantidad de franjas',
+  'Add point by GPS': 'Agregar punto con GPS', 'Undo point': 'Deshacer punto', 'Swap ends': 'Cambiar las puntas', 'Finish': 'Terminar',
+  'The map shows the strips as white lines with their numbers. Drag the round points R (riser), A and B (strip 1 ends) to move them; strip 1 moves all the strips. Drag the numbered points to move the end of one other strip.': 'El mapa muestra las franjas como líneas blancas con su número. Arrastre los puntos redondos R (hidrante), A y B (puntas de la franja 1) para moverlos; la franja 1 mueve todas las franjas. Arrastre los puntos con número para mover la punta de otra franja.',
+  'Put the strips on the other side': 'Poner las franjas del otro lado', 'The order of the shifts': 'El orden de los cambios',
+  'One line for each shift, in order. For each one, choose the strip and the side: A (the half at end A) or B. Tap a line to see that shift in orange on the map. Green = where the line is now.': 'Un renglón para cada cambio, en orden. En cada uno elija la franja y el lado: A (la mitad de la punta A) o B. Toque un renglón para ver ese cambio en naranja en el mapa. Verde = donde está la línea ahora.',
+  'Test drive this shift': 'Probar este cambio', 'Test the whole round': 'Probar la vuelta completa', 'Stop test': 'Parar la prueba',
+  'Tap a shift in the list: the map shows it in orange, and the path to drive there from the shift before.': 'Toque un cambio en la lista: el mapa lo muestra en naranja, con el recorrido para llegar desde el cambio anterior.',
+  '+ Add a shift': '+ Agregar un cambio', 'Start again with the manual order': 'Empezar de nuevo con el orden del manual',
+  'Strip 1 side A, strip 1 side B, strip 2 side A, and so on (own-shape sets stay at the end).': 'Franja 1 lado A, franja 1 lado B, franja 2 lado A, y así (las posiciones con forma propia quedan al final).',
+  'Start with side': 'Empezar por el lado', 'Make the manual order': 'Hacer el orden del manual', 'The line is here now': 'La línea está aquí ahora',
+  'Corners and odd shapes, if you need them': 'Esquinas y formas raras, si las necesita',
+  'If a set does not fit the strips (a corner, a short strip, a bend), make a set with its own shape. You draw where the line will lie: tap the tow end first, then along the line toward the riser. Or walk it with the GPS.': 'Si una posición no entra en las franjas (una esquina, una franja corta, una curva), haga una posición con forma propia. Usted dibuja dónde va a quedar la línea: toque primero la punta de tiro, después a lo largo de la línea hacia el hidrante. O camínela con el GPS.',
+  '"Shape" on a set in the list lets you change that set the same way. "Copy" makes the next one beside it.': '"Forma" en una posición de la lista le deja cambiarla igual. "Copiar" hace la siguiente al lado.',
+  'Shape': 'Forma', 'Copy': 'Copiar', '+ Add a set with its own shape': '+ Agregar una posición con forma propia',
+  'Recorded paths (your own way)': 'Recorridos grabados (a su manera)',
+  'Drive a shift your own way and the app keeps your track for that shift. Next time it shows your path instead of its suggested one. Tap the button, drive the next shift of this K-line, then tap "Shift done".': 'Haga un cambio a su manera y la app guarda su recorrido para ese cambio. La próxima vez muestra su recorrido en lugar del sugerido. Toque el botón, haga el próximo cambio de esta K-line y después toque "Cambio hecho".',
+  'Record a shift': 'Grabar un cambio', 'None yet.': 'Ninguno todavía.', 'Delete': 'Borrar', 'More settings': 'Más ajustes',
+  'Last pod to paddock end (m)': 'Último pod al final del potrero (m)', 'Hook rope: pod to tractor (m)': 'Cuerda de enganche: pod al tractor (m)',
+  'Gap between tractor and line at the start (m)': 'Distancia entre el tractor y la línea al empezar (m)', 'Delete this K-line': 'Borrar esta K-line',
+  'Put it back in line': 'Volver a ponerla en línea', 'No K-lines yet.': 'Todavía no hay K-lines.',
+  'Language': 'Idioma',
+  'Make at least 2 shifts first.': 'Primero haga al menos 2 cambios.', 'Tap a shift in the list first.': 'Primero toque un cambio en la lista.',
+  'Test finished: every shift driven.': 'Prueba terminada: se hicieron todos los cambios.', 'Test finished.': 'Prueba terminada.',
+  'Blue line = the path to drive.': 'Línea azul = el recorrido a manejar.', 'Orange line = your recorded path.': 'Línea naranja = su recorrido grabado.',
+  'No path yet: record one.': 'Todavía no hay recorrido: grabe uno.', 'Sharp turn: it may kink the pipe.': 'Curva cerrada: puede doblar el caño.',
+  'Set end A and the riser (or end B) first.': 'Primero ponga la punta A y el hidrante (o la punta B).',
+  'There are no strips. Set "Number of strips" first.': 'No hay franjas. Primero ponga la "Cantidad de franjas".',
+  'The strips you moved by hand go back in line. Go on?': 'Las franjas que movió a mano vuelven a ponerse en línea. ¿Sigue?',
+  'Replace the shifting order with the manual order? Own-shape sets stay, at the end.': '¿Cambiar el orden de los cambios por el orden del manual? Las posiciones con forma propia quedan, al final.',
+  'Give this set its own shape? It starts where the strip set is now. Then you can move its points.': '¿Darle a esta posición su propia forma? Empieza donde está ahora. Después puede mover sus puntos.',
+  'A set needs at least 2 points: the tow end and one more toward the riser.': 'Una posición necesita al menos 2 puntos: la punta de tiro y uno más hacia el hidrante.',
+  'Draw this set first.': 'Primero dibuje esta posición.', 'Delete this recorded path?': '¿Borrar este recorrido grabado?',
+  'Tap the map at the tow end first (the end you hook to). Then tap along the line toward the riser.': 'Toque el mapa primero en la punta de tiro (la punta que engancha). Después toque a lo largo de la línea hacia el hidrante.',
+  'The riser is not between the two ends.': 'El hidrante no está entre las dos puntas.',
+  'Copy this set beside it. How many metres to the side?\n+ = to the right, - = to the left (standing at the tow end, looking along the line)': 'Copiar esta posición al lado. ¿Cuántos metros hacia el costado?\n+ = a la derecha, - = a la izquierda (parado en la punta de tiro, mirando a lo largo de la línea)',
+  'Name for this set (for example "north-east corner")': 'Nombre para esta posición (por ejemplo "esquina noreste")',
+  // log
+  'Your name (saved on this phone, goes in the log)': 'Su nombre (se guarda en este teléfono, va en el registro)', 'Moves': 'Cambios hechos',
+  'When': 'Cuándo', 'Line': 'Línea', 'Move': 'Cambio', 'Who': 'Quién', 'No moves yet.': 'Todavía no hay cambios.',
+  'The setup and the log are kept in a Google Sheet, so every phone sees the same K-lines and where each line is. With no signal, changes wait on this phone and go later.': 'La configuración y el registro se guardan en una planilla de Google, así todos los teléfonos ven las mismas K-lines y dónde está cada línea. Sin señal, los cambios esperan en este teléfono y se mandan después.',
+  'Sheet web address (Apps Script, ends with /exec)': 'Dirección web de la planilla (Apps Script, termina en /exec)', 'Sync now': 'Sincronizar ahora',
+  'Backup': 'Copia de seguridad', 'A file with all the data on this phone.': 'Un archivo con todos los datos de este teléfono.',
+  'Save backup file': 'Guardar copia', 'Load backup file': 'Cargar copia', 'Backup loaded.': 'Copia cargada.',
+  'Replace all data on this phone with the backup?': '¿Cambiar todos los datos de este teléfono por la copia?',
+  'Could not save on this phone': 'No se pudo guardar en este teléfono', 'Saving to the Google Sheet...': 'Guardando en la planilla de Google...',
+  'No Google Sheet set. The data is only on this phone.': 'No hay planilla de Google. Los datos están solo en este teléfono.',
+  'Zoom in': 'Acercar', 'Zoom out': 'Alejar', 'Find me (GPS)': 'Ubicarme (GPS)'
+};
+// Patterns for texts with numbers or names inside. Order matters: whole sentences first, small pieces last.
+const ES_RULES = [
+  [/Steer (LEFT|RIGHT) ([\d.]+) m/g, (m, d, n) => `${d === 'LEFT' ? 'IZQUIERDA' : 'DERECHA'} ${n} m`],
+  [/STOP in (\d+) m/g, 'PARE en $1 m'], [/(\d+) m to go/g, 'Faltan $1 m'], [/^(\d+) m to start$/, 'A $1 m del inicio'],
+  [/^1\. Park beside the tow end \(red pod\)(?:, on the ([a-z-]+) \(dry\) side)?, ([\d.]+) m from the line, facing the middle\. 2\. Hook on\.$/,
+    (m, c, n) => `1. Estaciónese junto a la punta de tiro (pod rojo)${c ? ', del lado ' + (CMP[c] || c) + ' (seco)' : ''}, a ${n} m de la línea, mirando al medio. 2. Enganche.`],
+  [/The last pod should be about ([\d.]+) m from the paddock end\./g, 'El último pod debería quedar a unos $1 m del final del potrero.'],
+  [/^Line moved to (.+)\?$/, '¿La línea se movió a $1?'], [/^Is the line on (.+) now\?$/, '¿La línea está ahora en $1?'],
+  [/^Saved: the line is on (.+)\.$/, 'Guardado: la línea está en $1.'], [/^Yes: the line is on (.+)\.$/, 'Sí: la línea está en $1.'], [/^The line is on (.+)\.$/, 'La línea está en $1.'],
+  [/^Delete (.+)\? Its log stays\.$/, '¿Borrar $1? Su registro queda.'], [/^Delete (.+)\?$/, '¿Borrar $1?'],
+  [/^No tow end near you \(nearest is (.+), (\d+) m away\)\. Stand beside the tow end\.$/, 'No hay una punta de tiro cerca (la más cercana es $1, a $2 m). Párese junto a la punta de tiro.'],
+  [/^(.+): no path\. Record this shift\.$/, '$1: sin recorrido. Grabe este cambio.'],
+  [/^Shift (\d+) has no path\. Record it with "Record a shift"\.$/, 'El cambio $1 no tiene recorrido. Grábelo con "Grabar un cambio".'],
+  [/Google Sheet: up to date \((.+)\)\./, 'Planilla de Google: al día ($1).'],
+  [/^Google Sheet not reached(?:: (\d+) change\(s\) wait on this phone)?\. It tries again in a minute\.$/, (m, n) => `No se llegó a la planilla de Google${n ? ': ' + n + ' cambio(s) esperan en este teléfono' : ''}. Vuelve a probar en un minuto.`],
+  [/^Saved\. GPS accuracy about (\d+) m\.$/, 'Guardado. Precisión del GPS: unos $1 m.'], [/^Found you \(GPS ±(\d+) m\)\.$/, 'Lo encontré (GPS ±$1 m).'],
+  [/^End B was put (\d+) m from end A, through the riser\. Drag it if it is wrong\.$/, 'La punta B quedó a $1 m de la punta A, pasando por el hidrante. Arrástrela si está mal.'],
+  [/^Strip 1 is now (\d+) m long\.$/, 'La franja 1 ahora mide $1 m.'],
+  [/This line needs strip 1 about (\d+) m long \((\d+) m on each side of the riser\)\./, 'Esta línea necesita una franja 1 de unos $1 m ($2 m a cada lado del hidrante).'],
+  [/ Strip 1 is (\d+) m now\./, ' La franja 1 mide $1 m ahora.'],
+  [/^Tap the map at the riser\.$/, 'Toque el mapa en el hidrante.'], [/^Tap the map at strip 1, end (A|B)\.$/, 'Toque el mapa en la franja 1, punta $1.'],
+  [/^Put strips 2 to (\d+) on the ([a-z-]+) side$/, (m, n, c) => `Poner las franjas 2 a ${n} del lado ${CMP[c] || c}`],
+  [/^Strips 2 to (\d+) are on the ([a-z-]+) side of strip 1\.$/, (m, n, c) => `Las franjas 2 a ${n} están del lado ${CMP[c] || c} de la franja 1.`],
+  [/^Strip (\d+) was moved$/, 'La franja $1 fue movida'],
+  [/^(\d+) points\. Tap the map to add the next point toward the riser\. Drag a point to move it\. The big red point is the tow end\.$/, '$1 puntos. Toque el mapa para agregar el siguiente punto hacia el hidrante. Arrastre un punto para moverlo. El punto rojo grande es la punta de tiro.'],
+  [/^The pod line \((\d+) m from the end\) is longer than half the paddock \((\d+) m\)\. Check the points\.$/, 'La línea de pods ($1 m desde la punta) es más larga que medio potrero ($2 m). Revise los puntos.'],
+  [/Shift (\d+): from set (\d+) \(white dashes\) to set (\d+) \(orange\)\. /, 'Cambio $1: de la posición $2 (rayas blancas) a la posición $3 (naranja). '],
+  [/^Your recorded path \((.+)\)\.$/, 'Su recorrido grabado ($1).'], [/Your recorded path \((.+?)\)\./, 'Su recorrido grabado ($1).'],
+  [/^Recording \((\d+)\) — tap to stop$/, 'Grabando ($1) — toque para parar'],
+  [/^Set up (.+)$/, 'Configurar $1'], [/^Shape of (.+)$/, 'Forma de $1'], [/^App version (.+)$/, 'Versión de la app $1'],
+  [/^Could not load: (.+)$/, 'No se pudo cargar: $1'], [/^Own shape (\d+)$/, 'Forma propia $1'],
+  [/On Set (\d+)/g, 'En posición $1'], [/ · moved never/g, ' · nunca movida'], [/ · moved /g, ' · movida '], [/No sets yet/g, 'Sin posiciones'],
+  [/ — on Set (\d+)/g, ' — en posición $1'], [/ \(recorded\)/g, ' (grabado)'], [/ \(test\)/g, ' (prueba)'], [/(\d+) points/g, '$1 puntos'],
+  // pieces inside set names and lists
+  [/\bstrip (\d+), ([a-z-]+) half/g, (m, k, c) => `franja ${k}, mitad ${CMP[c] || c}`],
+  [/\bstrip (\d+), (end A|end B) half/g, (m, k, e) => `franja ${k}, mitad ${e === 'end A' ? 'punta A' : 'punta B'}`],
+  [/\bSet (\d+)\b/g, 'Posición $1'], [/\bset (\d+)\b/g, 'posición $1'], [/\bShift (\d+)\b/g, 'Cambio $1'], [/\bStrip (\d+)\b/g, 'Franja $1'],
+  [/^([AB]) \((N|NE|E|SE|S|SW|W|NW)\)$/, (m, h, c) => `${h} (${CMP_SHORT[c]})`],
+  [/^(own shape)$/, 'forma propia'], [/ \(own shape\)$/, ' (forma propia)']
+];
+// long English sentences that can sit inside a longer text (for example notes joined together)
+const ES_PARTS = Object.keys(ES).filter(k => k.length >= 24).sort((a, b) => b.length - a.length);
+function tr(text) {
+  if (LANG !== 'es' || text == null) return text;
+  const t = String(text), core = t.trim();
+  if (!core) return t;
+  const lead = t.slice(0, t.indexOf(core)), tail = t.slice(t.indexOf(core) + core.length);
+  if (Object.prototype.hasOwnProperty.call(ES, core)) return lead + ES[core] + tail;
+  let s = core;
+  for (const k of ES_PARTS) if (s.includes(k)) s = s.split(k).join(ES[k]);
+  for (const [re, rep] of ES_RULES) s = s.replace(re, rep);
+  return lead + s + tail;
+}
+// Translate the page as it is drawn: every new or changed text, and a few attributes.
+function trNode(n) {
+  if (n.nodeType === 3) {
+    const p = n.parentNode;
+    if (!p || /^(SCRIPT|STYLE|TEXTAREA)$/.test(p.nodeName) || n.data === n.__tr) return;
+    const out = tr(n.data); n.__tr = out;
+    if (out !== n.data) n.data = out;
+  } else if (n.nodeType === 1) {
+    if (/^(SCRIPT|STYLE|IMG|svg|path)$/i.test(n.nodeName)) return;
+    for (const a of ['placeholder', 'title', 'aria-label']) {
+      const v = n.getAttribute(a);
+      if (v && !/^https?:/.test(v)) { const o = tr(v); if (o !== v) n.setAttribute(a, o); }
+    }
+    n.childNodes.forEach(trNode);
+  }
+}
+if (LANG === 'es') {
+  document.documentElement.lang = 'es';
+  trNode(document.body);
+  new MutationObserver(ms => ms.forEach(m => {
+    if (m.type === 'characterData') trNode(m.target);
+    else m.addedNodes.forEach(trNode);
+  })).observe(document.body, { subtree: true, childList: true, characterData: true });
+  const c = window.confirm.bind(window), p = window.prompt.bind(window);
+  window.confirm = msg => c(tr(msg));
+  window.prompt = (msg, def) => p(tr(msg), def == null ? def : tr(String(def)));
+}
+
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18n';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18o';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -323,7 +513,7 @@ function save(quiet) {
 }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 3500); }
-function fmt(ts) { const d = new Date(ts); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
+function fmt(ts) { const d = new Date(ts), loc = LANG === 'es' ? 'es' : undefined; return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }); }
 const uid = () => Math.random().toString(36).slice(2, 10);
 const lineById = id => db.lines.find(l => l.id === id);
 
@@ -739,7 +929,7 @@ function renderSetup(fit = true) {
   // say in compass words which side the strips go, and what the button will do
   if (g && L.strips > 1) {
     const now = compass(g.bearS), other = compass((g.bearS + 180) % 360);
-    $('#sideText').innerHTML = `Strips 2 to ${L.strips} are on the <b>${now}</b> side of strip 1.`;
+    $('#sideText').textContent = `Strips 2 to ${L.strips} are on the ${now} side of strip 1.`;
     $('#btnSide').textContent = `Put strips 2 to ${L.strips} on the ${other} side`;
     $('#btnSide').style.display = '';
   } else { $('#sideText').textContent = ''; $('#btnSide').style.display = 'none'; }
@@ -1448,6 +1638,7 @@ async function checkUpdate() {
   } catch (e) {}
 }
 $('#appVer').textContent = 'App version ' + APP_VERSION;
+$('#langSel').value = LANG;
 show('shift');
 syncNow();
 checkUpdate();
