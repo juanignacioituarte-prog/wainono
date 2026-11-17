@@ -3,73 +3,117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="theme-color" content="#111111">
+<meta name="theme-color" content="#0F2C3F">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
 <title>K-line mover</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-:root{--bg:#111;--panel:#1c1e21;--card:#25282c;--text:#f2f2f2;--muted:#9aa0a6;--go:#2ecc71;--warn:#f5a623;--stop:#e74c3c;--path:#00e5ff;--rec:#ff8c1a}
+/* "Farm road sign": light screens that read in sun, a yellow sign for steering,
+   condensed sign lettering for the words you read while driving. */
+:root{
+  --ink:#0F2C3F; --sign:#FFC425; --water:#0077C8; --pasture:#2F8F3A; --stoppaint:#D7261E; --steel:#E9EDF0;
+  --line:#CBD4DB; --soft:#F5F7F8;
+  --bg:var(--steel); --panel:#fff; --card:#fff; --text:var(--ink); --muted:#56697A;
+  --go:var(--pasture); --warn:#A35F00; --stop:var(--stoppaint); --path:#00B4FF; --rec:#FF8C1A;
+  --sans:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --cond:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  color-scheme:light;
+}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:500 16px/1.45 var(--sans);-webkit-text-size-adjust:100%}
 body{display:flex;flex-direction:column}
-.topbar{position:sticky;top:-12px;z-index:1000;display:flex;gap:8px;align-items:center;margin:-12px -12px 12px;padding:8px 12px;background:var(--panel)}
-.topbar button{padding:8px 12px}
-.setupbtn{background:#fff;color:#222;font:600 14px system-ui,sans-serif;padding:6px 10px;border-radius:8px;border:2px solid rgba(0,0,0,.25);cursor:pointer}
-button{font:inherit;padding:12px 10px;border-radius:8px;border:1px solid #444;background:#2f3338;color:var(--text);cursor:pointer}
-button:active{filter:brightness(1.3)}
-button.on,button.primary{background:var(--go);border-color:var(--go);color:#000;font-weight:600}
-button.rec{background:var(--stop);border-color:var(--stop);color:#fff;font-weight:600}
-button.small{padding:6px 10px;font-size:14px}
-button.danger{border-color:var(--stop);color:#ff8a80}
 main{flex:1;min-height:0;position:relative}
-.page{position:absolute;inset:0;overflow:auto;padding:12px;display:none}
+.page{position:absolute;inset:0;overflow:auto;padding:12px 14px 28px;display:none}
 .page.show{display:block}
-#pg-shift.show{display:flex;flex-direction:column;padding:0}
-.card{background:var(--card);border-radius:10px;padding:12px;margin-bottom:12px}
-.card h3{margin:0 0 6px}
-.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+#pg-shift.show{display:flex;flex-direction:column;padding:0;background:#1b1f22}
+h3{font:700 22px/1.15 var(--cond);margin:0 0 8px;letter-spacing:.2px}
+
+/* buttons: big enough for a thumb in a moving cab */
+button{font:600 16px/1.2 var(--sans);min-height:48px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;touch-action:manipulation}
+button:active{transform:translateY(1px);background:var(--soft)}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--water);outline-offset:2px}
+button.primary{background:var(--water);border-color:var(--water);color:#fff}
+button.on{background:var(--pasture);border-color:var(--pasture);color:#fff}
+button.rec{background:var(--stoppaint);border-color:var(--stoppaint);color:#fff}
+button.small{min-height:40px;padding:6px 12px;font-size:15px;border-radius:10px}
+button.danger{border-color:#F1B5B1;color:var(--stoppaint)}
+
+/* setup and log screens */
+.topbar{position:sticky;top:-12px;z-index:1000;display:flex;gap:10px;align-items:center;margin:-12px -14px 14px;padding:10px 14px;background:var(--ink);color:#fff}
+.topbar b{font:700 24px var(--cond)}
+.topbar button{min-height:42px;background:transparent;border-color:rgba(255,255,255,.35);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.step{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 12px 0 4px;transform:rotate(45deg);background:var(--sign);border:2px solid var(--ink);border-radius:5px;vertical-align:middle}
+.step span{transform:rotate(-45deg);font:700 19px var(--cond);color:var(--ink)}
+#editTitle{font:700 30px/1.1 var(--cond);margin:18px 2px 12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .row>*{flex:1}
-.muted{color:var(--muted);font-size:14px}
-label{display:block;margin:10px 0 4px;color:var(--muted);font-size:14px}
-input,select{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px solid #444;background:#111;color:var(--text)}
+.muted{color:var(--muted);font-size:15px;font-weight:500}
+label{display:block;margin:12px 0 5px;color:var(--muted);font-size:14px;font-weight:600}
+input,select{font:500 17px var(--sans);width:100%;min-height:48px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-.pt{display:flex;gap:6px;align-items:center;margin-top:6px}
-.pt b{flex:1.4}
-.pt span{flex:1;font-size:13px;color:var(--muted)}
+.pt{display:flex;gap:8px;align-items:center;margin-top:8px}
+.pt b{flex:1.4;font-weight:600}
+.pt span{flex:1;font-size:14px;color:var(--muted)}
 .pt button{flex:0 0 auto}
-#setupMap{height:320px;border-radius:10px;margin-top:10px}
+#setupMap{height:340px;border-radius:14px;margin-top:12px;border:1px solid var(--line)}
+.order{list-style:none;padding:0;margin:10px 0}
+.order li{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--soft);cursor:pointer}
+.order li b{font:700 20px var(--cond)}
+.order li.cur{background:#E4F2E6;border-radius:12px}
+.order li.sel{outline:3px solid #FF9100;border-radius:12px}
+details{margin-top:12px}
+summary{cursor:pointer;padding:12px;border:1.5px solid var(--line);border-radius:12px;font-weight:600;list-style-position:inside}
+details[open] summary{margin-bottom:8px}
+#shapeBar{display:none;background:#FFF0F6;border:1.5px solid #FF4081;border-radius:12px;padding:10px;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:8px 6px;border-bottom:1px solid var(--soft);text-align:left}
+th{font:700 17px var(--cond);color:var(--muted)}
+
+/* the map */
 #shiftMap{flex:1;min-height:150px}
-.order{list-style:none;padding:0;margin:8px 0}
-.order li{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px;border-bottom:1px solid #333}
-.order li .nm{flex:1 1 100%}
+.leaflet-container{background:#1b1f22;font-family:var(--sans)}
+.leaflet-bar a{width:40px!important;height:40px!important;line-height:40px!important;font-size:20px!important;color:var(--ink)!important}
+.lbl{background:rgba(15,44,63,.88);color:#fff;border:0;border-radius:6px;box-shadow:none;font:700 14px var(--cond);padding:1px 6px}
+.lbl:before{display:none}
 .vtx{width:18px;height:18px;border-radius:50%;background:#ff4081;border:2px solid #fff}
 .vtx.tow{background:#ff1744;width:22px;height:22px}
-.hdl{width:28px;height:28px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font:700 13px system-ui,sans-serif;color:#000;background:#ffeb3b;box-shadow:0 0 0 1px #000;cursor:grab}
-.hdl-riser{background:#ab47bc;color:#fff}
-.hdl.hdl-strip{width:24px;height:24px;font-size:12px;border-width:2px}
-.findme{display:flex!important;align-items:center;justify-content:center;width:34px;height:34px;background:#fff}
-details{margin-top:10px}
-summary{cursor:pointer;padding:10px;border:1px solid #444;border-radius:8px;color:var(--text)}
-details[open] summary{margin-bottom:6px}
-#shapeBar{display:none;background:#3a1630;border:1px solid #ff4081;border-radius:8px;padding:8px;margin-top:10px}
-.order li.cur{background:#16361f;border-radius:6px}
-.order li.sel{outline:2px solid #ff9100;border-radius:6px}
-#guide{background:var(--panel);padding:8px 10px}
-#gTitle{font-size:14px;color:var(--muted)}
-#gMain{display:flex;align-items:center;gap:12px;margin:4px 0}
-#arrow{width:64px;height:64px;flex:0 0 64px;transition:transform .3s}
-#gBig{font-size:30px;font-weight:700;line-height:1.1}
-#gSub{font-size:18px}
-#gStep{font-size:15px;color:#ddd;margin:4px 0}
-#gNote{font-size:14px;color:var(--warn)}
-.bar{display:flex;gap:6px;margin-top:6px}
-.bar button{flex:1;padding:12px 4px}
-.stop #gBig{color:var(--stop)} .warn #gBig{color:var(--warn)} .ok #gBig{color:var(--go)}
-#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000;border:1px solid #555;padding:10px 16px;border-radius:8px;display:none;z-index:9999;max-width:90%}
-table{width:100%;border-collapse:collapse;font-size:14px}
-td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
-.leaflet-container{background:#222}
-.lbl{background:rgba(0,0,0,.6);color:#fff;border:0;box-shadow:none;font-size:12px;padding:1px 4px}
-.lbl:before{display:none}
+.hdl{width:30px;height:30px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font:700 15px var(--cond);color:var(--ink);background:var(--sign);box-shadow:0 0 0 1.5px var(--ink);cursor:grab}
+.hdl-riser{background:#AB47BC;color:#fff}
+.hdl.hdl-strip{width:26px;height:26px;font-size:14px;border-width:2px}
+.findme{display:flex!important;align-items:center;justify-content:center;width:40px;height:40px;background:#fff}
+.setupbtn{min-height:40px;background:#fff;color:var(--ink);font:700 18px var(--cond);padding:6px 14px;border-radius:12px;border:2px solid rgba(0,0,0,.2);box-shadow:0 2px 6px rgba(0,0,0,.25)}
+
+/* the guidance sheet: a road sign you read at arm's length */
+#guide{position:relative;z-index:500;margin-top:-18px;background:#fff;border-radius:20px 20px 0 0;padding:10px 14px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -4px 18px rgba(0,0,0,.25);max-height:62%;overflow:auto;border-top:6px solid transparent;transition:background .25s,border-color .25s}
+#guide::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 8px}
+#shLine{min-height:42px;font:700 19px var(--cond);padding:6px 10px;margin-bottom:4px}
+#gTitle{font-size:14px;color:var(--muted);font-weight:600}
+#gMain{display:flex;align-items:center;gap:16px;margin:8px 0 4px}
+.sign{flex:0 0 78px;width:78px;height:78px;display:flex;align-items:center;justify-content:center;position:relative}
+.sign::before{content:"";position:absolute;inset:11px;transform:rotate(45deg);background:var(--sign);border:3px solid var(--ink);border-radius:8px;box-shadow:inset 0 0 0 3px var(--sign),inset 0 0 0 5px var(--ink)}
+.sign:has(#arrow[style*="none"]){display:none}
+#arrow{position:relative;width:40px;height:40px;transition:transform .3s}
+#arrow path{fill:var(--ink)}
+#gBig{font:700 40px/1 var(--cond);letter-spacing:.2px}
+#gSub{font:600 22px/1.15 var(--cond);color:var(--muted);margin-top:2px}
+#gStep{font-size:16px;margin:6px 0 2px}
+#gNote{font-size:15px;color:var(--warn);font-weight:600}
+.bar{display:flex;gap:8px;margin-top:10px}
+.bar button{flex:1;padding:10px 4px}
+.bar #btnDone{flex:1.6;font:700 22px var(--cond)}
+.more summary{border:0;padding:8px 2px;color:var(--muted);font-size:15px}
+#guide.ok{border-top-color:var(--pasture)} #guide.ok #gBig{color:var(--pasture)}
+#guide.warn{border-top-color:var(--sign)} #guide.warn #gBig{color:var(--warn)}
+#guide.stop{background:var(--stoppaint);color:#fff;border-top-color:var(--stoppaint)}
+#guide.stop #gBig{font-size:64px;color:#fff;letter-spacing:2px}
+#guide.stop #gSub,#guide.stop #gTitle,#guide.stop #gStep,#guide.stop .muted,#guide.stop .more summary{color:#fff}
+
+#pg-shift.sim .gpsInfo{display:none!important}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;font-weight:600;padding:12px 18px;border-radius:12px;display:none;z-index:9999;max-width:90%;box-shadow:0 4px 18px rgba(0,0,0,.3)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
@@ -94,7 +138,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
   <div id="setupForm" style="display:none">
     <h3 id="editTitle" style="margin:4px 0 10px"></h3>
     <div class="card">
-      <h3>Step 1. The K-line</h3>
+      <h3><span class="step"><span>1</span></span>The K-line</h3>
       <label>Name</label><input id="f-name">
       <div class="grid2">
         <div><label>Number of pods</label><input id="f-pods" type="number" min="1"></div>
@@ -103,7 +147,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
     </div>
 
     <div class="card">
-      <h3>Step 2. The paddock</h3>
+      <h3><span class="step"><span>2</span></span>The paddock</h3>
       <div class="muted">The paddock is cut into strips side by side. The line waters one half of a strip at a time. Give 3 points, with the GPS (stand there) or by tapping the map:</div>
       <div class="pt"><b>Riser</b><span id="s-riser"></span><button class="small" onclick="gpsPoint('riser')">GPS</button><button class="small" onclick="tapPoint('riser')">Tap map</button></div>
       <div class="pt"><b>Strip 1, one end</b><span id="s-endA"></span><button class="small" onclick="gpsPoint('endA')">GPS</button><button class="small" onclick="tapPoint('endA')">Tap map</button></div>
@@ -137,7 +181,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
     </div>
 
     <div class="card">
-      <h3>Step 3. The order of the shifts</h3>
+      <h3><span class="step"><span>3</span></span>The order of the shifts</h3>
       <div class="muted">One line for each shift, in order. For each one, choose the strip and the side: A (the half at end A) or B. Tap a line to see that shift in orange on the map. Green = where the line is now.</div>
       <ol class="order" id="order"></ol>
       <div class="row"><button onclick="addSet()">+ Add a shift</button></div>
@@ -151,7 +195,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
     </div>
 
     <div class="card">
-      <h3>Step 4. Corners and odd shapes (if you need them)</h3>
+      <h3><span class="step"><span>4</span></span>Corners and odd shapes, if you need them</h3>
       <div class="muted">If a set does not fit the strips (a corner, a short strip, a bend), make a set with its own shape. You draw where the line will lie: tap the tow end first, then along the line toward the riser. Or walk it with the GPS.<br>"Shape" on a set in the list lets you change that set the same way. "Copy" makes the next one beside it.</div>
       <div class="row"><button onclick="addCustom()">+ Add a set with its own shape</button></div>
     </div>
@@ -179,11 +223,11 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <section class="page" id="pg-shift">
   <div id="shiftMap"></div>
   <div id="guide">
-    <select id="shLine" onchange="chooseShiftLine(this.value)" aria-label="K-line to shift" style="padding:8px;margin-bottom:4px"></select>
+    <select id="shLine" onchange="chooseShiftLine(this.value)" aria-label="K-line to shift"></select>
     <div id="gTitle">Tap a K-line on the map to shift it.</div>
     <div id="gMain">
-      <svg id="arrow" viewBox="0 0 64 64"><path d="M32 4 L54 40 L38 36 L38 60 L26 60 L26 36 L10 40 Z" fill="#fff"/></svg>
-      <div><div id="gBig">-</div><div id="gSub"></div></div>
+      <div class="sign" aria-hidden="true"><svg id="arrow" viewBox="0 0 64 64"><path d="M32 4 L54 40 L38 36 L38 60 L26 60 L26 36 L10 40 Z"/></svg></div>
+      <div role="status" aria-live="polite"><div id="gBig">-</div><div id="gSub"></div></div>
     </div>
     <div id="gStep"></div>
     <div id="gNote"></div>
@@ -194,20 +238,25 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
     </div>
     <div class="bar">
       <button id="btnRec" onclick="toggleRec()">Record</button>
-      <button class="primary" onclick="doneShift()">Done</button>
+      <button class="primary" id="btnDone" onclick="doneShift()">Done</button>
       <button onclick="lineIsHere()">Line is here</button>
       <button onclick="findMe(hMap)">Find me</button>
     </div>
-    <div class="bar">
-      <button id="btnHead" onclick="toggleHeadUp()">Map: north up</button>
-      <button id="btnSim" onclick="toggleSim()">Test mode: off</button>
-      <button id="btnAuto" onclick="autoDrive()" style="display:none">Auto drive all shifts</button>
-      <select id="speed" style="display:none;flex:0 0 76px" aria-label="Auto drive speed">
-        <option value="1">1x</option><option value="2">2x</option><option value="5" selected>5x</option>
-        <option value="10">10x</option><option value="20">20x</option><option value="50">50x</option>
-      </select>
-    </div>
-    <div class="muted" style="margin-top:6px">Line in another place? Tap that set on the map, or stand at the tow end and tap "Line is here".</div>
+    <details class="more">
+      <summary>Map turning and test mode</summary>
+      <div class="bar">
+        <button id="btnHead" onclick="toggleHeadUp()">Map: north up</button>
+        <button id="btnSim" onclick="toggleSim()">Test mode: off</button>
+      </div>
+      <div class="bar">
+        <button id="btnAuto" onclick="autoDrive()" style="display:none">Auto drive all shifts</button>
+        <select id="speed" style="display:none;flex:0 0 90px;width:auto" aria-label="Auto drive speed">
+          <option value="1">1x</option><option value="2">2x</option><option value="5" selected>5x</option>
+          <option value="10">10x</option><option value="20">20x</option><option value="50">50x</option>
+        </select>
+      </div>
+      <p class="muted">Line in another place? Tap that set on the map, or stand at the tow end and tap "Line is here".</p>
+    </details>
   </div>
 </section>
 
@@ -249,7 +298,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18j';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18k';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -1213,6 +1262,7 @@ function lineIsHere() {
 
 function toggleSim() {
   sim = !sim; stopAuto();
+  $('#pg-shift').classList.toggle('sim', sim);   // hides the real-GPS warnings in Test mode
   pos = null; heading = null; lastPos = null;   // the GPS keeps running; in Test mode the Shift page ignores it
   if (sim) toast('Test mode: tap the map to move the tractor.');
   drawMe(); guide();
