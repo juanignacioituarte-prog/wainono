@@ -44,6 +44,7 @@ input,select{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px s
 .vtx.tow{background:#ff1744;width:22px;height:22px}
 .hdl{width:28px;height:28px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font:700 13px system-ui,sans-serif;color:#000;background:#ffeb3b;box-shadow:0 0 0 1px #000;cursor:grab}
 .hdl-riser{background:#ab47bc;color:#fff}
+.hdl.hdl-strip{width:24px;height:24px;font-size:12px;border-width:2px}
 .findme{display:flex!important;align-items:center;justify-content:center;width:34px;height:34px;background:#fff}
 details{margin-top:10px}
 summary{cursor:pointer;padding:10px;border:1px solid #444;border-radius:8px;color:var(--text)}
@@ -122,10 +123,11 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
         </div>
       </div>
       <div id="setupMap"></div>
-      <div class="muted">The map shows the strips as white lines with their numbers. Drag the round points R (riser), A and B (strip 1 ends) to move them. If the strips are on the wrong side of strip 1, tap:</div>
+      <div class="muted">The map shows the strips as white lines with their numbers. Drag the round points R (riser), A and B (strip 1 ends) to move them; strip 1 moves all the strips. Drag the numbered points to move the end of one other strip. If the strips are on the wrong side of strip 1, tap:</div>
       <div class="row">
         <button onclick="flipSide()">Strips to the other side</button>
       </div>
+      <div id="movedList"></div>
       <div id="geoWarn" class="muted" style="color:var(--warn)"></div>
       <div class="muted gpsInfo" style="display:none;color:var(--warn)"></div>
     </div>
@@ -241,7 +243,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18d';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18e';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -318,9 +320,12 @@ async function pull() {
     const L = lineById(S.id);
     if (L && db.synced[L.id] !== lineSnap(L)) { keep.push(L); continue; }   // changed here meanwhile: keep ours
     const fresh = Object.assign(blankLine(S.name), S);
+    // an older sheet script does not keep moved strips: keep ours, and send again later
+    let resend = false;
+    if (!('stripEnds' in S) && L && L.stripEnds && Object.keys(L.stripEnds).length) { fresh.stripEnds = L.stripEnds; resend = true; }
     if (L) { Object.keys(L).forEach(k => delete L[k]); Object.assign(L, fresh); keep.push(L); }  // same object, so open pages keep working
     else keep.push(fresh);
-    db.synced[S.id] = lineSnap(keep[keep.length - 1]);
+    db.synced[S.id] = resend ? 'send again' : lineSnap(keep[keep.length - 1]);
   }
   db.lines.forEach(L => { if (!keep.includes(L) && db.synced[L.id] !== lineSnap(L)) keep.push(L); });  // new or changed here, not sent yet
   Object.keys(db.synced).forEach(id => { if (!keep.some(L => L.id === id)) delete db.synced[id]; });
@@ -433,10 +438,23 @@ function offsetPoly(P, d) {
   });
 }
 // Where the pod line lies on a set: from the tow pod to the first pod (riser side), local xy.
+// A strip that was dragged on the Setup map keeps its own two ends (L.stripEnds[k] = { a, b }).
+const movedStrip = (L, k) => L.stripEnds && L.stripEnds[k];
+function stripEndsLL(L, g, k) {
+  const m = movedStrip(L, k), s = (k - 1) * L.stripWidth;
+  return m ? [m.a, m.b] : [g.P(g.len, s), g.P(0, s)];
+}
 function setLineXY(L, pj, set) {
   const len = Math.max(1, (L.pods - 1) * L.podSpacing);
   if (isGrid(set)) {
     const g = geo(L); if (!g) return null;
+    const m = movedStrip(L, set.strip);
+    if (m) {
+      // tow pod endGap in from its end, the line toward the other end
+      const A = pj.toXY(m.a), B = pj.toXY(m.b), [e, o] = set.half === 'A' ? [A, B] : [B, A], u = unit(e, o);
+      const tow = [e[0] + u[0] * L.endGap, e[1] + u[1] * L.endGap];
+      return [tow, [tow[0] + u[0] * len, tow[1] + u[1] * len]];
+    }
     const s = (set.strip - 1) * L.stripWidth, tow = set.half === 'A' ? g.len - L.endGap : L.endGap;
     const dir = set.half === 'A' ? -1 : 1;
     return [pj.toXY(g.P(tow, s)), pj.toXY(g.P(tow + dir * len, s))];
@@ -467,6 +485,7 @@ const smooth = x => x <= 0 ? 0 : x >= 1 ? 1 : (1 - Math.cos(Math.PI * x)) / 2;
 function manualPath(L, g, i) {
   const n = L.order.length, from = L.order[i], to = L.order[(i + 1) % n];
   if (!isGrid(from) || !isGrid(to) || from.half === to.half) return null;
+  if (movedStrip(L, from.strip) || movedStrip(L, to.strip)) return null;   // suggestPath handles moved strips
   const w = L.stripWidth, s0 = (from.strip - 1) * w, s1 = (to.strip - 1) * w;
   const t0 = from.half === 'A' ? g.len - L.endGap : L.endGap;
   const stop = to.half === 'A' ? Math.min(g.len, g.len - L.endGap + L.hitch) : Math.max(0, L.endGap - L.hitch);
@@ -637,6 +656,8 @@ function renderSetup(fit = true) {
     else if (need > half) warn = `The pod line (${need.toFixed(0)} m from the end) is longer than half the paddock (${half.toFixed(0)} m). Check the points.`;
   }
   $('#geoWarn').textContent = warn;
+  const moved = Object.keys(L.stripEnds || {}).filter(k => +k <= L.strips);
+  $('#movedList').innerHTML = moved.map(k => `<div class="pt"><b>Strip ${k} was moved</b><button class="small" onclick="unmoveStrip(${k})">Put it back in line</button></div>`).join('');
   const s = shapeIdx != null && L.order[shapeIdx];
   $('#shapeBar').style.display = s ? 'block' : 'none';
   if (s) $('#shapeText').innerHTML = `<b>Shape of Set ${shapeIdx + 1}: ${esc(shortName(L, s))}</b><br>` +
@@ -660,7 +681,12 @@ function drawSetupMap(fit) {
   sMap.invalidateSize();
   if (sLayer) sLayer.remove();
   sLayer = L_.layerGroup().addTo(sMap);
-  const b = drawLayout(sLayer, L, { allSets: true, pick: shapeIdx == null && !tapFor ? i => pickSet(L, i) : null });
+  const b = drawLayout(sLayer, L, { allSets: true, pick: shapeIdx == null && !tapFor ? i => pickSet(L, i) : null,
+    dragStrips: shapeIdx == null ? (k, e, q, a, bb) => {
+      L.stripEnds = L.stripEnds || {};
+      L.stripEnds[k] = { a: e === 'a' ? [q.lat, q.lng] : a, b: e === 'b' ? [q.lat, q.lng] : bb };
+      save(); renderSetup(false);
+    } : null });
   const s = shapeIdx != null && L.order[shapeIdx];
   if (s) {
     if (s.pts.length > 1) L_.polyline(s.pts, { color: '#ff4081', weight: 4 }).addTo(sLayer);
@@ -695,6 +721,7 @@ function tapPoint(k) {
   const names = { riser: 'the riser', endA: 'strip 1, end A', endB: 'strip 1, end B' };
   $('#tapHint').textContent = `Tap the map at ${names[k]}.`; $('#tapHint').style.display = 'block';
 }
+function unmoveStrip(k) { const L = lineById(edId); delete L.stripEnds[k]; save(); renderSetup(false); }
 function flipSide() { const L = lineById(edId); L.side *= -1; save(); renderSetup(true); }
 function manualOrderFor(L) {
   const f = L.firstHalf, o = f === 'A' ? 'B' : 'A', own = L.order.filter(s => !isGrid(s));
@@ -826,10 +853,16 @@ function drawLayout(layer, L, opt = {}) {
   const g = geo(L);
   if (g) {
     for (let k = 1; k <= L.strips; k++) {
-      const s = (k - 1) * L.stripWidth, a = g.P(g.len, s), b = g.P(0, s);
-      L_.polyline([a, b], { color: '#fff', weight: 1, dashArray: '4 6', opacity: .7 }).addTo(layer);
-      [a, b].forEach(p => L_.circleMarker(p, { radius: 5, color: '#000', weight: 1, fillColor: '#ffeb3b', fillOpacity: 1 }).addTo(layer));
-      L_.marker(a, { opacity: 0 }).bindTooltip('' + k, { permanent: true, className: 'lbl', direction: 'top' }).addTo(layer);
+      const [a, b] = stripEndsLL(L, g, k);
+      L_.polyline([a, b], { color: movedStrip(L, k) ? '#ffeb3b' : '#fff', weight: 1, dashArray: '4 6', opacity: .7 }).addTo(layer);
+      // Setup: strips 2 and up have draggable ends (strip 1's ends are the A and B handles)
+      if (opt.dragStrips && k > 1) [['a', a], ['b', b]].forEach(([e, p]) => {
+        const m = L_.marker(p, { draggable: true, title: `Strip ${k} end (drag to move)`, zIndexOffset: 500,
+          icon: L_.divIcon({ className: '', html: `<div class="hdl hdl-strip">${k}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }) }).addTo(layer);
+        m.on('dragend', () => opt.dragStrips(k, e, m.getLatLng(), a, b));
+      });
+      else [a, b].forEach(p => L_.circleMarker(p, { radius: 5, color: '#000', weight: 1, fillColor: '#ffeb3b', fillOpacity: 1 }).addTo(layer));
+      if (!(opt.dragStrips && k > 1)) L_.marker(a, { opacity: 0 }).bindTooltip('' + k, { permanent: true, className: 'lbl', direction: 'top' }).addTo(layer);
       pts.push(a, b);
     }
     const edge = [-L.stripWidth / 2, (L.strips - .5) * L.stripWidth];
