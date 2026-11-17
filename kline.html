@@ -11,8 +11,9 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 body{display:flex;flex-direction:column}
-header{display:flex;gap:4px;padding:6px;background:var(--panel)}
-header button{flex:1;padding:10px 4px}
+.topbar{position:sticky;top:-12px;z-index:1000;display:flex;gap:8px;align-items:center;margin:-12px -12px 12px;padding:8px 12px;background:var(--panel)}
+.topbar button{padding:8px 12px}
+.setupbtn{background:#fff;color:#222;font:600 14px system-ui,sans-serif;padding:6px 10px;border-radius:8px;border:2px solid rgba(0,0,0,.25);cursor:pointer}
 button{font:inherit;padding:12px 10px;border-radius:8px;border:1px solid #444;background:#2f3338;color:var(--text);cursor:pointer}
 button:active{filter:brightness(1.3)}
 button.on,button.primary{background:var(--go);border-color:var(--go);color:#000;font-weight:600}
@@ -72,27 +73,26 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 </style>
 </head>
 <body>
-<header>
-  <button data-pg="lines" class="on">K-lines</button>
-  <button data-pg="setup">Setup</button>
-  <button data-pg="shift">Shift</button>
-  <button data-pg="log">Log</button>
-</header>
 <main>
 
-<section class="page show" id="pg-lines">
-  <div id="lines"></div>
-  <p class="muted syncInfo"></p>
-  <div class="row">
-    <button class="primary" onclick="newLine()">+ New K-line</button>
-    <button onclick="demoLine()">+ Demo line (for testing)</button>
-  </div>
-  <p class="muted">The shift follows the K-Line manual: drive beside the line on the dry side, over the feed line, and stop when the last pod is 8 m from the paddock end. You can also record your own way to drive a shift. The app then shows your recorded path the next time.</p>
-</section>
-
 <section class="page" id="pg-setup">
-  <div id="setupEmpty" class="muted">Pick a K-line on the K-lines page first.</div>
+  <div class="topbar">
+    <button onclick="show('shift')">&larr; Map</button>
+    <b style="flex:1;text-align:center">Setup</b>
+    <button onclick="show('log')">Log</button>
+  </div>
+  <div class="card">
+    <h3>K-lines</h3>
+    <div id="lines"></div>
+    <div class="row">
+      <button class="primary" onclick="newLine()">+ New K-line</button>
+      <button onclick="demoLine()">+ Demo line (for testing)</button>
+    </div>
+    <p class="muted syncInfo"></p>
+  </div>
+  <div id="setupEmpty" class="muted">Tap "Edit" on a K-line above, or make a new one.</div>
   <div id="setupForm" style="display:none">
+    <h3 id="editTitle" style="margin:4px 0 10px"></h3>
     <div class="card">
       <h3>Step 1. The K-line</h3>
       <label>Name</label><input id="f-name">
@@ -212,6 +212,11 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 </section>
 
 <section class="page" id="pg-log">
+  <div class="topbar">
+    <button onclick="show('setup')">&larr; Setup</button>
+    <b style="flex:1;text-align:center">Log</b>
+    <button onclick="show('shift')">Map</button>
+  </div>
   <div class="card">
     <label>Your name (saved on this phone, goes in the log)</label>
     <input id="me">
@@ -244,7 +249,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18i';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18j';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -353,8 +358,7 @@ async function syncNow() {
   }
 }
 function refreshPage() {
-  if (page === 'lines') renderLines();
-  else if (page === 'setup') renderSetup(false);
+  if (page === 'setup') renderSetup(false);
   else if (page === 'shift') { if (!autoTimer) drawShift(false); }
   else if (page === 'log') renderLog();
 }
@@ -573,26 +577,25 @@ function follow(g, pts, pos) {
 const bearing = (a, b) => (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + 360) % 360;
 
 // ---------- pages ----------
-let page = 'lines', edId = null, shId = null;
-document.querySelectorAll('header button').forEach(b => b.onclick = () => show(b.dataset.pg));
+// The Shift map is the main view. Setup (with the K-lines list) and Log open from small buttons.
+let page = 'shift', edId = null, shId = null;
 function show(pg) {
   page = pg;
-  document.querySelectorAll('header button').forEach(b => b.classList.toggle('on', b.dataset.pg === pg));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('show', p.id === 'pg-' + pg));
-  if (pg === 'lines') renderLines();
   if (pg === 'setup') renderSetup();
   if (pg === 'shift') openShift(); else leaveShift();
   if (pg === 'log') renderLog();
   if (pg === 'setup' || pg === 'shift') startGPS(); else stopGPS();
 }
 
+// The K-lines list at the top of Setup: one row each, the one being edited is marked.
 function renderLines() {
   $('#lines').innerHTML = db.lines.map(L => {
     const n = L.order.length, last = db.log.filter(x => x.line === L.id).slice(-1)[0];
-    return `<div class="card"><h3>${esc(L.name)}</h3>
-      <div>Line is on: ${n ? esc(setName(L, L.cur)) : 'no sets yet'}<br>Next:${n > 1 ? esc(setName(L, (L.cur + 1) % n)) : '-'}</div>
-      <div class="muted">Last moved: ${last ? fmt(last.time) : 'never'}</div>
-      <div class="row"><button class="primary" onclick="startShift('${L.id}')">Shift</button><button onclick="editLine('${L.id}')">Setup</button></div></div>`;
+    return `<div class="pt" style="padding:6px;border-radius:8px;${L.id === edId ? 'outline:2px solid var(--go)' : ''}">
+      <b style="flex:1">${esc(L.name)}<br><span class="muted">${n ? 'On Set ' + (L.cur + 1) : 'No sets yet'} &middot; moved ${last ? fmt(last.time) : 'never'}</span></b>
+      <button class="small" onclick="editLine('${L.id}')">Edit</button>
+      <button class="small primary" onclick="startShift('${L.id}')">Shift</button></div>`;
   }).join('') || '<p class="muted">No K-lines yet.</p>';
 }
 function newLine() {
@@ -602,9 +605,13 @@ function newLine() {
 function demoLine() {
   const L = blankLine('Demo');
   L.riser = [-43.9, 171.75]; L.endA = [-43.9 + 75 / 110540, 171.75]; L.endB = [-43.9 - 75 / 110540, 171.75];
-  db.lines.push(L); manualOrderFor(L); save(); renderLines(); toast('Demo line made. Use Test mode on the Shift page.');
+  db.lines.push(L); manualOrderFor(L); save(); editLine(L.id); toast('Demo line made. Use Test mode on the map.');
 }
-function editLine(id) { edId = id; show('setup'); }
+function editLine(id) {
+  edId = id; selIdx = null; shapeIdx = null;
+  if (page === 'setup') renderSetup(); else show('setup');
+  setTimeout(() => $('#setupForm').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
 function startShift(id) { shId = id; show('shift'); }
 
 // ---------- setup ----------
@@ -623,9 +630,11 @@ FIELDS.forEach(f => $('#f-' + f).addEventListener('change', e => {
 }));
 function renderSetup(fit = true) {
   const L = lineById(edId);
+  renderLines();
   $('#setupEmpty').style.display = L ? 'none' : 'block';
   $('#setupForm').style.display = L ? 'block' : 'none';
   if (!L) return;
+  $('#editTitle').textContent = 'Set up ' + L.name;
   if (shapeIdx != null && !L.order[shapeIdx]) shapeIdx = null;
   FIELDS.forEach(f => { const e = $('#f-' + f); if (document.activeElement !== e) e.value = L[f]; });
   ['riser', 'endA', 'endB'].forEach(k => $('#s-' + k).textContent = L[k] ? 'set' : 'not set');
@@ -855,7 +864,7 @@ function setCur(i) { const L = lineById(edId); L.cur = i; save(); renderSetup(fa
 function delRec(k) { const L = lineById(edId); if (!confirm('Delete this recorded path?')) return; delete L.paths[k]; delete L.use[k]; save(); renderSetup(false); }
 function deleteLine() {
   const L = lineById(edId); if (!confirm(`Delete ${L.name}? Its log stays.`)) return;
-  db.lines = db.lines.filter(x => x !== L); edId = null; save(); show('lines');
+  db.lines = db.lines.filter(x => x !== L); edId = null; if (shId === L.id) shId = null; save(); renderSetup();
 }
 
 // ---------- map drawing ----------
@@ -959,6 +968,17 @@ function openShift() {
   if (!hMap) {
     hMap = makeMap('shiftMap');
     hMap.on('click', e => { if (sim) { stopAuto(); onPos([e.latlng.lat, e.latlng.lng], 1, null, null); } });
+    // small "Setup" button at the top right of the map
+    const Setup = L_.Control.extend({
+      onAdd() {
+        const b = L_.DomUtil.create('button', 'setupbtn');
+        b.innerHTML = '&#9881; Setup';
+        L_.DomEvent.disableClickPropagation(b);
+        L_.DomEvent.on(b, 'click', e => { L_.DomEvent.stop(e); if (shId) edId = edId || shId; show('setup'); });
+        return b;
+      }
+    });
+    new Setup({ position: 'topright' }).addTo(hMap);
   }
   setTimeout(() => { hMap.invalidateSize(); drawShift(true); }, 0);
   if (!L) return;
@@ -1089,7 +1109,7 @@ function guide() {
   $('#pathChoice').style.display = 'none'; $('#gNote').textContent = '';
   if (!L) {
     $('#gTitle').textContent = '';
-    return set(db.lines.length ? 'Pick a K-line' : 'No K-lines yet', db.lines.length ? 'Tap a K-line on the map, or choose it in the list above.' : 'Make one on the K-lines page.');
+    return set(db.lines.length ? 'Pick a K-line' : 'No K-lines yet', db.lines.length ? 'Tap a K-line on the map, or choose it in the list above.' : 'Tap "Setup" at the top right of the map to make one.');
   }
   const n = L.order.length;
   if (n < 2) { $('#gTitle').textContent = L.name; return set('No sets', 'Make the shifting order in Setup.'); }
@@ -1111,7 +1131,7 @@ function guide() {
   }
   if (!sim && !navigator.geolocation) notes.push('No GPS: use Test mode.');
   $('#gNote').textContent = notes.join(' ');
-  if (!pos) return set('Waiting for GPS', sim ? 'Test mode: tap the map to put the tractor there, or tap Auto drive.' : gpsMsg, '', '', null);
+  if (!pos) return set('Waiting for GPS', sim ? 'Test mode: tap the map to put the tractor there, or tap Auto drive.' : '', '', '', null);
   const f = follow(ap.pj, ap.pts, pos);
   const dry = ap.kind === 'man' ? compass(ap.man.dryBear) : null;
   const rel = h => heading == null ? h : ((h - heading + 540) % 360) - 180;
@@ -1261,7 +1281,7 @@ function importData(inp) {
     const d = JSON.parse(t);
     if (!d.lines) throw new Error('not a backup file');
     if (!confirm('Replace all data on this phone with the backup?')) return;
-    db = d; save(); toast('Backup loaded.'); show('lines');
+    db = d; save(); toast('Backup loaded.'); show('setup');
   }).catch(e => toast('Could not load: ' + e.message));
   inp.value = '';
 }
@@ -1276,7 +1296,7 @@ async function checkUpdate() {
   } catch (e) {}
 }
 $('#appVer').textContent = 'App version ' + APP_VERSION;
-renderLines();
+show('shift');
 syncNow();
 checkUpdate();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
