@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="theme-color" content="#111111">
+<title>K-line mover</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--bg:#111;--panel:#1c1e21;--card:#25282c;--text:#f2f2f2;--muted:#9aa0a6;--go:#2ecc71;--warn:#f5a623;--stop:#e74c3c;--path:#00e5ff;--rec:#ff8c1a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{display:flex;flex-direction:column}
+header{display:flex;gap:4px;padding:6px;background:var(--panel)}
+header button{flex:1;padding:10px 4px}
+button{font:inherit;padding:12px 10px;border-radius:8px;border:1px solid #444;background:#2f3338;color:var(--text);cursor:pointer}
+button:active{filter:brightness(1.3)}
+button.on,button.primary{background:var(--go);border-color:var(--go);color:#000;font-weight:600}
+button.rec{background:var(--stop);border-color:var(--stop);color:#fff;font-weight:600}
+button.small{padding:6px 10px;font-size:14px}
+button.danger{border-color:var(--stop);color:#ff8a80}
+main{flex:1;min-height:0;position:relative}
+.page{position:absolute;inset:0;overflow:auto;padding:12px;display:none}
+.page.show{display:block}
+#pg-shift.show{display:flex;flex-direction:column;padding:0}
+.card{background:var(--card);border-radius:10px;padding:12px;margin-bottom:12px}
+.card h3{margin:0 0 6px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.row>*{flex:1}
+.muted{color:var(--muted);font-size:14px}
+label{display:block;margin:10px 0 4px;color:var(--muted);font-size:14px}
+input,select{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px solid #444;background:#111;color:var(--text)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.pt{display:flex;gap:6px;align-items:center;margin-top:6px}
+.pt b{flex:1.4}
+.pt span{flex:1;font-size:13px;color:var(--muted)}
+.pt button{flex:0 0 auto}
+#setupMap{height:320px;border-radius:10px;margin-top:10px}
+#shiftMap{flex:1;min-height:150px}
+.order{list-style:none;padding:0;margin:8px 0}
+.order li{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px;border-bottom:1px solid #333}
+.order li .nm{flex:1 1 100%}
+.vtx{width:18px;height:18px;border-radius:50%;background:#ff4081;border:2px solid #fff}
+.vtx.tow{background:#ff1744;width:22px;height:22px}
+details{margin-top:10px}
+summary{cursor:pointer;padding:10px;border:1px solid #444;border-radius:8px;color:var(--text)}
+details[open] summary{margin-bottom:6px}
+#shapeBar{display:none;background:#3a1630;border:1px solid #ff4081;border-radius:8px;padding:8px;margin-top:10px}
+.order li.cur{background:#16361f;border-radius:6px}
+#guide{background:var(--panel);padding:8px 10px}
+#gTitle{font-size:14px;color:var(--muted)}
+#gMain{display:flex;align-items:center;gap:12px;margin:4px 0}
+#arrow{width:64px;height:64px;flex:0 0 64px;transition:transform .3s}
+#gBig{font-size:30px;font-weight:700;line-height:1.1}
+#gSub{font-size:18px}
+#gStep{font-size:15px;color:#ddd;margin:4px 0}
+#gNote{font-size:14px;color:var(--warn)}
+.bar{display:flex;gap:6px;margin-top:6px}
+.bar button{flex:1;padding:12px 4px}
+.stop #gBig{color:var(--stop)} .warn #gBig{color:var(--warn)} .ok #gBig{color:var(--go)}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000;border:1px solid #555;padding:10px 16px;border-radius:8px;display:none;z-index:9999;max-width:90%}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
+.leaflet-container{background:#222}
+.lbl{background:rgba(0,0,0,.6);color:#fff;border:0;box-shadow:none;font-size:12px;padding:1px 4px}
+.lbl:before{display:none}
+</style>
+</head>
+<body>
+<header>
+  <button data-pg="lines" class="on">K-lines</button>
+  <button data-pg="setup">Setup</button>
+  <button data-pg="shift">Shift</button>
+  <button data-pg="log">Log</button>
+</header>
+<main>
+
+<section class="page show" id="pg-lines">
+  <div id="lines"></div>
+  <p class="muted syncInfo"></p>
+  <div class="row">
+    <button class="primary" onclick="newLine()">+ New K-line</button>
+    <button onclick="demoLine()">+ Demo line (for testing)</button>
+  </div>
+  <p class="muted">The shift follows the K-Line manual: drive beside the line on the dry side, over the feed line, and stop when the last pod is 8 m from the paddock end. You can also record your own way to drive a shift. The app then shows your recorded path the next time.</p>
+</section>
+
+<section class="page" id="pg-setup">
+  <div id="setupEmpty" class="muted">Pick a K-line on the K-lines page first.</div>
+  <div id="setupForm" style="display:none">
+    <div class="card">
+      <h3>Step 1. The K-line</h3>
+      <label>Name</label><input id="f-name">
+      <div class="grid2">
+        <div><label>Number of pods</label><input id="f-pods" type="number" min="1"></div>
+        <div><label>Metres between pods</label><input id="f-podSpacing" type="number" min="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Step 2. The paddock</h3>
+      <div class="muted">The paddock is cut into strips side by side. The line waters one half of a strip at a time. Give 3 points, with the GPS (stand there) or by tapping the map:</div>
+      <div class="pt"><b>Riser</b><span id="s-riser"></span><button class="small" onclick="gpsPoint('riser')">GPS</button><button class="small" onclick="tapPoint('riser')">Tap map</button></div>
+      <div class="pt"><b>Strip 1, one end</b><span id="s-endA"></span><button class="small" onclick="gpsPoint('endA')">GPS</button><button class="small" onclick="tapPoint('endA')">Tap map</button></div>
+      <div class="pt"><b>Strip 1, other end</b><span id="s-endB"></span><button class="small" onclick="gpsPoint('endB')">GPS</button><button class="small" onclick="tapPoint('endB')">Tap map</button></div>
+      <div class="muted">The two ends are the marker points at the paddock fences, in the middle of strip 1.</div>
+      <div class="grid2">
+        <div><label>Strip width (m)</label><input id="f-stripWidth" type="number" min="5"></div>
+        <div><label>Number of strips</label><input id="f-strips" type="number" min="0"></div>
+      </div>
+      <div id="tapHint" class="muted" style="display:none;color:var(--warn)"></div>
+      <div id="shapeBar">
+        <div id="shapeText"></div>
+        <div class="row">
+          <button class="small" onclick="shapeGps()">Add point by GPS</button>
+          <button class="small" onclick="shapeUndo()">Undo point</button>
+          <button class="small" onclick="shapeReverse()">Swap ends</button>
+          <button class="small primary" onclick="shapeDone()">Finish</button>
+        </div>
+      </div>
+      <div id="setupMap"></div>
+      <div class="muted">The map shows the strips as white lines with their numbers. If they are on the wrong side of strip 1, tap:</div>
+      <div class="row">
+        <button onclick="flipSide()">Strips to the other side</button>
+      </div>
+      <div id="geoWarn" class="muted" style="color:var(--warn)"></div>
+    </div>
+
+    <div class="card">
+      <h3>Step 3. The order of the shifts</h3>
+      <div class="muted">The app makes this list for you, the K-Line manual way: strip 1 one half, strip 1 other half, strip 2, and so on. Green = where the line is now. To change it, tap the set on the map, or "Line is here" in the list.</div>
+      <label>Set 1 is in the</label>
+      <select id="f-firstHalf"><option value="A">end A</option><option value="B">end B</option></select>
+      <ul class="order" id="order"></ul>
+      <details>
+        <summary>Change the list by hand (only if you need to)</summary>
+        <div class="muted">Use the arrows on a set to move it up or down, and &#10005; to take it out. To put a set back in the list, choose it here:</div>
+        <div class="grid2">
+          <div><label>Strip number</label><select id="add-strip"></select></div>
+          <div><label>Half of the paddock</label><select id="add-half"><option value="A">end A</option><option value="B">end B</option></select></div>
+        </div>
+        <div class="row"><button onclick="addSet()">+ Add this set to the end of the list</button></div>
+        <div class="row"><button onclick="manualOrder()">Start again with the manual order</button></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>Step 4. Corners and odd shapes (if you need them)</h3>
+      <div class="muted">If a set does not fit the strips (a corner, a short strip, a bend), make a set with its own shape. You draw where the line will lie: tap the tow end first, then along the line toward the riser. Or walk it with the GPS.<br>"Shape" on a set in the list lets you change that set the same way. "Copy" makes the next one beside it.</div>
+      <div class="row"><button onclick="addCustom()">+ Add a set with its own shape</button></div>
+    </div>
+
+    <div class="card">
+      <h3>Recorded paths (your own way)</h3>
+      <div class="muted">On the Shift page, tap "Record" before you drive. When you tap "Done", the track you drove is saved for that shift. Next time the app shows your path.</div>
+      <div id="recList"></div>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>More settings</summary>
+        <div class="grid2">
+          <div><label>Last pod to paddock end (m)</label><input id="f-endGap" type="number" min="0"></div>
+          <div><label>Hook rope: pod to tractor (m)</label><input id="f-hitch" type="number" min="0"></div>
+          <div><label>Drive beside line (m)</label><input id="f-dryGap" type="number" min="0" step="0.5"></div>
+        </div>
+        <div class="row"><button class="danger" onclick="deleteLine()">Delete this K-line</button></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="pg-shift">
+  <div id="shiftMap"></div>
+  <div id="guide">
+    <div id="gTitle">Pick a K-line on the K-lines page.</div>
+    <div id="gMain">
+      <svg id="arrow" viewBox="0 0 64 64"><path d="M32 4 L54 40 L38 36 L38 60 L26 60 L26 36 L10 40 Z" fill="#fff"/></svg>
+      <div><div id="gBig">-</div><div id="gSub"></div></div>
+    </div>
+    <div id="gStep"></div>
+    <div id="gNote"></div>
+    <div class="bar" id="pathChoice" style="display:none">
+      <button id="useMan" onclick="usePath('man')">Suggested path</button>
+      <button id="useRec" onclick="usePath('rec')">My recorded path</button>
+    </div>
+    <div class="bar">
+      <button id="btnRec" onclick="toggleRec()">Record</button>
+      <button class="primary" onclick="doneShift()">Done</button>
+      <button onclick="lineIsHere()">Line is here</button>
+      <button onclick="centreMe()">Centre</button>
+    </div>
+    <div class="bar">
+      <button id="btnSim" onclick="toggleSim()">Test mode: off</button>
+      <button id="btnAuto" onclick="autoDrive()" style="display:none">Auto drive all shifts</button>
+      <select id="speed" style="display:none;flex:0 0 76px" aria-label="Auto drive speed">
+        <option value="1">1x</option><option value="2">2x</option><option value="5" selected>5x</option>
+        <option value="10">10x</option><option value="20">20x</option><option value="50">50x</option>
+      </select>
+    </div>
+    <div class="muted" style="margin-top:6px">Line in another place? Tap that set on the map, or stand at the tow end and tap "Line is here".</div>
+  </div>
+</section>
+
+<section class="page" id="pg-log">
+  <div class="card">
+    <label>Your name (saved on this phone, goes in the log)</label>
+    <input id="me">
+  </div>
+  <div class="card"><h3>Moves</h3><div id="logTable"></div></div>
+  <div class="card">
+    <h3>Google Sheet</h3>
+    <div class="muted">The setup and the log are kept in a Google Sheet, so every phone sees the same K-lines and where each line is. With no signal, changes wait on this phone and go later.</div>
+    <label>Sheet web address (Apps Script, ends with /exec)</label>
+    <input id="sheetUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    <p class="muted syncInfo"></p>
+    <div class="row"><button onclick="syncNow()">Sync now</button></div>
+  </div>
+  <div class="card">
+    <h3>Backup</h3>
+    <div class="muted">A file with all the data on this phone.</div>
+    <div class="row">
+      <button onclick="exportData()">Save backup file</button>
+      <button onclick="$('#importFile').click()">Load backup file</button>
+    </div>
+    <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importData(this)">
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ---------- storage ----------
+const KEY = 'kline-mover-v1';
+const $ = s => document.querySelector(s);
+let db = load();
+function load() {
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.lines) return d; } catch (e) {}
+  return { lines: [], log: [], me: '' };
+}
+// quiet = do not send to the sheet (used by the sync itself)
+function save(quiet) {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Could not save on this phone'); }
+  if (!quiet) scheduleSync();
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 3500); }
+function fmt(ts) { const d = new Date(ts); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
+const uid = () => Math.random().toString(36).slice(2, 10);
+const lineById = id => db.lines.find(l => l.id === id);
+
+function blankLine(name) {
+  return { id: uid(), name, riser: null, endA: null, endB: null, pods: 5, podSpacing: 15, stripWidth: 15, strips: 4,
+    side: 1, firstHalf: 'A', endGap: 8, hitch: 4, dryGap: 2.25, order: [], cur: 0, paths: {}, use: {} };
+}
+
+// ---------- Google Sheet ----------
+// The phone keeps working with no signal. Changes wait on the phone and go to the
+// sheet when it can be reached. The sheet backend is kline_apps_script.js.
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxHb41wogq-jMCAaBccJmviAvhTE__09PSWQRmzKKUEcNMMcyNFhF2OIAmOz1k5V0BS/exec';   // the "K-line mover" sheet; the Log page can change it
+const sheetUrl = () => (db.sheetUrl || SHEET_URL || '').trim();
+let syncTimer = null, syncing = false, syncAgain = false;
+// What a line looked like the last time the sheet had it. A different snapshot = a change to send.
+function lineSnap(L) { const { updatedAt, ...rest } = L; return JSON.stringify(rest); }
+function waiting() {
+  const s = db.synced || {};
+  return db.lines.filter(L => s[L.id] !== lineSnap(L)).length
+    + Object.keys(s).filter(id => !lineById(id)).length + db.log.filter(x => !x.sent).length;
+}
+function setSync(msg) { db.syncMsg = msg; document.querySelectorAll('.syncInfo').forEach(e => e.textContent = msg); }
+function scheduleSync() {
+  if (!sheetUrl()) return;
+  clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1500);
+}
+async function post(body) {
+  // text/plain keeps it a "simple" request, so Apps Script needs no CORS check
+  const r = await fetch(sheetUrl(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (d.status !== 'ok') throw new Error(d.message || 'sheet error');
+}
+async function pushChanges() {
+  db.synced = db.synced || {};
+  for (const L of db.lines.slice()) {
+    const snap = lineSnap(L);
+    if (db.synced[L.id] === snap) continue;
+    await post({ type: 'save_line', line: L, who: db.me || '' });
+    db.synced[L.id] = snap; save(true);
+  }
+  for (const id of Object.keys(db.synced)) {
+    if (lineById(id)) continue;
+    await post({ type: 'delete_line', id });
+    delete db.synced[id]; save(true);
+  }
+  const out = db.log.filter(x => !x.sent);
+  if (out.length) {
+    out.forEach(x => x.id = x.id || uid());
+    await post({ type: 'log', entries: out });
+    out.forEach(x => x.sent = true); save(true);
+  }
+}
+async function pull() {
+  const r = await fetch(sheetUrl() + '?type=all&t=' + Date.now(), { cache: 'no-store' });
+  const d = await r.json();
+  if (d.status !== 'ok') throw new Error(d.message || 'sheet error');
+  db.synced = db.synced || {};
+  const keep = [];
+  for (const S of d.lines) {
+    const L = lineById(S.id);
+    if (L && db.synced[L.id] !== lineSnap(L)) { keep.push(L); continue; }   // changed here meanwhile: keep ours
+    const fresh = Object.assign(blankLine(S.name), S);
+    if (L) { Object.keys(L).forEach(k => delete L[k]); Object.assign(L, fresh); keep.push(L); }  // same object, so open pages keep working
+    else keep.push(fresh);
+    db.synced[S.id] = lineSnap(keep[keep.length - 1]);
+  }
+  db.lines.forEach(L => { if (!keep.includes(L) && db.synced[L.id] !== lineSnap(L)) keep.push(L); });  // new or changed here, not sent yet
+  Object.keys(db.synced).forEach(id => { if (!keep.some(L => L.id === id)) delete db.synced[id]; });
+  db.lines = keep;
+  db.log = d.log.map(x => ({ ...x, sent: true })).concat(db.log.filter(x => !x.sent));
+  save(true);
+}
+async function syncNow() {
+  if (!sheetUrl()) return setSync('No Google Sheet set. The data is only on this phone.');
+  if (syncing) { syncAgain = true; return; }
+  syncing = true; setSync('Saving to the Google Sheet...');
+  try {
+    await pushChanges();
+    await pull();
+    setSync('Google Sheet: up to date (' + fmt(Date.now()) + ').');
+    refreshPage();
+  } catch (e) {
+    const n = waiting();
+    setSync(`Google Sheet not reached${n ? ': ' + n + ' change(s) wait on this phone' : ''}. It tries again in a minute.`);
+    clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 60000);
+  } finally {
+    syncing = false;
+    if (syncAgain) { syncAgain = false; scheduleSync(); }
+  }
+}
+function refreshPage() {
+  if (page === 'lines') renderLines();
+  else if (page === 'setup') renderSetup(false);
+  else if (page === 'shift') { if (!autoTimer) drawShift(false); }
+  else if (page === 'log') renderLog();
+}
+window.addEventListener('online', () => syncNow());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
+
+// ---------- geometry ----------
+// Local metres (x east, y north) around the riser, or around the first point we have.
+function proj(L) {
+  const c = L.order.find(s => s.pts && s.pts.length);
+  const o = L.riser || L.endA || L.endB || (c && c.pts[0]);
+  if (!o) return null;
+  const k = Math.cos(o[0] * Math.PI / 180);
+  return {
+    toXY: p => [(p[1] - o[1]) * 111320 * k, (p[0] - o[0]) * 110540],
+    toLL: q => [o[0] + q[1] / 110540, o[1] + q[0] / (111320 * k)]
+  };
+}
+// The strip grid. t = along strip 1 from end B (0) to end A (len).
+// s = across, 0 on strip 1, growing toward the higher strips.
+function geo(L) {
+  if (!L.riser || !L.endA || !L.endB || !(L.strips > 0)) return null;
+  const { toXY, toLL } = proj(L);
+  const a = toXY(L.endA), b = toXY(L.endB);
+  const len = Math.hypot(a[0] - b[0], a[1] - b[1]);
+  if (len < 20) return null;
+  const u = [(a[0] - b[0]) / len, (a[1] - b[1]) / len];
+  const v = [u[1] * L.side, -u[0] * L.side];
+  const tr = -b[0] * u[0] - b[1] * u[1];
+  const P = (t, s) => toLL([b[0] + u[0] * t + v[0] * s, b[1] + u[1] * t + v[1] * s]);
+  const bearA = (Math.atan2(u[0], u[1]) * 180 / Math.PI + 360) % 360;
+  const bearS = (Math.atan2(v[0], v[1]) * 180 / Math.PI + 360) % 360;
+  return { len, tr, P, toXY, toLL, bearA, bearS };
+}
+function compass(b) { return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(b / 45) % 8]; }
+function halfName(L, h) {
+  const g = geo(L);
+  if (!g) return h === 'A' ? 'end A' : 'end B';
+  return compass(h === 'A' ? g.bearA : (g.bearA + 180) % 360);
+}
+const isGrid = s => s && s.strip != null;
+function shortName(L, s) { return isGrid(s) ? `strip ${s.strip}, ${halfName(L, s.half)} half` : (s.name || 'own shape'); }
+function setName(L, i) {
+  const s = L.order[i];
+  return s ? `Set ${i + 1}: ${shortName(L, s)}` : '-';
+}
+
+// small polyline helpers (local xy)
+const dxy = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+const unit = (a, b) => { const l = dxy(a, b) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+// The first `len` metres of P; goes on straight if P is shorter.
+function walk(P, len) {
+  const out = [P[0]]; let left = len;
+  for (let i = 1; i < P.length && left > 0; i++) {
+    const d = dxy(P[i - 1], P[i]); if (!d) continue;
+    if (d >= left) { const f = left / d; out.push([P[i - 1][0] + f * (P[i][0] - P[i - 1][0]), P[i - 1][1] + f * (P[i][1] - P[i - 1][1])]); left = 0; }
+    else { out.push(P[i]); left -= d; }
+  }
+  if (left > 0) {
+    const b = out[out.length - 1], dir = P.length > 1 ? unit(P[P.length - 2], P[P.length - 1]) : [0, 1];
+    out.push([b[0] + dir[0] * left, b[1] + dir[1] * left]);
+  }
+  return out;
+}
+function resample(P, step) {
+  const out = [P[0]]; let carry = 0;
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i], d = dxy(a, b); if (!d) continue;
+    let s = step - carry;
+    while (s <= d) { out.push([a[0] + (b[0] - a[0]) * s / d, a[1] + (b[1] - a[1]) * s / d]); s += step; }
+    carry = d - (s - step);
+  }
+  const last = P[P.length - 1];
+  if (dxy(out[out.length - 1], last) > 0.05) out.push(last);
+  return out;
+}
+// Shift a polyline sideways; d > 0 = to the left of its direction.
+function offsetPoly(P, d) {
+  return P.map((p, i) => {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], u = unit(a, b);
+    return [p[0] - u[1] * d, p[1] + u[0] * d];
+  });
+}
+// Where the pod line lies on a set: from the tow pod to the first pod (riser side), local xy.
+function setLineXY(L, pj, set) {
+  const len = Math.max(1, (L.pods - 1) * L.podSpacing);
+  if (isGrid(set)) {
+    const g = geo(L); if (!g) return null;
+    const s = (set.strip - 1) * L.stripWidth, tow = set.half === 'A' ? g.len - L.endGap : L.endGap;
+    const dir = set.half === 'A' ? -1 : 1;
+    return [pj.toXY(g.P(tow, s)), pj.toXY(g.P(tow + dir * len, s))];
+  }
+  if (!set.pts || set.pts.length < 2) return null;
+  return walk(set.pts.map(pj.toXY), len);
+}
+function podsLL(L, set) {
+  const pj = proj(L), line = pj && setLineXY(L, pj, set);
+  if (!line) return null;
+  const out = [];
+  for (let i = 0; i < L.pods; i++) { const w = walk(line, i * L.podSpacing); out.push(pj.toLL(w[w.length - 1])); }
+  return out;
+}
+// Which side is dry for a shift from set i: toward the next strip not yet done.
+function drySign(L, i) {
+  const n = L.order.length, s0 = L.order[i].strip;
+  for (let j = 1; j < n; j++) {
+    const s = L.order[(i + j) % n].strip;
+    if (s != null && s !== s0) return Math.sign(s - s0);
+  }
+  return 1;
+}
+const smooth = x => x <= 0 ? 0 : x >= 1 ? 1 : (1 - Math.cos(Math.PI * x)) / 2;
+
+// The manual's shift between two strip sets: start beside the tow end on the dry side,
+// drive past the riser, line up on the marker, stop when the tow pod is endGap from the far end.
+function manualPath(L, g, i) {
+  const n = L.order.length, from = L.order[i], to = L.order[(i + 1) % n];
+  if (!isGrid(from) || !isGrid(to) || from.half === to.half) return null;
+  const w = L.stripWidth, s0 = (from.strip - 1) * w, s1 = (to.strip - 1) * w;
+  const t0 = from.half === 'A' ? g.len - L.endGap : L.endGap;
+  const stop = to.half === 'A' ? Math.min(g.len, g.len - L.endGap + L.hitch) : Math.max(0, L.endGap - L.hitch);
+  const dir = Math.sign(stop - t0), total = Math.abs(stop - t0), aMid = Math.abs(g.tr - t0);
+  const dry = drySign(L, i), sd = s0 + dry * L.dryGap;
+  let a1, a2;
+  if (s1 === s0) { a2 = Math.max(5, aMid - 2); a1 = Math.max(0, a2 - 20); }
+  else {
+    a1 = Math.min(2 * L.podSpacing, aMid * 0.4);       // pull forward to the third pod
+    a2 = Math.min(a1 + Math.max(25, 1.5 * Math.abs(s1 - sd)), aMid - 2);
+    if (a2 < a1 + 10) a2 = a1 + 10;
+  }
+  const pts = [];
+  for (let a = 0; a < total; a += 1) pts.push(g.P(t0 + dir * a, sd + (s1 - sd) * smooth((a - a1) / (a2 - a1))));
+  pts.push(g.P(stop, s1));
+  return { pts, long: Math.abs(to.strip - from.strip) > 1, dryBear: (g.bearS + (dry < 0 ? 180 : 0)) % 360 };
+}
+// Any two sets (own shapes too): beside the line on the dry side to its first pod,
+// a smooth turn, then along the new set from its first pod out to the tow end.
+function suggestPath(L, i) {
+  const pj = proj(L); if (!pj) return null;
+  const n = L.order.length, A = setLineXY(L, pj, L.order[i]), B = setLineXY(L, pj, L.order[(i + 1) % n]);
+  if (!A || !B) return null;
+  const mid = P => P.reduce((m, p) => [m[0] + p[0] / P.length, m[1] + p[1] / P.length], [0, 0]);
+  const cA = mid(A), cB = mid(B), dA = unit(A[0], A[A.length - 1]);
+  const dry = Math.sign(dA[0] * (cB[1] - cA[1]) - dA[1] * (cB[0] - cA[0])) || 1;   // +1 = left
+  const Aoff = offsetPoly(A, dry * L.dryGap);
+  const Bin = B.slice().reverse();
+  const d3 = unit(Bin[Bin.length - 2], Bin[Bin.length - 1]), tail = Bin[Bin.length - 1];
+  Bin.push([tail[0] + d3[0] * L.hitch, tail[1] + d3[1] * L.hitch]);
+  const p0 = Aoff[Aoff.length - 1], d0 = unit(Aoff[Aoff.length - 2], p0), p3 = Bin[0], d1 = unit(Bin[0], Bin[1]);
+  const D = dxy(p0, p3), h = Math.max(8, D / 2);
+  const c1 = [p0[0] + d0[0] * h, p0[1] + d0[1] * h], c2 = [p3[0] - d1[0] * h, p3[1] - d1[1] * h];
+  const bez = [], m = Math.max(10, Math.ceil(D));
+  for (let k = 1; k < m; k++) {
+    const t = k / m, s = 1 - t;
+    bez.push([0, 1].map(j => s * s * s * p0[j] + 3 * s * s * t * c1[j] + 3 * s * t * t * c2[j] + t * t * t * p3[j]));
+  }
+  const turn = Math.acos(Math.max(-1, Math.min(1, d0[0] * d1[0] + d0[1] * d1[1]))) * 180 / Math.PI;
+  const nrm = [-dA[1] * dry, dA[0] * dry];
+  return {
+    pts: resample([...Aoff, ...bez, ...Bin], 1).map(pj.toLL),
+    sharp: turn > 100, long: D > 3 * L.stripWidth,
+    dryBear: (Math.atan2(nrm[0], nrm[1]) * 180 / Math.PI + 360) % 360
+  };
+}
+const setId = s => s.id || `${s.strip}${s.half}`;
+function shiftKey(L, i) {
+  const n = L.order.length;
+  return `${setId(L.order[i])}>${setId(L.order[(i + 1) % n])}`;
+}
+function activePath(L) {
+  const pj = proj(L), g = geo(L);
+  if (!pj || L.order.length < 2) return { pj, g, pts: null };
+  const key = shiftKey(L, L.cur), rec = L.paths[key];
+  const man = (g && manualPath(L, g, L.cur)) || suggestPath(L, L.cur);
+  let kind = L.use[key] || (rec ? 'rec' : 'man');
+  if (kind === 'rec' && !rec) kind = 'man';
+  if (kind === 'man' && !man) kind = rec ? 'rec' : null;
+  const pts = kind === 'rec' ? rec.pts : kind === 'man' ? man.pts : null;
+  return { pj, g, key, rec, man, kind, pts };
+}
+
+// distance along a polyline in local xy
+function follow(g, pts, pos) {
+  const P = pts.map(g.toXY), p = g.toXY(pos), cum = [0];
+  for (let i = 1; i < P.length; i++) cum[i] = cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+  let best = { d: Infinity };
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-9;
+    let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2; t = Math.max(0, Math.min(1, t));
+    const q = [a[0] + t * dx, a[1] + t * dy], d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    if (d < best.d) best = { d, along: cum[i - 1] + t * Math.sqrt(l2), side: Math.sign(dx * (p[1] - a[1]) - dy * (p[0] - a[0])) };
+  }
+  const total = cum[cum.length - 1];
+  const at = s => {
+    s = Math.max(0, Math.min(total, s));
+    let i = 1; while (i < cum.length - 1 && cum[i] < s) i++;
+    const f = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1e-9);
+    return [P[i - 1][0] + f * (P[i][0] - P[i - 1][0]), P[i - 1][1] + f * (P[i][1] - P[i - 1][1])];
+  };
+  return { off: best.d * best.side, dist: best.d, along: best.along, total, left: total - best.along, at, p, start: P[0] };
+}
+const bearing = (a, b) => (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + 360) % 360;
+
+// ---------- pages ----------
+let page = 'lines', edId = null, shId = null;
+document.querySelectorAll('header button').forEach(b => b.onclick = () => show(b.dataset.pg));
+function show(pg) {
+  page = pg;
+  document.querySelectorAll('header button').forEach(b => b.classList.toggle('on', b.dataset.pg === pg));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('show', p.id === 'pg-' + pg));
+  if (pg === 'lines') renderLines();
+  if (pg === 'setup') renderSetup();
+  if (pg === 'shift') openShift(); else leaveShift();
+  if (pg === 'log') renderLog();
+}
+
+function renderLines() {
+  $('#lines').innerHTML = db.lines.map(L => {
+    const n = L.order.length, last = db.log.filter(x => x.line === L.id).slice(-1)[0];
+    return `<div class="card"><h3>${esc(L.name)}</h3>
+      <div>Line is on: ${n ? esc(setName(L, L.cur)) : 'no sets yet'}<br>Next:${n > 1 ? esc(setName(L, (L.cur + 1) % n)) : '-'}</div>
+      <div class="muted">Last moved: ${last ? fmt(last.time) : 'never'}</div>
+      <div class="row"><button class="primary" onclick="startShift('${L.id}')">Shift</button><button onclick="editLine('${L.id}')">Setup</button></div></div>`;
+  }).join('') || '<p class="muted">No K-lines yet.</p>';
+}
+function newLine() {
+  const L = blankLine('K' + (db.lines.length + 1));
+  db.lines.push(L); manualOrderFor(L); save(); editLine(L.id);
+}
+function demoLine() {
+  const L = blankLine('Demo');
+  L.riser = [-43.9, 171.75]; L.endA = [-43.9 + 75 / 110540, 171.75]; L.endB = [-43.9 - 75 / 110540, 171.75];
+  db.lines.push(L); manualOrderFor(L); save(); renderLines(); toast('Demo line made. Use Test mode on the Shift page.');
+}
+function editLine(id) { edId = id; show('setup'); }
+function startShift(id) { shId = id; show('shift'); }
+
+// ---------- setup ----------
+let sMap = null, sLayer = null, tapFor = null, shapeIdx = null;
+const FIELDS = ['name', 'pods', 'podSpacing', 'stripWidth', 'strips', 'endGap', 'hitch', 'dryGap', 'firstHalf'];
+FIELDS.forEach(f => $('#f-' + f).addEventListener('change', e => {
+  const L = lineById(edId); if (!L) return;
+  const v = e.target.value;
+  L[f] = (f === 'name' || f === 'firstHalf') ? v : Math.max(0, parseFloat(v) || 0);
+  if (f === 'strips' || f === 'firstHalf') {
+    // a list nobody changed by hand follows the strips; a changed one only loses strips that are gone
+    if (!L.handOrder) manualOrderFor(L);
+    else { L.order = L.order.filter(s => !isGrid(s) || s.strip <= L.strips); if (L.cur >= L.order.length) L.cur = 0; }
+  }
+  save(); renderSetup(f === 'strips' || f === 'stripWidth');
+}));
+function renderSetup(fit = true) {
+  const L = lineById(edId);
+  $('#setupEmpty').style.display = L ? 'none' : 'block';
+  $('#setupForm').style.display = L ? 'block' : 'none';
+  if (!L) return;
+  if (shapeIdx != null && !L.order[shapeIdx]) shapeIdx = null;
+  FIELDS.forEach(f => { const e = $('#f-' + f); if (document.activeElement !== e) e.value = L[f]; });
+  ['riser', 'endA', 'endB'].forEach(k => $('#s-' + k).textContent = L[k] ? 'set' : 'not set');
+  $('#add-strip').innerHTML = Array.from({ length: L.strips }, (_, i) => `<option>${i + 1}</option>`).join('');
+  ['A', 'B'].forEach(h => {
+    $(`#add-half option[value=${h}]`).textContent = halfName(L, h) + ' half';
+    $(`#f-firstHalf option[value=${h}]`).textContent = halfName(L, h) + ' half';
+  });
+  $('#order').innerHTML = L.order.map((s, i) => `<li class="${i === L.cur ? 'cur' : ''}">
+      <span class="nm"><b>Set ${i + 1}</b>: ${esc(shortName(L, s))}${i === L.cur ? ' &mdash; <b style="color:var(--go)">the line is here now</b>' : ''}</span>
+      ${i === L.cur ? '' : `<button class="small" onclick="setCur(${i})">Line is here</button>`}
+      <button class="small" onclick="editShape(${i})">Shape</button>
+      ${isGrid(s) ? '' : `<button class="small" onclick="copyShape(${i})">Copy</button>`}
+      <button class="small" onclick="moveSet(${i},-1)" aria-label="Move up">&#9650;</button>
+      <button class="small" onclick="moveSet(${i},1)" aria-label="Move down">&#9660;</button>
+      <button class="small danger" onclick="delSet(${i})" aria-label="Delete">&#10005;</button>
+      <label style="margin:0;flex:1 1 100%;display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" style="width:auto" ${s.feed ? 'checked' : ''} onchange="setFeed(${i},this.checked)">Move the feed line by hand before shifting to this set</label></li>`).join('');
+  const keys = Object.keys(L.paths);
+  $('#recList').innerHTML = keys.length ? '<table>' + keys.map(k => {
+    const r = L.paths[k];
+    return `<tr><td>${esc(r.label || k)}<br><span class="muted">${fmt(r.time)}, ${r.pts.length} points</span></td>
+      <td><button class="small danger" onclick="delRec('${esc(k)}')">Delete</button></td></tr>`;
+  }).join('') + '</table>' : '<p class="muted">None yet.</p>';
+  const g = geo(L);
+  let warn = '';
+  if (g) {
+    const half = Math.min(g.tr, g.len - g.tr), need = L.endGap + (L.pods - 1) * L.podSpacing;
+    if (g.tr < 10 || g.tr > g.len - 10) warn = 'The riser is not between the two ends.';
+    else if (need > half) warn = `The pod line (${need.toFixed(0)} m from the end) is longer than half the paddock (${half.toFixed(0)} m). Check the points.`;
+  }
+  $('#geoWarn').textContent = warn;
+  const s = shapeIdx != null && L.order[shapeIdx];
+  $('#shapeBar').style.display = s ? 'block' : 'none';
+  if (s) $('#shapeText').innerHTML = `<b>Shape of Set ${shapeIdx + 1}: ${esc(shortName(L, s))}</b><br>` +
+    (s.pts.length ? `${s.pts.length} points. Tap the map to add the next point toward the riser. Drag a point to move it. The big red point is the tow end.`
+      : 'Tap the map at the tow end first (the end you hook to). Then tap along the line toward the riser.');
+  setTimeout(() => drawSetupMap(fit), 0);
+}
+function drawSetupMap(fit) {
+  const L = lineById(edId); if (!L) return;
+  if (!sMap) {
+    sMap = makeMap('setupMap');
+    sMap.on('click', e => {
+      const Lx = lineById(edId), p = [e.latlng.lat, e.latlng.lng];
+      let fit = false;
+      if (tapFor) { Lx[tapFor] = p; tapFor = null; $('#tapHint').style.display = 'none'; fit = !!geo(Lx); }
+      else if (shapeIdx != null && Lx.order[shapeIdx]) Lx.order[shapeIdx].pts.push(p);
+      else return;
+      save(); renderSetup(fit);
+    });
+  }
+  sMap.invalidateSize();
+  if (sLayer) sLayer.remove();
+  sLayer = L_.layerGroup().addTo(sMap);
+  const b = drawLayout(sLayer, L, { allSets: true, pick: shapeIdx == null && !tapFor ? i => pickSet(L, i) : null });
+  const s = shapeIdx != null && L.order[shapeIdx];
+  if (s) {
+    if (s.pts.length > 1) L_.polyline(s.pts, { color: '#ff4081', weight: 4 }).addTo(sLayer);
+    const pods = podsLL(L, s);
+    if (pods) pods.forEach(p => L_.circleMarker(p, { radius: 4, color: '#fff', weight: 1, fillColor: '#ff4081', fillOpacity: 1 }).addTo(sLayer));
+    s.pts.forEach((p, j) => {
+      const m = L_.marker(p, { draggable: true, icon: L_.divIcon({ className: '', html: `<div class="vtx${j === 0 ? ' tow' : ''}"></div>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(sLayer);
+      m.on('dragend', () => { const q = m.getLatLng(); s.pts[j] = [q.lat, q.lng]; save(); renderSetup(false); });
+    });
+  }
+  if (fit) b ? sMap.fitBounds(b, { padding: [20, 20] }) : (L.riser && sMap.setView(L.riser, 17));
+}
+function gpsHere(ok) {
+  if (!navigator.geolocation) return toast('No GPS on this device');
+  toast('Getting GPS...');
+  navigator.geolocation.getCurrentPosition(p => { ok([p.coords.latitude, p.coords.longitude]); toast(`Saved. GPS accuracy about ${Math.round(p.coords.accuracy)} m.`); },
+    e => toast('GPS: ' + e.message), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+function gpsPoint(k) { gpsHere(p => { const L = lineById(edId); L[k] = p; save(); renderSetup(); }); }
+function tapPoint(k) {
+  tapFor = k; shapeIdx = null; $('#shapeBar').style.display = 'none';
+  const names = { riser: 'the riser', endA: 'strip 1, end A', endB: 'strip 1, end B' };
+  $('#tapHint').textContent = `Tap the map at ${names[k]}.`; $('#tapHint').style.display = 'block';
+}
+function flipSide() { const L = lineById(edId); L.side *= -1; save(); renderSetup(true); }
+function manualOrderFor(L) {
+  const f = L.firstHalf, o = f === 'A' ? 'B' : 'A', own = L.order.filter(s => !isGrid(s));
+  L.order = [];
+  for (let k = 1; k <= L.strips; k++) L.order.push({ strip: k, half: f }, { strip: k, half: o });
+  L.order.push(...own);
+  L.cur = 0;
+}
+function manualOrder() {
+  const L = lineById(edId);
+  if (L.order.length && !confirm('Replace the shifting order with the manual order? Own-shape sets stay, at the end.')) return;
+  shapeIdx = null; manualOrderFor(L); L.handOrder = false; save(); renderSetup(false);
+}
+function addSet() {
+  const L = lineById(edId);
+  if (!(L.strips > 0)) return toast('There are no strips. Set "Number of strips" first.');
+  L.order.push({ strip: +$('#add-strip').value, half: $('#add-half').value }); L.handOrder = true; save(); renderSetup(false);
+}
+function addCustom() {
+  const L = lineById(edId), n = L.order.filter(s => !isGrid(s)).length + 1;
+  const name = prompt('Name for this set (for example "north-east corner")', 'Own shape ' + n);
+  if (name == null) return;
+  L.order.push({ id: 'c' + uid(), name: name.trim() || 'Own shape ' + n, pts: [] });
+  save(); editShape(L.order.length - 1);
+}
+function editShape(i) {
+  const L = lineById(edId), s = L.order[i];
+  if (isGrid(s)) {
+    if (!confirm('Give this set its own shape? It starts where the strip set is now. Then you can move its points.')) return;
+    const pj = proj(L), line = pj && setLineXY(L, pj, s);
+    L.order[i] = { id: 'c' + uid(), name: shortName(L, s) + ' (own shape)', pts: line ? line.map(pj.toLL) : [], feed: s.feed };
+    save();
+  }
+  shapeIdx = i; tapFor = null; $('#tapHint').style.display = 'none';
+  renderSetup(false);
+  setTimeout(() => $('#shapeBar').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+}
+function shapeGps() { gpsHere(p => { const L = lineById(edId); L.order[shapeIdx].pts.push(p); save(); renderSetup(false); }); }
+function shapeUndo() { const L = lineById(edId); L.order[shapeIdx].pts.pop(); save(); renderSetup(false); }
+function shapeReverse() { const L = lineById(edId); L.order[shapeIdx].pts.reverse(); save(); renderSetup(false); }
+function shapeDone() {
+  const L = lineById(edId), s = L.order[shapeIdx];
+  if (s && s.pts.length < 2) return toast('A set needs at least 2 points: the tow end and one more toward the riser.');
+  shapeIdx = null; renderSetup(false);
+}
+function copyShape(i) {
+  const L = lineById(edId), s = L.order[i], pj = proj(L);
+  if (!s.pts || s.pts.length < 2) return toast('Draw this set first.');
+  const d = parseFloat(prompt('Copy this set beside it. How many metres to the side?\n+ = to the right, - = to the left (standing at the tow end, looking along the line)', L.stripWidth));
+  if (!d) return;
+  const P = s.pts.map(pj.toXY), u = unit(P[0], P[P.length - 1]);
+  const pts = P.map(p => pj.toLL([p[0] + u[1] * d, p[1] - u[0] * d]));
+  L.order.splice(i + 1, 0, { id: 'c' + uid(), name: s.name + ' copy', pts });
+  if (L.cur > i) L.cur++;
+  save(); editShape(i + 1);
+}
+function moveSet(i, d) {
+  const L = lineById(edId), j = i + d; if (j < 0 || j >= L.order.length) return;
+  [L.order[i], L.order[j]] = [L.order[j], L.order[i]];
+  if (L.cur === i) L.cur = j; else if (L.cur === j) L.cur = i;
+  if (shapeIdx === i) shapeIdx = j; else if (shapeIdx === j) shapeIdx = i;
+  L.handOrder = true; save(); renderSetup(false);
+}
+function delSet(i) {
+  const L = lineById(edId);
+  if (!confirm(`Delete ${setName(L, i)}?`)) return;
+  if (isGrid(L.order[i])) L.handOrder = true;
+  L.order.splice(i, 1);
+  if (L.cur >= L.order.length) L.cur = 0; else if (i < L.cur) L.cur--;
+  shapeIdx = null; save(); renderSetup(false);
+}
+function setCur(i) { const L = lineById(edId); L.cur = i; save(); renderSetup(false); }
+function setFeed(i, v) { const L = lineById(edId); L.order[i].feed = v; save(); }
+function delRec(k) { const L = lineById(edId); if (!confirm('Delete this recorded path?')) return; delete L.paths[k]; delete L.use[k]; save(); renderSetup(false); }
+function deleteLine() {
+  const L = lineById(edId); if (!confirm(`Delete ${L.name}? Its log stays.`)) return;
+  db.lines = db.lines.filter(x => x !== L); edId = null; save(); show('lines');
+}
+
+// ---------- map drawing ----------
+const L_ = window.L;
+function makeMap(id) {
+  const m = L_.map(id, { zoomControl: true, attributionControl: false, zoomSnap: 0.25 });
+  L_.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 21 }).addTo(m);
+  m.setView([-43.9, 171.75], 15);
+  return m;
+}
+function drawPods(layer, L, set, style) {
+  const pts = podsLL(L, set);
+  if (!pts) return null;
+  L_.polyline(pts, { color: style.color, weight: style.weight, dashArray: style.dash, opacity: .9 }).addTo(layer);
+  pts.forEach((p, i) => L_.circleMarker(p, { radius: i === 0 ? 7 : 5, color: '#000', weight: 1, fillColor: i === 0 ? '#ff5252' : style.color, fillOpacity: 1 }).addTo(layer));
+  return pts;
+}
+function drawLayout(layer, L, opt = {}) {
+  const pts = [];
+  ['riser', 'endA', 'endB'].forEach(k => L[k] && pts.push(L[k]));
+  const g = geo(L);
+  if (g) {
+    for (let k = 1; k <= L.strips; k++) {
+      const s = (k - 1) * L.stripWidth, a = g.P(g.len, s), b = g.P(0, s);
+      L_.polyline([a, b], { color: '#fff', weight: 1, dashArray: '4 6', opacity: .7 }).addTo(layer);
+      [a, b].forEach(p => L_.circleMarker(p, { radius: 5, color: '#000', weight: 1, fillColor: '#ffeb3b', fillOpacity: 1 }).addTo(layer));
+      L_.marker(a, { opacity: 0 }).bindTooltip('' + k, { permanent: true, className: 'lbl', direction: 'top' }).addTo(layer);
+      pts.push(a, b);
+    }
+    const edge = [-L.stripWidth / 2, (L.strips - .5) * L.stripWidth];
+    L_.polygon([g.P(0, edge[0]), g.P(g.len, edge[0]), g.P(g.len, edge[1]), g.P(0, edge[1])], { color: '#fff', weight: 1, fill: false, opacity: .5 }).addTo(layer);
+    L_.marker(g.P(g.len, -L.stripWidth / 2), { opacity: 0 }).bindTooltip('end A', { permanent: true, className: 'lbl', direction: 'left' }).addTo(layer);
+    L_.marker(g.P(0, -L.stripWidth / 2), { opacity: 0 }).bindTooltip('end B', { permanent: true, className: 'lbl', direction: 'left' }).addTo(layer);
+  } else {
+    ['endA', 'endB'].forEach(k => L[k] && L_.circleMarker(L[k], { radius: 6, color: '#000', weight: 1, fillColor: '#ffeb3b', fillOpacity: 1 }).addTo(layer));
+  }
+  // own-shape sets: thin pink lines with their set number
+  L.order.forEach((s, i) => {
+    if (isGrid(s) || !s.pts || s.pts.length < 2) return;
+    const pods = podsLL(L, s);
+    L_.polyline(pods, { color: '#ff4081', weight: 2, dashArray: '3 5', opacity: .9 }).addTo(layer);
+    L_.marker(pods[0], { opacity: 0 }).bindTooltip('Set ' + (i + 1), { permanent: true, className: 'lbl', direction: 'top' }).addTo(layer);
+    pts.push(...pods);
+  });
+  // every set gets a wide, see-through line on top: tap it to say "the line is here"
+  if (opt.pick) L.order.forEach((s, i) => {
+    const pods = podsLL(L, s); if (!pods) return;
+    L_.polyline(pods, { weight: 22, opacity: 0.01, color: '#fff', bubblingMouseEvents: false })
+      .on('click', () => opt.pick(i)).addTo(layer);
+  });
+  if (L.riser) L_.circleMarker(L.riser, { radius: 8, color: '#fff', weight: 2, fillColor: '#2979ff', fillOpacity: 1 }).bindTooltip('Riser', { permanent: true, className: 'lbl', direction: 'right' }).addTo(layer);
+  if (opt.allSets && L.order[L.cur]) drawPods(layer, L, L.order[L.cur], { color: '#2ecc71', weight: 4 });
+  return pts.length > 1 ? L_.latLngBounds(pts) : null;
+}
+
+// ---------- shift ----------
+let hMap = null, hLayer = null, meLayer = null, recLine = null;
+let pos = null, acc = null, heading = null, lastPos = null, watchId = null;
+let sim = false, autoTimer = null, recording = false, track = [], wake = null;
+function openShift() {
+  if (!shId && db.lines.length === 1) shId = db.lines[0].id;
+  const L = lineById(shId);
+  if (!hMap) {
+    hMap = makeMap('shiftMap');
+    hMap.on('click', e => { if (sim) { stopAuto(); onPos([e.latlng.lat, e.latlng.lng], 1, null, null); } });
+  }
+  setTimeout(() => { hMap.invalidateSize(); drawShift(true); }, 0);
+  if (!L) return;
+  if (!sim) startGPS();
+  try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => wake = w).catch(() => {}); } catch (e) {}
+}
+function leaveShift() {
+  stopGPS(); stopAuto();
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+}
+function drawShift(fit) {
+  const L = lineById(shId);
+  if (hLayer) hLayer.remove();
+  hLayer = L_.layerGroup().addTo(hMap);
+  if (!L) { guide(); return; }
+  const b = drawLayout(hLayer, L, { pick: i => pickSet(L, i) });
+  const ap = activePath(L), n = L.order.length;
+  if (ap.pj && n) {
+    drawPods(hLayer, L, L.order[L.cur], { color: '#2ecc71', weight: 5 });
+    if (n > 1) drawPods(hLayer, L, L.order[(L.cur + 1) % n], { color: '#ffeb3b', weight: 4, dash: '8 8' });
+  }
+  if (ap.pts) {
+    L_.polyline(ap.pts, { color: ap.kind === 'rec' ? '#ff8c1a' : '#00e5ff', weight: 4 }).addTo(hLayer);
+    const end = ap.pts[ap.pts.length - 1], g = ap.pj, prev = ap.pts[Math.max(0, ap.pts.length - 4)];
+    // red stop bar across the end of the path
+    const e = g.toXY(end), p = g.toXY(prev), dx = e[0] - p[0], dy = e[1] - p[1], l = Math.hypot(dx, dy) || 1;
+    L_.polyline([g.toLL([e[0] - dy / l * 6, e[1] + dx / l * 6]), g.toLL([e[0] + dy / l * 6, e[1] - dx / l * 6])], { color: '#e74c3c', weight: 6 }).addTo(hLayer);
+    L_.circleMarker(ap.pts[0], { radius: 7, color: '#fff', weight: 2, fillColor: '#00e5ff', fillOpacity: 1 }).bindTooltip('Start', { permanent: true, className: 'lbl', direction: 'left' }).addTo(hLayer);
+  }
+  recLine = null;
+  if (track.length) recLine = L_.polyline(track, { color: '#ff8c1a', weight: 3, dashArray: '2 6' }).addTo(hLayer);
+  if (fit && b) hMap.fitBounds(b, { padding: [10, 10] });
+  drawMe(); guide();
+}
+function drawMe() {
+  if (meLayer) meLayer.remove();
+  meLayer = L_.layerGroup().addTo(hMap);
+  if (!pos) return;
+  if (acc && acc > 2) L_.circle(pos, { radius: acc, color: '#2979ff', weight: 1, fillOpacity: .1 }).addTo(meLayer);
+  L_.circleMarker(pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#2979ff', fillOpacity: 1 }).addTo(meLayer);
+}
+function centreMe() { if (pos) hMap.setView(pos, Math.max(hMap.getZoom(), 18)); else drawShift(true); }
+
+function startGPS() {
+  if (watchId !== null) return;
+  if (!navigator.geolocation) { toast('No GPS on this device. Use Test mode.'); return; }
+  watchId = navigator.geolocation.watchPosition(
+    p => onPos([p.coords.latitude, p.coords.longitude], p.coords.accuracy, p.coords.heading, p.coords.speed),
+    e => toast('GPS: ' + e.message + ' (Test mode works without GPS)'),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+}
+function stopGPS() { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
+function onPos(p, a, hd, sp) {
+  const L = lineById(shId), g = L && proj(L);
+  if (lastPos && g) {
+    const A = g.toXY(lastPos), B = g.toXY(p);
+    if (Math.hypot(B[0] - A[0], B[1] - A[1]) > 1.5) { heading = bearing(A, B); lastPos = p; }
+  } else lastPos = p;
+  if (hd != null && sp != null && sp > 0.7) heading = hd;
+  pos = p; acc = a;
+  if (recording && (a == null || a < 20)) {
+    const q = track[track.length - 1];
+    if (!q || !g || Math.hypot(...[0, 1].map(i => g.toXY(p)[i] - g.toXY(q)[i])) > 1) {
+      track.push([+p[0].toFixed(7), +p[1].toFixed(7)]);
+      if (recLine) recLine.setLatLngs(track); else if (hLayer) recLine = L_.polyline(track, { color: '#ff8c1a', weight: 3, dashArray: '2 6' }).addTo(hLayer);
+    }
+  }
+  drawMe(); guide();
+}
+
+function guide() {
+  const L = lineById(shId), box = $('#guide');
+  const set = (big, sub, step, cls, rot) => {
+    $('#gBig').textContent = big; $('#gSub').textContent = sub || ''; $('#gStep').textContent = step || '';
+    box.className = cls || '';
+    $('#arrow').style.display = rot == null ? 'none' : 'block';
+    if (rot != null) $('#arrow').style.transform = `rotate(${rot}deg)`;
+  };
+  $('#btnRec').textContent = recording ? `Recording (${track.length})` : 'Record';
+  $('#btnRec').className = recording ? 'rec' : '';
+  $('#btnSim').textContent = 'Test mode: ' + (sim ? 'on' : 'off');
+  $('#btnSim').className = sim ? 'on' : '';
+  $('#btnAuto').style.display = sim ? 'block' : 'none';
+  $('#speed').style.display = sim ? 'block' : 'none';
+  $('#pathChoice').style.display = 'none'; $('#gNote').textContent = '';
+  if (!L) { $('#gTitle').textContent = 'Pick a K-line on the K-lines page.'; return set('-'); }
+  const n = L.order.length;
+  if (n < 2) { $('#gTitle').textContent = L.name; return set('No sets', 'Make the shifting order in Setup.'); }
+  const ap = activePath(L);
+  $('#gTitle').textContent = `${L.name}: ${setName(L, L.cur)}  →  ${setName(L, (L.cur + 1) % n)}`;
+  if (!ap.pj) return set('Setup needed', 'Set the riser and the two strip 1 markers in Setup, or draw own-shape sets.');
+  const notes = [];
+  const to = L.order[(L.cur + 1) % n];
+  if (to.feed) notes.push('Before this shift: move the feed line by hand.');
+  if (ap.rec && ap.man) {
+    $('#pathChoice').style.display = 'flex';
+    $('#useMan').className = ap.kind === 'man' ? 'on' : ''; $('#useRec').className = ap.kind === 'rec' ? 'on' : '';
+  }
+  if (ap.kind === 'man' && ap.man.sharp) notes.push('This path has a sharp turn that may kink the pipe. Tap Record and drive it your way.');
+  else if (ap.kind === 'man' && ap.man.long) notes.push('This is a long move. Check the path, or tap Record and drive it your way.');
+  if (ap.kind === 'rec') notes.push(`Your recorded path (${fmt(ap.rec.time)}).`);
+  if (!ap.pts) {
+    $('#gNote').textContent = notes.join(' ');
+    return set('No path yet', 'A set has no shape yet, or the app cannot make a path. Tap Record, drive it your way, then tap Done.', '', 'warn');
+  }
+  if (!sim && !navigator.geolocation) notes.push('No GPS: use Test mode.');
+  $('#gNote').textContent = notes.join(' ');
+  if (!pos) return set('Waiting for GPS', sim ? 'Test mode: tap the map to put the tractor there, or tap Auto drive.' : '', '', '', null);
+  const f = follow(ap.pj, ap.pts, pos);
+  const dry = ap.kind === 'man' ? compass(ap.man.dryBear) : null;
+  const rel = h => heading == null ? h : ((h - heading + 540) % 360) - 180;
+  const accTxt = acc && acc > 5 ? ` (GPS ±${Math.round(acc)} m)` : '';
+  if (f.dist > 12 && f.along < 5) {
+    const d = Math.hypot(f.p[0] - f.start[0], f.p[1] - f.start[1]);
+    return set(`${Math.round(d)} m to start`, 'Drive to the tow end of the line.' + accTxt,
+      `1. Park beside the tow end (red pod)${dry ? ', on the ' + dry + ' (dry) side' : ''}, ${L.dryGap} m from the line, facing the middle. 2. Hook on.`, '', rel(bearing(f.p, f.start)));
+  }
+  if (f.left <= 1) return set('STOP', 'Unhook the line. Then tap Done.', 'The last pod should be about ' + L.endGap + ' m from the paddock end.', 'stop', null);
+  const off = Math.abs(f.off), dirTxt = off < 0.7 ? 'On the path' : `Steer ${f.off > 0 ? 'RIGHT' : 'LEFT'} ${off.toFixed(1)} m`;
+  const look = f.at(f.along + 8);
+  const cls = f.left < 15 ? 'warn' : off < 0.7 ? 'ok' : '';
+  const step = f.left < 15 ? `Slow down. Stop at the red line.` : f.along < 3 ? 'Hook on, then drive along the path.' : 'Follow the path. Drive over the feed line and aim at the marker.';
+  set(f.left < 15 ? `STOP in ${Math.round(f.left)} m` : dirTxt, `${Math.round(f.left)} m to go` + (f.left < 15 ? ' · ' + dirTxt : '') + accTxt, step, cls, rel(bearing(f.p, look)));
+}
+function usePath(k) { const L = lineById(shId), key = shiftKey(L, L.cur); L.use[key] = k; save(); drawShift(false); }
+
+function toggleRec() {
+  recording = !recording;
+  if (recording) { track = []; if (pos) track.push(pos.slice()); toast('Recording. Drive the shift, then tap Done.'); }
+  else { if (track.length && !confirm('Stop recording and throw away this track?')) { recording = true; return; } track = []; }
+  drawShift(false);
+}
+function doneShift() {
+  const L = lineById(shId); if (!L || L.order.length < 2) return;
+  const n = L.order.length, from = L.cur, to = (L.cur + 1) % n;
+  if (!confirm(`Line moved to ${setName(L, to)}?`)) return;
+  stopAuto();
+  const saved = finishShift(L, false);
+  toast(saved ? 'Saved. Your path is saved for this shift.' : 'Saved.');
+}
+// Saves the move (and a recorded track) and makes the next set current.
+function finishShift(L, test) {
+  const n = L.order.length, from = L.cur, to = (L.cur + 1) % n;
+  let saved = false;
+  if (recording && track.length >= 5) {
+    const key = shiftKey(L, from);
+    L.paths[key] = { pts: track.slice(), time: Date.now(), label: `${shortName(L, L.order[from])} → ${shortName(L, L.order[to])}` };
+    L.use[key] = 'rec'; saved = true;
+  }
+  db.log.push({ id: uid(), line: L.id, name: L.name, from: from + 1, to: to + 1, time: Date.now(), who: db.me || '', recorded: saved, test });
+  L.cur = to; recording = false; track = []; recLine = null;
+  save(); drawShift(false);
+  return saved;
+}
+
+// Tap a set on the map: the line is there now.
+function pickSet(L, i) {
+  if (i === L.cur) return toast(`The line is on ${setName(L, i)}.`);
+  if (!confirm(`Is the line on ${setName(L, i)} now?`)) return;
+  stopAuto(); L.cur = i; recording = false; track = []; save();
+  if (page === 'setup') renderSetup(false); else drawShift(false);
+  toast(`Saved: the line is on ${setName(L, i)}.`);
+}
+// Stand beside the tow end: the app finds the set whose tow pod is nearest and asks to make it current.
+function lineIsHere() {
+  const L = lineById(shId); if (!L || !L.order.length) return toast('No sets yet. Make them in Setup.');
+  const pick = p => {
+    const pj = proj(L); if (!pj) return toast('Setup needed first.');
+    const me = pj.toXY(p);
+    let best = null;
+    L.order.forEach((s, i) => {
+      const pods = podsLL(L, s); if (!pods) return;
+      const d = dxy(me, pj.toXY(pods[0]));
+      if (!best || d < best.d) best = { i, d };
+    });
+    if (!best) return toast('No set has a place yet. Check Setup.');
+    if (best.d > 25) return toast(`No tow end near you (nearest is ${setName(L, best.i)}, ${Math.round(best.d)} m away). Stand beside the tow end.`);
+    if (best.i === L.cur) return toast(`Yes: the line is on ${setName(L, best.i)}.`);
+    pickSet(L, best.i);
+  };
+  if (pos) return pick(pos);
+  if (!navigator.geolocation) return toast('No GPS on this device.');
+  toast('Getting GPS...');
+  navigator.geolocation.getCurrentPosition(p => pick([p.coords.latitude, p.coords.longitude]),
+    e => toast('GPS: ' + e.message), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+
+function toggleSim() {
+  sim = !sim; stopAuto();
+  if (sim) { stopGPS(); toast('Test mode: tap the map to move the tractor.'); }
+  else { pos = null; heading = null; startGPS(); }
+  drawMe(); guide();
+}
+function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; $('#btnAuto').textContent = 'Auto drive all shifts'; } }
+// Test mode: drives every shift of the round, one after the other, and marks each one done.
+function autoDrive() {
+  if (autoTimer) return stopAuto();
+  const L = lineById(shId);
+  if (!L || L.order.length < 2) return toast('No shifts to drive.');
+  let left = L.order.length, ap = null, f0 = null, s = 0, wait = 0;
+  const loadPath = () => {
+    ap = activePath(L);
+    if (!ap.pts) { stopAuto(); toast(`${setName(L, (L.cur + 1) % L.order.length)}: no path. Record this shift.`); return false; }
+    f0 = follow(ap.pj, ap.pts, ap.pts[0]); s = 0; heading = null; lastPos = null;
+    return true;
+  };
+  if (!loadPath()) return;
+  $('#btnAuto').textContent = 'Stop auto';
+  autoTimer = setInterval(() => {
+    const speed = +$('#speed').value;
+    if (wait > 0) {                              // stopped at the end: unhook, then the next shift
+      wait -= speed;
+      if (wait > 0) return;
+      finishShift(L, true);
+      if (--left <= 0) { stopAuto(); toast('Round finished: all shifts driven.'); return; }
+      if (!loadPath()) return;
+    }
+    s += 0.4 * speed;                            // 2 m/s at 1x
+    const q = f0.at(s), q2 = f0.at(s + 1), dx = q2[0] - q[0], dy = q2[1] - q[1], l = Math.hypot(dx, dy) || 1;
+    const wob = s >= f0.total ? 0 : 1.2 * Math.sin(s / 9);   // a little steering error
+    onPos(ap.pj.toLL([q[0] - dy / l * wob, q[1] + dx / l * wob]), 1, null, null);
+    if (!hMap.getBounds().pad(-0.15).contains(pos)) hMap.panTo(pos);
+    if (s >= f0.total) wait = 15;               // 3 s at 1x
+  }, 200);
+}
+
+// ---------- log ----------
+$('#me').value = db.me || '';
+$('#me').addEventListener('change', e => { db.me = e.target.value.trim(); save(); });
+$('#sheetUrl').value = sheetUrl();
+$('#sheetUrl').addEventListener('change', e => { db.sheetUrl = e.target.value.trim(); save(true); syncNow(); });
+function renderLog() {
+  const rows = db.log.slice().reverse().slice(0, 200);
+  $('#logTable').innerHTML = rows.length ? '<table><tr><th>When</th><th>Line</th><th>Move</th><th>Who</th></tr>' + rows.map(r =>
+    `<tr><td>${fmt(r.time)}</td><td>${esc(r.name)}</td><td>Set ${r.from} &rarr; ${r.to}${r.recorded ? ' (recorded)' : ''}${r.test ? ' (test)' : ''}</td><td>${esc(r.who)}</td></tr>`).join('') + '</table>'
+    : '<p class="muted">No moves yet.</p>';
+}
+function exportData() {
+  const blob = new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'kline-mover-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function importData(inp) {
+  const f = inp.files[0]; if (!f) return;
+  f.text().then(t => {
+    const d = JSON.parse(t);
+    if (!d.lines) throw new Error('not a backup file');
+    if (!confirm('Replace all data on this phone with the backup?')) return;
+    db = d; save(); toast('Backup loaded.'); show('lines');
+  }).catch(e => toast('Could not load: ' + e.message));
+  inp.value = '';
+}
+
+renderLines();
+syncNow();
+</script>
+</body>
+</html>

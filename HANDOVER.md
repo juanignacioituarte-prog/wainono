@@ -39,6 +39,7 @@ commit as the code.
 | `treatment.html`, `TRtreatment.html` | Cow treatment app (own project folder: `G:\My Drive\Apps\cow-treatment`) |
 | `shed.html` | Shed cow display log viewer (own project: `G:\My Drive\Apps\shed-cow-display`) |
 | `gr.html` | Pasture growth prediction page (own project: `G:\My Drive\Apps\pasture-growth`) |
+| `kline.html` | K-line mover: GPS app to shift K-line irrigators (own project: `G:\My Drive\Apps\kline-mover`) |
 | `index viejo.html`, `test.html` | Old copies. **Ignore them.** Only `index.html` is live |
 
 ---
@@ -632,6 +633,7 @@ These are separate and have their own notes. They live in
 | Cow treatment app | `Apps\cow-treatment` (ships as `treatment.html` here) |
 | Shed cow display | `Apps\shed-cow-display` (ships as `shed.html` here) |
 | Pasture growth prediction | `Apps\pasture-growth` (`gr.html`) |
+| K-line mover | `Apps\kline-mover` (`kline.html`) |
 | LH daily benchmark | `Apps\daily-benchmark` |
 | Mineral dispenser (ESP32) | `Apps\mineral-dispenser` |
 | Drafting gate (ESP32) | `Apps\drafting-gate` |
