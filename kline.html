@@ -51,6 +51,7 @@ summary{cursor:pointer;padding:10px;border:1px solid #444;border-radius:8px;colo
 details[open] summary{margin-bottom:6px}
 #shapeBar{display:none;background:#3a1630;border:1px solid #ff4081;border-radius:8px;padding:8px;margin-top:10px}
 .order li.cur{background:#16361f;border-radius:6px}
+.order li.sel{outline:2px solid #ff9100;border-radius:6px}
 #guide{background:var(--panel);padding:8px 10px}
 #gTitle{font-size:14px;color:var(--muted)}
 #gMain{display:flex;align-items:center;gap:12px;margin:4px 0}
@@ -137,19 +138,15 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 
     <div class="card">
       <h3>Step 3. The order of the shifts</h3>
-      <div class="muted">The app makes this list for you, the K-Line manual way: strip 1 one half, strip 1 other half, strip 2, and so on. Green = where the line is now. To change it, tap the set on the map, or "Line is here" in the list.</div>
-      <label>Set 1 is in the</label>
-      <select id="f-firstHalf"><option value="A">end A</option><option value="B">end B</option></select>
-      <ul class="order" id="order"></ul>
+      <div class="muted">One line for each shift, in order. For each one, choose the strip and the side: A (the half at end A) or B. Tap a line to see that shift in orange on the map. Green = where the line is now.</div>
+      <ol class="order" id="order"></ol>
+      <div class="row"><button onclick="addSet()">+ Add a shift</button></div>
       <details>
-        <summary>Change the list by hand (only if you need to)</summary>
-        <div class="muted">Use the arrows on a set to move it up or down, and &#10005; to take it out. To put a set back in the list, choose it here:</div>
-        <div class="grid2">
-          <div><label>Strip number</label><select id="add-strip"></select></div>
-          <div><label>Half of the paddock</label><select id="add-half"><option value="A">end A</option><option value="B">end B</option></select></div>
-        </div>
-        <div class="row"><button onclick="addSet()">+ Add this set to the end of the list</button></div>
-        <div class="row"><button onclick="manualOrder()">Start again with the manual order</button></div>
+        <summary>Start again with the manual order</summary>
+        <div class="muted">Strip 1 side A, strip 1 side B, strip 2 side A, and so on (own-shape sets stay at the end).</div>
+        <label>Start with side</label>
+        <select id="f-firstHalf"><option value="A">A</option><option value="B">B</option></select>
+        <div class="row"><button onclick="manualOrder()">Make the manual order</button></div>
       </details>
     </div>
 
@@ -246,7 +243,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18g';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18h';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -610,7 +607,7 @@ function editLine(id) { edId = id; show('setup'); }
 function startShift(id) { shId = id; show('shift'); }
 
 // ---------- setup ----------
-let sMap = null, sLayer = null, tapFor = null, shapeIdx = null;
+let sMap = null, sLayer = null, tapFor = null, shapeIdx = null, selIdx = null;
 const FIELDS = ['name', 'pods', 'podSpacing', 'stripWidth', 'strips', 'endGap', 'hitch', 'dryGap', 'firstHalf'];
 FIELDS.forEach(f => $('#f-' + f).addEventListener('change', e => {
   const L = lineById(edId); if (!L) return;
@@ -631,20 +628,24 @@ function renderSetup(fit = true) {
   if (shapeIdx != null && !L.order[shapeIdx]) shapeIdx = null;
   FIELDS.forEach(f => { const e = $('#f-' + f); if (document.activeElement !== e) e.value = L[f]; });
   ['riser', 'endA', 'endB'].forEach(k => $('#s-' + k).textContent = L[k] ? 'set' : 'not set');
-  $('#add-strip').innerHTML = Array.from({ length: L.strips }, (_, i) => `<option>${i + 1}</option>`).join('');
-  ['A', 'B'].forEach(h => {
-    $(`#add-half option[value=${h}]`).textContent = halfName(L, h) + ' half';
-    $(`#f-firstHalf option[value=${h}]`).textContent = halfName(L, h) + ' half';
-  });
-  $('#order').innerHTML = L.order.map((s, i) => `<li class="${i === L.cur ? 'cur' : ''}">
-      <span class="nm"><b>Set ${i + 1}</b>: ${esc(shortName(L, s))}${i === L.cur ? ' &mdash; <b style="color:var(--go)">the line is here now</b>' : ''}</span>
-      ${i === L.cur ? '' : `<button class="small" onclick="setCur(${i})">Line is here</button>`}
-      <button class="small" onclick="editShape(${i})">Shape</button>
-      ${isGrid(s) ? '' : `<button class="small" onclick="copyShape(${i})">Copy</button>`}
-      <button class="small" onclick="moveSet(${i},-1)" aria-label="Move up">&#9650;</button>
-      <button class="small" onclick="moveSet(${i},1)" aria-label="Move down">&#9660;</button>
-      <button class="small danger" onclick="delSet(${i})" aria-label="Delete">&#10005;</button>
-      <label style="margin:0;flex:1 1 100%;display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" style="width:auto" ${s.feed ? 'checked' : ''} onchange="setFeed(${i},this.checked)">Move the feed line by hand before shifting to this set</label></li>`).join('');
+  const short = { north: 'N', 'north-east': 'NE', east: 'E', 'south-east': 'SE', south: 'S', 'south-west': 'SW', west: 'W', 'north-west': 'NW' };
+  const sideName = h => { const c = halfName(L, h); return short[c] ? `${h} (${short[c]})` : h; };
+  ['A', 'B'].forEach(h => $(`#f-firstHalf option[value=${h}]`).textContent = sideName(h));
+  if (selIdx != null && !L.order[selIdx]) selIdx = null;
+  const stripOpts = cur => Array.from({ length: L.strips }, (_, i) => `<option value="${i + 1}"${i + 1 === cur ? ' selected' : ''}>Strip ${i + 1}</option>`).join('');
+  const sideOpts = cur => ['A', 'B'].map(h => `<option value="${h}"${h === cur ? ' selected' : ''}>Side ${sideName(h)}</option>`).join('');
+  // one row per shift: number, strip, side, delete. Own-shape sets show their name and Shape/Copy.
+  // Tapping a row shows that shift in orange on the map.
+  $('#order').innerHTML = L.order.map((s, i) => `<li class="${i === L.cur ? 'cur' : ''}${i === selIdx ? ' sel' : ''}" onclick="selectSet(${i})">
+      <b style="min-width:26px">${i + 1}.</b>
+      ${isGrid(s)
+        ? `<select style="flex:1;width:0;padding:8px" onchange="setSetField(${i},'strip',+this.value)">${stripOpts(s.strip)}</select>
+           <select style="flex:1;width:0;padding:8px" onchange="setSetField(${i},'half',this.value)">${sideOpts(s.half)}</select>`
+        : `<span style="flex:1">${esc(s.name || 'own shape')}</span>
+           <button class="small" onclick="editShape(${i})">Shape</button>
+           <button class="small" onclick="copyShape(${i})">Copy</button>`}
+      <button class="small danger" onclick="event.stopPropagation();delSet(${i})" aria-label="Delete">&#10005;</button>
+      ${i === L.cur ? '<span class="muted" style="flex:1 1 100%;color:var(--go)">The line is here now</span>' : ''}</li>`).join('');
   const keys = Object.keys(L.paths);
   $('#recList').innerHTML = keys.length ? '<table>' + keys.map(k => {
     const r = L.paths[k];
@@ -701,6 +702,15 @@ function drawSetupMap(fit) {
       L.stripEnds[k] = { a: e === 'a' ? [q.lat, q.lng] : a, b: e === 'b' ? [q.lat, q.lng] : bb };
       save(); renderSetup(false);
     } : null });
+  // the shift picked in the list: orange, and moved into view
+  const sel = selIdx != null && L.order[selIdx];
+  const selPods = sel && podsLL(L, sel);
+  if (selPods) {
+    L_.polyline(selPods, { color: '#ff9100', weight: 7, opacity: .95, interactive: false }).addTo(sLayer);
+    selPods.forEach((p, i) => L_.circleMarker(p, { radius: i === 0 ? 7 : 5, color: '#000', weight: 1, fillColor: '#ff9100', fillOpacity: 1, interactive: false }).addTo(sLayer));
+    L_.marker(selPods[0], { opacity: 0, interactive: false }).bindTooltip('Shift ' + (selIdx + 1), { permanent: true, className: 'lbl', direction: 'right' }).addTo(sLayer);
+    if (!fit && !sMap.getBounds().contains(L_.latLngBounds(selPods))) sMap.panTo(L_.latLngBounds(selPods).getCenter());
+  }
   const s = shapeIdx != null && L.order[shapeIdx];
   if (s) {
     if (s.pts.length > 1) L_.polyline(s.pts, { color: '#ff4081', weight: 4 }).addTo(sLayer);
@@ -777,10 +787,22 @@ function manualOrder() {
   if (L.order.length && !confirm('Replace the shifting order with the manual order? Own-shape sets stay, at the end.')) return;
   shapeIdx = null; manualOrderFor(L); L.handOrder = false; save(); renderSetup(false);
 }
+// A new row guesses the next shift in the manual pattern after the last strip row.
 function addSet() {
   const L = lineById(edId);
   if (!(L.strips > 0)) return toast('There are no strips. Set "Number of strips" first.');
-  L.order.push({ strip: +$('#add-strip').value, half: $('#add-half').value }); L.handOrder = true; save(); renderSetup(false);
+  const last = L.order.filter(isGrid).pop(), other = h => h === 'A' ? 'B' : 'A';
+  let next = { strip: 1, half: L.firstHalf };
+  if (last) next = last.half === L.firstHalf ? { strip: last.strip, half: other(last.half) }
+    : { strip: last.strip % L.strips + 1, half: L.firstHalf };
+  L.order.push(next); L.handOrder = true; selIdx = L.order.length - 1; save(); renderSetup(false);
+}
+function setSetField(i, k, v) { const L = lineById(edId); L.order[i][k] = v; L.handOrder = true; selIdx = i; save(); renderSetup(false); }
+function selectSet(i) {
+  if (selIdx === i) return;
+  selIdx = i;
+  document.querySelectorAll('#order li').forEach((li, j) => li.classList.toggle('sel', j === i));
+  drawSetupMap(false);
 }
 function addCustom() {
   const L = lineById(edId), n = L.order.filter(s => !isGrid(s)).length + 1;
@@ -794,7 +816,7 @@ function editShape(i) {
   if (isGrid(s)) {
     if (!confirm('Give this set its own shape? It starts where the strip set is now. Then you can move its points.')) return;
     const pj = proj(L), line = pj && setLineXY(L, pj, s);
-    L.order[i] = { id: 'c' + uid(), name: shortName(L, s) + ' (own shape)', pts: line ? line.map(pj.toLL) : [], feed: s.feed };
+    L.order[i] = { id: 'c' + uid(), name: shortName(L, s) + ' (own shape)', pts: line ? line.map(pj.toLL) : [] };
     save();
   }
   shapeIdx = i; tapFor = null; $('#tapHint').style.display = 'none';
@@ -820,23 +842,15 @@ function copyShape(i) {
   if (L.cur > i) L.cur++;
   save(); editShape(i + 1);
 }
-function moveSet(i, d) {
-  const L = lineById(edId), j = i + d; if (j < 0 || j >= L.order.length) return;
-  [L.order[i], L.order[j]] = [L.order[j], L.order[i]];
-  if (L.cur === i) L.cur = j; else if (L.cur === j) L.cur = i;
-  if (shapeIdx === i) shapeIdx = j; else if (shapeIdx === j) shapeIdx = i;
-  L.handOrder = true; save(); renderSetup(false);
-}
 function delSet(i) {
   const L = lineById(edId);
   if (!confirm(`Delete ${setName(L, i)}?`)) return;
   if (isGrid(L.order[i])) L.handOrder = true;
   L.order.splice(i, 1);
   if (L.cur >= L.order.length) L.cur = 0; else if (i < L.cur) L.cur--;
-  shapeIdx = null; save(); renderSetup(false);
+  shapeIdx = null; selIdx = null; save(); renderSetup(false);
 }
 function setCur(i) { const L = lineById(edId); L.cur = i; save(); renderSetup(false); }
-function setFeed(i, v) { const L = lineById(edId); L.order[i].feed = v; save(); }
 function delRec(k) { const L = lineById(edId); if (!confirm('Delete this recorded path?')) return; delete L.paths[k]; delete L.use[k]; save(); renderSetup(false); }
 function deleteLine() {
   const L = lineById(edId); if (!confirm(`Delete ${L.name}? Its log stays.`)) return;
@@ -1052,7 +1066,6 @@ function guide() {
   if (!ap.pj) return set('Setup needed', 'Set the riser and the two strip 1 markers in Setup, or draw own-shape sets.');
   const notes = [];
   const to = L.order[(L.cur + 1) % n];
-  if (to.feed) notes.push('Before this shift: move the feed line by hand.');
   if (ap.rec && ap.man) {
     $('#pathChoice').style.display = 'flex';
     $('#useMan').className = ap.kind === 'man' ? 'on' : ''; $('#useRec').className = ap.kind === 'rec' ? 'on' : '';
