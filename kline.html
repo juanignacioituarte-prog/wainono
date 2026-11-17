@@ -125,6 +125,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
         <button onclick="flipSide()">Strips to the other side</button>
       </div>
       <div id="geoWarn" class="muted" style="color:var(--warn)"></div>
+      <div class="muted gpsInfo" style="display:none;color:var(--warn)"></div>
     </div>
 
     <div class="card">
@@ -181,6 +182,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
     </div>
     <div id="gStep"></div>
     <div id="gNote"></div>
+    <div class="gpsInfo" style="display:none;font-size:14px;color:var(--warn)"></div>
     <div class="bar" id="pathChoice" style="display:none">
       <button id="useMan" onclick="usePath('man')">Suggested path</button>
       <button id="useRec" onclick="usePath('rec')">My recorded path</button>
@@ -192,6 +194,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
       <button onclick="findMe(hMap)">Find me</button>
     </div>
     <div class="bar">
+      <button id="btnHead" onclick="toggleHeadUp()">Map: north up</button>
       <button id="btnSim" onclick="toggleSim()">Test mode: off</button>
       <button id="btnAuto" onclick="autoDrive()" style="display:none">Auto drive all shifts</button>
       <select id="speed" style="display:none;flex:0 0 76px" aria-label="Auto drive speed">
@@ -232,10 +235,11 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <div id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18b';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18c';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -557,6 +561,7 @@ function show(pg) {
   if (pg === 'setup') renderSetup();
   if (pg === 'shift') openShift(); else leaveShift();
   if (pg === 'log') renderLog();
+  if (pg === 'setup' || pg === 'shift') startGPS(); else stopGPS();
 }
 
 function renderLines() {
@@ -666,6 +671,7 @@ function drawSetupMap(fit) {
   }
   // a new line with no points yet: start the map where I am
   if (fit) b ? sMap.fitBounds(b, { padding: [20, 20] }) : L.riser ? sMap.setView(L.riser, 17) : findMe(sMap, true);
+  drawMe();
 }
 function gpsHere(ok) {
   if (!navigator.geolocation) return toast('No GPS on this device');
@@ -761,7 +767,9 @@ function deleteLine() {
 // ---------- map drawing ----------
 const L_ = window.L;
 function makeMap(id) {
-  const m = L_.map(id, { zoomControl: true, attributionControl: false, zoomSnap: 0.25 });
+  // leaflet-rotate: turn the map with two fingers; the compass button turns it back to north up
+  const m = L_.map(id, { zoomControl: true, attributionControl: false, zoomSnap: 0.25,
+    rotate: true, touchRotate: true, bearing: 0, rotateControl: { closeOnZeroBearing: false, position: 'topleft' } });
   L_.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 21 }).addTo(m);
   m.setView([-43.9, 171.75], 15);
   // "Find me" button under the zoom buttons
@@ -778,23 +786,21 @@ function makeMap(id) {
   new Find({ position: 'topleft' }).addTo(m);
   return m;
 }
-// Show where I am on a map and zoom there. The Shift page uses its running GPS when it has one.
+// Zoom the map to where I am. There is only one blue dot: the running GPS draws it (drawMe).
+// In Test mode on the Shift page the dot is the test tractor, so go to that.
 function findMe(m, quiet) {
-  const go = (p, a) => {
-    m.setView(p, Math.max(m.getZoom(), 18));
-    if (m === hMap && !sim) return;               // the Shift page draws its own blue dot
-    if (m._me) m._me.remove();
-    m._me = L_.layerGroup([
-      L_.circle(p, { radius: a || 5, color: '#2979ff', weight: 1, fillOpacity: .1, interactive: false }),
-      L_.circleMarker(p, { radius: 8, color: '#fff', weight: 3, fillColor: '#2979ff', fillOpacity: 1, interactive: false })
-    ]).addTo(m);
-  };
-  if (m === hMap && pos && !sim) return go(pos, acc);
+  const go = p => m.setView(p, Math.max(m.getZoom(), 18));
+  if (pos) return go(pos);
   if (!navigator.geolocation) return quiet || toast('No GPS on this device.');
   if (!quiet) toast('Finding you...');
   navigator.geolocation.getCurrentPosition(
-    p => { go([p.coords.latitude, p.coords.longitude], p.coords.accuracy); if (!quiet) toast(`Found you (GPS ±${Math.round(p.coords.accuracy)} m).`); },
-    e => quiet || toast('GPS: ' + e.message + '. Allow location for this page in the phone settings.'),
+    p => {
+      const q = [p.coords.latitude, p.coords.longitude];
+      if (!(sim && page === 'shift')) onPos(q, p.coords.accuracy, p.coords.heading, p.coords.speed);
+      go(q);
+      if (!quiet) toast(`Found you (GPS ±${Math.round(p.coords.accuracy)} m).`);
+    },
+    e => quiet || toast(e.code === 1 ? 'Location is blocked for this page. In the browser: site settings > Location > Allow. Then reload.' : 'GPS: ' + e.message),
     { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
 }
 function drawPods(layer, L, set, style) {
@@ -837,7 +843,7 @@ function drawLayout(layer, L, opt = {}) {
     L_.polyline(pods, { weight: 22, opacity: 0.01, color: '#fff', bubblingMouseEvents: false })
       .on('click', () => opt.pick(i)).addTo(layer);
   });
-  if (L.riser) L_.circleMarker(L.riser, { radius: 8, color: '#fff', weight: 2, fillColor: '#2979ff', fillOpacity: 1 }).bindTooltip('Riser', { permanent: true, className: 'lbl', direction: 'right' }).addTo(layer);
+  if (L.riser) L_.circleMarker(L.riser, { radius: 8, color: '#fff', weight: 2, fillColor: '#ab47bc', fillOpacity: 1 }).bindTooltip('Riser', { permanent: true, className: 'lbl', direction: 'right' }).addTo(layer);
   if (opt.allSets && L.order[L.cur]) drawPods(layer, L, L.order[L.cur], { color: '#2ecc71', weight: 4 });
   return pts.length > 1 ? L_.latLngBounds(pts) : null;
 }
@@ -846,6 +852,7 @@ function drawLayout(layer, L, opt = {}) {
 let hMap = null, hLayer = null, meLayer = null, recLine = null;
 let pos = null, acc = null, heading = null, lastPos = null, watchId = null;
 let sim = false, autoTimer = null, recording = false, track = [], wake = null;
+let headUp = !!db.headUp;   // Shift map: driving direction up (true) or north up
 function openShift() {
   if (!shId && db.lines.length === 1) shId = db.lines[0].id;
   const L = lineById(shId);
@@ -855,11 +862,10 @@ function openShift() {
   }
   setTimeout(() => { hMap.invalidateSize(); drawShift(true); }, 0);
   if (!L) return;
-  if (!sim) startGPS();
   try { navigator.wakeLock && navigator.wakeLock.request('screen').then(w => wake = w).catch(() => {}); } catch (e) {}
 }
 function leaveShift() {
-  stopGPS(); stopAuto();
+  stopAuto();
   if (wake) { wake.release().catch(() => {}); wake = null; }
 }
 function drawShift(fit) {
@@ -886,31 +892,46 @@ function drawShift(fit) {
   if (fit && b) hMap.fitBounds(b, { padding: [10, 10] });
   drawMe(); guide();
 }
+// The blue dot (where I am), on the Shift map and the Setup map.
 function drawMe() {
-  if (meLayer) meLayer.remove();
-  meLayer = L_.layerGroup().addTo(hMap);
-  if (!pos) return;
-  if (acc && acc > 2) L_.circle(pos, { radius: acc, color: '#2979ff', weight: 1, fillOpacity: .1 }).addTo(meLayer);
-  L_.circleMarker(pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#2979ff', fillOpacity: 1 }).addTo(meLayer);
+  [hMap, sMap].forEach(m => {
+    if (!m) return;
+    if (m._meDot) m._meDot.remove();
+    m._meDot = L_.layerGroup().addTo(m);
+    if (!pos) return;
+    if (acc && acc > 2) L_.circle(pos, { radius: acc, color: '#2979ff', weight: 1, fillOpacity: .1, interactive: false }).addTo(m._meDot);
+    L_.circleMarker(pos, { radius: 9, color: '#fff', weight: 3, fillColor: '#2979ff', fillOpacity: 1, interactive: false }).addTo(m._meDot);
+  });
 }
 
+// The GPS runs while the Setup or Shift page is open (not in Test mode on the Shift page).
+let gpsMsg = '';
+function setGpsMsg(msg) { gpsMsg = msg; document.querySelectorAll('.gpsInfo').forEach(e => { e.textContent = msg; e.style.display = msg ? 'block' : 'none'; }); }
 function startGPS() {
   if (watchId !== null) return;
-  if (!navigator.geolocation) { toast('No GPS on this device. Use Test mode.'); return; }
+  if (!navigator.geolocation) return setGpsMsg('This phone or browser gives no location.');
+  if (!pos) setGpsMsg('Looking for GPS...');
   watchId = navigator.geolocation.watchPosition(
-    p => onPos([p.coords.latitude, p.coords.longitude], p.coords.accuracy, p.coords.heading, p.coords.speed),
-    e => toast('GPS: ' + e.message + ' (Test mode works without GPS)'),
+    p => { if (gpsMsg) setGpsMsg(''); if (!(sim && page === 'shift')) onPos([p.coords.latitude, p.coords.longitude], p.coords.accuracy, p.coords.heading, p.coords.speed); },
+    e => setGpsMsg(e.code === 1
+      ? 'Location is blocked for this page. In the browser: site settings > Location > Allow. Then reload the page.'
+      : e.code === 3 ? 'GPS is slow to answer. Go outside, or wait a little.' : 'No GPS position yet (' + e.message + ').'),
     { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
 }
 function stopGPS() { if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; } }
 function onPos(p, a, hd, sp) {
-  const L = lineById(shId), g = L && proj(L);
-  if (lastPos && g) {
-    const A = g.toXY(lastPos), B = g.toXY(p);
-    if (Math.hypot(B[0] - A[0], B[1] - A[1]) > 1.5) { heading = bearing(A, B); lastPos = p; }
+  if (lastPos) {
+    // flat metres between two close points
+    const k = Math.cos(p[0] * Math.PI / 180), A = [0, 0], B = [(p[1] - lastPos[1]) * 111320 * k, (p[0] - lastPos[0]) * 110540];
+    if (Math.hypot(B[0], B[1]) > 1.5) { heading = bearing(A, B); lastPos = p; }
   } else lastPos = p;
   if (hd != null && sp != null && sp > 0.7) heading = hd;
   pos = p; acc = a;
+  const L = lineById(shId), g = L && proj(L);
+  if (headUp && hMap && hMap.setBearing && page === 'shift') {
+    if (heading != null) hMap.setBearing(-heading);   // driving direction up
+    hMap.panTo(pos, { animate: false });
+  }
   if (recording && (a == null || a < 20)) {
     const q = track[track.length - 1];
     if (!q || !g || Math.hypot(...[0, 1].map(i => g.toXY(p)[i] - g.toXY(q)[i])) > 1) {
@@ -932,6 +953,8 @@ function guide() {
   $('#btnRec').textContent = recording ? `Recording (${track.length})` : 'Record';
   $('#btnRec').className = recording ? 'rec' : '';
   $('#btnSim').textContent = 'Test mode: ' + (sim ? 'on' : 'off');
+  $('#btnHead').textContent = headUp ? 'Map: driving up' : 'Map: north up';
+  $('#btnHead').className = headUp ? 'on' : '';
   $('#btnSim').className = sim ? 'on' : '';
   $('#btnAuto').style.display = sim ? 'block' : 'none';
   $('#speed').style.display = sim ? 'block' : 'none';
@@ -958,7 +981,7 @@ function guide() {
   }
   if (!sim && !navigator.geolocation) notes.push('No GPS: use Test mode.');
   $('#gNote').textContent = notes.join(' ');
-  if (!pos) return set('Waiting for GPS', sim ? 'Test mode: tap the map to put the tractor there, or tap Auto drive.' : '', '', '', null);
+  if (!pos) return set('Waiting for GPS', sim ? 'Test mode: tap the map to put the tractor there, or tap Auto drive.' : gpsMsg, '', '', null);
   const f = follow(ap.pj, ap.pts, pos);
   const dry = ap.kind === 'man' ? compass(ap.man.dryBear) : null;
   const rel = h => heading == null ? h : ((h - heading + 540) % 360) - 180;
@@ -1040,9 +1063,17 @@ function lineIsHere() {
 
 function toggleSim() {
   sim = !sim; stopAuto();
-  if (sim) { stopGPS(); toast('Test mode: tap the map to move the tractor.'); }
-  else { pos = null; heading = null; startGPS(); }
+  pos = null; heading = null; lastPos = null;   // the GPS keeps running; in Test mode the Shift page ignores it
+  if (sim) toast('Test mode: tap the map to move the tractor.');
   drawMe(); guide();
+}
+function toggleHeadUp() {
+  headUp = !headUp; db.headUp = headUp; save(true);
+  if (hMap && hMap.setBearing) {
+    if (!headUp) hMap.setBearing(0);
+    else if (heading != null) hMap.setBearing(-heading);
+  }
+  guide();
 }
 function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; $('#btnAuto').textContent = 'Auto drive all shifts'; } }
 // Test mode: drives every shift of the round, one after the other, and marks each one done.
