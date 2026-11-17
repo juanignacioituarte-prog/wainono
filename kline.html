@@ -107,7 +107,9 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
       <div class="pt"><b>Riser</b><span id="s-riser"></span><button class="small" onclick="gpsPoint('riser')">GPS</button><button class="small" onclick="tapPoint('riser')">Tap map</button></div>
       <div class="pt"><b>Strip 1, one end</b><span id="s-endA"></span><button class="small" onclick="gpsPoint('endA')">GPS</button><button class="small" onclick="tapPoint('endA')">Tap map</button></div>
       <div class="pt"><b>Strip 1, other end</b><span id="s-endB"></span><button class="small" onclick="gpsPoint('endB')">GPS</button><button class="small" onclick="tapPoint('endB')">Tap map</button></div>
-      <div class="muted">The two ends are the marker points at the paddock fences, in the middle of strip 1.</div>
+      <div class="muted">The two ends are the marker points at the paddock fences, in the middle of strip 1. When you set the riser and end A, the app puts end B for you, at the right distance for the line.</div>
+      <div id="fitText" class="muted" style="margin-top:6px"></div>
+      <div class="row"><button id="btnFitB" onclick="fitB()">Make strip 1 fit the line (move end B)</button></div>
       <div class="grid2">
         <div><label>Strip width (m)</label><input id="f-stripWidth" type="number" min="5"></div>
         <div><label>Number of strips</label><input id="f-strips" type="number" min="0"></div>
@@ -244,7 +246,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18f';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18g';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -657,6 +659,10 @@ function renderSetup(fit = true) {
     else if (need > half) warn = `The pod line (${need.toFixed(0)} m from the end) is longer than half the paddock (${half.toFixed(0)} m). Check the points.`;
   }
   $('#geoWarn').textContent = warn;
+  const need = stripLenFor(L);
+  $('#fitText').textContent = `This line needs strip 1 about ${Math.round(need)} m long (${Math.round(need / 2)} m on each side of the riser).`
+    + (g ? ` Strip 1 is ${Math.round(g.len)} m now.` : '');
+  $('#btnFitB').style.display = L.endA && (L.endB || L.riser) ? '' : 'none';
   // say in compass words which side the strips go, and what the button will do
   if (g && L.strips > 1) {
     const now = compass(g.bearS), other = compass((g.bearS + 180) % 360);
@@ -680,7 +686,7 @@ function drawSetupMap(fit) {
     sMap.on('click', e => {
       const Lx = lineById(edId), p = [e.latlng.lat, e.latlng.lng];
       let fit = false;
-      if (tapFor) { Lx[tapFor] = p; tapFor = null; $('#tapHint').style.display = 'none'; fit = !!geo(Lx); }
+      if (tapFor) { setPoint(Lx, tapFor, p); tapFor = null; $('#tapHint').style.display = 'none'; fit = !!geo(Lx); }
       else if (shapeIdx != null && Lx.order[shapeIdx]) Lx.order[shapeIdx].pts.push(p);
       else return;
       save(); renderSetup(fit);
@@ -723,7 +729,31 @@ function gpsHere(ok) {
   navigator.geolocation.getCurrentPosition(p => { ok([p.coords.latitude, p.coords.longitude]); toast(`Saved. GPS accuracy about ${Math.round(p.coords.accuracy)} m.`); },
     e => toast('GPS: ' + e.message), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
 }
-function gpsPoint(k) { gpsHere(p => { const L = lineById(edId); L[k] = p; save(); renderSetup(); }); }
+function gpsPoint(k) { gpsHere(p => { setPoint(lineById(edId), k, p); save(); renderSetup(); }); }
+
+// How long strip 1 must be for this line: on each side of the riser, the gap from the
+// riser to the first pod, the pods, and the gap from the last pod to the fence.
+// (Manual: a 5-pod line, 15 m apart, fills 75 m on each side.)
+const RISER_GAP = 7;
+const stripLenFor = L => 2 * (RISER_GAP + (L.pods - 1) * L.podSpacing + L.endGap);
+// Put end B on the line from end A (toward B, or toward the riser), at the right length.
+function fitEndB(L) {
+  if (!L.endA || !(L.endB || L.riser)) return false;
+  const pj = proj(L), a = pj.toXY(L.endA), u = unit(a, pj.toXY(L.endB || L.riser)), len = stripLenFor(L);
+  L.endB = pj.toLL([a[0] + u[0] * len, a[1] + u[1] * len]);
+  return true;
+}
+function setPoint(L, k, p) {
+  L[k] = p;
+  if ((k === 'endA' || k === 'riser') && L.endA && L.riser && !L.endB && fitEndB(L))
+    toast(`End B was put ${Math.round(stripLenFor(L))} m from end A, through the riser. Drag it if it is wrong.`);
+}
+function fitB() {
+  const L = lineById(edId);
+  if (!fitEndB(L)) return toast('Set end A and the riser (or end B) first.');
+  save(); renderSetup(true);
+  toast(`Strip 1 is now ${Math.round(stripLenFor(L))} m long.`);
+}
 function tapPoint(k) {
   tapFor = k; shapeIdx = null; $('#shapeBar').style.display = 'none';
   const names = { riser: 'the riser', endA: 'strip 1, end A', endB: 'strip 1, end B' };
