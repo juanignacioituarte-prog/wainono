@@ -216,6 +216,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
     <input id="sheetUrl" placeholder="https://script.google.com/macros/s/.../exec">
     <p class="muted syncInfo"></p>
     <div class="row"><button onclick="syncNow()">Sync now</button></div>
+    <p class="muted" id="appVer"></p>
   </div>
   <div class="card">
     <h3>Backup</h3>
@@ -234,6 +235,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
+const APP_VERSION = '2026-11-18b';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -1103,8 +1105,20 @@ function importData(inp) {
   inp.value = '';
 }
 
+// The browser keeps an old copy of this page for a while. Ask the website for the
+// newest one; if its version is different, that also refreshes the saved copy, so reload.
+async function checkUpdate() {
+  try {
+    const t = await (await fetch(location.pathname, { cache: 'no-cache' })).text();
+    const v = (t.match(/APP_VERSION = '([^']+)'/) || [])[1];
+    if (v && v !== APP_VERSION && !autoTimer && !recording) location.reload();
+  } catch (e) {}
+}
+$('#appVer').textContent = 'App version ' + APP_VERSION;
 renderLines();
 syncNow();
+checkUpdate();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 </script>
 </body>
 </html>
