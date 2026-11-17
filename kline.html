@@ -42,6 +42,8 @@ input,select{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px s
 .order li .nm{flex:1 1 100%}
 .vtx{width:18px;height:18px;border-radius:50%;background:#ff4081;border:2px solid #fff}
 .vtx.tow{background:#ff1744;width:22px;height:22px}
+.hdl{width:28px;height:28px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font:700 13px system-ui,sans-serif;color:#000;background:#ffeb3b;box-shadow:0 0 0 1px #000;cursor:grab}
+.hdl-riser{background:#ab47bc;color:#fff}
 .findme{display:flex!important;align-items:center;justify-content:center;width:34px;height:34px;background:#fff}
 details{margin-top:10px}
 summary{cursor:pointer;padding:10px;border:1px solid #444;border-radius:8px;color:var(--text)}
@@ -120,7 +122,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
         </div>
       </div>
       <div id="setupMap"></div>
-      <div class="muted">The map shows the strips as white lines with their numbers. If they are on the wrong side of strip 1, tap:</div>
+      <div class="muted">The map shows the strips as white lines with their numbers. Drag the round points R (riser), A and B (strip 1 ends) to move them. If the strips are on the wrong side of strip 1, tap:</div>
       <div class="row">
         <button onclick="flipSide()">Strips to the other side</button>
       </div>
@@ -239,7 +241,7 @@ td,th{padding:6px;border-bottom:1px solid #333;text-align:left}
 <script>
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18c';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18d';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -667,6 +669,14 @@ function drawSetupMap(fit) {
     s.pts.forEach((p, j) => {
       const m = L_.marker(p, { draggable: true, icon: L_.divIcon({ className: '', html: `<div class="vtx${j === 0 ? ' tow' : ''}"></div>`, iconSize: [22, 22], iconAnchor: [11, 11] }) }).addTo(sLayer);
       m.on('dragend', () => { const q = m.getLatLng(); s.pts[j] = [q.lat, q.lng]; save(); renderSetup(false); });
+    });
+  } else {
+    // the riser and the two strip 1 ends can be dragged to the right place
+    [['riser', 'R', 'Riser'], ['endA', 'A', 'Strip 1, end A'], ['endB', 'B', 'Strip 1, end B']].forEach(([k, t, name]) => {
+      if (!L[k]) return;
+      const m = L_.marker(L[k], { draggable: true, title: name + ' (drag to move)', zIndexOffset: 1000,
+        icon: L_.divIcon({ className: '', html: `<div class="hdl hdl-${k}">${t}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(sLayer);
+      m.on('dragend', () => { const q = m.getLatLng(); L[k] = [q.lat, q.lng]; save(); renderSetup(false); });
     });
   }
   // a new line with no points yet: start the map where I am
