@@ -116,6 +116,16 @@ th{font-weight:600;color:var(--muted);font-size:13px}
 #guide.stop .bar button:not(#btnDone){background:rgba(255,255,255,.15);border-color:transparent;color:#fff}
 #pg-shift.sim .gpsInfo{display:none!important}
 
+/* the guided tour */
+#tour{position:fixed;inset:0;z-index:20000}
+#tour[hidden]{display:none}
+#tourHole{position:fixed;border-radius:16px;box-shadow:0 0 0 3px var(--lime),0 0 0 9999px rgba(21,23,26,.62);transition:all .25s;pointer-events:none}
+#tourCard{position:fixed;left:16px;right:16px;max-width:420px;margin:0 auto;background:#fff;border-radius:20px;padding:16px;box-shadow:var(--shadow);transition:top .25s}
+#tourText{font:500 16px/1.45 var(--font);margin:6px 0 12px}
+#tourCount{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+#tourCard .row{margin-top:0}
+#tourSkip{flex:0 0 auto;border:0;background:transparent;color:var(--muted)}
+
 #toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);background:var(--ink);color:#fff;font-weight:500;font-size:14px;padding:12px 16px;border-radius:14px;display:none;z-index:9999;max-width:92%;box-shadow:var(--shadow)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -136,8 +146,9 @@ th{font-weight:600;color:var(--muted);font-size:13px}
         <option value="en">English</option><option value="es">Español</option>
       </select>
     </div>
+    <div class="row"><button onclick="startTour()">How it works</button></div>
   </div>
-  <div class="card">
+  <div class="card" id="linesCard">
     <h3>K-lines</h3>
     <div id="lines"></div>
     <div class="row">
@@ -158,7 +169,7 @@ th{font-weight:600;color:var(--muted);font-size:13px}
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardPaddock">
       <h3><span class="step"><span>2</span></span>The paddock</h3>
       <div class="muted">The paddock is cut into strips side by side. The line waters one half of a strip at a time. Give 3 points, with the GPS (stand there) or by tapping the map:</div>
       <div class="pt"><b>Riser</b><span id="s-riser"></span><button class="small" onclick="gpsPoint('riser')">GPS</button><button class="small" onclick="tapPoint('riser')">Tap map</button></div>
@@ -192,7 +203,7 @@ th{font-weight:600;color:var(--muted);font-size:13px}
       <div class="muted gpsInfo" style="display:none;color:var(--warn)"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardOrder">
       <h3><span class="step"><span>3</span></span>The order of the shifts</h3>
       <div class="muted">One line for each shift, in order. For each one, choose the strip and the side: A (the half at end A) or B. Tap a line to see that shift in orange on the map. Green = where the line is now.</div>
       <div id="mapSlot3"></div>
@@ -218,7 +229,7 @@ th{font-weight:600;color:var(--muted);font-size:13px}
       <div class="row"><button onclick="addCustom()">+ Add a set with its own shape</button></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardRecord">
       <h3>Recorded paths (your own way)</h3>
       <div class="muted">Drive a shift your own way and the app keeps your track for that shift. Next time it shows your path instead of its suggested one. Tap the button, drive the next shift of this K-line, then tap "Shift done".</div>
       <div class="row"><button class="primary" onclick="recordShift()">Record a shift</button></div>
@@ -258,11 +269,12 @@ th{font-weight:600;color:var(--muted);font-size:13px}
     <div class="bar">
       <button id="btnRec" onclick="toggleRec()" style="display:none">Record</button>
       <button class="primary" id="btnDone" onclick="doneShift()">Shift done</button>
-      <button onclick="lineIsHere()">Line is here</button>
+      <button id="btnHere" onclick="lineIsHere()">Line is here</button>
       <button id="btnFind" onclick="findMe(hMap)">Find me</button>
     </div>
     <details class="more">
       <summary>More: map turning, test mode</summary>
+      <div class="bar"><button onclick="startTour()">How it works</button></div>
       <div class="bar">
         <button id="btnHead" onclick="toggleHeadUp()">Map: north up</button>
         <button id="btnSim" onclick="toggleSim()">Test mode: off</button>
@@ -311,6 +323,18 @@ th{font-weight:600;color:var(--muted);font-size:13px}
 </section>
 </main>
 <div id="toast"></div>
+<div id="tour" hidden role="dialog" aria-modal="true" aria-label="How it works">
+  <div id="tourHole"></div>
+  <div id="tourCard">
+    <div id="tourCount"></div>
+    <p id="tourText" aria-live="polite"></p>
+    <div class="row">
+      <button id="tourSkip" onclick="endTour()">Skip</button>
+      <button id="tourBack" onclick="tourGo(-1)">Back</button>
+      <button id="tourNext" class="primary" onclick="tourGo(1)">Next</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
@@ -389,6 +413,21 @@ const ES = {
   'Gap between tractor and line at the start (m)': 'Distancia entre el tractor y la línea al empezar (m)', 'Delete this K-line': 'Borrar esta K-line',
   'Put it back in line': 'Volver a ponerla en línea', 'No K-lines yet.': 'Todavía no hay K-lines.',
   'Language': 'Idioma',
+  // the guided tour
+  'How it works': 'Cómo funciona', 'Skip': 'Saltar', 'Back': 'Atrás', 'Next': 'Siguiente',
+  'This app guides the tractor when you shift a K-line. It shows where the next set is, and the path to drive so the pipe does not kink.': 'Esta app guía al tractor cuando mueve una K-line. Muestra dónde está la próxima posición y el recorrido a manejar para que el caño no se doble.',
+  'Setup: make your K-lines here. You set the riser, the paddock strips and the order of the shifts once.': 'Configurar: aquí crea sus K-lines. Pone una sola vez el hidrante, las franjas del potrero y el orden de los cambios.',
+  'Choose the K-line to shift. You can also tap a line on the map.': 'Elija la K-line para mover. También puede tocar una línea en el mapa.',
+  'Follow the arrow and the words. They tell you to steer left or right to stay on the path, and how far you have to go. The path is the blue line on the map.': 'Siga la flecha y las palabras. Le dicen si corregir a la izquierda o a la derecha para seguir el recorrido, y cuánto falta. El recorrido es la línea azul del mapa.',
+  'Find me shows where you are and keeps you in view. Drag the map to stop following.': 'Ubicarme muestra dónde está usted y lo sigue en el mapa. Arrastre el mapa para dejar de seguirlo.',
+  'At the stop point the card turns red. Unhook the line, then tap Shift done. The app moves on to the next shift.': 'En el punto de parada el cuadro se pone rojo. Desenganche la línea y toque Cambio hecho. La app pasa al próximo cambio.',
+  'Is the line somewhere else? Stand at the tow end and tap Line is here, or tap that set on the map.': '¿La línea está en otro lugar? Párese en la punta de tiro y toque La línea está aquí, o toque esa posición en el mapa.',
+  'More: turn the map so the driving direction is up, and Test mode to try a shift without moving.': 'Más: gire el mapa para que la dirección de avance quede arriba, y el modo prueba para probar un cambio sin moverse.',
+  'In Setup, make a new K-line or tap Edit on one. Each phone sees the same K-lines.': 'En Configurar, cree una K-line nueva o toque Editar en una. Todos los teléfonos ven las mismas K-lines.',
+  'Steps 1 and 2: the line and the paddock. Set the riser and the two ends of strip 1, with the GPS or by tapping the map. You can drag the points.': 'Pasos 1 y 2: la línea y el potrero. Ponga el hidrante y las dos puntas de la franja 1, con el GPS o tocando el mapa. Puede arrastrar los puntos.',
+  'Step 3: the order of the shifts. Choose the strip and the side for each one. Tap a shift to see it on the map, and test drive it.': 'Paso 3: el orden de los cambios. Elija la franja y el lado de cada uno. Toque un cambio para verlo en el mapa y probarlo.',
+  'Record a shift: drive it your own way once, and the app shows your path next time.': 'Grabar un cambio: hágalo una vez a su manera, y la app muestra su recorrido la próxima vez.',
+  'You are ready. You can open this guide again from Setup or from More on the map: How it works.': 'Ya está listo. Puede volver a abrir esta guía desde Configurar o desde Más en el mapa: Cómo funciona.',
   'Make at least 2 shifts first.': 'Primero haga al menos 2 cambios.', 'Tap a shift in the list first.': 'Primero toque un cambio en la lista.',
   'Test finished: every shift driven.': 'Prueba terminada: se hicieron todos los cambios.', 'Test finished.': 'Prueba terminada.',
   'Blue line = the path to drive.': 'Línea azul = el recorrido a manejar.', 'Orange line = your recorded path.': 'Línea naranja = su recorrido grabado.',
@@ -499,7 +538,7 @@ if (LANG === 'es') {
 
 // ---------- storage ----------
 const KEY = 'kline-mover-v1';
-const APP_VERSION = '2026-11-18o';   // change on every release, so phones load the new page
+const APP_VERSION = '2026-11-18p';   // change on every release, so phones load the new page
 const $ = s => document.querySelector(s);
 let db = load();
 function load() {
@@ -1290,6 +1329,72 @@ function drawLayout(layer, L, opt = {}) {
   return pts.length > 1 ? L_.latLngBounds(pts) : null;
 }
 
+// ---------- tutorial ----------
+// A short guided tour: each step darkens the screen, lights up one real part of the app and
+// explains it. It opens by itself the first time; "How it works" opens it again.
+// `at` lists places to point at, the first one you can see wins; none = a card in the middle.
+const TOUR = [
+  { page: 'shift', text: 'This app guides the tractor when you shift a K-line. It shows where the next set is, and the path to drive so the pipe does not kink.' },
+  { page: 'shift', at: ['#shiftMap .setupbtn'], text: 'Setup: make your K-lines here. You set the riser, the paddock strips and the order of the shifts once.' },
+  { page: 'shift', at: ['#shLine'], text: 'Choose the K-line to shift. You can also tap a line on the map.' },
+  { page: 'shift', at: ['#gMain'], text: 'Follow the arrow and the words. They tell you to steer left or right to stay on the path, and how far you have to go. The path is the blue line on the map.' },
+  { page: 'shift', at: ['#btnFind'], text: 'Find me shows where you are and keeps you in view. Drag the map to stop following.' },
+  { page: 'shift', at: ['#btnDone'], text: 'At the stop point the card turns red. Unhook the line, then tap Shift done. The app moves on to the next shift.' },
+  { page: 'shift', at: ['#btnHere'], text: 'Is the line somewhere else? Stand at the tow end and tap Line is here, or tap that set on the map.' },
+  { page: 'shift', at: ['#guide .more summary'], text: 'More: turn the map so the driving direction is up, and Test mode to try a shift without moving.' },
+  { page: 'setup', at: ['#linesCard'], text: 'In Setup, make a new K-line or tap Edit on one. Each phone sees the same K-lines.' },
+  { page: 'setup', at: ['#cardPaddock h3', '#linesCard'], text: 'Steps 1 and 2: the line and the paddock. Set the riser and the two ends of strip 1, with the GPS or by tapping the map. You can drag the points.' },
+  { page: 'setup', at: ['#cardOrder h3', '#linesCard'], text: 'Step 3: the order of the shifts. Choose the strip and the side for each one. Tap a shift to see it on the map, and test drive it.' },
+  { page: 'setup', at: ['#cardRecord', '#linesCard'], text: 'Record a shift: drive it your own way once, and the app shows your path next time.' },
+  { page: 'shift', text: 'You are ready. You can open this guide again from Setup or from More on the map: How it works.' }
+];
+let tourStep = -1;
+const seen = el => el && el.offsetParent !== null && el.getBoundingClientRect().width > 0;
+function startTour() {
+  try { localStorage.setItem('kline-tour-done', '1'); } catch (e) {}
+  tourStep = 0; $('#tour').hidden = false; showTourStep();
+}
+function endTour() {
+  tourStep = -1; $('#tour').hidden = true;
+  if (page !== 'shift') show('shift');
+}
+function tourGo(d) {
+  const n = tourStep + d;
+  if (n < 0) return;
+  if (n >= TOUR.length) return endTour();
+  tourStep = n; showTourStep();
+}
+function showTourStep() {
+  const st = TOUR[tourStep];
+  if (page !== st.page) show(st.page);
+  if (st.page === 'setup' && !edId && db.lines[0]) editLine(db.lines[0].id);
+  $('#tourText').textContent = st.text;
+  $('#tourCount').textContent = `${tourStep + 1} / ${TOUR.length}`;
+  $('#tourBack').style.visibility = tourStep ? 'visible' : 'hidden';
+  $('#tourNext').textContent = tourStep === TOUR.length - 1 ? 'Finish' : 'Next';
+  const el = (st.at || []).map(s => document.querySelector(s)).find(seen);
+  if (el) el.scrollIntoView({ block: el.offsetHeight > innerHeight * 0.4 ? 'start' : 'center' });
+  // measure after the page has drawn and scrolled
+  setTimeout(() => placeTour(el), 120);
+}
+function placeTour(el) {
+  if (tourStep < 0) return;
+  const hole = $('#tourHole'), card = $('#tourCard'), W = innerWidth, H = innerHeight;
+  if (!el || !seen(el)) {
+    hole.style.cssText = `left:${W / 2}px;top:${H / 2}px;width:0;height:0`;
+    card.style.top = Math.max(16, (H - card.offsetHeight) / 2) + 'px';
+    return;
+  }
+  const b = el.getBoundingClientRect(), pad = 6;
+  // a tall part only lights up its top, so the card still fits next to it
+  const r = { left: b.left, top: b.top, width: b.width, height: Math.min(b.height, H * 0.4) };
+  r.bottom = r.top + r.height;
+  hole.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + 2 * pad}px;height:${r.height + 2 * pad}px`;
+  const ch = card.offsetHeight, below = r.bottom + pad + 12;
+  card.style.top = (below + ch < H - 12 ? below : Math.max(12, r.top - pad - 12 - ch)) + 'px';
+}
+addEventListener('resize', () => { if (tourStep >= 0) showTourStep(); });
+
 // ---------- shift ----------
 let hMap = null, hLayer = null, meLayer = null, recLine = null;
 let pos = null, acc = null, heading = null, lastPos = null, watchId = null;
@@ -1642,6 +1747,7 @@ $('#langSel').value = LANG;
 show('shift');
 syncNow();
 checkUpdate();
+try { if (!localStorage.getItem('kline-tour-done')) setTimeout(startTour, 900); } catch (e) {}
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 </script>
 </body>
