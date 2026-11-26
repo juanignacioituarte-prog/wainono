@@ -1736,6 +1736,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('print_map'); toggleSettingsMenu();" style="font-weight: bold; color: #2c3e50;">🖨 Print Map</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('fert'); toggleSettingsMenu();" style="font-weight: bold; color: #27ae60;">🧪 Fert</div>
                     <div class="dropdown-item" onclick="openPkePage(); toggleSettingsMenu();" style="font-weight: bold; color: #8d6e63;">🥛 PKE Silo</div>
+                    <div class="dropdown-item" onclick="openPumpsPage(); toggleSettingsMenu();" style="font-weight: bold; color: #2980b9;">💧 Pumps</div>
                     <div class="dropdown-item" id="menu-item-farm-config" style="display:none; font-weight: bold; color: #9b59b6;" onclick="switchDashboardMode('farm_config'); toggleSettingsMenu();">🗺️ Farm Configuration</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
@@ -11133,9 +11134,18 @@
 
         /* PKE Silo (Juani, 24 Oct 2026): pke.html in a new tab. In a frame
          * inside the app its Google sign-in did not work. */
-        function openPkePage() {
-            const w = window.open('pke.html', '_blank', 'noopener');
-            if (!w) location.href = 'pke.html';   // pop-up blocked: open it here
+        function openPkePage() { openInNewTab('pke.html'); }
+
+        /* Pumps (Juani, 26 Nov 2026): pump.html, the flow meter dashboard, in a
+         * new tab, the same way as PKE Silo. */
+        function openPumpsPage() { openInNewTab('pump.html'); }
+
+        // With 'noopener' window.open always returns null, so the old code
+        // also sent the app's own tab to the page. Open it, then cut the link.
+        function openInNewTab(url) {
+            const w = window.open(url, '_blank');
+            if (w) { try { w.opener = null; } catch (e) {} }
+            else location.href = url;   // pop-up blocked: open it here
         }
 
         async function init() {

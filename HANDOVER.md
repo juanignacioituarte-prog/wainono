@@ -1036,3 +1036,8 @@ Added 26 November 2026 (Zenbook):
     (`reshapeKeptPieces`). A piece with a hole still cannot be reshaped.
   - The crumbs of L1a and L1b are still in the sheet until each is
     reshaped once. Nothing in the sheet was changed by Claude.
+- ⋮ menu **💧 Pumps** (v1.1.103, Juani 26 Nov 2026): opens `pump.html` (the
+  flow meter dashboard) in a new tab, under PKE Silo (`openPumpsPage`).
+  Both now use `openInNewTab`: the old PKE code passed 'noopener', with
+  which `window.open` always returns null, so the app's own tab also went
+  to pke.html.
