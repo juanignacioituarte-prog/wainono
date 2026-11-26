@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.101</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.102</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1740,7 +1740,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.101</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.102</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -7806,6 +7806,13 @@
                 const info = outStatusInfo(pt.status);
                 L.polygon(pt.vertices.map(v => [v.lat, v.lng]), { color: '#fff', weight: 3, opacity: 1, dashArray: '7, 5', fillColor: info.color, fillOpacity: 0.55, interactive: true })
                     .bindTooltip(`<div style="font-weight:bold; font-size:12px;">${escUnit(pt.paddock || '')}</div><div style="font-size:11px; font-weight:bold; color:${info.color};">PART OUT: ${escUnit(info.label)}</div><div style="font-size:10px; color:#7f8c8d;">${(Number(pt.areaHa) || 0).toFixed(2)} ha</div>`, { sticky: true })
+                    // Farm Configuration: the tap belongs to the paddock under the part.
+                    .on('click', e => {
+                        if (isDrawingBreak || currentDashboardMode !== 'farm_config') return;
+                        L.DomEvent.stopPropagation(e);
+                        const under = getPaddockFromPoint(e.latlng);
+                        if (under && paddockMap[under]) paddockMap[under].fire('click', e);
+                    })
                     .addTo(outPartsLayer);
             });
             outPartsLayer.addTo(map);
@@ -15424,6 +15431,8 @@
                 
                 const handlePressStart = (e) => {
                     isLongPress = false;
+                    // Drawing a new break over this one: no long-press select.
+                    if (isDrawingBreak || currentDashboardMode === 'farm_config') return;
                     pressTimer = setTimeout(() => {
                         isLongPress = true;
                         if (navigator.vibrate) navigator.vibrate(80);
@@ -15455,8 +15464,19 @@
                         isLongPress = false;
                         return;
                     }
-                    if (isDrawingBreak) return; 
-                    
+                    // Drawing a new break over this one (Juani, 26 Nov 2026):
+                    // the tap is a point of the new break, as on the bare map.
+                    if (isDrawingBreak) { onMapClickForBreak(e); return; }
+
+                    // Farm Configuration: a break never takes you to BREAKS. The
+                    // tap belongs to the paddock under it (picking a paddock to
+                    // take out, units, walk order, boundaries).
+                    if (currentDashboardMode === 'farm_config') {
+                        const under = typeof getPaddockFromPoint === 'function' ? getPaddockFromPoint(e.latlng) : null;
+                        if (under && paddockMap[under]) paddockMap[under].fire('click', e);
+                        return;
+                    }
+
                     if (breakSelectMode) {
                         toggleBreakSelection(brk.id);
                     } else {

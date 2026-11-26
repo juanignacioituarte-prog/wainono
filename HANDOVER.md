@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 26 November 2026. App version: **v1.1.101**,
-service worker cache `wn-farm-v1.1.115`, Apps Script `2026-11-01-a`.
+Written 2 October 2026, updated 26 November 2026. App version: **v1.1.102**,
+service worker cache `wn-farm-v1.1.116`, Apps Script `2026-11-01-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -999,3 +999,15 @@ Added 26 November 2026 (Zenbook):
     Open-Meteo; the first load can time out at 25 s, then it works).
   - On 26 Nov: 97 paddocks in the list, 34 out (A1-b and O2-b are out for
     KALE, U1 and U2 by a 0 cover). Top: A3 36 days, 8 31 days.
+- **Taps on breaks** (v1.1.102, Juani 26 Nov 2026), in the break layer's
+  click handler (`renderLayer.on('click')`):
+  - **Drawing a break over another break**: a tap on an old break is now a
+    point of the new break (`onMapClickForBreak(e)`); before, the old break
+    caught the tap and nothing happened. No long-press select while
+    drawing. This also works for DRAW A PART OUT (same drawing tool).
+  - **Farm Configuration**: a tap on a break no longer jumps to BREAKS
+    (`scrollToBreakCard` switched mode). It goes to the paddock under it
+    (`getPaddockFromPoint`, then the paddock layer's click), so picking a
+    paddock to take out works on paddocks with breaks. The drawn parts out
+    do the same in Farm Configuration. In the other screens a tap on a break
+    still opens it in BREAKS.
