@@ -240,19 +240,22 @@ function render(j){
   $('tSeen').textContent = newest ? fmtClock(newest) : '–';
 
   // --- combined take against its consented rate ---
-  // Always WaterMetrics' own figure for the Combi consent, never a sum of the
-  // meters: the portal calculates it separately and it is what compliance is
-  // judged on. It runs on its own clock and lags the meters, so it carries its
-  // own "as at" time rather than being passed off as current.
+  // The headline is the LATEST meter readings added up, against the consented
+  // limit. The portal's own used value lags by up to an hour and barely moves,
+  // so it sits underneath as a reference with its timestamp.
+  // Only takes on this consent are counted - Pivot 4 FM is not one of them.
   const c = j.combi;
-  if (c && c.allowedLs) {
-    $('tCombi').innerHTML = c.usedLs.toFixed(1) +
+  if (c && c.allowedLs && c.liveSumLs != null) {
+    $('tCombi').innerHTML = c.liveSumLs.toFixed(1) +
       '<span class="unit"> / ' + c.allowedLs.toFixed(0) + ' l/s</span>';
-    $('tCombi').className = 'val ' + band(c.pct);
-    $('tCombiNote').textContent = c.pct.toFixed(1) + '% of consent' +
-      (c.pct > 100 ? ' — OVER' : '') +
-      (c.asAt ? ' · as at ' + c.asAt.replace(/^\d{2}-\d{2}-\d{4}\s*/, '') : '');
-    setBar('tCombiBar', c.pct);
+    $('tCombi').className = 'val ' + band(c.livePct);
+    $('tCombiNote').textContent = c.livePct.toFixed(1) + '% of consent' +
+      (c.livePct > 100 ? ' — OVER' : '') +
+      (c.portalUsedLs != null
+        ? ' · portal ' + c.portalUsedLs.toFixed(1) + ' at ' +
+          String(c.portalAsAt || '').replace(/^\d{2}-\d{2}-\d{4}\s*/, '')
+        : '');
+    setBar('tCombiBar', c.livePct);
   } else {
     $('tCombi').textContent = '–';
     $('tCombiNote').textContent = j.consentError ? 'consent data unavailable' : 'no consent rule found';
@@ -269,15 +272,19 @@ function render(j){
     $('tAnnualNote').textContent = 'no annual rule found';
   }
 
-  const over = c && c.pct > 100;
+  const over = c && c.livePct > 100;
   const stale = j.meters.filter(m => m.stale);
   let warn = '';
   if (over) {
     warn += '<div class="msg bad"><b>Combined take is over consent.</b> ' +
-      c.usedLs.toFixed(1) + ' l/s against a limit of ' + c.allowedLs.toFixed(0) +
-      ' l/s (' + c.pct.toFixed(1) + '%)' +
-      (c.asAt ? ', as calculated by the portal at ' + esc(c.asAt) : '') +
-      '. This is the figure the council sees.</div>';
+      c.liveSumLs.toFixed(1) + ' l/s against a limit of ' + c.allowedLs.toFixed(0) +
+      ' l/s (' + c.livePct.toFixed(1) + '%), from the latest reading of the ' +
+      c.countedMeters + ' takes on this consent' +
+      (c.portalUsedLs != null
+        ? '. The portal&rsquo;s own figure was ' + c.portalUsedLs.toFixed(1) +
+          ' l/s at ' + esc(c.portalAsAt || 'unknown') + ' &mdash; that is the one ' +
+          'the council sees, and it updates slowly.'
+        : '.') + '</div>';
   }
   if (stale.length) {
     warn += '<div class="msg"><b>' + stale.length + ' meter' + (stale.length > 1 ? 's' : '') +
