@@ -325,7 +325,7 @@ resetTimes();
 // ---------------------------------------------------------------------------
 async function load(){
   if (!SCRIPT_URL) { $('setup').style.display = 'block'; $('sub').textContent = 'not connected'; render(); return; }
-  if (!idToken || !tokenFresh()) { showLogin(); return; }
+  if (!useSharedToken()) { showLogin(); return; }
   $('sub').textContent = 'loading…';
   try {
     let j;
@@ -701,12 +701,37 @@ const tokenFresh = () => {
   try { const p = JSON.parse(atob(idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
         return p.exp * 1000 > Date.now() + 60000; } catch (e) { return false; }
 };
+
+// One sign-in for the farm pages (Juani, 26 Nov 2026): the farm app, PKE and
+// Pumps keep the newest Google pass in localStorage under this key, the same
+// in index.html and pump.html. A valid one is used before asking Google.
+const FARM_TOKEN_KEY = 'farm_google_token';
+function sharedTokenGet(){
+  try { const t = localStorage.getItem(FARM_TOKEN_KEY); if (!t) return null;
+        const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return p.exp * 1000 > Date.now() + 60000 ? t : null; } catch (e) { return null; }
+}
+function sharedTokenSave(t){ try { if (t) localStorage.setItem(FARM_TOKEN_KEY, t); } catch (e) {} }
+// The pass of this tab, or else the shared one. True when there is a valid one.
+function useSharedToken(){
+  if (idToken && tokenFresh()) return true;
+  const s = sharedTokenGet();
+  if (s) { idToken = s; try { sessionStorage.setItem('pkeToken', s); } catch (e) {} return true; }
+  return false;
+}
+// The farm app got a new pass in another tab: take it, if this page is waiting.
+window.addEventListener('storage', e => {
+  if (e.key !== FARM_TOKEN_KEY || !sharedTokenGet()) return;
+  if ($('login').style.display !== 'none' && useSharedToken()) load();
+});
+
 function gsiInit(){
   if (!window.google || !google.accounts || !google.accounts.id) return false;
   if (!gsiInit.done) {
     google.accounts.id.initialize({ client_id: CLIENT_ID, auto_select: true, callback: r => {
       idToken = r.credential; $('gsiBtn').innerHTML = '';
       try { sessionStorage.setItem('pkeToken', idToken); } catch (e) {}
+      sharedTokenSave(idToken);
       if (pendingAct) { const a = pendingAct; pendingAct = null; a(); }
       else load();
     }});
@@ -716,7 +741,7 @@ function gsiInit(){
 }
 // Runs act now if signed in; otherwise shows the Google button and runs it after.
 function signedIn(act){
-  if (idToken && tokenFresh()) { act(); return; }
+  if (useSharedToken()) { act(); return; }
   if (!gsiInit()) { toast('Google sign-in is still loading. Try again in a moment.', true); return; }
   pendingAct = act;
   google.accounts.id.renderButton($('gsiBtn'), { theme:'outline', size:'medium', text:'signin_with' });

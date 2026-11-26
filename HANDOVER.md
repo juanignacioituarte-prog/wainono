@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 26 November 2026. App version: **v1.1.103**,
-service worker cache `wn-farm-v1.1.117`, Apps Script `2026-11-01-a`.
+Written 2 October 2026, updated 26 November 2026. App version: **v1.1.104**,
+service worker cache `wn-farm-v1.1.118`, Apps Script `2026-11-01-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -1041,3 +1041,24 @@ Added 26 November 2026 (Zenbook):
   Both now use `openInNewTab`: the old PKE code passed 'noopener', with
   which `window.open` always returns null, so the app's own tab also went
   to pke.html.
+- **One sign-in for the farm pages** (v1.1.104, Juani 26 Nov 2026: PKE Silo
+  asked him to sign in while he was in the farm app; he chose to share the
+  sign-in, not to trust the saved email). PKE and Pumps send a Google ID
+  token that their scripts check; the farm app only kept the email
+  (`auth_email`), so they asked Google again.
+  - `index.html`, `pke.html` and `pump.html` keep the newest token in
+    localStorage `farm_google_token` (`sharedTokenGet` / `sharedTokenSave`;
+    valid = more than 1 minute before `exp`; Google tokens last 1 hour).
+  - The farm app saves the token at sign-in, and `farmTokenRefresh` asks
+    Google for a new one (auto_select, usually no click) 3 s after an
+    auto-login start and when the app comes back to the screen, if the saved
+    one is old. It calls `google.accounts.id.initialize` again, which
+    replaces the sign-in button's setup, so its callback also calls
+    `handleCredentialResponse` when nobody is signed in yet. Only runs when
+    `auth_email` is set.
+  - PKE and Pumps use a valid shared token before asking Google, save any
+    token they get, and take a new one from another tab (`storage` event).
+    No Apps Script change. Notes in `Apps\pke-silo\NOTES.md` and
+    `Apps\pump-monitor\NOTES.md`; both pages are edited there and copied here.
+  - If Google cannot sign in without a click, it shows its small "Sign in
+    as..." card on the farm app once the token is over 1 hour old.

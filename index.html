@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.103</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.104</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1741,7 +1741,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.103</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.104</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -16636,6 +16636,7 @@
             
             // If response is passed from Google Sign-In
             if (response && response.credential) {
+                sharedTokenSave(response.credential);   // PKE Silo and Pumps use it too
                 const responsePayload = parseJwt(response.credential);
                 userEmail = responsePayload.email.toLowerCase();
             } else {
@@ -16707,8 +16708,52 @@
             if (savedEmail) {
                 // Skips Google prompt, attempts authentication silently
                 handleCredentialResponse(savedEmail);
+                setTimeout(farmTokenRefresh, 3000);
             }
         });
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) farmTokenRefresh(); });
+
+        /* ONE SIGN-IN FOR THE FARM PAGES (Juani, 26 Nov 2026: PKE Silo asked to
+         * sign in while he was in the farm app). PKE Silo and Pumps send a
+         * Google sign-in pass (an ID token) that their scripts check. The farm
+         * app only kept the email, so they had to ask Google again. Now every
+         * page on this site keeps the newest pass in localStorage
+         * ('farm_google_token', the same key in pke.html and pump.html) and
+         * uses it while it is valid (Google makes them last 1 hour). The farm
+         * app asks Google for a new one when it opens or comes back to the
+         * screen and the pass is old; with auto_select Google gives it without
+         * a click when it can. */
+        const FARM_TOKEN_KEY = 'farm_google_token';
+        function sharedTokenGet() {
+            try {
+                const t = localStorage.getItem(FARM_TOKEN_KEY);
+                if (!t) return null;
+                const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+                return p.exp * 1000 > Date.now() + 60000 ? t : null;
+            } catch (e) { return null; }
+        }
+        function sharedTokenSave(t) { try { if (t) localStorage.setItem(FARM_TOKEN_KEY, t); } catch (e) {} }
+        function farmTokenRefresh(tries) {
+            if (!localStorage.getItem('auth_email') || sharedTokenGet()) return;
+            if (!window.google || !google.accounts || !google.accounts.id) {
+                if ((tries || 0) < 20) setTimeout(() => farmTokenRefresh((tries || 0) + 1), 500);
+                return;
+            }
+            const onload = document.getElementById('g_id_onload');
+            const clientId = onload && onload.getAttribute('data-client_id');
+            if (!clientId) return;
+            if (!farmTokenRefresh.done) {
+                // This replaces the sign-in button's setup, so its first sign-in
+                // still goes to handleCredentialResponse.
+                google.accounts.id.initialize({ client_id: clientId, auto_select: true, callback: r => {
+                    if (!r || !r.credential) return;
+                    sharedTokenSave(r.credential);
+                    if (!localStorage.getItem('auth_email')) handleCredentialResponse(r);
+                } });
+                farmTokenRefresh.done = true;
+            }
+            google.accounts.id.prompt();
+        }
 
         function showUnauthorized(email) {
             document.querySelector('.g_id_signin').classList.add('hidden');

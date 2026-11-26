@@ -140,6 +140,37 @@ let timer = null;
 
 const $ = id => document.getElementById(id);
 
+// One sign-in for the farm pages (Juani, 26 Nov 2026): the farm app, PKE and
+// Pumps keep the newest Google pass in localStorage under this key, the same
+// in index.html and pke.html. A valid one is used before asking Google
+// (Google makes a pass last 1 hour).
+const FARM_TOKEN_KEY = 'farm_google_token';
+function tokenValid(t){
+  try { const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return p.exp * 1000 > Date.now() + 60000; } catch (e) { return false; }
+}
+function sharedTokenGet(){
+  try { const t = localStorage.getItem(FARM_TOKEN_KEY); return t && tokenValid(t) ? t : null; } catch (e) { return null; }
+}
+function sharedTokenSave(t){ try { if (t) localStorage.setItem(FARM_TOKEN_KEY, t); } catch (e) {} }
+// This page's pass, or else the shared one. True when there is a valid one.
+function useSharedToken(){
+  if (idToken && tokenValid(idToken)) return true;
+  const s = sharedTokenGet();
+  if (s) { idToken = s; return true; }
+  return false;
+}
+function startLoading(){
+  load();
+  if (timer) clearInterval(timer);
+  timer = setInterval(load, REFRESH_MS);
+}
+// The farm app got a new pass in another tab: take it, if this page is waiting.
+window.addEventListener('storage', e => {
+  if (e.key !== FARM_TOKEN_KEY || !sharedTokenGet()) return;
+  if (!(idToken && tokenValid(idToken)) && useSharedToken()) startLoading();
+});
+
 // The clock time the meter actually reported, not how long ago that was.
 // Anything from an earlier day keeps its date so an old reading cannot be
 // mistaken for today's.
@@ -175,7 +206,11 @@ function showSignin(msg){
 }
 
 async function load(){
-  if (!idToken) return;
+  // An old pass (over 1 hour): take the shared one; with none, sign in again.
+  if (!useSharedToken()) {
+    if (idToken) { idToken = null; showSignin('Your sign-in ran out. Sign in again.'); if (window.google && google.accounts && google.accounts.id) google.accounts.id.prompt(); }
+    return;
+  }
   $('refresh').disabled = true;
   $('refresh').textContent = 'Checking…';
   try {
@@ -304,13 +339,14 @@ function startGsi(){
     auto_select: true,
     callback: r => {
       idToken = r.credential;
+      sharedTokenSave(idToken);
       $('gsiBtn').innerHTML = '';
-      load();
-      if (timer) clearInterval(timer);
-      timer = setInterval(load, REFRESH_MS);
+      startLoading();
     }
   });
   google.accounts.id.renderButton($('gsiBtn'), { theme:'outline', size:'large', text:'signin_with' });
+  // Already signed in through the farm app (started below): no need to ask Google.
+  if (idToken && tokenValid(idToken)) return;
   google.accounts.id.prompt();
 }
 
@@ -319,6 +355,7 @@ if (SCRIPT_URL.indexOf('PASTE') === 0) {
     '<p>SCRIPT_URL is not set yet. Deploy Code.gs as a web app and paste the /exec URL ' +
     'into pump.html.</p>';
 } else {
+  if (useSharedToken()) startLoading();   // signed in through the farm app
   startGsi();
   // the portal only refreshes every 15 min, so nothing is gained by polling harder
   document.addEventListener('visibilitychange', () => {
