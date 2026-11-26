@@ -53,6 +53,10 @@
 
   .bar{height:4px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:6px;}
   .bar i{display:block; height:100%; background:var(--fill); border-radius:3px;}
+  .bar i.warn{background:var(--warn);}
+  .bar i.over{background:var(--bad);}
+  .pump .rate small{display:block; font-size:10px; color:var(--ink3); font-weight:500; margin-top:1px;}
+  .val.warn{color:var(--warn);} .val.over{color:var(--bad);}
 
   .msg{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--warn);
     border-radius:8px; padding:12px 14px; font-size:13px; color:var(--ink2); margin:14px 0;}
@@ -88,9 +92,16 @@
         <div class="note" id="tRunningNote">of &ndash; meters</div>
       </div>
       <div class="tile">
-        <div class="lab">Total flow</div>
-        <div class="val" id="tFlow">&ndash;<span class="unit"> l/s</span></div>
-        <div class="note">all takes combined</div>
+        <div class="lab">Combined vs consent</div>
+        <div class="val" id="tCombi">&ndash;</div>
+        <div class="note" id="tCombiNote">all takes combined</div>
+        <div class="bar"><i id="tCombiBar" style="width:0"></i></div>
+      </div>
+      <div class="tile">
+        <div class="lab">Annual volume</div>
+        <div class="val" id="tAnnual">&ndash;</div>
+        <div class="note" id="tAnnualNote">of the consented year</div>
+        <div class="bar"><i id="tAnnualBar" style="width:0"></i></div>
       </div>
       <div class="tile">
         <div class="lab">Last reading</div>
@@ -177,35 +188,78 @@ function render(j){
   $('signin').classList.add('hidden');
   $('app').classList.remove('hidden');
 
-  const total = j.meters.reduce((s,m) => s + m.flow, 0);
   const newest = Math.max.apply(null, j.meters.map(m => m.readingTime || 0));
-  const maxFlow = Math.max.apply(null, j.meters.map(m => m.flow).concat([1]));
 
   $('tRunning').textContent = j.running;
   $('tRunningNote').textContent = 'of ' + j.total + ' meters';
-  $('tFlow').innerHTML = total.toFixed(1) + '<span class="unit"> l/s</span>';
   $('tSeen').textContent = newest ? fmtAge(Date.now() - newest) : '–';
 
+  // --- combined take against its consented rate ---
+  // Always WaterMetrics' own figure for the Combi consent, never a sum of the
+  // meters: the portal calculates it separately and it is what compliance is
+  // judged on. It runs on its own clock and lags the meters, so it carries its
+  // own "as at" time rather than being passed off as current.
+  const c = j.combi;
+  if (c && c.allowedLs) {
+    $('tCombi').innerHTML = c.usedLs.toFixed(1) +
+      '<span class="unit"> / ' + c.allowedLs.toFixed(0) + ' l/s</span>';
+    $('tCombi').className = 'val ' + band(c.pct);
+    $('tCombiNote').textContent = c.pct.toFixed(1) + '% of consent' +
+      (c.pct > 100 ? ' — OVER' : '') +
+      (c.asAt ? ' · as at ' + c.asAt.replace(/^\d{2}-\d{2}-\d{4}\s*/, '') : '');
+    setBar('tCombiBar', c.pct);
+  } else {
+    $('tCombi').textContent = '–';
+    $('tCombiNote').textContent = j.consentError ? 'consent data unavailable' : 'no consent rule found';
+  }
+
+  if (c && c.annual && c.annual.allowed) {
+    $('tAnnual').innerHTML = c.annual.pct.toFixed(1) + '<span class="unit">%</span>';
+    $('tAnnual').className = 'val ' + band(c.annual.pct);
+    $('tAnnualNote').textContent = Math.round(c.annual.used).toLocaleString() + ' of ' +
+      Math.round(c.annual.allowed).toLocaleString() + ' m³';
+    setBar('tAnnualBar', c.annual.pct);
+  } else {
+    $('tAnnual').textContent = '–';
+    $('tAnnualNote').textContent = 'no annual rule found';
+  }
+
+  const over = c && c.pct > 100;
   const stale = j.meters.filter(m => m.stale);
-  $('warn').innerHTML = stale.length
-    ? '<div class="msg"><b>' + stale.length + ' meter' + (stale.length > 1 ? 's' : '') +
+  let warn = '';
+  if (over) {
+    warn += '<div class="msg bad"><b>Combined take is over consent.</b> ' +
+      c.usedLs.toFixed(1) + ' l/s against a limit of ' + c.allowedLs.toFixed(0) +
+      ' l/s (' + c.pct.toFixed(1) + '%)' +
+      (c.asAt ? ', as calculated by the portal at ' + esc(c.asAt) : '') +
+      '. This is the figure the council sees.</div>';
+  }
+  if (stale.length) {
+    warn += '<div class="msg"><b>' + stale.length + ' meter' + (stale.length > 1 ? 's' : '') +
       ' not reporting.</b> A silent meter is not the same as a stopped pump &ndash; ' +
-      'it may have lost radio or power while the pump runs on.</div>'
-    : '';
+      'it may have lost radio or power while the pump runs on.</div>';
+  }
+  $('warn').innerHTML = warn;
 
   $('list').innerHTML = j.meters.map(m => {
     const cls = m.stale ? 'stale' : (m.running ? 'run' : 'off');
     const state = m.stale ? 'No data' : (m.running ? 'Running' : 'Off');
     const forBit = m.sinceMinutes != null ? ' for ' + fmtFor(m.sinceMinutes) : '';
-    const pct = Math.max(0, Math.min(100, (m.flow / maxFlow) * 100));
+    const hasC = m.consentLs != null;
+    const pct = hasC ? m.consentPct : null;
+    const barW = pct == null ? 0 : Math.max(0, Math.min(100, pct));
     return '<div class="pump' + (m.running ? '' : ' isoff') + '">' +
       '<span class="dot ' + cls + '"></span>' +
       '<div><div class="nm">' + esc(m.name) + '</div>' +
       '<div class="meta">' + state + forBit + ' &middot; read ' +
-        (m.readingTime ? fmtAge(Date.now() - m.readingTime) : 'unknown') + '</div>' +
-      (m.running ? '<div class="bar"><i style="width:' + pct.toFixed(0) + '%"></i></div>' : '') +
+        (m.readingTime ? fmtAge(Date.now() - m.readingTime) : 'unknown') +
+        (hasC ? ' &middot; ' + pct.toFixed(0) + '% of its ' + m.consentLs.toFixed(0) +
+                ' l/s consent' : '') + '</div>' +
+      (hasC ? '<div class="bar"><i class="' + band(pct) +
+              '" style="width:' + barW.toFixed(0) + '%"></i></div>' : '') +
       '</div>' +
-      '<div class="rate">' + m.flow.toFixed(1) + '<span> l/s</span></div>' +
+      '<div class="rate">' + m.flow.toFixed(1) + '<span> l/s</span>' +
+        (hasC ? '<small>of ' + m.consentLs.toFixed(0) + '</small>' : '') + '</div>' +
       '</div>';
   }).join('');
 
@@ -215,6 +269,20 @@ function render(j){
 
 function esc(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// green well under consent, amber getting close, red at or over it
+function band(pct){
+  if (pct == null) return '';
+  if (pct > 100) return 'over';
+  if (pct >= 90) return 'warn';
+  return '';
+}
+
+function setBar(id, pct){
+  const el = $(id);
+  el.className = band(pct);
+  el.style.width = Math.max(0, Math.min(100, pct || 0)).toFixed(0) + '%';
 }
 
 function startGsi(){
