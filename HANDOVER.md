@@ -1011,3 +1011,15 @@ Added 26 November 2026 (Zenbook):
     paddock to take out works on paddocks with breaks. The drawn parts out
     do the same in Farm Configuration. In the other screens a tap on a break
     still opens it in BREAKS.
+- **A new grazing hides the old one** (v1.1.102, Juani 26 Nov 2026: "if we
+  draw a break over another one, hide the previous grazing's breaks for that
+  paddock"), `hiddenOldBreakIds`. Per paddock (`fertBreakPaddock`), the grass
+  breaks inside Break Display Days are split into grazings by a gap of more
+  than 10 days (`FERT_GAP_DAYS`). A break of an earlier grazing is hidden,
+  on the map and in the BREAKS list, when a break of a later grazing
+  overlaps it by more than 50 m² and 5% of the old break. Breaks of the same
+  grazing never hide each other. Crop breaks and lines are never hidden.
+  The weekly (historical) view shows everything. AREA/DAY and the other
+  numbers still count every break. While a new break is being drawn the old
+  ones still show; they go when it is saved. On 26 Nov: 5 hidden (11 x3,
+  L2, F8).

@@ -14893,6 +14893,51 @@
             const v = parseFloat(el && el.value) || parseFloat(localStorage.getItem('feed_round'));
             return v > 0 ? v : 25;
         }
+        /* A new grazing hides the old one (Juani, 26 Nov 2026): when a break is
+         * drawn over a break of an EARLIER grazing of the same paddock, the
+         * old break is hidden, on the map and in the list. A grazing = the
+         * paddock's grass breaks with no gap over FERT_GAP_DAYS (10 days)
+         * between them, as Fert counts them. Breaks of the same grazing never
+         * hide each other; crop breaks and lines are never hidden. Only the
+         * normal view; the weekly (historical) view shows everything. */
+        function hiddenOldBreakIds(sinceTs) {
+            const gapMs = (typeof FERT_GAP_DAYS !== 'undefined' ? FERT_GAP_DAYS : 10) * 86400000;
+            const byPaddock = {};
+            (savedBreaks || []).forEach(b => {
+                if (b.isDeleted || b.isCropBreak || b.cropMode === 'line' || (b.group || '') === 'crops') return;
+                if (!b.createdAt || !Array.isArray(b.vertices) || b.vertices.length < 3) return;
+                const t = new Date(b.createdAt).getTime();
+                if (!isFinite(t) || t < sinceTs) return;
+                const at = typeof fertBreakPaddock === 'function' ? fertBreakPaddock(b) : null;
+                const k = normName(at || (b.paddock != null ? String(b.paddock) : ''));
+                if (!k) return;
+                (byPaddock[k] = byPaddock[k] || []).push({ b, t });
+            });
+            const ring = b => { const r = b.vertices.map(v => [v.lng, v.lat]); r.push(r[0]); return [r]; };
+            const areaOf = poly => { try { return turf.area({ type: 'Feature', geometry: { type: 'MultiPolygon', coordinates: poly } }); } catch (e) { return 0; } };
+            const hidden = new Set();
+            Object.keys(byPaddock).forEach(k => {
+                const list = byPaddock[k].sort((x, y) => x.t - y.t);
+                let g = 0;
+                list.forEach((x, i) => { if (i > 0 && x.t - list[i - 1].t > gapMs) g++; x.g = g; });
+                if (g === 0) return;   // only one grazing in view
+                list.forEach(old => {
+                    const oldArea = areaOf([ring(old.b)]);
+                    const covered = list.some(nw => {
+                        if (nw.g <= old.g) return false;
+                        try {
+                            const inter = polygonClipping.intersection(ring(old.b), ring(nw.b));
+                            const a = inter && inter.length ? areaOf(inter) : 0;
+                            // More than a sliver along a shared fence.
+                            return a > 50 && a > 0.05 * oldArea;
+                        } catch (e) { return false; }
+                    });
+                    if (covered) hidden.add(String(old.b.id));
+                });
+            });
+            return hidden;
+        }
+
         function getBreakDisplayDays() {
             return Math.max(1, Math.round(currentRotationLength()) + getBreakDisplayOffset());
         }
@@ -15361,9 +15406,14 @@
             const viewOnly = breakToggleApplies();
             if (viewOnly && !breaksOnMapVisible) return;
 
+            // Old grazings drawn over by a newer one are hidden (normal view only).
+            const hiddenOld = weeklyFilterRange ? new Set()
+                : hiddenOldBreakIds(Date.now() - (typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 21) * 86400000);
+
             savedBreaks.forEach(brk => {
                 if (brk.isDeleted) return;
                 if (brk.id === editingBreakId) return;
+                if (hiddenOld.has(String(brk.id))) return;
 
                 if (weeklyFilterRange) {
                     if (!brk.createdAt) return;
@@ -15726,8 +15776,10 @@
             });
 
             const filterDays = typeof getBreakDisplayDays === 'function' ? getBreakDisplayDays() : 21;
+            const hiddenOld = weeklyFilterRange ? new Set() : hiddenOldBreakIds(Date.now() - filterDays * 86400000);
             const visibleBreaks = savedBreaks.filter(b => {
                 if (!b.createdAt || b.isDeleted) return false;
+                if (hiddenOld.has(String(b.id))) return false;
                 const ts = new Date(b.createdAt).getTime();
                 if (weeklyFilterRange) {
                     return ts >= weeklyFilterRange.start && ts < weeklyFilterRange.end;
