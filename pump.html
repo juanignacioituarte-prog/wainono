@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pumps</title>
+<style>
+  :root{
+    --bg:#101413; --card:#1a201e; --line:#2c3633;
+    --ink:#f2f5f4; --ink2:#a9b5b1; --ink3:#78847f;
+    --fill:#41ab5d; --fill2:#238b45;
+    /* status colours are reserved for state, never for a data series */
+    --ok:#41ab5d; --warn:#eda100; --bad:#e34948;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:900px; margin:0 auto; padding:0 16px 40px;}
+  header{position:sticky; top:0; z-index:5; background:var(--bg);
+    border-bottom:1px solid var(--line); padding:10px 16px; display:flex; align-items:center; gap:10px;}
+  header h1{font-size:15px; margin:0; letter-spacing:.5px; flex:1; font-weight:700;}
+  header .sub{font-size:11px; color:var(--ink3); font-weight:400; display:block; letter-spacing:0;}
+  .btn{background:var(--card); color:var(--ink); border:1px solid var(--line);
+    padding:8px 12px; border-radius:7px; font-size:13px; cursor:pointer; font-weight:600; font-family:inherit;}
+  .btn:active{transform:scale(.97);}
+  .btn.small{padding:4px 9px; font-size:11px;}
+  .btn[disabled]{opacity:.5; cursor:default;}
+
+  .tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:14px 0;}
+  .tile{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px;}
+  .tile .lab{font-size:10px; letter-spacing:.9px; color:var(--ink3); text-transform:uppercase;}
+  .tile .val{font-size:24px; font-weight:700; margin-top:3px; line-height:1.1;}
+  .tile .unit{font-size:11px; color:var(--ink2); font-weight:400;}
+  .tile .note{font-size:11px; color:var(--ink3); margin-top:4px;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; margin-bottom:14px;}
+  .card h2{font-size:11px; letter-spacing:.9px; color:var(--ink3); text-transform:uppercase;
+    margin:0 0 10px; font-weight:700;}
+
+  .pump{display:grid; grid-template-columns:10px 1fr auto; gap:12px; align-items:center;
+    padding:11px 0; border-bottom:1px solid var(--line);}
+  .pump:last-child{border-bottom:0;}
+  .dot{width:10px; height:10px; border-radius:50%; background:var(--ink3);}
+  .dot.run{background:var(--ok); box-shadow:0 0 0 3px rgba(65,171,93,.18);}
+  .dot.off{background:var(--bad); box-shadow:0 0 0 3px rgba(227,73,72,.18);}
+  .dot.stale{background:var(--warn); box-shadow:0 0 0 3px rgba(237,161,0,.18);}
+  .pump .nm{font-size:14px; font-weight:600; line-height:1.25;}
+  .pump .meta{font-size:11px; color:var(--ink3); margin-top:2px;}
+  .pump .rate{text-align:right; font-size:17px; font-weight:700; white-space:nowrap;}
+  .pump .rate span{font-size:11px; color:var(--ink2); font-weight:400;}
+  .pump.isoff .rate{color:var(--bad);}
+
+  .bar{height:4px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:6px;}
+  .bar i{display:block; height:100%; background:var(--fill); border-radius:3px;}
+
+  .msg{background:var(--card); border:1px solid var(--line); border-left:4px solid var(--warn);
+    border-radius:8px; padding:12px 14px; font-size:13px; color:var(--ink2); margin:14px 0;}
+  .msg.bad{border-left-color:var(--bad);}
+  .muted{color:var(--ink3); font-size:11px;}
+  #signin{text-align:center; padding:50px 16px;}
+  #signin p{color:var(--ink2); font-size:14px; margin:0 0 18px;}
+  #gsiBtn{display:flex; justify-content:center;}
+  .hidden{display:none !important;}
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<header>
+  <h1>Pumps<span class="sub" id="sub">Wainono &middot; WaterMetrics</span></h1>
+  <button class="btn small" id="refresh" onclick="load()">Refresh</button>
+</header>
+
+<div class="wrap">
+
+  <div id="signin">
+    <p>Sign in with an authorised farm account.</p>
+    <div id="gsiBtn"></div>
+    <p class="muted" id="signinErr" style="margin-top:18px;"></p>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="tiles">
+      <div class="tile">
+        <div class="lab">Running</div>
+        <div class="val" id="tRunning">&ndash;</div>
+        <div class="note" id="tRunningNote">of &ndash; meters</div>
+      </div>
+      <div class="tile">
+        <div class="lab">Total flow</div>
+        <div class="val" id="tFlow">&ndash;<span class="unit"> l/s</span></div>
+        <div class="note">all takes combined</div>
+      </div>
+      <div class="tile">
+        <div class="lab">Last reading</div>
+        <div class="val" id="tSeen">&ndash;</div>
+        <div class="note" id="tSeenNote">from the portal</div>
+      </div>
+    </div>
+
+    <div id="warn"></div>
+
+    <div class="card">
+      <h2>Flow meters</h2>
+      <div id="list"></div>
+    </div>
+
+    <p class="muted" id="foot"></p>
+  </div>
+
+</div>
+
+<script>
+// Paste the /exec URL here after deploying Code.gs as a web app.
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyHT5UuVoBCpRiyYT9E8MxOB2oWk-_pNZuSxxsiPLs8CSAuCMth0G_q8_RNjtOaxb_3/exec';
+const CLIENT_ID  = '299650316460-graossgtkdodcvj3lohn2t324053se5c.apps.googleusercontent.com';   // the farm app's sign-in
+
+const REFRESH_MS = 5 * 60 * 1000;   // the portal only updates every 15 min
+let idToken = null;
+let timer = null;
+
+const $ = id => document.getElementById(id);
+
+function fmtAge(ms){
+  if (ms == null) return 'unknown';
+  const m = Math.round(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 90) return m + ' min ago';
+  const h = m / 60;
+  if (h < 48) return h.toFixed(1) + ' h ago';
+  return (h / 24).toFixed(1) + ' days ago';
+}
+
+function fmtFor(min){
+  if (min == null) return '';
+  if (min < 90) return Math.round(min) + ' min';
+  if (min < 48 * 60) return (min / 60).toFixed(1) + ' h';
+  return (min / 1440).toFixed(1) + ' days';
+}
+
+async function call(body){
+  const r = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(Object.assign({}, body, { token: idToken }))
+  });
+  return r.json();
+}
+
+function showSignin(msg){
+  $('app').classList.add('hidden');
+  $('signin').classList.remove('hidden');
+  if (msg) $('signinErr').textContent = msg;
+}
+
+async function load(){
+  if (!idToken) return;
+  $('refresh').disabled = true;
+  $('refresh').textContent = 'Checking…';
+  try {
+    const j = await call({ action: 'read' });
+    if (!j.ok){
+      if (j.auth === false) { showSignin(j.error || 'Not authorised.'); return; }
+      throw new Error(j.error || 'read failed');
+    }
+    render(j);
+  } catch (err) {
+    $('warn').innerHTML = '<div class="msg bad">Could not read the portal: ' +
+      String(err.message || err).replace(/</g,'&lt;') + '</div>';
+  } finally {
+    $('refresh').disabled = false;
+    $('refresh').textContent = 'Refresh';
+  }
+}
+
+function render(j){
+  $('signin').classList.add('hidden');
+  $('app').classList.remove('hidden');
+
+  const total = j.meters.reduce((s,m) => s + m.flow, 0);
+  const newest = Math.max.apply(null, j.meters.map(m => m.readingTime || 0));
+  const maxFlow = Math.max.apply(null, j.meters.map(m => m.flow).concat([1]));
+
+  $('tRunning').textContent = j.running;
+  $('tRunningNote').textContent = 'of ' + j.total + ' meters';
+  $('tFlow').innerHTML = total.toFixed(1) + '<span class="unit"> l/s</span>';
+  $('tSeen').textContent = newest ? fmtAge(Date.now() - newest) : '–';
+
+  const stale = j.meters.filter(m => m.stale);
+  $('warn').innerHTML = stale.length
+    ? '<div class="msg"><b>' + stale.length + ' meter' + (stale.length > 1 ? 's' : '') +
+      ' not reporting.</b> A silent meter is not the same as a stopped pump &ndash; ' +
+      'it may have lost radio or power while the pump runs on.</div>'
+    : '';
+
+  $('list').innerHTML = j.meters.map(m => {
+    const cls = m.stale ? 'stale' : (m.running ? 'run' : 'off');
+    const state = m.stale ? 'No data' : (m.running ? 'Running' : 'Off');
+    const forBit = m.sinceMinutes != null ? ' for ' + fmtFor(m.sinceMinutes) : '';
+    const pct = Math.max(0, Math.min(100, (m.flow / maxFlow) * 100));
+    return '<div class="pump' + (m.running ? '' : ' isoff') + '">' +
+      '<span class="dot ' + cls + '"></span>' +
+      '<div><div class="nm">' + esc(m.name) + '</div>' +
+      '<div class="meta">' + state + forBit + ' &middot; read ' +
+        (m.readingTime ? fmtAge(Date.now() - m.readingTime) : 'unknown') + '</div>' +
+      (m.running ? '<div class="bar"><i style="width:' + pct.toFixed(0) + '%"></i></div>' : '') +
+      '</div>' +
+      '<div class="rate">' + m.flow.toFixed(1) + '<span> l/s</span></div>' +
+      '</div>';
+  }).join('');
+
+  $('foot').textContent = 'Checked ' + new Date(j.checkedAt).toLocaleTimeString() +
+    ' · signed in as ' + j.user + ' · refreshes every 5 min';
+}
+
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function startGsi(){
+  if (!window.google || !google.accounts || !google.accounts.id) {
+    return setTimeout(startGsi, 300);
+  }
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID,
+    auto_select: true,
+    callback: r => {
+      idToken = r.credential;
+      $('gsiBtn').innerHTML = '';
+      load();
+      if (timer) clearInterval(timer);
+      timer = setInterval(load, REFRESH_MS);
+    }
+  });
+  google.accounts.id.renderButton($('gsiBtn'), { theme:'outline', size:'large', text:'signin_with' });
+  google.accounts.id.prompt();
+}
+
+if (SCRIPT_URL.indexOf('PASTE') === 0) {
+  $('signin').innerHTML =
+    '<p>SCRIPT_URL is not set yet. Deploy Code.gs as a web app and paste the /exec URL ' +
+    'into pump.html.</p>';
+} else {
+  startGsi();
+  // the portal only refreshes every 15 min, so nothing is gained by polling harder
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && idToken) load();
+  });
+}
+</script>
+</body>
+</html>
