@@ -990,11 +990,12 @@ Added 26 November 2026 (Zenbook):
     `fertBreakPaddock`, no crop breaks, no lines), or a silage cut ("mown"
     cover, `fertCutDates`) if that is later; marked "cut". NZ dates
     (`fertNzDay`).
-  - Paddocks out of rotation as a whole are left out (count shown); a
-    paddock with a part out stays, marked "(part out)". Paddocks with no
-    grazing found are on top.
+  - Paddocks out of rotation are left out (count shown): on the out tab, or
+    out by an old farmwalk cover of 0 (`walkOutPaddocks`, U1 and U2 on
+    26 Nov; Juani: they should not show). A paddock with a part out stays,
+    marked "(part out)". Paddocks with no grazing found are on top.
   - Days colour: green under 20, orange 20-29, red 30+.
   - Est. cover is "--" until the growth model has loaded (weather from
     Open-Meteo; the first load can time out at 25 s, then it works).
-  - On 26 Nov: 101 paddocks in rotation, 30 out; A1-b, O2-b, U1, U2 had no
-    grazing found.
+  - On 26 Nov: 97 paddocks in the list, 34 out (A1-b and O2-b are out for
+    KALE, U1 and U2 by a 0 cover). Top: A3 36 days, 8 31 days.

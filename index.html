@@ -5256,9 +5256,11 @@
             const est = typeof estimateCover === 'function' && typeof GR !== 'undefined' && GR.ready;
             const rows = [];
             let outCount = 0;
+            // Out by an old farmwalk cover of 0 (U1, U2) is out too, not only the out tab.
+            const walkOut = new Set((typeof walkOutPaddocks === 'function' ? walkOutPaddocks() : []).map(p => normName(p.name)));
             Object.keys(paddockMap || {}).forEach(n => {
                 if (unit && !unitHasPaddock(unit, n)) return;
-                if (excludedPaddocks.get(normName(n))) { outCount++; return; }
+                if (excludedPaddocks.get(normName(n)) || walkOut.has(normName(n))) { outCount++; return; }
                 let g = last[normName(n)] || null;
                 const cuts = typeof fertCutDates === 'function' ? fertCutDates(n) : [];
                 const cut = cuts.length ? cuts[cuts.length - 1] : null;
