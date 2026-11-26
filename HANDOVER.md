@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 12 October 2026. App version: **v1.1.100**,
-service worker cache `wn-farm-v1.1.114`, Apps Script `2026-11-01-a`.
+Written 2 October 2026, updated 26 November 2026. App version: **v1.1.101**,
+service worker cache `wn-farm-v1.1.115`, Apps Script `2026-11-01-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -976,3 +976,25 @@ Added 12 October 2026:
   the demand summed all herds but divided by the area of the unit shown, so
   one unit showed a target near 5200 and a huge supplement. It now uses
   `planScopedHerds()`, like the rest of the page.
+
+Added 26 November 2026 (Zenbook):
+
+- **🐄 GRAZING ORDER** (v1.1.101, no script change, Juani 26 Nov 2026): a
+  list of every paddock in rotation by last grazing date, the longest since
+  on top and the latest grazed at the bottom, so it is the order for the next
+  grazings. Columns: #, paddock, last grazing, days since, ha, est. cover.
+  Unit chips (ALL + each unit) inside the window; it opens on the unit picked
+  in FARMWALK. Buttons: in BREAKS under + NEW BREAK (Juani asked for it
+  there), and in FARMWALK > TOOLS. `openGrazingOrder`, `grazingOrderRows`.
+  - Last grazing = the last grass break drawn in the paddock (placed with
+    `fertBreakPaddock`, no crop breaks, no lines), or a silage cut ("mown"
+    cover, `fertCutDates`) if that is later; marked "cut". NZ dates
+    (`fertNzDay`).
+  - Paddocks out of rotation as a whole are left out (count shown); a
+    paddock with a part out stays, marked "(part out)". Paddocks with no
+    grazing found are on top.
+  - Days colour: green under 20, orange 20-29, red 30+.
+  - Est. cover is "--" until the growth model has loaded (weather from
+    Open-Meteo; the first load can time out at 25 s, then it works).
+  - On 26 Nov: 101 paddocks in rotation, 30 out; A1-b, O2-b, U1, U2 had no
+    grazing found.

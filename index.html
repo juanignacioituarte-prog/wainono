@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.100</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.101</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1740,7 +1740,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.100</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.101</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -1815,6 +1815,7 @@
                         <button id="btn-plan" onclick="switchDashboardMode('plan')" style="background:#8e44ad; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">📊 PLAN</button>
                         <button id="btn-farmwalk-history" onclick="switchDashboardMode('farmwalk_history')" style="background:#16a085; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">🕘 HISTORY</button>
                         <button id="btn-growth" onclick="openGrowthPage()" style="background:#27ae60; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">🌱 GROWTH</button>
+                        <button id="btn-grazing-order" onclick="openGrazingOrder()" style="background:#d35400; color:white; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:0.2s;">🐄 GRAZING ORDER</button>
                     </div>
                     <!-- FILTER -->
                     <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
@@ -5234,6 +5235,91 @@
             });
             return last;
         }
+        /* GRAZING ORDER (Juani, 26 Nov 2026): every paddock in rotation, longest
+         * since its last grazing on top and the latest grazed at the bottom, so
+         * the list is the order for the next grazings. Last grazing = the last
+         * grass break drawn in the paddock (as Fert and the silage list), or a
+         * silage cut if that is later. Paddocks out of rotation as a whole are
+         * left out. Filter by unit, inside the window. */
+        let grazingOrderUnit = null;    // a unit id, or null for the whole farm
+        function grazingOrderRows() {
+            const last = {};
+            (savedBreaks || []).forEach(b => {
+                if (b.isDeleted || b.isCropBreak || b.cropMode === 'line' || !b.createdAt) return;
+                const t = new Date(b.createdAt); if (!isFinite(t.getTime())) return;
+                const at = typeof fertBreakPaddock === 'function' ? fertBreakPaddock(b) : null;
+                const k = normName(at || (b.paddock != null ? String(b.paddock) : ''));
+                if (k && (!last[k] || t > last[k].t)) last[k] = { t, cut: false };
+            });
+            const unit = grazingOrderUnit ? (FARM_UNITS.find(u => u.id === grazingOrderUnit) || null) : null;
+            const today = fertNzDay(new Date());
+            const est = typeof estimateCover === 'function' && typeof GR !== 'undefined' && GR.ready;
+            const rows = [];
+            let outCount = 0;
+            Object.keys(paddockMap || {}).forEach(n => {
+                if (unit && !unitHasPaddock(unit, n)) return;
+                if (excludedPaddocks.get(normName(n))) { outCount++; return; }
+                let g = last[normName(n)] || null;
+                const cuts = typeof fertCutDates === 'function' ? fertCutDates(n) : [];
+                const cut = cuts.length ? cuts[cuts.length - 1] : null;
+                if (cut && (!g || cut > g.t)) g = { t: cut, cut: true };
+                const day = g ? fertNzDay(g.t) : null;
+                const e = est ? estimateCover(n, new Date()) : null;
+                rows.push({
+                    name: n, last: day, cut: !!(g && g.cut),
+                    days: day ? Math.round((today - day) / 86400000) : null,
+                    ha: Number(paddockAreaFor(n)) || 0,
+                    cover: e ? e.cover : null,
+                    part: (typeof OUT_PARTS !== 'undefined' ? OUT_PARTS : []).some(pt => normName(pt.paddock) === normName(n))
+                });
+            });
+            // Never grazed first, then the longest since the last grazing.
+            rows.sort((a, b) => (b.days == null ? Infinity : b.days) - (a.days == null ? Infinity : a.days) ||
+                a.name.localeCompare(b.name, undefined, { numeric: true }));
+            return { rows, outCount, unit };
+        }
+
+        function openGrazingOrder(unitId) {
+            if (unitId !== undefined) grazingOrderUnit = unitId || null;
+            else if (grazingOrderUnit === null && typeof activeUnitId !== 'undefined' && activeUnitId) grazingOrderUnit = activeUnitId;
+            closeGrazingOrder();
+            const { rows, outCount, unit } = grazingOrderRows();
+            const ha = rows.reduce((a, r) => a + r.ha, 0);
+            const chip = (label, color, on, arg) => `<button onclick="openGrazingOrder(${arg})" style="background:${on ? color : '#fff'}; color:${on ? '#fff' : '#2c3e50'}; border:1.5px solid ${color}; padding:5px 11px; border-radius:14px; font-size:11px; font-weight:bold; cursor:pointer;">${escUnit(label)}</button>`;
+            const chips = FARM_UNITS.length ? chip('ALL', '#2c3e50', !unit, "''") +
+                FARM_UNITS.map(u => chip(u.name, u.color || '#9b59b6', unit && unit.id === u.id, `'${escUnit(u.id)}'`)).join('') : '';
+            const daysColor = d => d == null ? '#7f8c8d' : (d >= 30 ? '#c0392b' : (d >= 20 ? '#e67e22' : '#27ae60'));
+            const wrap = document.createElement('div');
+            wrap.id = 'grazing-order-modal';
+            wrap.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:4000; display:flex; align-items:center; justify-content:center; padding:15px;';
+            wrap.onclick = e => { if (e.target === wrap) closeGrazingOrder(); };
+            wrap.innerHTML = `<div style="background:#fff; border-radius:10px; padding:14px 16px; width:100%; max-width:520px; max-height:88vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin:0; font-size:16px;">🐄 Grazing order</h3>
+                <button onclick="closeGrazingOrder()" style="background:none; border:none; font-size:22px; color:#95a5a6; cursor:pointer;">&times;</button></div>
+                <div style="font-size:11px; color:#7f8c8d; margin:4px 0 8px;">Longest since the last grazing on top. The latest grazed is at the bottom.</div>
+                ${chips ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">${chips}</div>` : ''}
+                <div style="font-size:12px; margin-bottom:6px;"><b>${rows.length}</b> paddock${rows.length === 1 ? '' : 's'} in rotation · <b>${ha.toFixed(1)}</b> ha${outCount ? ` <span style="color:#7f8c8d;">· ${outCount} out of rotation not shown</span>` : ''}</div>
+                <table style="width:100%; font-size:12px; border-collapse:collapse; border:1px solid #ddd;">
+                    <tr style="color:#7f8c8d; font-size:10px; background:#f8f9fa;"><td style="padding:4px 6px;">#</td><td>Paddock</td><td>Last grazing</td><td style="text-align:right;">Days</td><td style="text-align:right;">ha</td><td style="text-align:right; padding-right:6px;">Est. cover</td></tr>
+                    ${rows.map((r, i) => `<tr style="border-top:1px solid #eee; cursor:pointer;" onclick="grazingOrderShow('${escUnit(r.name)}')">
+                        <td style="padding:5px 6px; color:#95a5a6;">${i + 1}</td>
+                        <td><b>${escUnit(r.name)}</b>${r.part ? ' <span style="font-size:10px; color:#7f8c8d;">(part out)</span>' : ''}</td>
+                        <td>${r.last ? fmtNZ(r.last) + (r.cut ? ' <span style="font-size:10px; color:#8e44ad;">cut</span>' : '') : '<span style="color:#7f8c8d;">no grazing found</span>'}</td>
+                        <td style="text-align:right; font-weight:bold; color:${daysColor(r.days)};">${r.days != null ? r.days : '--'}</td>
+                        <td style="text-align:right;">${r.ha.toFixed(1)}</td>
+                        <td style="text-align:right; padding-right:6px; color:#2980b9;">${r.cover != null ? '&asymp; ' + r.cover : '--'}</td></tr>`).join('')}
+                </table>
+                <div style="font-size:10px; color:#7f8c8d; margin-top:6px;">Last grazing: the last grass break drawn in the paddock, or a silage cut if later. Days: green under 20, orange 20-29, red 30 or more. Tap a paddock to see it on the map.</div>
+            </div>`;
+            document.body.appendChild(wrap);
+        }
+        function closeGrazingOrder() { const w = document.getElementById('grazing-order-modal'); if (w) w.remove(); }
+        function grazingOrderShow(name) {
+            closeGrazingOrder();
+            const layer = paddockMap[name] || paddockMap[Object.keys(paddockMap).find(n => normName(n) === normName(name))];
+            if (layer) map.fitBounds(layer.getBounds(), { padding: [60, 60], maxZoom: 17 });
+        }
+
         /* Pick paddocks in the locked list, see their total area, and send them
          * to Print Map in one colour named "Silage" (Juani, 28 Oct 2026). */
         const silageSel = new Set();
@@ -15709,6 +15795,8 @@
                 html += `<button class="btn-select-breaks ${breakSelectMode ? 'active' : ''}" style="flex:0.6;" onclick="toggleBreakSelectMode()">${breakSelectMode ? '\u2715 CANCEL' : '\u2610 SELECT'}</button>`;
             }
             html += `</div>`;
+            // Which paddock is next: the grazing order (Juani, 26 Nov 2026).
+            html += `<button onclick="openGrazingOrder()" style="width:100%; background:#d35400; color:#fff; border:none; padding:9px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; margin-bottom:10px;">\ud83d\udc04 GRAZING ORDER</button>`;
 
             // Delete / Status multi-select actions
             if (breakSelectMode && selectedBreakIds.size > 0) {
