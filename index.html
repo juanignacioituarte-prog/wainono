@@ -1724,7 +1724,7 @@
         <div class="header" style="position:relative;">
             <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-dots" onclick="toggleSettingsMenu()">⋮</button>
-                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.102</span>
+                <span style="font-size: 9px; color: #bdc3c7; font-weight: normal; margin-left: -2px; cursor: pointer; user-select: none;" onclick="toggleSettingsMenu()">v1.1.103</span>
                 <div id="settings-menu" class="dropdown-menu">
                     <div class="dropdown-item" id="menu-item-admin" style="display:none;" onclick="switchDashboardMode('admin'); toggleSettingsMenu();">Invite Users</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('health_safety'); toggleSettingsMenu();" style="font-weight: bold; color: #e74c3c;">Health & Safety</div>
@@ -1740,7 +1740,7 @@
                     <div class="dropdown-item" onclick="switchDashboardMode('audio_settings'); toggleSettingsMenu();">Audio & Map Settings</div>
                     <div class="dropdown-item" onclick="switchDashboardMode('weekly_report'); toggleSettingsMenu();">Weekly Area Report</div>
                     <div class="dropdown-item" onclick="location.reload()">Refresh App</div>
-                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.102</div>
+                    <div style="font-size: 8px; color: #bdc3c7; padding: 5px 10px; border-top: 1px solid #eee; text-align: center;">v1.1.103</div>
                 </div>
                 <div class="mode-toggle-container" style="flex:1; margin-bottom:0;">
                     <button id="btn-mode-man" class="mode-btn"
@@ -7169,6 +7169,13 @@
             return m2 / 10000;
         }
 
+        // Pieces of a paddock smaller than this are leftovers, not land.
+        const SLIVER_HA = 0.01;   // 100 m²
+        function dropSlivers(coords) {
+            if (!Array.isArray(coords)) return coords;
+            return coords.filter(piece => multiPolygonAreaHa([piece]) >= SLIVER_HA);
+        }
+
         // Cut a shape with the straight line p1->p2. The line is stretched well
         // past the paddock, then one side of it is used to take a bite out.
         function splitByLine(coords, p1, p2) {
@@ -7183,8 +7190,10 @@
             const px = -uy, py = ux;                 // perpendicular, to close one side
             const half = [[a, b, [b[0] + px * BIG, b[1] + py * BIG], [a[0] + px * BIG, a[1] + py * BIG], a]];
             try {
-                const left = polygonClipping.intersection(coords, half);
-                const right = polygonClipping.difference(coords, half);
+                // A cut through a corner leaves crumbs of a few m² on the other
+                // side; L1a and L1b each got one (Nov 2026). They are dropped.
+                const left = dropSlivers(polygonClipping.intersection(coords, half));
+                const right = dropSlivers(polygonClipping.difference(coords, half));
                 if (!left || !right || left.length === 0 || right.length === 0) return null;
                 return [left, right];
             } catch (e) {
@@ -7532,17 +7541,36 @@
             }]);
         }
 
+        let reshapeKeptPieces = [];   // the pieces of a paddock not being reshaped
         function startPaddockReshape() {
             const sel = selectedPaddocks();
             if (sel.length !== 1) return;
             const p = sel[0];
             const geom = p.geometry || [];
-            if (geom.length !== 1 || !geom[0] || geom[0].length !== 1) {
-                alert(`${p.name} is made of more than one piece, so its corners cannot be dragged.\n\nSplit it first, or reshape the pieces before merging.`);
+
+            /* A paddock in more than one piece (Juani, 26 Nov 2026: L1b could
+             * not be reshaped). Leftover crumbs under 100 m² are dropped when
+             * the new shape is saved. With two real pieces (K4-K5, 24) you
+             * pick the piece to reshape; the other pieces are kept as they are. */
+            const pieces = dropSlivers(geom);
+            const crumbs = geom.length - pieces.length;
+            if (pieces.length === 0) { alert(`${p.name} has no shape to reshape.`); return; }
+            let pick = 0;
+            if (pieces.length > 1) {
+                const list = pieces.map((pc, i) => `${i + 1} = ${multiPolygonAreaHa([pc]).toFixed(2)} ha`).join('\n');
+                const typed = prompt(`${p.name} is made of ${pieces.length} pieces:\n${list}\n\nType the number of the piece to reshape. The other piece${pieces.length > 2 ? 's stay' : ' stays'} as it is.`, '1');
+                if (typed === null) return;
+                pick = parseInt(typed, 10) - 1;
+                if (!(pick >= 0 && pick < pieces.length)) { alert('Type one of the numbers in the list.'); return; }
+            }
+            if (!pieces[pick] || pieces[pick].length !== 1) {
+                alert(`That piece of ${p.name} has a hole in it, so its corners cannot be dragged.`);
                 return;
             }
+            if (crumbs > 0 && !confirm(`${p.name} has ${crumbs} tiny leftover piece${crumbs === 1 ? '' : 's'} (under 100 m²) from an old split. ${crumbs === 1 ? 'It' : 'They'} will be removed when you save the new shape.`)) return;
+            reshapeKeptPieces = pieces.filter((pc, i) => i !== pick);
 
-            const ring = geom[0][0].slice();
+            const ring = pieces[pick][0].slice();
             // a closed ring repeats its first point; the editor does not want that
             if (ring.length > 1) {
                 const a = ring[0], b = ring[ring.length - 1];
@@ -7573,7 +7601,9 @@
 
             const ring = verts.map(v => [v.lng, v.lat]);
             ring.push([ring[0][0], ring[0][1]]);           // close it again
-            const coords = [[ring]];
+            // The piece that was reshaped, plus the other real pieces as they were.
+            const coords = [[ring]].concat(reshapeKeptPieces || []);
+            reshapeKeptPieces = [];
             await savePaddockChanges([{
                 paddockId: p.paddockId, geometry: coords,
                 calcArea: multiPolygonAreaHa(coords), geometryType: 'MultiPolygon'

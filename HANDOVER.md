@@ -1,8 +1,8 @@
 # Wainono farm app - handover notes
 
 Everything needed to carry on working on this app from another computer.
-Written 2 October 2026, updated 26 November 2026. App version: **v1.1.102**,
-service worker cache `wn-farm-v1.1.116`, Apps Script `2026-11-01-a`.
+Written 2 October 2026, updated 26 November 2026. App version: **v1.1.103**,
+service worker cache `wn-farm-v1.1.117`, Apps Script `2026-11-01-a`.
 
 The index of all projects and the rules is `G:\My Drive\Apps\README.md`
 (`G:\Mi unidad\Apps\README.md` on the Zenbook).
@@ -1023,3 +1023,16 @@ Added 26 November 2026 (Zenbook):
   numbers still count every break. While a new break is being drawn the old
   ones still show; they go when it is saved. On 26 Nov: 5 hidden (11 x3,
   L2, F8).
+- **Paddocks in more than one piece can be reshaped** (v1.1.103, Juani
+  26 Nov 2026: RESHAPE refused L1b, "made of more than one piece").
+  - L1 was split on 26 Nov 15:55. The cut left a crumb of about 10 m²
+    (0.001 ha) on each side, so L1a and L1b were each 2 pieces. K4-K5 (0.90 +
+    4.70 ha) and 24 (1.12 + 1.56 ha) really are 2 pieces.
+  - `dropSlivers` drops pieces under `SLIVER_HA` (0.01 ha = 100 m²).
+    `splitByLine` now uses it, so a split no longer makes crumbs.
+  - RESHAPE (`startPaddockReshape`): crumbs are removed when the new shape
+    is saved (a confirm says so). With 2+ real pieces it asks which piece
+    (numbered, with ha); the other pieces are saved back unchanged
+    (`reshapeKeptPieces`). A piece with a hole still cannot be reshaped.
+  - The crumbs of L1a and L1b are still in the sheet until each is
+    reshaped once. Nothing in the sheet was changed by Claude.
