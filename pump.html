@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- GitHub Pages serves this with a 10-minute cache, and phones hold it far
+     longer. Without these, people keep seeing an old copy after an update and
+     report wrong numbers that were fixed days ago. A hard refresh
+     (Ctrl+Shift+R) still beats everything if a stale copy does stick. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Pumps</title>
 <style>
   :root{
@@ -133,14 +140,17 @@ let timer = null;
 
 const $ = id => document.getElementById(id);
 
-function fmtAge(ms){
+// The clock time the meter actually reported, not how long ago that was.
+// Anything from an earlier day keeps its date so an old reading cannot be
+// mistaken for today's.
+function fmtClock(ms){
   if (ms == null) return 'unknown';
-  const m = Math.round(ms / 60000);
-  if (m < 1) return 'just now';
-  if (m < 90) return m + ' min ago';
-  const h = m / 60;
-  if (h < 48) return h.toFixed(1) + ' h ago';
-  return (h / 24).toFixed(1) + ' days ago';
+  const d = new Date(ms);
+  if (isNaN(d)) return 'unknown';
+  const hhmm = String(d.getHours()).padStart(2, '0') + ':' +
+               String(d.getMinutes()).padStart(2, '0');
+  if (d.toDateString() === new Date().toDateString()) return hhmm;
+  return d.getDate() + ' ' + d.toLocaleString(undefined, { month: 'short' }) + ' ' + hhmm;
 }
 
 function fmtFor(min){
@@ -192,7 +202,7 @@ function render(j){
 
   $('tRunning').textContent = j.running;
   $('tRunningNote').textContent = 'of ' + j.total + ' meters';
-  $('tSeen').textContent = newest ? fmtAge(Date.now() - newest) : '–';
+  $('tSeen').textContent = newest ? fmtClock(newest) : '–';
 
   // --- combined take against its consented rate ---
   // Always WaterMetrics' own figure for the Combi consent, never a sum of the
@@ -251,8 +261,8 @@ function render(j){
     return '<div class="pump' + (m.running ? '' : ' isoff') + '">' +
       '<span class="dot ' + cls + '"></span>' +
       '<div><div class="nm">' + esc(m.name) + '</div>' +
-      '<div class="meta">' + state + forBit + ' &middot; read ' +
-        (m.readingTime ? fmtAge(Date.now() - m.readingTime) : 'unknown') +
+      '<div class="meta">' + state + forBit + ' &middot; read at ' +
+        fmtClock(m.readingTime) +
         (hasC ? ' &middot; ' + pct.toFixed(0) + '% of its ' + m.consentLs.toFixed(0) +
                 ' l/s consent' : '') + '</div>' +
       (hasC ? '<div class="bar"><i class="' + band(pct) +
